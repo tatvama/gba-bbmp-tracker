@@ -17,6 +17,7 @@ import {
   Smartphone,
   ScanLine,
   Construction,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,6 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/corporations", label: "Corporations", icon: Building2, group: "main" },
   { href: "/explorer", label: "Tree Map", icon: LayoutGrid, group: "main" },
   { href: "/contacts", label: "Contacts", icon: Users, group: "main" },
+  { href: "/officers", label: "Officers", icon: Network, group: "main" },
 
   { href: "/rti", label: "RTI Dashboard", icon: FileText, group: "rti" },
   { href: "/rti/all", label: "All RTIs", icon: Files, group: "rti" },

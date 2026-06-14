@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { CORP_NAME, CORPORATION_CODES } from "@/lib/constants";
+import { CORP_NAME, CORPORATION_CODES, COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
 import { getDeadlineRules } from "@/lib/settings";
 import { activeDeadline } from "@/lib/rti-deadlines";
 import type {
@@ -28,6 +28,7 @@ import type {
   ComplaintReply,
   ComplaintActionTaken,
   OcrJob,
+  OfficerTransfer,
 } from "@/lib/types";
 
 /**
@@ -1152,4 +1153,107 @@ export async function rtiDashboardStats(): Promise<RtiDashboardStats> {
       stats.secondAppealsDue++;
   }
   return stats;
+}
+
+// ==========================================================================
+// Officer accountability (hierarchy, transfers, scorecard)
+// ==========================================================================
+
+const OFFICER_SELECT =
+  "*, corporation:corporations!corporation_id(id,code,name), division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), reporting_officer:contacts!reporting_officer_id(id,full_name,designation)";
+
+export type OfficerRow = ContactWithRelations & {
+  reporting_officer?: { id: string; full_name: string; designation: string } | null;
+};
+
+/** All officers (contacts), with relations + reporting line, for the hierarchy. */
+export async function listOfficers(): Promise<OfficerRow[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select(OFFICER_SELECT)
+    .order("full_name");
+  logErr("listOfficers", error);
+  return (data as unknown as OfficerRow[]) ?? [];
+}
+
+export async function getOfficer(id: string): Promise<OfficerRow | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select(OFFICER_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getOfficer", error);
+  return (data as unknown as OfficerRow) ?? null;
+}
+
+/** Officers who report to this officer. */
+export async function listDirectReports(officerId: string): Promise<OfficerRow[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select(OFFICER_SELECT)
+    .eq("reporting_officer_id", officerId)
+    .order("full_name");
+  logErr("listDirectReports", error);
+  return (data as unknown as OfficerRow[]) ?? [];
+}
+
+export async function listOfficerTransfers(officerId: string): Promise<OfficerTransfer[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("officer_transfers")
+    .select("*")
+    .eq("officer_id", officerId)
+    .order("effective_date", { ascending: false, nullsFirst: false });
+  logErr("listOfficerTransfers", error);
+  return (data as OfficerTransfer[]) ?? [];
+}
+
+export interface OfficerScorecard {
+  complaintsTotal: number;
+  complaintsOpen: number;
+  complaintsOverdue: number;
+  rtisLinked: number;
+  transfers: number;
+}
+
+/** Accountability counts for one officer (assigned complaints + linked RTIs). */
+export async function getOfficerScorecard(officerId: string): Promise<OfficerScorecard> {
+  const supabase = await sb();
+  const today = new Date().toISOString().slice(0, 10);
+  const assignedOr = `assigned_engineer_id.eq.${officerId},assigned_officer_id.eq.${officerId}`;
+
+  const num = async (q: PromiseLike<{ count: number | null; error: unknown }>) => {
+    const { count, error } = await q;
+    logErr("officerScorecard", error);
+    return count ?? 0;
+  };
+
+  const [complaintsTotal, complaintsOpen, complaintsOverdue, rtisLinked, transfers] =
+    await Promise.all([
+      num(supabase.from("complaints").select("*", { count: "exact", head: true }).is("deleted_at", null).or(assignedOr)),
+      num(
+        supabase
+          .from("complaints")
+          .select("*", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .or(assignedOr)
+          .in("status", COMPLAINT_OPEN_STATUSES as unknown as string[]),
+      ),
+      num(
+        supabase
+          .from("complaints")
+          .select("*", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .or(assignedOr)
+          .in("status", COMPLAINT_OPEN_STATUSES as unknown as string[])
+          .lt("next_follow_up_date", today),
+      ),
+      num(supabase.from("rti_applications").select("*", { count: "exact", head: true }).eq("contact_id", officerId)),
+      num(supabase.from("officer_transfers").select("*", { count: "exact", head: true }).eq("officer_id", officerId)),
+    ]);
+
+  return { complaintsTotal, complaintsOpen, complaintsOverdue, rtisLinked, transfers };
 }

@@ -318,3 +318,20 @@ export const contactImportRowSchema = z.object({
   source: z.preprocess(emptyToUndef, z.string().trim().optional()),
 });
 export type ContactImportRow = z.infer<typeof contactImportRowSchema>;
+
+// Officer transfer (TransferHistory) ----------------------------------------
+export const officerTransferSchema = z.object({
+  prevCorporation: optText,
+  prevDivision: optText,
+  prevSubdivision: optText,
+  prevWard: optText,
+  newCorporation: optText,
+  newDivision: optText,
+  newSubdivision: optText,
+  newWard: optText,
+  transferOrderNo: optText,
+  transferOrderDate: optDate,
+  effectiveDate: optDate,
+  sourceDocument: optText,
+  notes: optText,
+});
