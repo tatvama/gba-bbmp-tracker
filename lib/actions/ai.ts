@@ -16,7 +16,11 @@ import {
 } from "@/lib/ai/prompts";
 import {
   buildRoadWorkLetterPrompt,
+  buildRoadWorkReplyAnalysisPrompt,
+  buildRoadWorkEscalationPrompt,
   type RoadWorkLetterInput,
+  type RoadWorkReplyInput,
+  type RoadWorkEscalationInput,
 } from "@/lib/ai/road-work-knowledge";
 
 export interface AiResult {
@@ -71,6 +75,64 @@ export async function generateRoadWorkLetter(input: RoadWorkLetterInput): Promis
     return { ok: false, error: "Provide a short summary or upload a work order first." };
   }
   const { system, prompt } = buildRoadWorkLetterPrompt(input);
+  const r = await generateText({ system, prompt, maxTokens: 4000 });
+  return { ok: r.ok, text: r.text, error: r.error };
+}
+
+// ── Road-work reply analysis + escalation ──────────────────────────────────
+
+export interface RoadWorkReplyPoint {
+  request: string;
+  section: string;
+  status: string;
+  replyExtract: string;
+  appealGround: string;
+}
+export interface RoadWorkReplyAnalysis {
+  points: RoadWorkReplyPoint[];
+  overall: {
+    complete: boolean;
+    missingSections: string[];
+    escalationRecommended: boolean;
+    summary: string;
+  };
+}
+export interface RoadWorkReplyResult {
+  ok: boolean;
+  analysis?: RoadWorkReplyAnalysis;
+  raw?: string;
+  error?: string;
+}
+
+/** Analyze a BBMP reply against the road-work framework (RTI or complaint). */
+export async function analyzeRoadWorkReply(
+  input: RoadWorkReplyInput & { outputType?: "rti" | "complaint" },
+): Promise<RoadWorkReplyResult> {
+  const roles = input.outputType === "complaint" ? COMPLAINT_WRITE_ROLES : RTI_WRITE_ROLES;
+  const denied = await gate(roles);
+  if (denied) return { ok: false, error: denied.error };
+  if (!input.replyText.trim()) return { ok: false, error: "Paste the reply text first." };
+  if (!input.originalRequests.trim()) return { ok: false, error: "Paste what you originally asked for." };
+
+  const { system, prompt } = buildRoadWorkReplyAnalysisPrompt(input);
+  const r = await generateText({ system, prompt, temperature: 0, maxTokens: 3000 });
+  if (!r.ok) return { ok: false, error: r.error };
+
+  const cleaned = (r.text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  try {
+    const analysis = JSON.parse(cleaned) as RoadWorkReplyAnalysis;
+    return { ok: true, analysis, raw: r.text };
+  } catch {
+    return { ok: true, raw: r.text, error: "Could not parse structured output; showing raw text." };
+  }
+}
+
+/** Draft a first appeal / escalation from the reply gaps. */
+export async function generateRoadWorkEscalation(input: RoadWorkEscalationInput): Promise<AiResult> {
+  const roles = input.outputType === "complaint" ? COMPLAINT_WRITE_ROLES : RTI_WRITE_ROLES;
+  const denied = await gate(roles);
+  if (denied) return denied;
+  const { system, prompt } = buildRoadWorkEscalationPrompt(input);
   const r = await generateText({ system, prompt, maxTokens: 4000 });
   return { ok: r.ok, text: r.text, error: r.error };
 }

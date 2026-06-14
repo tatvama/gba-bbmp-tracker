@@ -328,3 +328,100 @@ export function buildRoadWorkLetterPrompt(input: RoadWorkLetterInput): {
 
   return { system: ROAD_WORK_SYSTEM_PROMPT, prompt: lines.join("\n") };
 }
+
+// ── reply analyzer ───────────────────────────────────────────────────────────
+
+export interface RoadWorkReplyInput {
+  /** The original requests / letter the citizen sent (or a list of points). */
+  originalRequests: string;
+  /** The authority's reply text. */
+  replyText: string;
+  language?: RoadWorkLanguage;
+}
+
+/** Analyze a BBMP reply against the road-work framework. Returns STRICT JSON. */
+export function buildRoadWorkReplyAnalysisPrompt(input: RoadWorkReplyInput): {
+  system: string;
+  prompt: string;
+} {
+  const system = `You analyse BBMP / GBA replies to road-work RTI applications and complaints, using the road-work inspection framework. You are precise and conservative: if a point is not clearly and fully answered with the actual record, do NOT mark it "Answered". Map each point to the framework section it belongs to. Output STRICT JSON only — no prose, no markdown.
+
+${ROAD_WORK_KNOWLEDGE_TEXT}`;
+
+  const prompt = `Original requests / letter sent by the citizen:
+"""
+${input.originalRequests.slice(0, 8000)}
+"""
+
+BBMP / authority reply text:
+"""
+${input.replyText.slice(0, 8000)}
+"""
+
+For each distinct request/point, return an object:
+- "request": the point (short)
+- "section": the framework section it maps to (e.g. "A — KW-4 Insurance", "G — MB Book"), or "Other"
+- "status": one of "Answered" | "Partial" | "Dodged" | "Denied" | "Not addressed"
+- "replyExtract": the relevant snippet of the reply (or "")
+- "appealGround": a short first-appeal/escalation ground if deficient, else ""
+
+Also assess overall: is the reply complete, which framework sections are still missing, and is escalation (first appeal / complaint) recommended.
+
+Return JSON of EXACTLY this shape:
+{"points":[{"request":"","section":"","status":"","replyExtract":"","appealGround":""}],"overall":{"complete":false,"missingSections":[],"escalationRecommended":false,"summary":""}}`;
+
+  return { system, prompt };
+}
+
+// ── escalation drafting ──────────────────────────────────────────────────────
+
+export interface RoadWorkEscalationInput {
+  outputType: RoadWorkOutputType;
+  language: RoadWorkLanguage;
+  /** Subject / reference of the original RTI or complaint. */
+  reference?: string | null;
+  originalRequests?: string | null;
+  replyText?: string | null;
+  /** The deficient points / missing sections from the analysis. */
+  gaps?: string | null;
+  applicantName?: string | null;
+}
+
+/** Draft a first appeal (RTI) or escalation complaint from the reply gaps. */
+export function buildRoadWorkEscalationPrompt(input: RoadWorkEscalationInput): {
+  system: string;
+  prompt: string;
+} {
+  const isRti = input.outputType === "rti";
+  const docLine = isRti
+    ? "Draft a FIRST APPEAL under Section 19(1) of the Right to Information Act, 2005, to the First Appellate Authority, because the PIO's reply is deficient."
+    : "Draft an ESCALATION COMPLAINT to the higher authority (Chief Engineer / Commissioner, copy Lokayukta where appropriate), because the earlier complaint reply is unsatisfactory.";
+
+  const lines: string[] = [
+    docLine,
+    "",
+    scopeNote,
+    "",
+    "--- KNOWLEDGE BASE ---",
+    ROAD_WORK_KNOWLEDGE_TEXT,
+    "--- END KNOWLEDGE BASE ---",
+    "",
+    "--- CASE ---",
+    input.reference ? `Original reference / subject: ${input.reference}` : "",
+    input.originalRequests ? `Originally requested:\n${input.originalRequests.slice(0, 4000)}` : "",
+    input.replyText ? `Authority's reply received:\n${input.replyText.slice(0, 4000)}` : "",
+    input.gaps ? `Deficiencies / points still unanswered:\n${input.gaps}` : "",
+    input.applicantName ? `Applicant: ${input.applicantName}` : "",
+    "--- END CASE ---",
+    "",
+    isRti
+      ? "Cite Section 19(1), list each unanswered point as a numbered ground, and request the FAA to direct the PIO to furnish the complete records and to consider penalty under Section 20."
+      : "List each unresolved point, request an inquiry, fixing of officer liability, and action under the Prevention of Corruption Act 1988 / BNS 2023 where warranted.",
+    languageLine(input.language),
+  ].filter(Boolean);
+
+  return { system: ROAD_WORK_SYSTEM_PROMPT, prompt: lines.join("\n") };
+}
+
+const scopeNote =
+  "Reference only the framework points that remain unanswered. Cite legal provisions and case law only from the knowledge base; never invent case numbers (flag [verify citation before filing] where marked).";

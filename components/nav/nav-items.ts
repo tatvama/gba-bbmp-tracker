@@ -18,6 +18,7 @@ import {
   ScanLine,
   Construction,
   Network,
+  ScanSearch,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/rti/all", label: "All RTIs", icon: Files, group: "rti" },
   { href: "/rti/new", label: "New RTI", icon: FilePlus2, group: "rti" },
   { href: "/rti/road-work", label: "Road Work RTI", icon: Construction, group: "rti" },
+  { href: "/rti/road-work/analyze", label: "Reply Analyzer", icon: ScanSearch, group: "rti" },
   { href: "/rti/calendar", label: "RTI Calendar", icon: CalendarClock, group: "rti" },
   { href: "/rti/reports", label: "RTI Reports", icon: BarChart3, group: "rti" },
   { href: "/rti/settings", label: "RTI Settings", icon: SlidersHorizontal, group: "rti" },
