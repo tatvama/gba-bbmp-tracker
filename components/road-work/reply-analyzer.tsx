@@ -90,7 +90,7 @@ export function RoadWorkReplyAnalyzer({ aiConfigured }: { aiConfigured: boolean 
             placeholder="Paste the RTI/complaint letter or the list of points you requested." />
         </div>
         <div>
-          <Label htmlFor="reply" className="mb-1.5 block text-sm font-medium">BBMP's reply</Label>
+          <Label htmlFor="reply" className="mb-1.5 block text-sm font-medium">Reply received from BBMP</Label>
           <Textarea id="reply" rows={8} value={replyText} onChange={(e) => setReplyText(e.target.value)}
             placeholder="Paste the authority's reply text (or OCR of the reply letter)." />
         </div>

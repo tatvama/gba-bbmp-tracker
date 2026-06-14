@@ -1257,3 +1257,144 @@ export async function getOfficerScorecard(officerId: string): Promise<OfficerSco
 
   return { complaintsTotal, complaintsOpen, complaintsOverdue, rtisLinked, transfers };
 }
+
+// ==========================================================================
+// Notifications digest + public case status
+// ==========================================================================
+
+export interface NotificationDigest {
+  generatedAt: string;
+  overdueRtis: { id: string; ref: string | null; subject: string; due: string; label: string }[];
+  overdueComplaints: { id: string; caseNumber: string | null; title: string; followUp: string | null }[];
+  dueReminders: { id: string; title: string; dueDate: string | null; entityType: string; entityId: string | null }[];
+  counts: { overdueRtis: number; overdueComplaints: number; dueReminders: number };
+}
+
+/** Everything currently due/overdue — for the scheduled notification job. */
+export async function getNotificationDigest(): Promise<NotificationDigest> {
+  const supabase = await sb();
+  const rules = await getDeadlineRules();
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+
+  const [rtiRes, cmpRes, remRes] = await Promise.all([
+    supabase
+      .from("rti_applications")
+      .select("id, internal_ref, subject, status, is_life_liberty, normal_due, life_liberty_due, first_appeal_due, second_appeal_due")
+      .neq("status", "Closed"),
+    supabase
+      .from("complaints")
+      .select("id, internal_case_number, title, next_follow_up_date, status")
+      .is("deleted_at", null)
+      .in("status", COMPLAINT_OPEN_STATUSES as unknown as string[])
+      .lt("next_follow_up_date", today)
+      .order("next_follow_up_date"),
+    supabase
+      .from("reminders")
+      .select("id, title, due_date, entity_type, entity_id, status")
+      .eq("status", "Pending")
+      .lte("due_date", today)
+      .order("due_date"),
+  ]);
+  logErr("digest:rti", rtiRes.error);
+  logErr("digest:complaints", cmpRes.error);
+  logErr("digest:reminders", remRes.error);
+
+  const overdueRtis = (rtiRes.data ?? [])
+    .map((r: Record<string, unknown>) => {
+      const active = activeDeadline(r as Parameters<typeof activeDeadline>[0], now, rules);
+      return active && (active.bucket === "overdue" || active.bucket === "critical-overdue")
+        ? { id: r.id as string, ref: (r.internal_ref as string) ?? null, subject: r.subject as string, due: active.due, label: active.label }
+        : null;
+    })
+    .filter(Boolean) as NotificationDigest["overdueRtis"];
+
+  const overdueComplaints = (cmpRes.data ?? []).map((c: Record<string, unknown>) => ({
+    id: c.id as string,
+    caseNumber: (c.internal_case_number as string) ?? null,
+    title: c.title as string,
+    followUp: (c.next_follow_up_date as string) ?? null,
+  }));
+
+  const dueReminders = (remRes.data ?? []).map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    title: r.title as string,
+    dueDate: (r.due_date as string) ?? null,
+    entityType: r.entity_type as string,
+    entityId: (r.entity_id as string) ?? null,
+  }));
+
+  return {
+    generatedAt: now.toISOString(),
+    overdueRtis,
+    overdueComplaints,
+    dueReminders,
+    counts: {
+      overdueRtis: overdueRtis.length,
+      overdueComplaints: overdueComplaints.length,
+      dueReminders: dueReminders.length,
+    },
+  };
+}
+
+export interface PublicCaseStatus {
+  kind: "complaint" | "rti";
+  ref: string | null;
+  title: string;
+  status: string;
+  ward: string | null;
+  dates: { label: string; value: string }[];
+}
+
+/** Sanitised, no-login status of a complaint or RTI by UUID (for share links). */
+export async function getPublicCaseStatus(id: string): Promise<PublicCaseStatus | null> {
+  const supabase = await sb();
+
+  const { data: c } = await supabase
+    .from("complaints")
+    .select("internal_case_number, title, status, date_submitted, latest_reply_date, latest_action_taken_date, next_follow_up_date, ward:wards!ward_id(new_no,new_name)")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (c) {
+    const row = c as Record<string, unknown>;
+    const ward = row.ward as { new_no?: number; new_name?: string } | null;
+    return {
+      kind: "complaint",
+      ref: (row.internal_case_number as string) ?? null,
+      title: row.title as string,
+      status: row.status as string,
+      ward: ward ? `${ward.new_no} — ${ward.new_name}` : null,
+      dates: [
+        { label: "Submitted", value: (row.date_submitted as string) ?? "—" },
+        { label: "Latest reply", value: (row.latest_reply_date as string) ?? "—" },
+        { label: "Action taken", value: (row.latest_action_taken_date as string) ?? "—" },
+        { label: "Next follow-up", value: (row.next_follow_up_date as string) ?? "—" },
+      ],
+    };
+  }
+
+  const { data: r } = await supabase
+    .from("rti_applications")
+    .select("internal_ref, subject, status, date_filed, normal_due, first_appeal_due, ward:wards!ward_id(new_no,new_name)")
+    .eq("id", id)
+    .maybeSingle();
+  if (r) {
+    const row = r as Record<string, unknown>;
+    const ward = row.ward as { new_no?: number; new_name?: string } | null;
+    return {
+      kind: "rti",
+      ref: (row.internal_ref as string) ?? null,
+      title: row.subject as string,
+      status: row.status as string,
+      ward: ward ? `${ward.new_no} — ${ward.new_name}` : null,
+      dates: [
+        { label: "Filed", value: (row.date_filed as string) ?? "—" },
+        { label: "Reply due", value: (row.normal_due as string) ?? "—" },
+        { label: "First appeal due", value: (row.first_appeal_due as string) ?? "—" },
+      ],
+    };
+  }
+
+  return null;
+}
