@@ -3,7 +3,7 @@
  *
  * Transport: stdio (works with Claude Desktop, Claude Code, any MCP client).
  * Auth: Supabase service-role key (bypasses RLS — trusted server-side process).
- * Read-only: no mutation tools (no user session auth in MCP context).
+ * Write tools use the admin client directly (no user-session needed); created_by = null.
  *
  * Usage:
  *   npm run mcp:start          # from project root (loads .env automatically)
@@ -20,6 +20,9 @@
 // dotenv/config MUST be first — loads .env before any other import reads process.env
 import "dotenv/config";
 
+import fs from "node:fs";
+import path from "node:path";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createClient } from "@supabase/supabase-js";
@@ -29,8 +32,11 @@ import { z } from "zod";
 import { activeDeadline } from "../lib/rti-deadlines";
 import {
   COMPLAINT_OPEN_STATUSES,
+  COMPLAINT_STATUSES,
+  COMPLAINT_TYPES,
   CORPORATION_CODES,
   DEFAULT_DEADLINE_RULES,
+  PRIORITIES,
 } from "../lib/constants";
 
 // ── Environment validation ──────────────────────────────────────────────────
@@ -726,6 +732,400 @@ server.registerTool(
     }
 
     return ok({ contact: data, wards_covered: wards });
+  },
+);
+
+// ════════════════════════════════════════════════════════════════════════════
+// WRITE TOOLS (11–14)  — use admin client; created_by = null (system)
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── slug helper for storage paths ───────────────────────────────────────────
+function slugPath(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+}
+
+// ── MIME detection from file extension ──────────────────────────────────────
+const EXT_MIME: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".pdf": "application/pdf",
+};
+
+function mimeFromPath(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  return EXT_MIME[ext] ?? "application/octet-stream";
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 11: create_complaint
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "create_complaint",
+  {
+    description:
+      "Create a new BBMP complaint case. Returns the auto-generated internal case number (e.g. DM-CMP-2026-000042).",
+    inputSchema: {
+      title: z.string().min(3).describe("Complaint title — brief description of the issue"),
+      type: z.enum(COMPLAINT_TYPES).describe(
+        "Complaint type. E.g. 'Road', 'Drain', 'Garbage', 'Streetlight', 'Building Violation'",
+      ),
+      description: z.string().optional().describe("Detailed description of the complaint"),
+      priority: z.enum(PRIORITIES).optional().describe("Low | Medium | High | Urgent"),
+      status: z
+        .enum(COMPLAINT_STATUSES)
+        .optional()
+        .default("Draft")
+        .describe("Initial status. Defaults to 'Draft'. Use 'Filed' if already submitted to BBMP."),
+      ward_number: z.number().int().optional().describe("BBMP ward number (1–225) — auto-links corporation & division"),
+      location: z.string().optional().describe("Street address or landmark description"),
+      notes: z.string().optional().describe("Internal notes visible only to team"),
+    },
+  },
+  async ({ title, type, description, priority, status = "Draft", ward_number, location, notes }) => {
+    // 1. Ward lookup
+    let wardId: string | null = null;
+    let corpId: string | null = null;
+    let divisionId: string | null = null;
+
+    if (ward_number) {
+      const { data: ward } = await supabase
+        .from("wards")
+        .select("id, derived_corporation_id, division_id")
+        .eq("new_no", ward_number)
+        .maybeSingle();
+      if (ward) {
+        wardId = (ward as Record<string, unknown>).id as string;
+        corpId = (ward as Record<string, unknown>).derived_corporation_id as string | null;
+        divisionId = (ward as Record<string, unknown>).division_id as string | null;
+      }
+    }
+
+    // 2. Complaint settings (case number prefix)
+    const { data: settingsRow } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "complaint_settings")
+      .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const settings: any = settingsRow?.value ?? {};
+    const prefix: string = settings.caseNumberPrefix ?? "DM-CMP";
+    const year = new Date().getFullYear();
+
+    // 3. Generate atomic case number
+    const { data: caseNum, error: rpcErr } = await supabase.rpc(
+      "next_complaint_case_number",
+      { prefix, year },
+    );
+    logErr("create_complaint:rpc", rpcErr);
+    if (!caseNum) return err("Failed to generate case number — check DB migration");
+
+    // 4. Insert complaint
+    const { data: inserted, error: insertErr } = await supabase
+      .from("complaints")
+      .insert({
+        title,
+        type,
+        description: description ?? null,
+        priority: priority ?? null,
+        status,
+        ward_id: wardId,
+        corporation_id: corpId,
+        division_id: divisionId,
+        location: location ?? null,
+        notes: notes ?? null,
+        internal_case_number: caseNum,
+        created_by: null,
+        updated_by: null,
+      })
+      .select("id, internal_case_number, title, type, status")
+      .single();
+    logErr("create_complaint:insert", insertErr);
+    if (!inserted) return err("Failed to insert complaint");
+
+    // 5. Timeline entry
+    await supabase.from("complaint_timeline").insert({
+      complaint_id: (inserted as Record<string, unknown>).id,
+      event_type: "Created",
+      description: "Case created via BBMP MCP server",
+      created_by: null,
+    });
+
+    return ok({
+      message: "Complaint created successfully",
+      id: (inserted as Record<string, unknown>).id,
+      internal_case_number: (inserted as Record<string, unknown>).internal_case_number,
+      title: (inserted as Record<string, unknown>).title,
+      type: (inserted as Record<string, unknown>).type,
+      status: (inserted as Record<string, unknown>).status,
+      ward_number: ward_number ?? null,
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 12: upload_document
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "upload_document",
+  {
+    description:
+      "Upload a local file (photo, letter, PDF) to a BBMP complaint. Supports jpg/png/webp/pdf. Set run_ocr=true to queue OCR for text extraction.",
+    inputSchema: {
+      complaint_id: z.string().uuid().describe("Complaint UUID (from create_complaint or get_complaint)"),
+      file_path: z
+        .string()
+        .describe(
+          "Absolute local path to the file. E.g. C:/letters/bbmp-reply.jpg or /home/user/docs/letter.pdf",
+        ),
+      document_type: z
+        .string()
+        .optional()
+        .describe(
+          "Document category. E.g. 'Original complaint copy', 'Department reply', 'Action Taken Report', 'Site photos', 'WhatsApp screenshot'",
+        ),
+      title: z.string().optional().describe("Human-readable title for this document"),
+      description: z.string().optional(),
+      as_evidence: z
+        .boolean()
+        .optional()
+        .describe("If true, stores in evidence bucket (for site photos, proof). Default: false."),
+      run_ocr: z
+        .boolean()
+        .optional()
+        .describe("Queue OCR on upload. Extracted text will be available in the Documents tab. Default: false."),
+    },
+  },
+  async ({ complaint_id, file_path, document_type, title, description, as_evidence, run_ocr }) => {
+    // 1. Read file
+    if (!fs.existsSync(file_path)) {
+      return err(`File not found: ${file_path}`);
+    }
+    const buffer = fs.readFileSync(file_path);
+    const mime = mimeFromPath(file_path);
+    const fileName = path.basename(file_path);
+
+    // 2. Bucket selection
+    const isSitePhoto = document_type?.toLowerCase().startsWith("site photo") ?? false;
+    const bucket = as_evidence || isSitePhoto ? "complaint-evidence" : "complaint-documents";
+
+    // 3. Storage path
+    const storagePath = `${complaint_id}/${Date.now()}-${slugPath(fileName)}`;
+
+    // 4. Upload to Supabase Storage
+    const { error: uploadErr } = await supabase.storage
+      .from(bucket)
+      .upload(storagePath, buffer, { contentType: mime, upsert: false });
+    logErr("upload_document:storage", uploadErr);
+    if (uploadErr) return err(`Storage upload failed: ${uploadErr.message}`);
+
+    // 5. Determine OCR status
+    const isPdf = mime === "application/pdf";
+    const ocrStatus = run_ocr && !isPdf ? "Queued" : "Not Started";
+
+    // 6. Insert document record
+    const { data: doc, error: docErr } = await supabase
+      .from("complaint_documents")
+      .insert({
+        complaint_id,
+        document_type: document_type ?? null,
+        title: title ?? fileName,
+        description: description ?? null,
+        original_file_name: fileName,
+        storage_bucket: bucket,
+        storage_path: storagePath,
+        mime_type: mime,
+        file_size: buffer.length,
+        ocr_status: ocrStatus,
+        uploaded_by: null,
+      })
+      .select("id")
+      .single();
+    logErr("upload_document:insert", docErr);
+    if (!doc) return err("Document metadata save failed");
+
+    const docId = (doc as Record<string, unknown>).id as string;
+
+    // 7. Timeline entry
+    await supabase.from("complaint_timeline").insert({
+      complaint_id,
+      event_type: isSitePhoto ? "Photo Evidence" : "Document Uploaded",
+      description: `Uploaded: ${title ?? fileName}${document_type ? ` (${document_type})` : ""}`,
+      created_by: null,
+    });
+
+    return ok({
+      message: "Document uploaded successfully",
+      document_id: docId,
+      bucket,
+      storage_path: storagePath,
+      file_name: fileName,
+      mime_type: mime,
+      file_size_kb: Math.round(buffer.length / 1024),
+      ocr_status: ocrStatus,
+      ocr_note:
+        ocrStatus === "Queued"
+          ? "OCR queued — view results in the web app under Documents tab or /complaints/ocr-queue"
+          : run_ocr && isPdf
+            ? "OCR skipped for PDFs — trigger manually from the web UI"
+            : undefined,
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 13: update_complaint_status
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "update_complaint_status",
+  {
+    description:
+      "Update the status of a BBMP complaint and add an optional note to the timeline.",
+    inputSchema: {
+      complaint_id: z.string().uuid().describe("Complaint UUID"),
+      status: z.enum(COMPLAINT_STATUSES).describe(
+        "New status. E.g. 'Filed', 'Under Review', 'Resolved', 'Escalated', 'Closed'",
+      ),
+      notes: z
+        .string()
+        .optional()
+        .describe("Optional note to record alongside the status change"),
+      next_follow_up_date: z
+        .string()
+        .optional()
+        .describe("YYYY-MM-DD — set or update the follow-up reminder date"),
+    },
+  },
+  async ({ complaint_id, status, notes, next_follow_up_date }) => {
+    // 1. Fetch existing to get current status
+    const { data: existing, error: fetchErr } = await supabase
+      .from("complaints")
+      .select("id, status, title")
+      .eq("id", complaint_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    logErr("update_status:fetch", fetchErr);
+    if (!existing) return err(`Complaint ${complaint_id} not found`);
+
+    const oldStatus = (existing as Record<string, unknown>).status as string;
+
+    // 2. Update
+    const updatePayload: Record<string, unknown> = { status, updated_by: null };
+    if (next_follow_up_date) updatePayload.next_follow_up_date = next_follow_up_date;
+
+    const { error: updateErr } = await supabase
+      .from("complaints")
+      .update(updatePayload)
+      .eq("id", complaint_id);
+    logErr("update_status:update", updateErr);
+    if (updateErr) return err(`Update failed: ${updateErr.message}`);
+
+    // 3. Timeline entry
+    const timelineDesc = [
+      `Status changed: ${oldStatus} → ${status}`,
+      notes ? `Note: ${notes}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    await supabase.from("complaint_timeline").insert({
+      complaint_id,
+      event_type: "Status Change",
+      description: timelineDesc,
+      created_by: null,
+    });
+
+    return ok({
+      ok: true,
+      id: complaint_id,
+      title: (existing as Record<string, unknown>).title,
+      old_status: oldStatus,
+      new_status: status,
+      next_follow_up_date: next_follow_up_date ?? null,
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 14: add_complaint_reply
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "add_complaint_reply",
+  {
+    description:
+      "Record a reply received from BBMP/authority on a complaint. Updates the complaint's latest reply date and optionally sets the next follow-up.",
+    inputSchema: {
+      complaint_id: z.string().uuid().describe("Complaint UUID"),
+      summary: z
+        .string()
+        .min(5)
+        .describe("Summary of the reply — what did the authority say or confirm?"),
+      reply_date: z
+        .string()
+        .optional()
+        .describe("Date the reply was received (YYYY-MM-DD). Defaults to today."),
+      satisfaction: z
+        .enum([
+          "Satisfied",
+          "Partially Satisfied",
+          "Unsatisfied",
+          "False Information",
+          "Incomplete Information",
+          "No Information",
+        ])
+        .optional()
+        .describe("Was the reply satisfactory?"),
+      next_follow_up_date: z
+        .string()
+        .optional()
+        .describe("YYYY-MM-DD — when to follow up if reply was incomplete"),
+    },
+  },
+  async ({ complaint_id, summary, reply_date, satisfaction, next_follow_up_date }) => {
+    const date = reply_date ?? new Date().toISOString().slice(0, 10);
+
+    // 1. Insert reply record
+    const { error: replyErr } = await supabase.from("complaint_replies").insert({
+      complaint_id,
+      reply_summary: summary,
+      reply_date: date,
+      satisfaction_status: satisfaction ?? null,
+      created_by: null,
+    });
+    logErr("add_reply:insert", replyErr);
+    if (replyErr) return err(`Failed to save reply: ${replyErr.message}`);
+
+    // 2. Update complaint's latest reply fields
+    const complaintUpdate: Record<string, unknown> = {
+      latest_reply_summary: summary,
+      latest_reply_date: date,
+      updated_by: null,
+    };
+    if (next_follow_up_date) complaintUpdate.next_follow_up_date = next_follow_up_date;
+
+    await supabase.from("complaints").update(complaintUpdate).eq("id", complaint_id);
+
+    // 3. Timeline entry
+    await supabase.from("complaint_timeline").insert({
+      complaint_id,
+      event_type: "Reply Received",
+      description: `Reply on ${date}: ${summary.slice(0, 120)}${summary.length > 120 ? "…" : ""}`,
+      created_by: null,
+    });
+
+    return ok({
+      ok: true,
+      complaint_id,
+      reply_date: date,
+      satisfaction: satisfaction ?? null,
+      next_follow_up_date: next_follow_up_date ?? null,
+      summary_preview: summary.slice(0, 100),
+    });
   },
 );
 
