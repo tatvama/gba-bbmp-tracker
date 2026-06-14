@@ -1,0 +1,95 @@
+{
+ "source": "GBA 5 City Corporation Division & Sub-Division Details (Memo 06-03-2026)",
+ "total_wards": 369,
+ "total_divisions": 50,
+ "total_subdivisions": 150,
+ "corporations": [
+  {
+   "code": "KENDRA",
+   "name": "Bengaluru Central",
+   "name_kn": "केंद΁",
+   "wards": 63,
+   "divisions": 7,
+   "subdivisions": 24,
+   "annexure": "01",
+   "assembly_constituencies": [
+    "161-C.V. Raman Nagar",
+    "162-Shivajinagar",
+    "163-Shanthinagar",
+    "164-Gandhinagar",
+    "168-Chamarajpet",
+    "169-Chickpet"
+   ],
+   "ward_list": []
+  },
+  {
+   "code": "PURVA",
+   "name": "Bengaluru East",
+   "name_kn": "पूर्व",
+   "wards": 50,
+   "divisions": 7,
+   "subdivisions": 22,
+   "annexure": "02",
+   "assembly_constituencies": [
+    "151-Krishnarajapuram",
+    "174-Mahadevapura"
+   ],
+   "ward_list": []
+  },
+  {
+   "code": "PASHCHIMA",
+   "name": "Bengaluru West",
+   "name_kn": "पश्चिम",
+   "wards": 112,
+   "divisions": 15,
+   "subdivisions": 45,
+   "annexure": "03",
+   "assembly_constituencies": [
+    "153-Yeshwantpur",
+    "154-Rajarajeshwari Nagar",
+    "155-Dasarahalli",
+    "156-Mahalakshmi Layout",
+    "157-Malleswaram",
+    "165-Rajajinagar",
+    "166-Govindarajanagar",
+    "167-Vijayanagar",
+    "170-Basavanagudi",
+    "171-Padmanabhanagar"
+   ],
+   "ward_list": []
+  },
+  {
+   "code": "UTTARA",
+   "name": "Bengaluru North",
+   "name_kn": "उत्तर",
+   "wards": 72,
+   "divisions": 11,
+   "subdivisions": 30,
+   "annexure": "04",
+   "assembly_constituencies": [
+    "150-Yelahanka",
+    "152-Byatarayanapura",
+    "158-Hebbala",
+    "159-Pulikeshinagar",
+    "160-Sarvagananagar"
+   ],
+   "ward_list": []
+  },
+  {
+   "code": "DAKSHINA",
+   "name": "Bengaluru South",
+   "name_kn": "दक्षिण",
+   "wards": 72,
+   "divisions": 10,
+   "subdivisions": 29,
+   "annexure": "05",
+   "assembly_constituencies": [
+    "172-B.T.M. Layout",
+    "173-Jayanagar",
+    "175-Bommanahalli",
+    "176-Bengaluru South"
+   ],
+   "ward_list": []
+  }
+ ]
+}

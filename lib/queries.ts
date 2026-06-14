@@ -1,0 +1,1155 @@
+import "server-only";
+import { createClient } from "@/lib/supabase/server";
+import { CORP_NAME, CORPORATION_CODES } from "@/lib/constants";
+import { getDeadlineRules } from "@/lib/settings";
+import { activeDeadline } from "@/lib/rti-deadlines";
+import type {
+  Contact,
+  ContactWithRelations,
+  Corporation,
+  Division,
+  EngSubDivision,
+  Ward,
+  WardWithRelations,
+  Complaint,
+  AuditLog,
+  SourceDocument,
+  RtiApplication,
+  RtiWithRelations,
+  RtiFirstAppeal,
+  RtiSecondAppeal,
+  Template,
+  AiDraft,
+  Reminder,
+  CommunicationLog,
+  ComplaintWithRelations,
+  ComplaintDocument,
+  ComplaintTimelineEntry,
+  ComplaintReply,
+  ComplaintActionTaken,
+  OcrJob,
+} from "@/lib/types";
+
+/**
+ * All read queries hit RLS-public tables (anon key is fine). Each is wrapped so
+ * a missing table / pre-migration DB yields an empty result + a server log,
+ * never a crashed page.
+ */
+async function sb() {
+  return createClient();
+}
+
+function logErr(where: string, error: unknown) {
+  if (error) console.error(`[queries:${where}]`, error);
+}
+
+const WARD_SELECT =
+  "*, division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name,sl_no), derived_corporation:corporations!derived_corporation_id(id,code,name)";
+
+const CONTACT_SELECT =
+  "*, corporation:corporations!corporation_id(id,code,name), division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name)";
+
+// --------------------------------------------------------------------------
+// Dashboard
+// --------------------------------------------------------------------------
+export interface DashboardStats {
+  corporations: number;
+  gbaWards: number;
+  bbmp225Wards: number;
+  old198Represented: number;
+  divisions: number;
+  subdivisions: number;
+  contacts: number;
+  verified: number;
+  pending: number;
+  missingContactInfo: number;
+  wardsWithoutContact: number;
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const supabase = await sb();
+  const count = async (table: string, mod?: (q: any) => any) => {
+    let q = supabase.from(table).select("*", { count: "exact", head: true });
+    if (mod) q = mod(q);
+    const { count: c, error } = await q;
+    logErr(`count:${table}`, error);
+    return c ?? 0;
+  };
+
+  const [corporations, bbmp225Wards, divisions, subdivisions, contacts, verified, pending] =
+    await Promise.all([
+      count("corporations"),
+      count("wards"),
+      count("divisions"),
+      count("eng_subdivisions"),
+      count("contacts"),
+      count("contacts", (q) => q.eq("verification_status", "VERIFIED")),
+      count("contacts", (q) => q.eq("verification_status", "PENDING")),
+    ]);
+
+  // GBA wards = sum of corporation ward_count (369)
+  const { data: corps } = await supabase.from("corporations").select("ward_count");
+  const gbaWards = (corps ?? []).reduce(
+    (s: number, c: { ward_count: number }) => s + (c.ward_count ?? 0),
+    0,
+  );
+
+  // Old-198 represented = distinct old_wards entries across all wards
+  const { data: oldRows } = await supabase.from("wards").select("old_wards");
+  const oldSet = new Set<string>();
+  for (const r of (oldRows ?? []) as { old_wards: string[] }[])
+    for (const o of r.old_wards ?? []) oldSet.add(o);
+
+  const missingContactInfo = await count("contacts", (q) =>
+    q.or("phone.is.null,email.is.null,office_address.is.null"),
+  );
+
+  // wards whose eng sub-division has no contact
+  const { data: subWithContact } = await supabase
+    .from("contacts")
+    .select("eng_subdivision_id")
+    .not("eng_subdivision_id", "is", null);
+  const subsCovered = new Set(
+    (subWithContact ?? []).map((r: { eng_subdivision_id: string }) => r.eng_subdivision_id),
+  );
+  const { data: wardSubs } = await supabase.from("wards").select("eng_subdivision_id");
+  const wardsWithoutContact = (wardSubs ?? []).filter(
+    (w: { eng_subdivision_id: string | null }) =>
+      !w.eng_subdivision_id || !subsCovered.has(w.eng_subdivision_id),
+  ).length;
+
+  return {
+    corporations,
+    gbaWards,
+    bbmp225Wards,
+    old198Represented: oldSet.size,
+    divisions,
+    subdivisions,
+    contacts,
+    verified,
+    pending,
+    missingContactInfo,
+    wardsWithoutContact,
+  };
+}
+
+export async function getRecentlyUpdated(limit = 8): Promise<Contact[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  logErr("recentlyUpdated", error);
+  return (data as Contact[]) ?? [];
+}
+
+export async function getNeedsVerification(limit = 8): Promise<Contact[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("*")
+    .in("verification_status", ["PENDING", "NEEDS_CORRECTION", "UNKNOWN"])
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  logErr("needsVerification", error);
+  return (data as Contact[]) ?? [];
+}
+
+// --------------------------------------------------------------------------
+// Wards
+// --------------------------------------------------------------------------
+export async function listWards(): Promise<WardWithRelations[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("wards")
+    .select(WARD_SELECT)
+    .order("new_no", { ascending: true });
+  logErr("listWards", error);
+  return (data as unknown as WardWithRelations[]) ?? [];
+}
+
+export async function getWard(newNo: number): Promise<WardWithRelations | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("wards")
+    .select(WARD_SELECT)
+    .eq("new_no", newNo)
+    .maybeSingle();
+  logErr("getWard", error);
+  return (data as unknown as WardWithRelations) ?? null;
+}
+
+// --------------------------------------------------------------------------
+// Corporations / Divisions / Sub-divisions
+// --------------------------------------------------------------------------
+export async function listCorporations(): Promise<Corporation[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase.from("corporations").select("*").order("name");
+  logErr("listCorporations", error);
+  return (data as Corporation[]) ?? [];
+}
+
+export async function getCorporation(code: string): Promise<Corporation | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("corporations")
+    .select("*")
+    .eq("code", code.toUpperCase())
+    .maybeSingle();
+  logErr("getCorporation", error);
+  return (data as Corporation) ?? null;
+}
+
+export interface GbaWardRow {
+  ward_no: number;
+  ward_name_en: string;
+  ward_name_kn: string | null;
+  legible: boolean;
+  division: string;
+  subdivision: string;
+  assembly_constituency: string | null;
+}
+
+export interface GbaSubDivision {
+  name: string;
+  wards: GbaWardRow[];
+}
+export interface GbaDivision {
+  name: string;
+  assembly_constituency: string | null;
+  subdivisions: GbaSubDivision[];
+  wardCount: number;
+}
+
+/** GBA per-corporation breakdown (division → sub-division → wards), from public.gba_wards. */
+export async function getGbaStructure(code: string): Promise<GbaDivision[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("gba_wards")
+    .select("ward_no, ward_name_en, ward_name_kn, legible, division, subdivision, assembly_constituency")
+    .eq("corporation_code", code.toUpperCase())
+    .order("ward_no");
+  logErr("getGbaStructure", error);
+  const rows = (data as GbaWardRow[]) ?? [];
+
+  const divMap = new Map<string, GbaDivision>();
+  for (const r of rows) {
+    let d = divMap.get(r.division);
+    if (!d) {
+      d = { name: r.division, assembly_constituency: r.assembly_constituency, subdivisions: [], wardCount: 0 };
+      divMap.set(r.division, d);
+    }
+    let s = d.subdivisions.find((x) => x.name === r.subdivision);
+    if (!s) {
+      s = { name: r.subdivision, wards: [] };
+      d.subdivisions.push(s);
+    }
+    s.wards.push(r);
+    d.wardCount++;
+  }
+  return Array.from(divMap.values());
+}
+
+// --------------------------------------------------------------------------
+// GBA hierarchy tree (for the interactive Tree Map) — all 5 corporations,
+// nested Corporation → Division → Sub-division → Ward, from public.gba_wards.
+// --------------------------------------------------------------------------
+export interface GbaTreeWard {
+  no: number;
+  name: string;
+  kn: string | null;
+  legible: boolean;
+  extra?: string; // BBMP mode: old 198-ward names that merged into this ward
+}
+export interface GbaTreeSub {
+  name: string;
+  wardCount: number;
+  wards: GbaTreeWard[];
+}
+export interface GbaTreeDiv {
+  name: string;
+  ac: string | null;
+  wardCount: number;
+  subdivisions: GbaTreeSub[];
+}
+export interface GbaTreeCorp {
+  code: string;
+  name: string;
+  wardCount: number;
+  divisionCount: number;
+  subdivisionCount: number;
+  divisions: GbaTreeDiv[];
+}
+
+export async function getGbaTree(): Promise<GbaTreeCorp[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("gba_wards")
+    .select(
+      "corporation_code, ward_no, ward_name_en, ward_name_kn, legible, division, subdivision, assembly_constituency",
+    )
+    .order("ward_no");
+  logErr("getGbaTree", error);
+  const rows = (data as (GbaWardRow & { corporation_code: string })[]) ?? [];
+
+  const corpMap = new Map<string, GbaTreeCorp>();
+  for (const r of rows) {
+    let corp = corpMap.get(r.corporation_code);
+    if (!corp) {
+      corp = {
+        code: r.corporation_code,
+        name: CORP_NAME[r.corporation_code] ?? r.corporation_code,
+        wardCount: 0,
+        divisionCount: 0,
+        subdivisionCount: 0,
+        divisions: [],
+      };
+      corpMap.set(r.corporation_code, corp);
+    }
+    let div = corp.divisions.find((d) => d.name === r.division);
+    if (!div) {
+      div = { name: r.division, ac: r.assembly_constituency, wardCount: 0, subdivisions: [] };
+      corp.divisions.push(div);
+    }
+    let sub = div.subdivisions.find((s) => s.name === r.subdivision);
+    if (!sub) {
+      sub = { name: r.subdivision, wardCount: 0, wards: [] };
+      div.subdivisions.push(sub);
+    }
+    sub.wards.push({ no: r.ward_no, name: r.ward_name_en, kn: r.ward_name_kn, legible: r.legible });
+    sub.wardCount++;
+    div.wardCount++;
+    corp.wardCount++;
+  }
+
+  for (const corp of corpMap.values()) {
+    corp.divisionCount = corp.divisions.length;
+    corp.subdivisionCount = corp.divisions.reduce((s, d) => s + d.subdivisions.length, 0);
+  }
+
+  // Canonical corporation order.
+  return CORPORATION_CODES.map((code) => corpMap.get(code)).filter(
+    (c): c is GbaTreeCorp => Boolean(c),
+  );
+}
+
+export async function getBbmpTree(): Promise<GbaTreeCorp[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("wards")
+    .select(
+      "new_no, new_name, old_wards, division:divisions!division_id(name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name), derived_corporation:corporations!derived_corporation_id(code)",
+    )
+    .order("new_no");
+  logErr("getBbmpTree", error);
+
+  const rows = (
+    (data as unknown) as {
+      new_no: number;
+      new_name: string;
+      old_wards: string[] | null;
+      division: { name: string } | null;
+      eng_subdivision: { name: string } | null;
+      derived_corporation: { code: string } | null;
+    }[]
+  ) ?? [];
+
+  const corpMap = new Map<string, GbaTreeCorp>();
+  for (const r of rows) {
+    const corpCode = r.derived_corporation?.code;
+    const divName = r.division?.name;
+    const subName = r.eng_subdivision?.name;
+    if (!corpCode || !divName || !subName) continue;
+
+    let corp = corpMap.get(corpCode);
+    if (!corp) {
+      corp = {
+        code: corpCode,
+        name: CORP_NAME[corpCode] ?? corpCode,
+        wardCount: 0,
+        divisionCount: 0,
+        subdivisionCount: 0,
+        divisions: [],
+      };
+      corpMap.set(corpCode, corp);
+    }
+    let div = corp.divisions.find((d) => d.name === divName);
+    if (!div) {
+      div = { name: divName, ac: null, wardCount: 0, subdivisions: [] };
+      corp.divisions.push(div);
+    }
+    let sub = div.subdivisions.find((s) => s.name === subName);
+    if (!sub) {
+      sub = { name: subName, wardCount: 0, wards: [] };
+      div.subdivisions.push(sub);
+    }
+    const oldInfo = r.old_wards?.length ? r.old_wards.join(" · ") : undefined;
+    sub.wards.push({ no: r.new_no, name: r.new_name, kn: null, legible: true, extra: oldInfo });
+    sub.wardCount++;
+    div.wardCount++;
+    corp.wardCount++;
+  }
+
+  for (const corp of corpMap.values()) {
+    corp.divisionCount = corp.divisions.length;
+    corp.subdivisionCount = corp.divisions.reduce((s, d) => s + d.subdivisions.length, 0);
+  }
+
+  return CORPORATION_CODES.map((code) => corpMap.get(code)).filter(
+    (c): c is GbaTreeCorp => Boolean(c),
+  );
+}
+
+export async function listDivisions(): Promise<
+  (Division & { corporation?: Pick<Corporation, "code" | "name"> | null })[]
+> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("divisions")
+    .select("*, corporation:corporations!corporation_id(code,name)")
+    .order("name");
+  logErr("listDivisions", error);
+  return (data as any) ?? [];
+}
+
+export async function getDivision(id: string) {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("divisions")
+    .select("*, corporation:corporations!corporation_id(id,code,name)")
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getDivision", error);
+  return (data as any) ?? null;
+}
+
+export async function listSubDivisions(): Promise<
+  (EngSubDivision & { division?: Pick<Division, "id" | "name"> | null })[]
+> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("eng_subdivisions")
+    .select("*, division:divisions!division_id(id,name)")
+    .order("sl_no", { ascending: true, nullsFirst: false });
+  logErr("listSubDivisions", error);
+  return (data as any) ?? [];
+}
+
+export async function getSubDivision(id: string) {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("eng_subdivisions")
+    .select("*, division:divisions!division_id(id,name,corporation_id)")
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getSubDivision", error);
+  return (data as any) ?? null;
+}
+
+export async function listWardsForSubDivision(subId: string): Promise<Ward[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("wards")
+    .select("*")
+    .eq("eng_subdivision_id", subId)
+    .order("new_no");
+  logErr("wardsForSub", error);
+  return (data as Ward[]) ?? [];
+}
+
+export async function listWardsForDivision(divisionId: string): Promise<Ward[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("wards")
+    .select("*")
+    .eq("division_id", divisionId)
+    .order("new_no");
+  logErr("wardsForDivision", error);
+  return (data as Ward[]) ?? [];
+}
+
+export async function listSubDivisionsForDivision(divisionId: string): Promise<EngSubDivision[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("eng_subdivisions")
+    .select("*")
+    .eq("division_id", divisionId)
+    .order("sl_no", { nullsFirst: false });
+  logErr("subsForDivision", error);
+  return (data as EngSubDivision[]) ?? [];
+}
+
+// --------------------------------------------------------------------------
+// Contacts
+// --------------------------------------------------------------------------
+export async function listContacts(): Promise<ContactWithRelations[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select(CONTACT_SELECT)
+    .order("full_name");
+  logErr("listContacts", error);
+  return (data as unknown as ContactWithRelations[]) ?? [];
+}
+
+export async function getContact(id: string): Promise<ContactWithRelations | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select(CONTACT_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getContact", error);
+  return (data as unknown as ContactWithRelations) ?? null;
+}
+
+export async function listContactsForSubDivision(subId: string): Promise<Contact[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("*")
+    .eq("eng_subdivision_id", subId);
+  logErr("contactsForSub", error);
+  return (data as Contact[]) ?? [];
+}
+
+export async function listContactsForCorporation(corpId: string): Promise<Contact[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("*")
+    .eq("corporation_id", corpId)
+    .order("full_name");
+  logErr("contactsForCorp", error);
+  return (data as Contact[]) ?? [];
+}
+
+// --------------------------------------------------------------------------
+// Complaints / Sources / Audit
+// --------------------------------------------------------------------------
+const COMPLAINT_SELECT =
+  "*, ward:wards!ward_id(id,new_no,new_name), division:divisions!division_id(id,name), corporation:corporations!corporation_id(id,code,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), assigned_engineer:contacts!assigned_engineer_id(id,full_name,designation,phone,whatsapp,email), assigned_officer:contacts!assigned_officer_id(id,full_name,designation)";
+
+export async function listComplaints(): Promise<ComplaintWithRelations[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaints")
+    .select(COMPLAINT_SELECT)
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false });
+  logErr("listComplaints", error);
+  return (data as unknown as ComplaintWithRelations[]) ?? [];
+}
+
+export async function listComplaintsForWard(wardId: string): Promise<Complaint[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaints")
+    .select("*")
+    .eq("ward_id", wardId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  logErr("complaintsForWard", error);
+  return (data as Complaint[]) ?? [];
+}
+
+export async function listSources(): Promise<SourceDocument[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase.from("source_documents").select("*").order("title");
+  logErr("listSources", error);
+  return (data as SourceDocument[]) ?? [];
+}
+
+export async function listAuditLogs(
+  filter?: { entityType?: string; entityId?: string },
+  limit = 200,
+): Promise<AuditLog[]> {
+  const supabase = await sb();
+  let q = supabase.from("audit_logs").select("*").order("changed_at", { ascending: false }).limit(limit);
+  if (filter?.entityType) q = q.eq("entity_type", filter.entityType);
+  if (filter?.entityId) q = q.eq("entity_id", filter.entityId);
+  const { data, error } = await q;
+  logErr("listAuditLogs", error);
+  return (data as AuditLog[]) ?? [];
+}
+
+// --------------------------------------------------------------------------
+// Global search (grouped)
+// --------------------------------------------------------------------------
+export interface SearchResults {
+  wards: WardWithRelations[];
+  contacts: ContactWithRelations[];
+  divisions: Division[];
+  subdivisions: (EngSubDivision & { division?: Pick<Division, "id" | "name"> | null })[];
+  complaints: Complaint[];
+  gbaWards: GbaWardSearchRow[];
+}
+
+export interface GbaWardSearchRow {
+  corporation_code: string;
+  ward_no: number;
+  ward_name_en: string;
+  division: string;
+  subdivision: string;
+}
+
+export async function globalSearch(q: string): Promise<SearchResults> {
+  const supabase = await sb();
+  const term = q.trim();
+  if (!term) return { wards: [], contacts: [], divisions: [], subdivisions: [], complaints: [], gbaWards: [] };
+  const like = `%${term}%`;
+  const numeric = /^\d+$/.test(term) ? Number(term) : null;
+
+  const wardOr = [
+    `new_name.ilike.${like}`,
+    `assembly_constituency.ilike.${like}`,
+    `zone.ilike.${like}`,
+    `old_subdiv.ilike.${like}`,
+    ...(numeric !== null ? [`new_no.eq.${numeric}`] : []),
+  ].join(",");
+
+  const gbaOr = [
+    `ward_name_en.ilike.${like}`,
+    `subdivision.ilike.${like}`,
+    `division.ilike.${like}`,
+  ].join(",");
+
+  const [wards, contacts, divisions, subdivisions, complaints, gbaWards] = await Promise.all([
+    supabase.from("wards").select(WARD_SELECT).or(wardOr).order("new_no").limit(25),
+    supabase
+      .from("contacts")
+      .select(CONTACT_SELECT)
+      .or(`full_name.ilike.${like},designation.ilike.${like},phone.ilike.${like},email.ilike.${like}`)
+      .limit(25),
+    supabase.from("divisions").select("*").ilike("name", like).limit(25),
+    supabase
+      .from("eng_subdivisions")
+      .select("*, division:divisions!division_id(id,name)")
+      .ilike("name", like)
+      .limit(25),
+    supabase
+      .from("complaints")
+      .select("*")
+      .or(`title.ilike.${like},complaint_number.ilike.${like},internal_case_number.ilike.${like},rti_number.ilike.${like},latest_reply_summary.ilike.${like}`)
+      .is("deleted_at", null)
+      .limit(25),
+    supabase
+      .from("gba_wards")
+      .select("corporation_code, ward_no, ward_name_en, division, subdivision")
+      .or(gbaOr)
+      .limit(25),
+  ]);
+
+  logErr("search:wards", wards.error);
+  logErr("search:contacts", contacts.error);
+  return {
+    wards: (wards.data as unknown as WardWithRelations[]) ?? [],
+    contacts: (contacts.data as unknown as ContactWithRelations[]) ?? [],
+    divisions: (divisions.data as Division[]) ?? [],
+    subdivisions: (subdivisions.data as any) ?? [],
+    complaints: (complaints.data as Complaint[]) ?? [],
+    gbaWards: (gbaWards.data as GbaWardSearchRow[]) ?? [],
+  };
+}
+
+export async function listDivisionsForCorporation(corpId: string): Promise<Division[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("divisions")
+    .select("*")
+    .eq("corporation_id", corpId)
+    .order("name");
+  logErr("divisionsForCorp", error);
+  return (data as Division[]) ?? [];
+}
+
+export async function countDerivedWards(corpId: string): Promise<number> {
+  const supabase = await sb();
+  const { count, error } = await supabase
+    .from("wards")
+    .select("*", { count: "exact", head: true })
+    .eq("derived_corporation_id", corpId);
+  logErr("countDerivedWards", error);
+  return count ?? 0;
+}
+
+export async function getComplaintFormOptions() {
+  const supabase = await sb();
+  const [corps, divs, wards, subs, contacts] = await Promise.all([
+    supabase.from("corporations").select("id,code,name").order("name"),
+    supabase.from("divisions").select("id,name").order("name"),
+    supabase.from("wards").select("id,new_no,new_name").order("new_no"),
+    supabase.from("eng_subdivisions").select("id,name").order("name"),
+    supabase.from("contacts").select("id,full_name,designation").order("full_name"),
+  ]);
+  return {
+    corporations: (corps.data as { id: string; code: string; name: string }[]) ?? [],
+    divisions: (divs.data as { id: string; name: string }[]) ?? [],
+    wards: (wards.data as { id: string; new_no: number; new_name: string }[]) ?? [],
+    subdivisions: (subs.data as { id: string; name: string }[]) ?? [],
+    contacts: (contacts.data as { id: string; full_name: string; designation: string }[]) ?? [],
+  };
+}
+
+/** Lightweight options for select inputs (forms / filters). */
+export async function getFormOptions() {
+  const supabase = await sb();
+  const [corps, divs, subs] = await Promise.all([
+    supabase.from("corporations").select("id,code,name").order("name"),
+    supabase.from("divisions").select("id,name").order("name"),
+    supabase.from("eng_subdivisions").select("id,name").order("name"),
+  ]);
+  return {
+    corporations: (corps.data as { id: string; code: string; name: string }[]) ?? [],
+    divisions: (divs.data as { id: string; name: string }[]) ?? [],
+    subdivisions: (subs.data as { id: string; name: string }[]) ?? [],
+  };
+}
+
+// ==========================================================================
+// Phase 2 — RTI lifecycle
+// ==========================================================================
+
+const RTI_SELECT =
+  "*, corporation:corporations!corporation_id(id,code,name), division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), ward:wards!ward_id(id,new_no,new_name), contact:contacts!contact_id(id,full_name,designation)";
+
+export async function listRtis(): Promise<RtiWithRelations[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_applications")
+    .select(RTI_SELECT)
+    .order("updated_at", { ascending: false });
+  logErr("listRtis", error);
+  return (data as unknown as RtiWithRelations[]) ?? [];
+}
+
+export async function getRti(id: string): Promise<RtiWithRelations | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_applications")
+    .select(RTI_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getRti", error);
+  return (data as unknown as RtiWithRelations) ?? null;
+}
+
+/** Options for the RTI wizard / form selects. */
+export async function getRtiFormOptions() {
+  const supabase = await sb();
+  const [corps, divs, subs, wards, contacts] = await Promise.all([
+    supabase.from("corporations").select("id,code,name").order("name"),
+    supabase.from("divisions").select("id,name").order("name"),
+    supabase.from("eng_subdivisions").select("id,name").order("name"),
+    supabase.from("wards").select("id,new_no,new_name").order("new_no"),
+    supabase.from("contacts").select("id,full_name,designation").order("full_name"),
+  ]);
+  return {
+    corporations: (corps.data as { id: string; code: string; name: string }[]) ?? [],
+    divisions: (divs.data as { id: string; name: string }[]) ?? [],
+    subdivisions: (subs.data as { id: string; name: string }[]) ?? [],
+    wards: (wards.data as { id: string; new_no: number; new_name: string }[]) ?? [],
+    contacts:
+      (contacts.data as { id: string; full_name: string; designation: string }[]) ?? [],
+  };
+}
+
+export async function listFirstAppeals(rtiId: string): Promise<RtiFirstAppeal[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_first_appeals")
+    .select("*")
+    .eq("rti_id", rtiId)
+    .order("created_at", { ascending: false });
+  logErr("listFirstAppeals", error);
+  return (data as RtiFirstAppeal[]) ?? [];
+}
+
+export async function listSecondAppeals(rtiId: string): Promise<RtiSecondAppeal[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_second_appeals")
+    .select("*")
+    .eq("rti_id", rtiId)
+    .order("created_at", { ascending: false });
+  logErr("listSecondAppeals", error);
+  return (data as RtiSecondAppeal[]) ?? [];
+}
+
+export async function listAllFirstAppeals(): Promise<RtiFirstAppeal[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_first_appeals")
+    .select("*")
+    .order("created_at", { ascending: false });
+  logErr("listAllFirstAppeals", error);
+  return (data as RtiFirstAppeal[]) ?? [];
+}
+
+export async function listAllSecondAppeals(): Promise<RtiSecondAppeal[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_second_appeals")
+    .select("*")
+    .order("created_at", { ascending: false });
+  logErr("listAllSecondAppeals", error);
+  return (data as RtiSecondAppeal[]) ?? [];
+}
+
+export async function listRtiTemplates(kind?: string): Promise<Template[]> {
+  const supabase = await sb();
+  let q = supabase.from("templates").select("*").eq("active", true).order("title");
+  if (kind) q = q.eq("kind", kind);
+  const { data, error } = await q;
+  logErr("listRtiTemplates", error);
+  return (data as Template[]) ?? [];
+}
+
+export async function listAiDrafts(
+  entityType: string,
+  entityId: string,
+): Promise<AiDraft[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("ai_drafts")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false });
+  logErr("listAiDrafts", error);
+  return (data as AiDraft[]) ?? [];
+}
+
+export async function listCommunications(
+  entityType: string,
+  entityId: string,
+): Promise<CommunicationLog[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("communication_logs")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("occurred_at", { ascending: false });
+  logErr("listCommunications", error);
+  return (data as CommunicationLog[]) ?? [];
+}
+
+export async function listRemindersForEntity(
+  entityType: string,
+  entityId: string,
+): Promise<Reminder[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("due_date", { ascending: true, nullsFirst: false });
+  logErr("listRemindersForEntity", error);
+  return (data as Reminder[]) ?? [];
+}
+
+/** Pending RTI reminders soonest-first (RTI dashboard "urgent follow-ups"). */
+export async function listUpcomingRtiReminders(limit = 8): Promise<Reminder[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("entity_type", "rti")
+    .eq("status", "Pending")
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .limit(limit);
+  logErr("listUpcomingRtiReminders", error);
+  return (data as Reminder[]) ?? [];
+}
+
+export interface RtiDashboardStats {
+  total: number;
+  draft: number;
+  filed: number;
+  awaitingReply: number;
+  replyReceived: number;
+  firstAppealsDue: number;
+  secondAppealsDue: number;
+  overdue: number;
+  urgentLifeLiberty: number;
+  needsReview: number;
+  incompleteReply: number;
+  closed: number;
+}
+
+// ==========================================================================
+// Phase 3 — Advanced Complaint Management
+// ==========================================================================
+
+export async function getComplaint(id: string): Promise<ComplaintWithRelations | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaints")
+    .select(COMPLAINT_SELECT)
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  logErr("getComplaint", error);
+  return (data as unknown as ComplaintWithRelations) ?? null;
+}
+
+export async function listComplaintDocuments(complaintId: string): Promise<ComplaintDocument[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaint_documents")
+    .select("*")
+    .eq("complaint_id", complaintId)
+    .order("uploaded_at", { ascending: false });
+  logErr("listComplaintDocuments", error);
+  return (data as ComplaintDocument[]) ?? [];
+}
+
+export async function getComplaintDocument(id: string): Promise<ComplaintDocument | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaint_documents")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getComplaintDocument", error);
+  return (data as ComplaintDocument) ?? null;
+}
+
+export async function listComplaintTimeline(complaintId: string): Promise<ComplaintTimelineEntry[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaint_timeline")
+    .select("*")
+    .eq("complaint_id", complaintId)
+    .order("event_date", { ascending: false });
+  logErr("listComplaintTimeline", error);
+  return (data as ComplaintTimelineEntry[]) ?? [];
+}
+
+export async function listComplaintReplies(complaintId: string): Promise<ComplaintReply[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaint_replies")
+    .select("*")
+    .eq("complaint_id", complaintId)
+    .order("created_at", { ascending: false });
+  logErr("listComplaintReplies", error);
+  return (data as ComplaintReply[]) ?? [];
+}
+
+export async function listComplaintActions(complaintId: string): Promise<ComplaintActionTaken[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaint_action_taken")
+    .select("*")
+    .eq("complaint_id", complaintId)
+    .order("created_at", { ascending: false });
+  logErr("listComplaintActions", error);
+  return (data as ComplaintActionTaken[]) ?? [];
+}
+
+export async function listComplaintCommunications(complaintId: string): Promise<CommunicationLog[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("communication_logs")
+    .select("*")
+    .eq("entity_type", "complaint")
+    .eq("entity_id", complaintId)
+    .order("occurred_at", { ascending: false });
+  logErr("listComplaintCommunications", error);
+  return (data as CommunicationLog[]) ?? [];
+}
+
+export async function listComplaintReminders(complaintId: string): Promise<Reminder[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("entity_type", "complaint")
+    .eq("entity_id", complaintId)
+    .order("due_date", { ascending: true, nullsFirst: false });
+  logErr("listComplaintReminders", error);
+  return (data as Reminder[]) ?? [];
+}
+
+export async function listComplaintEscalations(complaintId: string) {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("escalation_logs")
+    .select("*")
+    .eq("entity_type", "complaint")
+    .eq("entity_id", complaintId)
+    .order("created_at", { ascending: false });
+  logErr("listComplaintEscalations", error);
+  return (data as Record<string, unknown>[]) ?? [];
+}
+
+export async function listComplaintAiDrafts(complaintId: string): Promise<AiDraft[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("ai_drafts")
+    .select("*")
+    .eq("entity_type", "complaint")
+    .eq("entity_id", complaintId)
+    .order("created_at", { ascending: false });
+  logErr("listComplaintAiDrafts", error);
+  return (data as AiDraft[]) ?? [];
+}
+
+/** OCR jobs joined with their document's title/complaint for the admin queue. */
+export async function listOcrJobs(): Promise<(OcrJob & { document?: { id: string; title: string | null; complaint_id: string; ocr_status: string } | null })[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("ocr_jobs")
+    .select("*, document:complaint_documents!document_id(id,title,complaint_id,ocr_status)")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  logErr("listOcrJobs", error);
+  return (data as unknown as (OcrJob & { document?: { id: string; title: string | null; complaint_id: string; ocr_status: string } | null })[]) ?? [];
+}
+
+/** Documents joined with their complaint, for OCR/review reports. */
+export async function listComplaintDocsForReports(): Promise<
+  (ComplaintDocument & { complaint?: { id: string; title: string; internal_case_number: string | null } | null })[]
+> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaint_documents")
+    .select("*, complaint:complaints!complaint_id(id,title,internal_case_number)")
+    .order("uploaded_at", { ascending: false })
+    .limit(1000);
+  logErr("listComplaintDocsForReports", error);
+  return (data as unknown as (ComplaintDocument & { complaint?: { id: string; title: string; internal_case_number: string | null } | null })[]) ?? [];
+}
+
+export interface ComplaintDashboardStats {
+  total: number;
+  filedThisMonth: number;
+  pending: number;
+  overdue: number;
+  repliesReceived: number;
+  actionTaken: number;
+  noReply: number;
+  followUpsDueToday: number;
+  escalationsPending: number;
+  ocrPending: number;
+  lowConfidenceOcr: number;
+  needsManualReview: number;
+}
+
+export async function complaintDashboardStats(): Promise<ComplaintDashboardStats> {
+  const supabase = await sb();
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + "01";
+  const OPEN = [
+    "Draft", "Filed", "Acknowledged", "Under Review", "Assigned To Engineer",
+    "Site Visit Pending", "Site Visit Done", "Work In Progress", "Reply Received",
+    "Action Taken Report Received", "Partially Resolved", "Reopened", "Escalated",
+    "No Response", "Overdue",
+  ];
+  const count = async (table: string, mod?: (q: any) => any) => {
+    let q = supabase.from(table).select("*", { count: "exact", head: true });
+    if (mod) q = mod(q);
+    const { count: c, error } = await q;
+    logErr(`count:${table}`, error);
+    return c ?? 0;
+  };
+  const notDeleted = (q: any) => q.is("deleted_at", null);
+
+  const [
+    total, filedThisMonth, pending, overdue, repliesReceived, actionTaken,
+    followUpsDueToday, escalationsPending, ocrPending, lowConfidenceOcr, needsManualReview, noReply,
+  ] = await Promise.all([
+    count("complaints", notDeleted),
+    count("complaints", (q) => notDeleted(q).gte("date_submitted", monthStart)),
+    count("complaints", (q) => notDeleted(q).in("status", OPEN)),
+    count("complaints", (q) => notDeleted(q).in("status", OPEN).lt("next_follow_up_date", today)),
+    count("complaints", (q) => notDeleted(q).not("latest_reply_date", "is", null)),
+    count("complaints", (q) => notDeleted(q).not("latest_action_taken_date", "is", null)),
+    count("complaints", (q) => notDeleted(q).eq("next_follow_up_date", today)),
+    count("complaints", (q) => notDeleted(q).eq("status", "Escalated")),
+    count("complaint_documents", (q) => q.in("ocr_status", ["Not Started", "Queued", "Processing"])),
+    count("complaint_documents", (q) => q.eq("ocr_status", "Needs Manual Review")),
+    count("complaint_documents", (q) => q.in("verification_status", ["Pending Review", "Low Confidence", "Needs Correction"])),
+    count("complaints", (q) => notDeleted(q).is("latest_reply_date", null).in("status", ["Filed", "Acknowledged", "Under Review", "Assigned To Engineer"])),
+  ]);
+
+  return {
+    total, filedThisMonth, pending, overdue, repliesReceived, actionTaken, noReply,
+    followUpsDueToday, escalationsPending, ocrPending, lowConfidenceOcr, needsManualReview,
+  };
+}
+
+export async function rtiDashboardStats(): Promise<RtiDashboardStats> {
+  const supabase = await sb();
+  const rules = await getDeadlineRules();
+  const { data, error } = await supabase
+    .from("rti_applications")
+    .select(
+      "status, priority, is_life_liberty, satisfaction_status, normal_due, life_liberty_due, first_appeal_due, second_appeal_due",
+    );
+  logErr("rtiDashboardStats", error);
+  const rows = (data as RtiApplication[]) ?? [];
+  const now = new Date();
+
+  const stats: RtiDashboardStats = {
+    total: rows.length,
+    draft: 0,
+    filed: 0,
+    awaitingReply: 0,
+    replyReceived: 0,
+    firstAppealsDue: 0,
+    secondAppealsDue: 0,
+    overdue: 0,
+    urgentLifeLiberty: 0,
+    needsReview: 0,
+    incompleteReply: 0,
+    closed: 0,
+  };
+
+  const overdueBuckets = new Set(["overdue", "critical-overdue"]);
+  const dueBuckets = new Set(["overdue", "critical-overdue", "due-today", "due-soon"]);
+
+  for (const r of rows) {
+    switch (r.status) {
+      case "Draft":
+      case "Ready to File":
+        stats.draft++;
+        break;
+      case "Filed":
+        stats.filed++;
+        break;
+      case "Awaiting Reply":
+        stats.awaitingReply++;
+        break;
+      case "Reply Received":
+      case "Partial Reply":
+        stats.replyReceived++;
+        break;
+      case "Closed":
+        stats.closed++;
+        break;
+    }
+    if (
+      r.satisfaction_status === "Partially Satisfied" ||
+      r.satisfaction_status === "Incomplete Information" ||
+      r.status === "Partial Reply"
+    ) {
+      stats.incompleteReply++;
+    }
+    if (["Rejected", "No Reply", "Partial Reply", "Reply Received"].includes(r.status))
+      stats.needsReview++;
+    if (r.is_life_liberty && r.status !== "Closed") stats.urgentLifeLiberty++;
+
+    const active = activeDeadline(r, now, rules);
+    if (active && overdueBuckets.has(active.bucket)) stats.overdue++;
+    if (active?.label === "First appeal" && dueBuckets.has(active.bucket))
+      stats.firstAppealsDue++;
+    if (active?.label === "Second appeal" && dueBuckets.has(active.bucket))
+      stats.secondAppealsDue++;
+  }
+  return stats;
+}

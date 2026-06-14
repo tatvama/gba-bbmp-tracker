@@ -1,0 +1,185 @@
+import "server-only";
+import { generateText, isAiConfigured } from "@/lib/ai/provider";
+import type { ComplaintExtraction } from "@/lib/types";
+import {
+  COMPLAINT_DRAFT_KINDS,
+  type ComplaintDraftKind,
+  type DraftLanguage,
+  type LegalTone,
+} from "@/lib/constants";
+
+export type { ComplaintDraftKind };
+
+/**
+ * AI analysis of an uploaded complaint document's OCR text. Returns STRUCTURED
+ * extraction for the human review screen. Env-gated: with no AI key it returns a
+ * "needs manual review" placeholder so the workflow still completes and the user
+ * can fill the fields by hand. NEVER applies anything to a complaint directly.
+ */
+
+const ANALYZER_SYSTEM = `You analyse scanned civic-complaint documents (BBMP / GBA, Bengaluru) — complaint copies, acknowledgements, department/engineer replies, Action Taken Reports, postal receipts, site notes. The text comes from OCR and may contain errors.
+
+Rules:
+1. Use ONLY what is present in the OCR text + provided context. Never invent names, numbers, dates, or actions.
+2. If the reply is unclear, set replyGiven to "Reply appears unclear / needs manual review".
+3. If no clear action is visible, set actionTaken to "No clear action taken found in document".
+4. If dates are uncertain, leave them empty and add a note in summary asking the user to verify.
+5. Do not make unsupported allegations.
+6. Set confidence to "Low" and needsManualReview to true whenever the OCR text is short, garbled, or ambiguous.
+7. Output STRICT JSON only — no prose, no markdown fences.`;
+
+function buildAnalysisPrompt(input: {
+  ocrText: string;
+  documentType?: string | null;
+  complaintContext?: string;
+  userNotes?: string;
+}): string {
+  return `Document type (claimed): ${input.documentType ?? "unknown"}
+
+Complaint context:
+${input.complaintContext ?? "(none provided)"}
+
+${input.userNotes ? `User notes: ${input.userNotes}\n` : ""}OCR text:
+"""
+${input.ocrText.slice(0, 12000)}
+"""
+
+Return JSON of EXACTLY this shape (use "" or [] when unknown):
+{
+  "documentType": "",
+  "summary": "",
+  "importantDates": [],
+  "complaintNumber": "",
+  "replyDate": "",
+  "actionTakenDate": "",
+  "officerNames": [],
+  "departmentNames": [],
+  "workDescription": "",
+  "replyGiven": "",
+  "actionTaken": "",
+  "pendingIssues": [],
+  "suggestedComplaintStatus": "",
+  "suggestedNextAction": "",
+  "suggestedFollowUpDate": "",
+  "recommendedEscalation": "",
+  "confidence": "High | Medium | Low",
+  "needsManualReview": true
+}`;
+}
+
+export interface AnalyzeResult {
+  ok: boolean;
+  extraction: ComplaintExtraction;
+  error?: string;
+}
+
+/** A safe placeholder extraction used when AI is unavailable or parsing fails. */
+function placeholder(summary: string): ComplaintExtraction {
+  return {
+    documentType: "",
+    summary,
+    importantDates: [],
+    complaintNumber: "",
+    replyDate: "",
+    actionTakenDate: "",
+    officerNames: [],
+    departmentNames: [],
+    workDescription: "",
+    replyGiven: "",
+    actionTaken: "",
+    pendingIssues: [],
+    suggestedComplaintStatus: "",
+    suggestedNextAction: "",
+    suggestedFollowUpDate: "",
+    recommendedEscalation: "",
+    confidence: "Low",
+    needsManualReview: true,
+  };
+}
+
+export async function analyzeComplaintDocument(input: {
+  ocrText: string;
+  documentType?: string | null;
+  complaintContext?: string;
+  userNotes?: string;
+}): Promise<AnalyzeResult> {
+  if (!isAiConfigured()) {
+    return {
+      ok: false,
+      error: "AI not configured",
+      extraction: placeholder("AI not configured — review the OCR text and fill the fields manually."),
+    };
+  }
+  if (!input.ocrText || input.ocrText.trim().length < 8) {
+    return {
+      ok: false,
+      error: "Not enough OCR text to analyse",
+      extraction: placeholder("No usable OCR text — add a summary manually."),
+    };
+  }
+
+  const r = await generateText({
+    system: ANALYZER_SYSTEM,
+    prompt: buildAnalysisPrompt(input),
+    temperature: 0,
+  });
+  if (!r.ok || !r.text) {
+    return { ok: false, error: r.error ?? "AI request failed", extraction: placeholder("AI request failed — fill fields manually.") };
+  }
+
+  const cleaned = r.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  try {
+    const parsed = JSON.parse(cleaned) as ComplaintExtraction;
+    return { ok: true, extraction: { ...placeholder(""), ...parsed } };
+  } catch {
+    return {
+      ok: false,
+      error: "Could not parse AI output",
+      extraction: placeholder(r.text.slice(0, 600)),
+    };
+  }
+}
+
+// ── Complaint AI drafts (letters / messages) ────────────────────────────────
+
+const DRAFT_SYSTEM = `You draft civic accountability correspondence for a citizens' team in Bengaluru (BBMP / GBA). Rules: produce an EDITABLE DRAFT only — never state it has been sent. Use only the provided complaint facts; insert [PLACEHOLDERS] for anything missing. Be factual and respectful; phrase concerns as "it appears" / "kindly" unless proof is provided. No unsupported allegations. Output only the draft text.`;
+
+function languageLine(language?: DraftLanguage): string {
+  if (language === "Kannada") return "Write the entire draft in formal Kannada (ಕನ್ನಡ).";
+  if (language === "Bilingual") return "Write in English, then a formal Kannada (ಕನ್ನಡ) translation below, separated by a line of dashes.";
+  return "Write the draft in English.";
+}
+function toneLine(tone?: LegalTone): string {
+  switch (tone) {
+    case "Strong": return "Tone: firm and assertive, but factual and respectful.";
+    case "Investigative": return "Tone: investigative — probe for specific records and responsibilities.";
+    case "Simple": return "Tone: plain, simple language.";
+    default: return "Tone: formal and respectful.";
+  }
+}
+
+export function buildComplaintDraftPrompt(input: {
+  kind: ComplaintDraftKind;
+  complaintContext: string;
+  tone?: LegalTone;
+  language?: DraftLanguage;
+}): { system: string; prompt: string } {
+  const what = COMPLAINT_DRAFT_KINDS[input.kind];
+  const extra =
+    input.kind === "whatsapp"
+      ? "Keep it concise (a short WhatsApp message), polite, with the case number and the single clear ask."
+      : input.kind === "rti_from_complaint"
+        ? "Frame it as a Right to Information Act 2005 application with numbered, specific information requests derived from the complaint history."
+        : "";
+  return {
+    system: DRAFT_SYSTEM,
+    prompt: `Draft: ${what}.
+
+Complaint context:
+${input.complaintContext}
+
+${extra}
+${toneLine(input.tone)}
+${languageLine(input.language)}`,
+  };
+}

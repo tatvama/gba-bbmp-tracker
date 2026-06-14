@@ -1,0 +1,226 @@
+{
+  "_note": "Sample + template data for Phase 2 RTI. Sample RTIs use internal_ref SAMPLE-RTI-* and reminders are titled 'Sample: …' so they are clearly not real records and are replaced on every seed run.",
+  "templates": [
+    {
+      "title": "Work order copy",
+      "kind": "rti_application",
+      "category": "Work order",
+      "department": "Engineering",
+      "legal_tone": "Formal",
+      "language": "English",
+      "body": "",
+      "default_questions": [
+        "Provide a certified copy of the work order for the work [WORK / JOB NUMBER] in [WARD].",
+        "Provide the name, address and registration details of the contractor to whom the work was awarded.",
+        "Provide the sanctioned estimate and the date of the work order."
+      ],
+      "variables": [{ "name": "WARD", "label": "Ward" }, { "name": "WORK / JOB NUMBER", "label": "Work / job number" }]
+    },
+    {
+      "title": "Estimate copy",
+      "kind": "rti_application",
+      "category": "Estimate",
+      "department": "Engineering",
+      "legal_tone": "Formal",
+      "language": "English",
+      "body": "",
+      "default_questions": [
+        "Provide a certified copy of the detailed estimate for [WORK / JOB NUMBER] in [WARD].",
+        "Provide the technical sanction and administrative approval for the said estimate.",
+        "State the rate analysis used and the approving authority."
+      ],
+      "variables": [{ "name": "WARD", "label": "Ward" }, { "name": "WORK / JOB NUMBER", "label": "Work / job number" }]
+    },
+    {
+      "title": "Measurement Book (MB) copy",
+      "kind": "rti_application",
+      "category": "MB Book",
+      "department": "Engineering",
+      "legal_tone": "Investigative",
+      "language": "English",
+      "body": "",
+      "default_questions": [
+        "Provide a certified copy of the Measurement Book entries for [WORK / JOB NUMBER] in [WARD].",
+        "Provide the name and designation of the officer who recorded and check-measured the entries.",
+        "Provide the dates on which measurements were recorded and check-measured."
+      ],
+      "variables": [{ "name": "WARD", "label": "Ward" }, { "name": "WORK / JOB NUMBER", "label": "Work / job number" }]
+    },
+    {
+      "title": "Tender documents",
+      "kind": "rti_application",
+      "category": "Tender",
+      "department": "Engineering",
+      "legal_tone": "Formal",
+      "language": "English",
+      "body": "",
+      "default_questions": [
+        "Provide certified copies of the tender notification, tender documents and bid comparison statement for [WORK / JOB NUMBER].",
+        "Provide the list of bidders and the evaluation criteria applied.",
+        "Provide the date of award and the value of the awarded contract."
+      ],
+      "variables": [{ "name": "WORK / JOB NUMBER", "label": "Work / job number" }]
+    },
+    {
+      "title": "Contractor eligibility & registration",
+      "kind": "rti_application",
+      "category": "Contractor details",
+      "department": "Engineering",
+      "legal_tone": "Investigative",
+      "language": "English",
+      "body": "",
+      "default_questions": [
+        "Provide the contractor registration class and validity for the contractor of [WORK / JOB NUMBER].",
+        "Provide documents establishing the contractor's eligibility for the said work.",
+        "State whether the contractor was blacklisted at any time and, if so, the details."
+      ],
+      "variables": [{ "name": "WORK / JOB NUMBER", "label": "Work / job number" }]
+    },
+    {
+      "title": "Quality control / third-party inspection report",
+      "kind": "rti_application",
+      "category": "Quality control",
+      "department": "Quality Control",
+      "legal_tone": "Investigative",
+      "language": "English",
+      "body": "",
+      "default_questions": [
+        "Provide a certified copy of the quality-control / third-party inspection report for [WORK / JOB NUMBER] in [WARD].",
+        "Provide the name and designation of the officer responsible for quality control.",
+        "Provide before-and-after photographs and the completion certificate."
+      ],
+      "variables": [{ "name": "WARD", "label": "Ward" }, { "name": "WORK / JOB NUMBER", "label": "Work / job number" }]
+    }
+  ],
+  "rtis": [
+    {
+      "ref": "SAMPLE-RTI-1",
+      "subject": "Pothole repair work — Ward road, status and work order",
+      "category": "Road work",
+      "status": "Awaiting Reply",
+      "priority": "High",
+      "public_authority": "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+      "department": "Engineering",
+      "pio_name": "Assistant Executive Engineer (Sample)",
+      "pio_designation": "AEE",
+      "ward_no": 1,
+      "date_filed": "2026-05-20",
+      "date_received": "2026-05-22",
+      "filing_mode": "Speed Post",
+      "info_requested": "1. Provide a certified copy of the work order for the pothole repair work on [ROAD NAME].\n2. Provide the name and registration details of the contractor.\n3. Provide the date of completion and the completion certificate.",
+      "public_notes": "SAMPLE DATA — illustrative only."
+    },
+    {
+      "ref": "SAMPLE-RTI-2",
+      "subject": "Garbage contractor details and payment for the ward",
+      "category": "Garbage",
+      "status": "Awaiting Reply",
+      "priority": "Medium",
+      "public_authority": "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+      "department": "Solid Waste Management",
+      "pio_name": "Health Officer (Sample)",
+      "pio_designation": "Health Officer",
+      "ward_no": 2,
+      "date_filed": "2026-04-29",
+      "date_received": "2026-05-01",
+      "filing_mode": "Online",
+      "online_reg_no": "KARTI/SAMPLE/2026/0001",
+      "info_requested": "1. Provide the name of the garbage-collection contractor for the ward.\n2. Provide the monthly payments released to the contractor for the last 12 months.\n3. Provide the attendance / trip records of the collection vehicles.",
+      "public_notes": "SAMPLE DATA — illustrative only."
+    },
+    {
+      "ref": "SAMPLE-RTI-3",
+      "subject": "Drain construction — measurement book and quality control",
+      "category": "Drain work",
+      "status": "Partial Reply",
+      "priority": "High",
+      "satisfaction_status": "Incomplete Information",
+      "public_authority": "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+      "department": "Engineering",
+      "pio_name": "Executive Engineer (Sample)",
+      "pio_designation": "EE",
+      "ward_no": 3,
+      "date_filed": "2026-04-08",
+      "date_received": "2026-04-10",
+      "reply_date": "2026-05-05",
+      "filing_mode": "Registered Post",
+      "info_requested": "1. Provide a certified copy of the Measurement Book entries for the drain construction.\n2. Provide the quality-control inspection report.\n3. Provide the name of the check-measuring officer.",
+      "reply_summary": "PIO provided only the work order; MB entries and QC report not furnished.",
+      "public_notes": "SAMPLE DATA — illustrative only."
+    },
+    {
+      "ref": "SAMPLE-RTI-4",
+      "subject": "Tender irregularity in footpath works — full tender file",
+      "category": "Tender",
+      "status": "FAA Order Received",
+      "priority": "Urgent",
+      "satisfaction_status": "Unsatisfied",
+      "public_authority": "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+      "department": "Engineering",
+      "pio_name": "Executive Engineer (Sample)",
+      "pio_designation": "EE",
+      "faa_name": "Superintending Engineer (Sample)",
+      "faa_designation": "SE",
+      "ward_no": 4,
+      "date_filed": "2026-02-27",
+      "date_received": "2026-03-01",
+      "reply_date": "2026-03-25",
+      "first_appeal_decision_date": "2026-06-10",
+      "filing_mode": "Physical",
+      "info_requested": "1. Provide the complete tender file for the footpath works.\n2. Provide the bid comparison statement and evaluation notes.\n3. Provide the file movement and approval notings.",
+      "reply_summary": "PIO denied citing third-party information; appeal filed.",
+      "public_notes": "SAMPLE DATA — illustrative only."
+    },
+    {
+      "ref": "SAMPLE-RTI-5",
+      "subject": "Dangerous open electrical junction box — immediate hazard",
+      "category": "Streetlight",
+      "status": "Filed",
+      "priority": "Urgent",
+      "is_life_liberty": true,
+      "public_authority": "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+      "department": "Electrical",
+      "pio_name": "Assistant Engineer (Sample)",
+      "pio_designation": "AE",
+      "ward_no": 5,
+      "date_filed": "2026-06-12",
+      "date_received": "2026-06-13",
+      "filing_mode": "Hand submission",
+      "info_requested": "1. Provide the action taken to make safe the open electrical junction box at [LOCATION].\n2. Provide the name of the officer responsible for streetlight maintenance in the ward.",
+      "public_notes": "SAMPLE DATA — life/liberty (48-hour) illustrative case."
+    }
+  ],
+  "first_appeals": [
+    {
+      "rti_ref": "SAMPLE-RTI-3",
+      "grounds": ["Incomplete information", "No reply within time"],
+      "grounds_detail": "MB entries and QC report were not provided within the statutory period.",
+      "date_drafted": "2026-06-06",
+      "date_filed": "2026-06-08"
+    },
+    {
+      "rti_ref": "SAMPLE-RTI-4",
+      "grounds": ["Wrong denial", "Misleading information"],
+      "grounds_detail": "Section 8(1)(d) wrongly invoked for a public-works tender.",
+      "date_drafted": "2026-04-05",
+      "date_filed": "2026-04-08",
+      "faa_order_date": "2026-06-10",
+      "decision_summary": "FAA directed the PIO to furnish the tender file but the records remain incomplete."
+    }
+  ],
+  "second_appeals": [
+    {
+      "rti_ref": "SAMPLE-RTI-4",
+      "reason": ["Unsatisfactory FAA order", "Direction to disclose information", "Penalty request"],
+      "reason_detail": "FAA order not complied with; records still withheld.",
+      "commission_name": "Karnataka Information Commission",
+      "filing_date": "2026-06-12",
+      "diary_number": "KIC/SA/2026/SAMPLE-0042"
+    }
+  ],
+  "reminders": [
+    { "rti_ref": "SAMPLE-RTI-1", "title": "Sample: follow up on RTI reply", "description": "Reply window closing soon.", "due_date": "2026-06-20", "priority": "High" },
+    { "rti_ref": "SAMPLE-RTI-3", "title": "Sample: file first appeal", "description": "Partial reply received — appeal window open.", "due_date": "2026-06-16", "priority": "Urgent" },
+    { "rti_ref": "SAMPLE-RTI-5", "title": "Sample: confirm hazard made safe", "description": "Life/liberty case — verify action within 48h.", "due_date": "2026-06-15", "priority": "Urgent" }
+  ]
+}

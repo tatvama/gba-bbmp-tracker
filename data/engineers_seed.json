@@ -1,0 +1,33 @@
+{
+ "note": "Seed contacts from official BBMP directories (dl.bbmpgov.in / site.bbmp.gov.in, 2014-2017). Verify & update; GBA-specific assignments not yet published.",
+ "by_eng_subdiv": {
+  "Hegganahalli": {
+   "name": "Sri H. Eshwaraiah",
+   "designation": "Assistant Executive Engineer",
+   "phone": "9480684488",
+   "address": "Hegganahalli Subdivision Office, Dasarahalli",
+   "verified": false
+  },
+  "Shanthi Nagar": {
+   "name": "Venkateshiah",
+   "designation": "Engineering Ward Office",
+   "phone": "9900623513",
+   "address": "Engineering Ward Office, Ejipura, 17th Main Road, 5th Block",
+   "verified": false
+  },
+  "Domlur": {
+   "name": "Rajendra",
+   "designation": "Ward Engineer",
+   "phone": "9945072721",
+   "address": "Ward Office, 17th F Cross, Indiranagar 1st Stage, Bangalore-38",
+   "verified": false
+  },
+  "Banasavadi": {
+   "name": "Venkatesh",
+   "designation": "Ward Engineer",
+   "phone": "9986555521",
+   "address": "Ward Office Banaswadi, Main Road, Bus Stand, 1st Block HRBR Layout",
+   "verified": false
+  }
+ }
+}
