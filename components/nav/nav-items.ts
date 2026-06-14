@@ -16,6 +16,7 @@ import {
   ClipboardList,
   Smartphone,
   ScanLine,
+  Construction,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,6 +40,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/rti", label: "RTI Dashboard", icon: FileText, group: "rti" },
   { href: "/rti/all", label: "All RTIs", icon: Files, group: "rti" },
   { href: "/rti/new", label: "New RTI", icon: FilePlus2, group: "rti" },
+  { href: "/rti/road-work", label: "Road Work RTI", icon: Construction, group: "rti" },
   { href: "/rti/calendar", label: "RTI Calendar", icon: CalendarClock, group: "rti" },
   { href: "/rti/reports", label: "RTI Reports", icon: BarChart3, group: "rti" },
   { href: "/rti/settings", label: "RTI Settings", icon: SlidersHorizontal, group: "rti" },
@@ -46,6 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/complaints/dashboard", label: "Complaint Dashboard", icon: LayoutDashboard, group: "complaints" },
   { href: "/complaints", label: "Complaints", icon: ClipboardList, group: "complaints" },
   { href: "/complaints/new", label: "New Complaint", icon: FilePlus2, group: "complaints" },
+  { href: "/complaints/road-work", label: "Road Work Complaint", icon: Construction, group: "complaints" },
   { href: "/complaints/mobile/upload", label: "Mobile Upload", icon: Smartphone, group: "complaints" },
   { href: "/complaints/ocr-queue", label: "OCR Queue", icon: ScanLine, group: "complaints" },
   { href: "/complaints/reports", label: "Complaint Reports", icon: BarChart3, group: "complaints" },

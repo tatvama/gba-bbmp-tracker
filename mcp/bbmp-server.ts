@@ -29,7 +29,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 // Framework-free lib imports (no "server-only" guard — safe outside Next.js)
-import { activeDeadline } from "../lib/rti-deadlines";
+import { activeDeadline, computeRtiDeadlines } from "../lib/rti-deadlines";
 import {
   COMPLAINT_OPEN_STATUSES,
   COMPLAINT_STATUSES,
@@ -37,7 +37,9 @@ import {
   CORPORATION_CODES,
   DEFAULT_DEADLINE_RULES,
   PRIORITIES,
+  RTI_CATEGORIES,
 } from "../lib/constants";
+import { buildRoadWorkLetterPrompt } from "../lib/ai/road-work-knowledge";
 
 // ── Environment validation ──────────────────────────────────────────────────
 
@@ -572,9 +574,7 @@ server.registerTool(
   async () => {
     const today = new Date().toISOString().slice(0, 10);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function count(table: string, modifier?: (q: any) => any): Promise<number> {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let q: any = supabase.from(table).select("*", { count: "exact", head: true });
       if (modifier) q = modifier(q);
       const { count: c, error } = await q;
@@ -809,15 +809,14 @@ server.registerTool(
       .select("value")
       .eq("key", "complaint_settings")
       .maybeSingle();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const settings: any = settingsRow?.value ?? {};
     const prefix: string = settings.caseNumberPrefix ?? "DM-CMP";
     const year = new Date().getFullYear();
 
-    // 3. Generate atomic case number
+    // 3. Generate atomic case number (RPC param names are p_prefix / p_year)
     const { data: caseNum, error: rpcErr } = await supabase.rpc(
       "next_complaint_case_number",
-      { prefix, year },
+      { p_prefix: prefix, p_year: year },
     );
     logErr("create_complaint:rpc", rpcErr);
     if (!caseNum) return err("Failed to generate case number — check DB migration");
@@ -1125,6 +1124,141 @@ server.registerTool(
       satisfaction: satisfaction ?? null,
       next_follow_up_date: next_follow_up_date ?? null,
       summary_preview: summary.slice(0, 100),
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 15: generate_road_work_letter
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "generate_road_work_letter",
+  {
+    description:
+      "Draft a BBMP road-work RTI application or complaint letter from a short summary, using the standard 60-point inspection framework (KW-4 insurance, trip sheets, NGT, royalty, dismantling/salvage, MB book, road thickness, geo-tag photos) with legal basis, case law and officer accountability. Returns an editable draft — does NOT create a case (use create_complaint / create_rti to persist after review).",
+    inputSchema: {
+      summary: z.string().min(5).describe("Short description of the road-work issue"),
+      output_type: z.enum(["rti", "complaint"]).describe("'rti' = request records; 'complaint' = allege irregularity"),
+      language: z.enum(["English", "Kannada"]).default("English").optional(),
+      ward_number: z.number().int().optional(),
+      job_number: z.string().optional().describe("Work / job number, e.g. RR-2026-0456"),
+      road_name: z.string().optional(),
+      contractor: z.string().optional(),
+      include_all: z.boolean().optional().describe("Include all 60 inspection points instead of the relevant subset"),
+    },
+  },
+  async ({ summary, output_type, language = "English", ward_number, job_number, road_name, contractor, include_all }) => {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return ok({ error: "AI not configured — set ANTHROPIC_API_KEY to generate letters." });
+    }
+    let wardName: string | null = null;
+    if (ward_number) {
+      const { data: w } = await supabase.from("wards").select("new_no,new_name").eq("new_no", ward_number).maybeSingle();
+      const wr = w as { new_no?: number; new_name?: string } | null;
+      wardName = wr ? `${wr.new_no} — ${wr.new_name}` : `Ward ${ward_number}`;
+    }
+
+    const { system, prompt } = buildRoadWorkLetterPrompt({
+      outputType: output_type,
+      language,
+      summary,
+      wardName,
+      jobNumber: job_number ?? null,
+      roadName: road_name ?? null,
+      contractor: contractor ?? null,
+      scope: include_all ? "all" : "smart",
+    });
+
+    try {
+      const { default: Anthropic } = await import("@anthropic-ai/sdk");
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const msg = await client.messages.create({
+        model: process.env.AI_MODEL ?? "claude-sonnet-4-6",
+        max_tokens: 4000,
+        temperature: Number(process.env.AI_TEMPERATURE ?? "0.4"),
+        system,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const text = (msg.content as { type: string; text?: string }[])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text ?? "")
+        .join("\n")
+        .trim();
+      return ok({ output_type, language, draft: text });
+    } catch (e) {
+      return err(e instanceof Error ? e.message : "AI request failed");
+    }
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 16: create_rti  (mirrors create_complaint — persists an RTI application)
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "create_rti",
+  {
+    description:
+      "Create a new RTI application. Generates the internal reference and statutory deadlines. Pair with generate_road_work_letter to persist a reviewed road-work RTI.",
+    inputSchema: {
+      subject: z.string().min(3).describe("RTI subject line"),
+      info_requested: z.string().describe("The full RTI letter / numbered information requests"),
+      category: z.enum(RTI_CATEGORIES).optional().describe("e.g. 'Road work'"),
+      status: z.enum(["Draft", "Ready to File", "Filed"]).optional().default("Draft"),
+      priority: z.enum(PRIORITIES).optional(),
+      ward_number: z.number().int().optional(),
+      public_authority: z.string().optional(),
+      pio_name: z.string().optional(),
+      date_filed: z.string().optional().describe("YYYY-MM-DD if already filed"),
+    },
+  },
+  async ({ subject, info_requested, category, status = "Draft", priority, ward_number, public_authority, pio_name, date_filed }) => {
+    let wardId: string | null = null;
+    if (ward_number) {
+      const { data: w } = await supabase.from("wards").select("id").eq("new_no", ward_number).maybeSingle();
+      wardId = (w as { id?: string } | null)?.id ?? null;
+    }
+
+    const deadlines = computeRtiDeadlines(
+      { dateFiled: date_filed ?? null, isLifeLiberty: false },
+      DEFAULT_DEADLINE_RULES,
+    );
+    const internalRef = `RTI-${Date.now().toString(36).slice(-5).toUpperCase()}`;
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from("rti_applications")
+      .insert({
+        internal_ref: internalRef,
+        subject,
+        info_requested,
+        category: category ?? null,
+        status,
+        priority: priority ?? "Medium",
+        ward_id: wardId,
+        public_authority: public_authority ?? null,
+        pio_name: pio_name ?? null,
+        date_filed: date_filed ?? null,
+        normal_due: deadlines.normalDue,
+        life_liberty_due: deadlines.lifeLibertyDue,
+        first_appeal_due: deadlines.firstAppealDue,
+        second_appeal_due: deadlines.secondAppealDue,
+        created_by: null,
+        updated_by: null,
+      })
+      .select("id, internal_ref, subject, status")
+      .single();
+    logErr("create_rti:insert", insertErr);
+    if (!inserted) return err(`Failed to create RTI${insertErr ? `: ${insertErr.message}` : ""}`);
+
+    const row = inserted as Record<string, unknown>;
+    return ok({
+      message: "RTI created successfully",
+      id: row.id,
+      internal_ref: row.internal_ref,
+      subject: row.subject,
+      status: row.status,
+      normal_due: deadlines.normalDue,
     });
   },
 );

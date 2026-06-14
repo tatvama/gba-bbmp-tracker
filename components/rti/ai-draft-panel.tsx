@@ -9,6 +9,7 @@ import {
   Loader2,
   AlertTriangle,
   Check,
+  FileCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +33,8 @@ export function AiDraftPanel({
   kind,
   language,
   inputs,
+  onApprove,
+  approveLabel = "Approve & Create Case",
 }: {
   aiConfigured: boolean;
   /** Caller binds the entity context; returns an editable draft (never filed). */
@@ -42,12 +45,29 @@ export function AiDraftPanel({
   language?: string;
   /** Left-column summary of what will be sent to the model. */
   inputs?: React.ReactNode;
+  /** When set, shows an "Approve & Create Case" button that receives the final
+   *  edited text. Returns the created entity id (or an error). */
+  onApprove?: (finalText: string) => Promise<{ ok: boolean; id?: string; error?: string }>;
+  approveLabel?: string;
 }) {
   const [draft, setDraft] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [approving, setApproving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+
+  async function onApproveClick() {
+    if (!onApprove || !draft.trim()) return;
+    setApproving(true);
+    setError(null);
+    try {
+      const r = await onApprove(draft);
+      if (!r.ok) setError(r.error ?? "Could not create the case.");
+    } finally {
+      setApproving(false);
+    }
+  }
 
   async function run(fn: () => Promise<AiResult>) {
     setBusy(true);
@@ -146,6 +166,17 @@ export function AiDraftPanel({
             {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
             {saved ? "Saved" : "Save draft"}
           </Button>
+          {onApprove && (
+            <Button
+              size="sm"
+              onClick={onApproveClick}
+              disabled={!draft || approving}
+              className="ml-auto"
+            >
+              {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
+              {approving ? "Creating…" : approveLabel}
+            </Button>
+          )}
         </div>
       </div>
     </div>

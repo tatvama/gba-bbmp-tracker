@@ -1,7 +1,7 @@
 "use server";
 
 import { requireRole, AuthorizationError } from "@/lib/auth";
-import { RTI_WRITE_ROLES } from "@/lib/constants";
+import { RTI_WRITE_ROLES, COMPLAINT_WRITE_ROLES, type UserRole } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { generateText, aiProvider, aiModel } from "@/lib/ai/provider";
 import {
@@ -14,6 +14,10 @@ import {
   type FirstAppealInput,
   type SecondAppealInput,
 } from "@/lib/ai/prompts";
+import {
+  buildRoadWorkLetterPrompt,
+  type RoadWorkLetterInput,
+} from "@/lib/ai/road-work-knowledge";
 
 export interface AiResult {
   ok: boolean;
@@ -21,9 +25,9 @@ export interface AiResult {
   error?: string;
 }
 
-async function gate(): Promise<AiResult | null> {
+async function gate(roles: UserRole[] = RTI_WRITE_ROLES): Promise<AiResult | null> {
   try {
-    await requireRole(RTI_WRITE_ROLES);
+    await requireRole(roles);
     return null;
   } catch (e) {
     return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
@@ -51,6 +55,23 @@ export async function generateSecondAppealDraft(input: SecondAppealInput): Promi
   if (denied) return denied;
   const { system, prompt } = buildSecondAppealPrompt(input);
   const r = await generateText({ system, prompt });
+  return { ok: r.ok, text: r.text, error: r.error };
+}
+
+/**
+ * Generate a road-work RTI application or complaint letter from a short summary
+ * and/or a work-order extract, using the road-work inspection knowledge base.
+ * Gated by the role matching the output type. Never files anything.
+ */
+export async function generateRoadWorkLetter(input: RoadWorkLetterInput): Promise<AiResult> {
+  const roles = input.outputType === "complaint" ? COMPLAINT_WRITE_ROLES : RTI_WRITE_ROLES;
+  const denied = await gate(roles);
+  if (denied) return denied;
+  if (!input.summary?.trim() && !input.workOrderExtract?.trim()) {
+    return { ok: false, error: "Provide a short summary or upload a work order first." };
+  }
+  const { system, prompt } = buildRoadWorkLetterPrompt(input);
+  const r = await generateText({ system, prompt, maxTokens: 4000 });
   return { ok: r.ok, text: r.text, error: r.error };
 }
 
@@ -125,7 +146,9 @@ export async function saveAiDraft(input: {
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   let user;
   try {
-    user = await requireRole(RTI_WRITE_ROLES);
+    // Either an RTI writer or a complaint writer may save a draft.
+    const roles = Array.from(new Set([...RTI_WRITE_ROLES, ...COMPLAINT_WRITE_ROLES])) as UserRole[];
+    user = await requireRole(roles);
   } catch (e) {
     return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
