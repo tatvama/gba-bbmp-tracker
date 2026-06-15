@@ -4,6 +4,8 @@ A full-stack civic accountability platform for Bengaluru — tracking ward restr
 
 > **Status:** Production-ready · Phase 1 + 2 + 3 complete · Zero typecheck/lint errors · 51 tests pass
 
+> 🧠 **Project memory / AI context:** the architecture, key decisions and hard-won gotchas are checked in under [`.claude/memory/`](.claude/memory/) — start with [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md). A fresh Claude Code session (or a new teammate) starts fully briefed.
+
 ---
 
 ## Table of Contents
@@ -26,6 +28,7 @@ A full-stack civic accountability platform for Bengaluru — tracking ward restr
 16. [API Reference](#api-reference)
 17. [Deployment](#deployment)
 18. [Development Guide](#development-guide)
+19. [Project Memory](#project-memory)
 
 ---
 
@@ -750,6 +753,24 @@ export async function createComplaint(formData: FormData) {
   return { success: true, id: data.id };
 }
 ```
+
+---
+
+## Project Memory
+
+This repo carries its own **Claude Code memory** under [`.claude/memory/`](.claude/memory/) — a set of working notes capturing the architecture, the decisions behind it, and the gotchas discovered while building. It's version-controlled so the context travels with the code: clone the repo and a fresh Claude session (or a new teammate) starts fully briefed.
+
+Index: [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md)
+
+| Note | Covers |
+|------|--------|
+| [`bbmp-stack-override.md`](.claude/memory/bbmp-stack-override.md) | Why Supabase-native (not Prisma/local PG) |
+| [`bbmp-data-model-facts.md`](.claude/memory/bbmp-data-model-facts.md) | Seed counts, AC→corp derivation, 369-ward data, OCR of scanned PDFs |
+| [`bbmp-ui-preferences.md`](.claude/memory/bbmp-ui-preferences.md) | Nav, search-first UX, Tree Map explorer |
+| [`bbmp-phase2-rti.md`](.claude/memory/bbmp-phase2-rti.md) | RTI module — migration 0003, deadline engine, AI wrapper |
+| [`bbmp-phase3-complaints.md`](.claude/memory/bbmp-phase3-complaints.md) | Complaint mgmt — migration 0004, OCR, AI extraction, Storage, soft-delete |
+| [`bbmp-design-system.md`](.claude/memory/bbmp-design-system.md) | CSS/component rework |
+| [`bbmp-mcp-and-road-work.md`](.claude/memory/bbmp-mcp-and-road-work.md) | MCP server (16 tools) + road-work generator + 4 accountability features |
 
 ---
 
