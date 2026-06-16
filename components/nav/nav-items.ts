@@ -23,6 +23,7 @@ import {
   Images,
   MapPinned,
   Gauge,
+  Gavel,
   type LucideIcon,
 } from "lucide-react";
 
@@ -58,6 +59,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/complaints/new", label: "New Complaint", icon: FilePlus2, group: "complaints" },
   { href: "/complaints/road-work", label: "Road Work Complaint", icon: Construction, group: "complaints" },
   { href: "/complaints/road-work/audit", label: "Bill / MB Audit", icon: ShieldAlert, group: "complaints" },
+  { href: "/complaints/jobs", label: "Job Forensic Audit", icon: Gavel, group: "complaints" },
   { href: "/complaints/duplicates", label: "Duplicate Photos", icon: Images, group: "complaints" },
   { href: "/complaints/map", label: "Complaint Map", icon: MapPinned, group: "complaints" },
   { href: "/complaints/risk", label: "Risk & Red Flags", icon: Gauge, group: "complaints" },
