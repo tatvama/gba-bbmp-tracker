@@ -240,6 +240,12 @@ export interface ComplaintDocument {
   dup_severity: string | null;
   dup_matches: unknown;
   dup_checked_at: string | null;
+  // Forensics (0006)
+  vision_verdict: string | null;
+  vision_json: unknown;
+  vision_checked_at: string | null;
+  geo_flag: string | null;
+  geo_distance_m: number | null;
 }
 
 /** Structured AI extraction stored in complaint_documents.ai_extracted_json. */

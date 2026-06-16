@@ -7,11 +7,14 @@ import {
   type ComplaintSettings,
   DEFAULT_PHOTO_DEDUPE_RULES,
   type PhotoDedupeRules,
+  DEFAULT_FORENSICS_RULES,
+  type ForensicsRules,
 } from "@/lib/constants";
 
 export const DEADLINE_RULES_KEY = "rti_deadline_rules";
 export const COMPLAINT_SETTINGS_KEY = "complaint_settings";
 export const PHOTO_DEDUPE_RULES_KEY = "photo_dedupe_rules";
+export const FORENSICS_RULES_KEY = "forensics_rules";
 
 /**
  * Read the configurable RTI deadline rules from app_settings, falling back to the
@@ -65,5 +68,21 @@ export async function getPhotoDedupeRules(): Promise<PhotoDedupeRules> {
     return { ...DEFAULT_PHOTO_DEDUPE_RULES, ...value };
   } catch {
     return DEFAULT_PHOTO_DEDUPE_RULES;
+  }
+}
+
+/** Read forensics thresholds (geofence radius, etc.), merged over defaults. */
+export async function getForensicsRules(): Promise<ForensicsRules> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", FORENSICS_RULES_KEY)
+      .maybeSingle();
+    const value = (data?.value ?? {}) as Partial<ForensicsRules>;
+    return { ...DEFAULT_FORENSICS_RULES, ...value };
+  } catch {
+    return DEFAULT_FORENSICS_RULES;
   }
 }

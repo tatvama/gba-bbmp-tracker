@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, RefreshCw, Sparkles, ClipboardCheck, Loader2, FileText, CheckCircle2 } from "lucide-react";
+import { Eye, RefreshCw, Sparkles, ClipboardCheck, Loader2, FileText, CheckCircle2, ScanEye, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
@@ -21,6 +21,12 @@ const OCR_VARIANT: Record<string, BadgeProps["variant"]> = {
 const VERIF_VARIANT: Record<string, BadgeProps["variant"]> = {
   Verified: "success", "Pending Review": "muted", "Needs Correction": "warning",
   Rejected: "destructive", Duplicate: "destructive", "Low Confidence": "warning",
+};
+const VISION_VARIANT: Record<string, BadgeProps["variant"]> = {
+  ok: "success", suspect: "warning", mismatch: "destructive", not_site_photo: "destructive",
+};
+const VISION_LABEL: Record<string, string> = {
+  ok: "Photo OK", suspect: "Photo suspect", mismatch: "Photo mismatch", not_site_photo: "Not a site photo",
 };
 
 export function DocumentList({
@@ -88,6 +94,16 @@ export function DocumentList({
                       <Badge variant="destructive">⚠ Duplicate{d.dup_severity ? ` · ${d.dup_severity}` : ""}</Badge>
                     </Link>
                   )}
+                  {d.vision_verdict && (
+                    <Badge variant={VISION_VARIANT[d.vision_verdict] ?? "muted"}>
+                      {VISION_LABEL[d.vision_verdict] ?? d.vision_verdict}
+                    </Badge>
+                  )}
+                  {d.geo_flag === "far" && (
+                    <Badge variant="destructive" title={d.geo_distance_m ? `${Math.round(d.geo_distance_m)} m from the reported location` : undefined}>
+                      <MapPin className="h-3 w-3" /> GPS off-site
+                    </Badge>
+                  )}
                   {d.ai_confidence && <Badge variant="outline">AI {d.ai_confidence}</Badge>}
                 </div>
               </div>
@@ -105,6 +121,9 @@ export function DocumentList({
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => post(`/api/complaints/documents/${d.id}/analyze`, d.id)} disabled={busy}>
                       <Sparkles className="h-4 w-4" /> Re-run AI
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => post(`/api/complaints/documents/${d.id}/vision`, d.id)} disabled={busy}>
+                      <ScanEye className="h-4 w-4" /> Verify image
                     </Button>
                     <Button size="sm" onClick={() => setReviewDoc(d)}>
                       <ClipboardCheck className="h-4 w-4" /> Review &amp; apply

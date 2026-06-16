@@ -323,6 +323,14 @@ export const DEFAULT_PHOTO_DEDUPE_RULES: PhotoDedupeRules = {
   gpsEpsilon: 0.0002,
 };
 
+/** Forensics thresholds (photo geofence, etc.). */
+export interface ForensicsRules {
+  geofenceMaxMeters: number; // photo GPS beyond this from the reported location => flag
+}
+export const DEFAULT_FORENSICS_RULES: ForensicsRules = {
+  geofenceMaxMeters: 300,
+};
+
 // =============================================================================
 // Phase 3 — Advanced Complaint Management (documents, OCR, AI)
 // =============================================================================

@@ -5,7 +5,8 @@ import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/supabase-
 import { processDocumentOcr } from "@/lib/ocr/process-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { findPhotoMatches, deriveStage } from "@/lib/dedupe-photos";
-import { getComplaintSettings } from "@/lib/settings";
+import { geofencePhoto } from "@/lib/geo";
+import { getComplaintSettings, getForensicsRules } from "@/lib/settings";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { COMPLAINT_FIELD_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
 
@@ -58,6 +59,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // 2) Persist document row (admin client; app-level role already checked).
   const admin = createAdminClient();
+
+  // Geofence: is the photo's EXIF GPS near the complaint's reported location?
+  const { data: comp } = await admin
+    .from("complaints")
+    .select("division_id, latitude, longitude")
+    .eq("id", id)
+    .maybeSingle();
+  const divisionId = (comp as { division_id?: string | null } | null)?.division_id ?? null;
+  let geo: { flag: string; distanceM: number | null } = { flag: "no_gps", distanceM: null };
+  try {
+    const rules = await getForensicsRules();
+    geo = geofencePhoto(
+      fp?.gpsLat ?? null,
+      fp?.gpsLon ?? null,
+      (comp as { latitude?: number | null } | null)?.latitude ?? null,
+      (comp as { longitude?: number | null } | null)?.longitude ?? null,
+      rules.geofenceMaxMeters,
+    );
+  } catch { /* best-effort */ }
+
   const { data: doc, error } = await admin
     .from("complaint_documents")
     .insert({
@@ -86,6 +107,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       exif_gps_lon: fp?.gpsLon ?? null,
       exif_taken_at: fp?.takenAt ?? null,
       photo_stage: deriveStage(documentType),
+      geo_flag: geo.flag,
+      geo_distance_m: geo.distanceM,
     })
     .select("id")
     .single();
@@ -120,8 +143,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } | null = null;
   if (fp) {
     try {
-      const { data: comp } = await admin.from("complaints").select("division_id").eq("id", id).maybeSingle();
-      const matches = await findPhotoMatches(fp, { excludeComplaintId: id, divisionId: comp?.division_id ?? null });
+      const matches = await findPhotoMatches(fp, { excludeComplaintId: id, divisionId });
       if (matches.length) {
         const severity = matches[0]!.severity;
         await admin

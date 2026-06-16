@@ -21,6 +21,7 @@ import {
   ScanSearch,
   ShieldAlert,
   Images,
+  MapPinned,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +58,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/complaints/road-work", label: "Road Work Complaint", icon: Construction, group: "complaints" },
   { href: "/complaints/road-work/audit", label: "Bill / MB Audit", icon: ShieldAlert, group: "complaints" },
   { href: "/complaints/duplicates", label: "Duplicate Photos", icon: Images, group: "complaints" },
+  { href: "/complaints/map", label: "Complaint Map", icon: MapPinned, group: "complaints" },
   { href: "/complaints/mobile/upload", label: "Mobile Upload", icon: Smartphone, group: "complaints" },
   { href: "/complaints/ocr-queue", label: "OCR Queue", icon: ScanLine, group: "complaints" },
   { href: "/complaints/reports", label: "Complaint Reports", icon: BarChart3, group: "complaints" },

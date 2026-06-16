@@ -1398,3 +1398,56 @@ export async function getPublicCaseStatus(id: string): Promise<PublicCaseStatus 
 
   return null;
 }
+
+export interface MapPoint {
+  kind: "complaint" | "photo";
+  lat: number;
+  lon: number;
+  label: string;
+  complaintId: string;
+  flag?: string | null;
+}
+
+/** Points for the forensic map: complaint reported locations + photo EXIF GPS. */
+export async function getForensicMapPoints(): Promise<MapPoint[]> {
+  const supabase = await sb();
+  const [comps, photos] = await Promise.all([
+    supabase
+      .from("complaints")
+      .select("id, internal_case_number, title, latitude, longitude")
+      .not("latitude", "is", null)
+      .is("deleted_at", null)
+      .limit(2000),
+    supabase
+      .from("complaint_documents")
+      .select("complaint_id, document_type, exif_gps_lat, exif_gps_lon, geo_flag")
+      .not("exif_gps_lat", "is", null)
+      .limit(4000),
+  ]);
+  logErr("mapPoints:complaints", comps.error);
+  logErr("mapPoints:photos", photos.error);
+
+  const points: MapPoint[] = [];
+  for (const c of comps.data ?? []) {
+    const r = c as Record<string, unknown>;
+    points.push({
+      kind: "complaint",
+      lat: r.latitude as number,
+      lon: r.longitude as number,
+      label: `${(r.internal_case_number as string) ?? "Case"}: ${r.title as string}`,
+      complaintId: r.id as string,
+    });
+  }
+  for (const p of photos.data ?? []) {
+    const r = p as Record<string, unknown>;
+    points.push({
+      kind: "photo",
+      lat: r.exif_gps_lat as number,
+      lon: r.exif_gps_lon as number,
+      label: `Photo: ${(r.document_type as string) ?? "image"}`,
+      complaintId: r.complaint_id as string,
+      flag: (r.geo_flag as string) ?? null,
+    });
+  }
+  return points;
+}

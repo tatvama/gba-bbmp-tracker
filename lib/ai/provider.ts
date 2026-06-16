@@ -85,3 +85,51 @@ export async function generateText(params: GenerateParams): Promise<GenerateResu
     return { ok: false, error: e instanceof Error ? e.message : "AI request failed" };
   }
 }
+
+export interface VisionImage {
+  /** image/jpeg | image/png | image/webp | image/gif */
+  mediaType: string;
+  /** base64-encoded image bytes (no data: prefix) */
+  dataBase64: string;
+}
+
+/** Multimodal generation — sends image(s) + a prompt to a vision-capable model. */
+export async function generateVision(params: {
+  system: string;
+  prompt: string;
+  images: VisionImage[];
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<GenerateResult> {
+  if (!isAiConfigured()) return { ok: false, error: AI_NOT_CONFIGURED };
+  const provider = aiProvider();
+  if (provider !== "anthropic") {
+    return { ok: false, error: `Vision is wired only for anthropic in this build.` };
+  }
+  const model = aiModel();
+  const temperature = params.temperature ?? 0;
+  const maxTokens = params.maxTokens ?? 1500;
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const imageBlocks = params.images.map((img) => ({
+      type: "image" as const,
+      source: { type: "base64" as const, media_type: img.mediaType as "image/jpeg", data: img.dataBase64 },
+    }));
+    const msg = await client.messages.create({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      system: params.system,
+      messages: [{ role: "user", content: [...imageBlocks, { type: "text", text: params.prompt }] }],
+    });
+    const text = (msg.content as { type: string; text?: string }[])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text ?? "")
+      .join("\n")
+      .trim();
+    return { ok: true, text, provider, model };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Vision request failed" };
+  }
+}
