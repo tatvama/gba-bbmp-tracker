@@ -14,7 +14,7 @@ import type { SrRate } from "./rate-check";
 import { matchSrRate } from "./rate-check";
 
 const DEFAULT_EXPECTED_RECOVERIES = ["Royalty", "Income Tax", "GST", "Security Deposit"];
-const HIDDEN_ITEM_RE = /\b(wmm|gsb|dbm|\bbc\b|bituminous|prime coat|tack coat|excavation|earthwork|pcc|rcc)\b/i;
+const HIDDEN_ITEM_RE = /\b(wmm|gsb|dbm|\bbc\b|bituminous|macadam|wet mix|granular sub|prime coat|tack coat|excavation|earthwork|pcc|rcc)\b/i;
 // Common approval ceilings (₹) — a total sitting just below one suggests splitting.
 const APPROVAL_THRESHOLDS = [100_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000];
 
