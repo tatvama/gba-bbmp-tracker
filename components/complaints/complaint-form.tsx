@@ -97,6 +97,9 @@ export function ComplaintForm({
         <Field label="Job / work-order no." error={fe.jobNumber}>
           <Input name="jobNumber" defaultValue={initial?.job_number ?? ""} placeholder="Govt contract job code, e.g. RR-2026-0456" />
         </Field>
+        <Field label="Contractor" error={fe.contractor}>
+          <Input name="contractor" defaultValue={initial?.contractor ?? ""} placeholder="Contractor / agency name" />
+        </Field>
         <Field label="RTI no. (if any)" error={fe.rtiNumber}>
           <Input name="rtiNumber" defaultValue={initial?.rti_number ?? ""} />
         </Field>

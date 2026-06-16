@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Pencil, ShieldAlert, FolderArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/print-button";
@@ -53,7 +53,10 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
         <div className="no-print flex gap-2">
           <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/print`}>Case file</Link></Button>
           {flags.canVerify && (
-            <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/forensics`}><ShieldAlert className="h-4 w-4" /> Forensic audit</Link></Button>
+            <>
+              <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/forensics`}><ShieldAlert className="h-4 w-4" /> Forensic audit</Link></Button>
+              <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/dossier`}><FolderArchive className="h-4 w-4" /> Dossier</Link></Button>
+            </>
           )}
           <PrintButton />
           {flags.canEdit && (

@@ -123,6 +123,7 @@ function toRow(input: Record<string, any>) {
     public_impact: input.publicImpact ?? null,
     complaint_number: input.externalComplaintNumber ?? null,
     job_number: input.jobNumber ?? null,
+    contractor: input.contractor ?? null,
     rti_number: input.rtiNumber ?? null,
     complaint_mode: input.complaintFiledMode ?? null,
     complaint_filed_to: input.complaintFiledTo ?? null,

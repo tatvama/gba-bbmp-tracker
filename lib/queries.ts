@@ -1408,6 +1408,98 @@ export interface MapPoint {
   flag?: string | null;
 }
 
+export interface ContractorRisk {
+  contractor: string;
+  complaints: number;
+  overdue: number;
+  duplicatePhotos: number;
+  visionFlags: number;
+  offSitePhotos: number;
+  score: number;
+}
+
+export interface RedFlagSummary {
+  duplicateDocs: number;
+  offSitePhotos: number;
+  visionFlags: number;
+  overdueComplaints: number;
+  contractorsAtRisk: number;
+}
+
+/** Aggregate fraud signals per contractor + a global red-flag summary. */
+export async function getContractorRisk(): Promise<{ summary: RedFlagSummary; contractors: ContractorRisk[] }> {
+  const supabase = await sb();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [compRes, docRes] = await Promise.all([
+    supabase
+      .from("complaints")
+      .select("id, contractor, status, next_follow_up_date")
+      .is("deleted_at", null)
+      .limit(5000),
+    supabase
+      .from("complaint_documents")
+      .select("complaint_id, is_duplicate, vision_verdict, geo_flag")
+      .or("is_duplicate.eq.true,vision_verdict.not.is.null,geo_flag.eq.far")
+      .limit(8000),
+  ]);
+  logErr("risk:complaints", compRes.error);
+  logErr("risk:docs", docRes.error);
+
+  const comps = compRes.data ?? [];
+  const openSet = new Set(COMPLAINT_OPEN_STATUSES as readonly string[]);
+  const byComplaint = new Map<string, { contractor: string | null; overdue: boolean }>();
+  for (const c of comps) {
+    const r = c as Record<string, unknown>;
+    const overdue =
+      openSet.has(r.status as string) && !!r.next_follow_up_date && (r.next_follow_up_date as string) < today;
+    byComplaint.set(r.id as string, { contractor: (r.contractor as string) ?? null, overdue });
+  }
+
+  const summary: RedFlagSummary = { duplicateDocs: 0, offSitePhotos: 0, visionFlags: 0, overdueComplaints: 0, contractorsAtRisk: 0 };
+  for (const c of byComplaint.values()) if (c.overdue) summary.overdueComplaints++;
+
+  const map = new Map<string, ContractorRisk>();
+  const ensure = (name: string) =>
+    map.get(name) ?? map.set(name, { contractor: name, complaints: 0, overdue: 0, duplicatePhotos: 0, visionFlags: 0, offSitePhotos: 0, score: 0 }).get(name)!;
+
+  // complaints + overdue per contractor
+  for (const c of byComplaint.values()) {
+    if (!c.contractor) continue;
+    const e = ensure(c.contractor);
+    e.complaints++;
+    if (c.overdue) e.overdue++;
+  }
+
+  // document flags
+  for (const d of docRes.data ?? []) {
+    const r = d as Record<string, unknown>;
+    const isDup = r.is_duplicate === true;
+    const vision = r.vision_verdict as string | null;
+    const visionFlag = vision === "suspect" || vision === "mismatch" || vision === "not_site_photo";
+    const offSite = r.geo_flag === "far";
+    if (isDup) summary.duplicateDocs++;
+    if (offSite) summary.offSitePhotos++;
+    if (visionFlag) summary.visionFlags++;
+
+    const owner = byComplaint.get(r.complaint_id as string);
+    if (!owner?.contractor) continue;
+    const e = ensure(owner.contractor);
+    if (isDup) e.duplicatePhotos++;
+    if (visionFlag) e.visionFlags++;
+    if (offSite) e.offSitePhotos++;
+  }
+
+  const contractors = [...map.values()].map((e) => {
+    e.score = e.duplicatePhotos * 5 + e.visionFlags * 4 + e.offSitePhotos * 4 + e.overdue * 1;
+    return e;
+  });
+  summary.contractorsAtRisk = contractors.filter((c) => c.score > 0).length;
+  contractors.sort((a, b) => b.score - a.score);
+
+  return { summary, contractors };
+}
+
 /** Points for the forensic map: complaint reported locations + photo EXIF GPS. */
 export async function getForensicMapPoints(): Promise<MapPoint[]> {
   const supabase = await sb();

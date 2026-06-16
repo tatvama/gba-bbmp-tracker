@@ -131,6 +131,7 @@ export interface Complaint {
   contact_id: string | null;
   complaint_number: string | null;
   job_number: string | null;
+  contractor: string | null;
   rti_number: string | null;
   date_submitted: string | null;
   due_date: string | null;

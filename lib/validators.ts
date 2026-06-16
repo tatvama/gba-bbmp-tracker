@@ -106,6 +106,7 @@ export const complaintSchema = z.object({
   publicImpact: optEnum(PUBLIC_IMPACT_LEVELS),
   externalComplaintNumber: optText,
   jobNumber: optText,
+  contractor: optText,
   rtiNumber: optText,
   complaintFiledMode: optEnum(COMPLAINT_FILED_MODES),
   complaintFiledTo: optText,
