@@ -1639,3 +1639,67 @@ export async function getForensicMapPoints(): Promise<MapPoint[]> {
   }
   return points;
 }
+
+// ==========================================================================
+// Job-number forensic audit
+// ==========================================================================
+
+import type { JobAuditReport } from "@/lib/forensics/job-audit";
+
+export interface JobAuditRow {
+  id: string;
+  jobNumber: string;
+  report: JobAuditReport | null;
+  riskScore: number;
+  riskBand: string | null;
+  totalExposure: number | null;
+  findingCount: number;
+  redFlagCount: number;
+  docCount: number;
+  createdAt: string;
+}
+
+/** Latest persisted forensic report for a job (no re-run). */
+export async function getJobAudit(jobNumber: string): Promise<JobAuditRow | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("job_audits")
+    .select("*")
+    .eq("job_number", jobNumber)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  logErr("getJobAudit", error);
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    id: r.id as string,
+    jobNumber: r.job_number as string,
+    report: (r.report as JobAuditReport) ?? null,
+    riskScore: (r.risk_score as number) ?? 0,
+    riskBand: (r.risk_band as string) ?? null,
+    totalExposure: (r.total_exposure as number) ?? null,
+    findingCount: (r.finding_count as number) ?? 0,
+    redFlagCount: (r.red_flag_count as number) ?? 0,
+    docCount: (r.doc_count as number) ?? 0,
+    createdAt: r.created_at as string,
+  };
+}
+
+/** Distinct job numbers across complaints, with complaint + document counts. */
+export async function listJobNumbers(): Promise<{ jobNumber: string; complaints: number }[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaints")
+    .select("job_number")
+    .not("job_number", "is", null)
+    .is("deleted_at", null)
+    .limit(5000);
+  logErr("listJobNumbers", error);
+  const counts = new Map<string, number>();
+  for (const r of data ?? []) {
+    const j = (r as { job_number: string }).job_number;
+    if (j) counts.set(j, (counts.get(j) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([jobNumber, complaints]) => ({ jobNumber, complaints })).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
+}

@@ -6,6 +6,7 @@ import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { extractBillStructure } from "@/lib/ai/bill-extractor";
 import { runBillRules, scoreFindings } from "@/lib/forensics/rule-engine";
 import { checkRates, type SrRate } from "@/lib/forensics/rate-check";
+import { loadSrRates } from "@/lib/sr-rates";
 import type { BillFinding, StructuredBill } from "@/lib/forensics/types";
 
 export interface BillAuditItem {
@@ -54,15 +55,8 @@ export async function auditComplaintBills(complaintId: string): Promise<BillAudi
     return { ok: false, error: "No OCR'd bill/MB documents on this case. Upload and run OCR first.", audits: [] };
   }
 
-  // Rate book.
-  const { data: sr } = await admin.from("sr_rates").select("sr_code, description, unit, rate, sr_year").limit(5000);
-  const book: SrRate[] = (sr ?? []).map((r) => ({
-    srCode: (r.sr_code as string) ?? null,
-    description: (r.description as string) ?? "",
-    unit: (r.unit as string) ?? null,
-    rate: Number(r.rate),
-    srYear: (r.sr_year as string) ?? null,
-  }));
+  // Rate book (paged — defeats the PostgREST 1000-row cap).
+  const book: SrRate[] = await loadSrRates(admin);
 
   const audits: BillAuditItem[] = [];
   for (const d of targets) {
