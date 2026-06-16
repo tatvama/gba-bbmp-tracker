@@ -40,6 +40,13 @@ import {
   RTI_CATEGORIES,
 } from "../lib/constants";
 import { buildRoadWorkLetterPrompt } from "../lib/ai/road-work-knowledge";
+import { LETTER_VARIANTS, LETTER_SIGNATORIES } from "../lib/constants";
+import { assembleSkeleton, skeletonToPlainText, letterFileName } from "../lib/letters/letter-skeleton";
+import { sanitizeDraft, lintLetter } from "../lib/letters/safe-language";
+import { mapBillFindingToLetter } from "../lib/letters/from-findings";
+import { buildLetterPrompt } from "../lib/ai/letter-builder";
+import type { LetterContext, LetterFinding, LetterVariant } from "../lib/letters/types";
+import type { JobAuditReport } from "../lib/forensics/job-audit";
 
 // ── Environment validation ──────────────────────────────────────────────────
 
@@ -1259,6 +1266,154 @@ server.registerTool(
       subject: row.subject,
       status: row.status,
       normal_due: deadlines.normalDue,
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 17: get_job_audit  (read the latest persisted job-number forensic report)
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "get_job_audit",
+  {
+    description:
+      "Get the latest forensic audit for a government job number: risk score + band, finding counts, the ranked findings (each a documented suspicion with evidence grade, rule basis and the record to demand), and the possible-loss-exposure lines. Read-only — run the audit from the web app first (Complaints → Job Forensic Audit) if none exists.",
+    inputSchema: {
+      job_number: z.string().min(1).describe("Government work / job number, e.g. 222-12-345678"),
+    },
+  },
+  async ({ job_number }) => {
+    const { data, error } = await supabase
+      .from("job_audits")
+      .select("report, risk_score, risk_band, total_exposure, finding_count, red_flag_count, doc_count, created_at")
+      .eq("job_number", job_number)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    logErr("get_job_audit", error);
+    if (!data?.report) return ok({ job_number, audited: false, message: "No forensic audit found. Run it from the web app (Complaints → Job Forensic Audit) first." });
+    const report = data.report as JobAuditReport;
+    return ok({
+      job_number,
+      audited: true,
+      risk: { score: data.risk_score, band: data.risk_band },
+      counts: { findings: data.finding_count, red_flags: data.red_flag_count, documents_read: data.doc_count },
+      total_possible_exposure: data.total_exposure,
+      findings: (report.rankedFindings ?? []).map((f) => ({
+        code: f.code, title: f.title, severity: f.severity, evidence_grade: f.evidenceGrade,
+        risk_points: f.riskPoints, detail: f.safeText ?? f.detail, rule: f.ruleRef, record_to_demand: f.recordToDemand,
+      })),
+      loss_lines: report.loss?.lines ?? [],
+      caveat: "Findings are documented suspicions requiring records and explanation — not findings of guilt. Exposure is a possible amount requiring verification, not proven loss.",
+      audited_at: data.created_at,
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tool 18: draft_job_letter  (Kannada bill-stop / Lokayukta / RTI from findings)
+// ────────────────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  "draft_job_letter",
+  {
+    description:
+      "Draft a cautious Kannada (or bilingual) forensic letter from a job's persisted audit findings — a bill-stop notice, Lokayukta complaint, RTI application or bilingual summary. Every adverse point is a documented suspicion seeking records, never an accusation. AI prose is hard-gated by the safe-language linter; if it produces prohibited wording the AI text is discarded and the deterministic draft is returned. Persists an editable draft (download .docx from the web app); never auto-files. Signs as the configured signatory, never as Guruji / the Trust.",
+    inputSchema: {
+      job_number: z.string().min(1).describe("Government work / job number"),
+      variant: z.enum(LETTER_VARIANTS).default("bill_stop").describe("bill_stop | lokayukta | rti | bilingual_summary"),
+      language: z.enum(["Kannada", "Bilingual"]).default("Kannada").optional(),
+      signatory: z.enum(Object.keys(LETTER_SIGNATORIES) as [string, ...string[]]).default("raghav_gowda").optional(),
+      use_ai: z.boolean().default(true).optional().describe("AI-polish the deterministic skeleton (needs ANTHROPIC_API_KEY)"),
+      persist: z.boolean().default(true).optional().describe("Save an editable draft to letter_drafts"),
+    },
+  },
+  async ({ job_number, variant, language = "Kannada", signatory = "raghav_gowda", use_ai = true, persist = true }) => {
+    const { data: audit } = await supabase
+      .from("job_audits")
+      .select("report, risk_score, risk_band")
+      .eq("job_number", job_number)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!audit?.report) return err(`No forensic audit found for job "${job_number}". Run it from the web app first.`);
+
+    const report = audit.report as JobAuditReport;
+    const findings: LetterFinding[] = (report.rankedFindings ?? report.findings ?? []).map(mapBillFindingToLetter);
+    if (findings.length === 0) return err("The audit produced no findings to base a letter on.");
+
+    const ctx: LetterContext = {
+      jobCode: job_number,
+      variant: variant as LetterVariant,
+      language: language as "Kannada" | "Bilingual",
+      signatoryKey: signatory as LetterContext["signatoryKey"],
+      findings,
+      references: [],
+    };
+
+    let skeleton;
+    try {
+      skeleton = assembleSkeleton(ctx);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : "Could not assemble the letter.");
+    }
+
+    let content = sanitizeDraft(skeletonToPlainText(skeleton)).text;
+    let aiUsed = false;
+    let aiDiscarded = false;
+
+    if (use_ai && process.env.ANTHROPIC_API_KEY) {
+      const { system, prompt } = buildLetterPrompt(ctx, skeleton);
+      try {
+        const { default: Anthropic } = await import("@anthropic-ai/sdk");
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const msg = await client.messages.create({
+          model: process.env.AI_MODEL ?? "claude-sonnet-4-6",
+          max_tokens: 4000,
+          temperature: 0.3,
+          system,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const text = (msg.content as { type: string; text?: string }[]).filter((b) => b.type === "text").map((b) => b.text ?? "").join("\n").trim();
+        const cleaned = sanitizeDraft(text);
+        if (cleaned.lint.ok) { content = cleaned.text; aiUsed = true; }
+        else aiDiscarded = true;
+      } catch (e) {
+        console.error("[bbmp-mcp:draft_job_letter] AI failed, using deterministic draft:", e);
+      }
+    }
+
+    const finalLint = lintLetter(content);
+    const fileName = letterFileName(ctx);
+    let draftId: string | null = null;
+
+    if (persist) {
+      const { data: ins, error: insErr } = await supabase
+        .from("letter_drafts")
+        .insert({
+          job_number, variant, language: ctx.language, signatory_key: ctx.signatoryKey,
+          content, skeleton, evidence_index: skeleton.evidenceIndex, summary_box: skeleton.summaryBox,
+          risk_score: report.risk?.score ?? audit.risk_score ?? null, band: report.risk?.band ?? audit.risk_band ?? null,
+          ai_used: aiUsed, lint_ok: finalLint.ok, file_name: fileName, created_by: null,
+        })
+        .select("id")
+        .single();
+      logErr("draft_job_letter:insert", insErr);
+      draftId = (ins as { id?: string } | null)?.id ?? null;
+    }
+
+    return ok({
+      job_number, variant, language: ctx.language, signatory,
+      ai_used: aiUsed, ai_discarded: aiDiscarded,
+      lint_ok: finalLint.ok,
+      lint_errors: finalLint.errors.map((e) => `${e.reason}: "${e.excerpt}"`),
+      dash_warnings: finalLint.warnings.length,
+      file_name: fileName,
+      draft_id: draftId,
+      docx_url: draftId ? `/api/job-audit/${encodeURIComponent(job_number)}/letter?draftId=${draftId}` : null,
+      draft: content,
+      caveat: "Editable draft — review before filing. Never auto-filed. Adverse points are documented suspicions, not accusations.",
     });
   },
 );
