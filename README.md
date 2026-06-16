@@ -93,6 +93,14 @@ All data lives in **Supabase (PostgreSQL)** with Row-Level Security. Auth is Sup
 - Complaint dashboard with 12 stat counters
 - Mobile field officer pages, reports, OCR queue monitor
 
+### Phase 4 — Forensic Public-Works Audit & Letter Drafting
+- **Job-Number forensic audit** (`/complaints/jobs` → `/complaints/job/[jobNumber]/audit`): aggregates every document across all complaints sharing a government job number, AI-extracts the figures, then runs **deterministic** engines (`lib/forensics/*`) — arithmetic, quantity/rate (125% cap, SR rate check), MB-book integrity, chronology, contractor eligibility, insurance/security, royalty/salvage/disposal, plus carried-forward photo flags (duplicate / off-site GPS / vision). Additive risk score → 4 bands (low → procedural → serious → bill-stop), evidence grading A–E, and a possible-loss-exposure table (every line caveated).
+- **AI is bounded:** "AI extracts/classifies; pure libs judge." Exact arithmetic is never left to the model; figures vary per tender and are read from the document, never hardcoded.
+- **Advanced letter drafting** (`/complaints/job/[jobNumber]/letter`): Kannada / bilingual **bill-stop notice, Lokayukta complaint, RTI application** or bilingual summary, built from the findings in the evidence-block format (7 mandatory Kannada labels + worked example), with an evidence index, officer-responsibility table and document-demand list.
+- **Safe-language hard gate** (`lib/letters/safe-language.ts`): every adverse point is a *documented suspicion seeking records*, never an accusation. The linter fails on 8 prohibited patterns (4 English + 4 Kannada); if the AI emits any, its draft is **discarded** and the deterministic draft is used. Letters never sign as Guruji / the Trust. Drafts are editable and never auto-filed.
+- **DOCX / CSV export** (`/api/job-audit/[jobNumber]/letter`): A4 Word with Kannada via the complex-script font slot, shaded ground tables and a quantity-variation bar chart; evidence index as CSV.
+- **MCP tools:** `get_job_audit` and `draft_job_letter` expose the audit + safety-gated letter drafting to Claude/MCP clients.
+
 ---
 
 ## Project Structure
