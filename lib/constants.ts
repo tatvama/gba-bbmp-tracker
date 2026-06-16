@@ -366,6 +366,23 @@ export const COMPLAINT_DOCUMENT_TYPES = [
   "Appeal related document",
   "Site photo before work",
   "Site photo after work",
+  // Forensic / tender / financial document types (job-audit module)
+  "Tender notice",
+  "Technical bid",
+  "Financial bid",
+  "Contractor registration certificate",
+  "Insurance policy",
+  "KW-4 agreement",
+  "Technical Sanction",
+  "Schedule B",
+  "Modified Schedule B",
+  "Royalty challan",
+  "Trip sheet / weighbridge",
+  "Quality test report",
+  "Geo-tagged site photo",
+  "Completion certificate",
+  "Defect liability / handover",
+  "C&D waste / dumping-yard / salvage register",
   "Other evidence",
 ] as const;
 export type ComplaintDocumentType = (typeof COMPLAINT_DOCUMENT_TYPES)[number];
@@ -463,4 +480,78 @@ export const DEFAULT_COMPLAINT_SETTINGS: ComplaintSettings = {
   aiAutoSummary: true,
   maxUploadMb: 15,
   documentsPrivateByDefault: true,
+};
+
+// =============================================================================
+// Phase 4 — Forensic job-audit + letter constants (verified build spec)
+// Sources cross-verified via web research; values that VARY per tender are read
+// from the document (graded C/D), never hardcoded — see comments.
+// =============================================================================
+
+/** Risk scorer (additive SEV + EVD + add-ons, clamped 0–100). */
+export const RISK_SEV = { Low: 10, Medium: 25, High: 45, critical: 60 } as const;
+export const RISK_EVD = { weak: 5, moderate: 15, strong: 25, documentary: 35 } as const;
+export const RISK_ADDONS = { missing_proof: 10, chronology_issue: 10, possible_forgery_redflag: 15 } as const;
+export const RISK_VALUE_IMPACT = { high: 20, medium: 12, low: 5 } as const;
+/** 4 bands (NO "vigilance"). Evaluated high→low. */
+export const RISK_BANDS = [
+  { min: 76, band: "bill_stop", label: "high priority bill stop matter" },
+  { min: 51, band: "serious", label: "serious audit doubt" },
+  { min: 26, band: "procedural", label: "procedural irregularity or moderate red flag" },
+  { min: 0, band: "low", label: "low documentary doubt" },
+] as const;
+
+export const EVIDENCE_GRADES = {
+  A: "Direct documentary fact",
+  B: "Calculated from supplied records",
+  C: "Missing mandatory record inference",
+  D: "Requires original verification",
+  E: "Requires field inspection / technical test",
+} as const;
+
+// ── Statutory deductions (s.194C etc.) ──
+/** IT-TDS %: 1% for individual/HUF, 2% for others — payee type READ from bill/agreement. */
+export const IT_TDS_PCT = { individual: 1, huf: 1, company: 2, firm: 2, other: 2 } as const;
+export const GST_TDS_PCT = 2; // 1% CGST + 1% SGST
+export const GST_TDS_MIN_CONTRACT = 250_000; // GST-TDS applies only above ₹2.5L
+export const BOCW_CESS_PCT = 1; // labour-welfare cess band 1–2%; flag + verify base (excl. GST)
+
+// ── GST on works contracts (date-sensitive — branch in lib/forensics/gst.ts) ──
+export const GST_2_0_DATE = "2025-09-22";
+export const GST_WC_CURRENT = 18; // on/after cutover
+export const GST_WC_PRE = 12; // before cutover, general
+export const GST_WC_EARTHWORK_PRE = 5; // before cutover, earthwork share > 75%
+
+// ── 125% quantity rule — TWO DISTINCT numbers ──
+export const QTY_PER_ITEM_QUOTED_CAP_PCT = 125; // ≤125% at quoted rate; excess priced at SoR (READ)
+export const CONTRACT_OVERALL_CAP = { aboveTenCrPct: 5, atOrBelowTenCrPct: 10, thresholdInr: 100_000_000 };
+
+// ── KTPP s.4 thresholds (2000 figures — flag + verify amendment before filing) ──
+export const KTPP_S4_THRESHOLDS = { govtDept: 500_000, localBody: 200_000, other: 100_000 };
+
+// ── RTI Act 2005 timelines ──
+export const RTI_DAYS = {
+  reply: 30, lifeLiberty_hours: 48, apio_extra: 5,
+  firstAppeal: 30, faaDispose: 30, faaDisposeMax: 45, secondAppeal: 90,
+  penaltyPerDay: 250, penaltyMax: 25_000,
+} as const;
+
+/** KW contractor class rank, lowest→highest. */
+export const KW_CLASS_RANK = ["V", "IV", "III", "II", "I"] as const;
+
+// ── Letter signatories (NEVER sign as Guruji / Sri Sai Samsthana Trust) ──
+export const LETTER_SIGNATORIES = {
+  raghav_gowda: { name: "K.G. Raghav Gowda", address: "No. 7, Bheru Mansion, 7/7, 2nd Floor, Gandhi Bazar Main, Basavanagudi, Bengaluru 560004", mobile: "9555800064", fileTag: "Raghav_Gowda" },
+  sharath_babu: { name: "K.N. Sharath Babu", address: "Chief Editor, Sathyadhari Kannada Masa Patrike, Reg. KARKAN/2014/552277", mobile: null, fileTag: "Sharath_Babu" },
+  sai_raghav: { name: "Sri Sai Raghav", address: "No. 141, Sri Sai Residency, JP Nagar 7th Phase, Bengaluru", mobile: "09092028055", fileTag: "Sai_Raghav" },
+} as const;
+export type SignatoryKey = keyof typeof LETTER_SIGNATORIES;
+
+export const LETTER_VARIANTS = ["bill_stop", "lokayukta", "rti", "bilingual_summary"] as const;
+export type LetterVariant = (typeof LETTER_VARIANTS)[number];
+export const LETTER_DRAFT_KINDS: Record<LetterVariant, string> = {
+  bill_stop: "Kannada bill-stop notice",
+  lokayukta: "Lokayukta complaint",
+  rti: "RTI application (from findings)",
+  bilingual_summary: "Bilingual forensic summary",
 };
