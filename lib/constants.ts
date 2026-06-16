@@ -309,6 +309,20 @@ export const DEFAULT_DEADLINE_RULES: DeadlineRules = {
   criticalOverdueDays: 7,
 };
 
+/** Duplicate-photo detection thresholds (Hamming distance on 64-bit hashes). */
+export interface PhotoDedupeRules {
+  phashMax: number;   // max pHash Hamming for a perceptual match
+  dhashMax: number;   // max dHash Hamming for a perceptual match
+  strictMax: number;  // both under this => High severity
+  gpsEpsilon: number; // degrees tolerance for "same GPS"
+}
+export const DEFAULT_PHOTO_DEDUPE_RULES: PhotoDedupeRules = {
+  phashMax: 10,
+  dhashMax: 10,
+  strictMax: 6,
+  gpsEpsilon: 0.0002,
+};
+
 // =============================================================================
 // Phase 3 — Advanced Complaint Management (documents, OCR, AI)
 // =============================================================================

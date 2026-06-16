@@ -3,6 +3,8 @@ import { getSessionUser, hasRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/supabase-upload";
 import { processDocumentOcr } from "@/lib/ocr/process-document";
+import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
+import { findPhotoMatches, deriveStage } from "@/lib/dedupe-photos";
 import { getComplaintSettings } from "@/lib/settings";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { COMPLAINT_FIELD_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
@@ -51,6 +53,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const wantsOcr = String(form.get("runOcr")) === "true" && mime !== "application/pdf";
   const initialOcr = mime === "application/pdf" ? "Skipped" : wantsOcr ? "Queued" : "Not Started";
 
+  // Fingerprint for duplicate-photo detection (best-effort; never blocks upload).
+  const fp = await fingerprintImage(buffer, mime).catch(() => null);
+
   // 2) Persist document row (admin client; app-level role already checked).
   const admin = createAdminClient();
   const { data: doc, error } = await admin
@@ -74,6 +79,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       internal_notes: (form.get("internalNotes") as string) || null,
       ocr_status: initialOcr,
       ocr_language: settings.ocrLanguage,
+      file_sha256: fp?.sha256 ?? null,
+      phash: fp?.phash ?? null,
+      dhash: fp?.dhash ?? null,
+      exif_gps_lat: fp?.gpsLat ?? null,
+      exif_gps_lon: fp?.gpsLon ?? null,
+      exif_taken_at: fp?.takenAt ?? null,
+      photo_stage: deriveStage(documentType),
     })
     .select("id")
     .single();
@@ -99,6 +111,59 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     changed_by: user.id,
   });
 
+  // 3b) Duplicate-photo check across other jobs/cases (best-effort).
+  let duplicateWarning: {
+    severity: string;
+    count: number;
+    sameDivision: boolean;
+    matches: { jobNumber: string | null; caseNumber: string | null; road: string | null; division: string | null; severity: string; sameDivision: boolean }[];
+  } | null = null;
+  if (fp) {
+    try {
+      const { data: comp } = await admin.from("complaints").select("division_id").eq("id", id).maybeSingle();
+      const matches = await findPhotoMatches(fp, { excludeComplaintId: id, divisionId: comp?.division_id ?? null });
+      if (matches.length) {
+        const severity = matches[0]!.severity;
+        await admin
+          .from("complaint_documents")
+          .update({
+            is_duplicate: true,
+            verification_status: "Duplicate",
+            dup_severity: severity,
+            dup_matches: matches.slice(0, 20),
+            dup_checked_at: new Date().toISOString(),
+          })
+          .eq("id", documentId);
+        duplicateWarning = {
+          severity,
+          count: matches.length,
+          sameDivision: matches.some((m) => m.sameDivision),
+          matches: matches.slice(0, 5).map((m) => ({
+            jobNumber: m.jobNumber,
+            caseNumber: m.caseNumber,
+            road: m.road,
+            division: m.division,
+            severity: m.severity,
+            sameDivision: m.sameDivision,
+          })),
+        };
+        await admin.from("complaint_timeline").insert({
+          complaint_id: id,
+          event_type: "Note",
+          title: `⚠ Possible duplicate photo (${severity}) — same image on ${matches.length} other case(s)`,
+          summary: matches
+            .slice(0, 5)
+            .map((m) => `${m.jobNumber ?? m.caseNumber ?? "?"}${m.road ? ` (${m.road})` : ""}${m.sameDivision ? " · same division" : ""}`)
+            .join("; "),
+          related_document_id: documentId,
+          created_by: user.id,
+        });
+      }
+    } catch (e) {
+      console.error("[upload] duplicate check failed (upload preserved)", e);
+    }
+  }
+
   // 4) OCR inline (best-effort). Failure NEVER breaks the upload.
   let ocrStatus = initialOcr;
   if (wantsOcr && settings.ocrAutoRun) {
@@ -117,5 +182,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     bucket,
     ocrStatus,
     aiConfigured: isAiConfigured(),
+    duplicateWarning,
   });
 }

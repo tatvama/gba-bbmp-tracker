@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadBuffer, uploadBuffer } from "@/lib/storage/supabase-upload";
 import { runOcr } from "@/lib/ocr/ocr-service";
+import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { analyzeComplaintDocument } from "@/lib/ai/complaint-document-analyzer";
 import { getComplaintSettings } from "@/lib/settings";
 import { STORAGE_BUCKETS } from "@/lib/constants";
@@ -31,6 +32,24 @@ export async function processDocumentOcr(
     return { ok: false, status: "Failed", error: "Could not download original file" };
   }
 
+  // Backfill image fingerprint if missing (best-effort).
+  let fpUpdate: Record<string, unknown> = {};
+  if (!doc.file_sha256) {
+    try {
+      const fp = await fingerprintImage(buffer, doc.mime_type ?? null);
+      fpUpdate = {
+        file_sha256: fp.sha256,
+        phash: fp.phash,
+        dhash: fp.dhash,
+        exif_gps_lat: fp.gpsLat,
+        exif_gps_lon: fp.gpsLon,
+        exif_taken_at: fp.takenAt,
+      };
+    } catch (e) {
+      console.warn("[ocr] fingerprint backfill failed", e);
+    }
+  }
+
   const settings = await getComplaintSettings();
   const res = await runOcr({
     buffer,
@@ -55,6 +74,7 @@ export async function processDocumentOcr(
   }
 
   await admin.from("complaint_documents").update({
+    ...fpUpdate,
     ocr_status: res.status,
     ocr_raw_text: res.rawText || null,
     ocr_clean_text: res.cleanText || null,

@@ -130,6 +130,7 @@ export interface Complaint {
   eng_subdivision_id: string | null;
   contact_id: string | null;
   complaint_number: string | null;
+  job_number: string | null;
   rti_number: string | null;
   date_submitted: string | null;
   due_date: string | null;
@@ -227,6 +228,18 @@ export interface ComplaintDocument {
   internal_notes: string | null;
   created_at: string;
   updated_at: string;
+  // Duplicate-photo detection (0005)
+  file_sha256: string | null;
+  phash: string | null;
+  dhash: string | null;
+  exif_gps_lat: number | null;
+  exif_gps_lon: number | null;
+  exif_taken_at: string | null;
+  photo_stage: string | null;
+  is_duplicate: boolean;
+  dup_severity: string | null;
+  dup_matches: unknown;
+  dup_checked_at: string | null;
 }
 
 /** Structured AI extraction stored in complaint_documents.ai_extracted_json. */

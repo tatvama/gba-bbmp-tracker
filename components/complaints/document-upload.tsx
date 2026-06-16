@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, Upload, Loader2, ImagePlus, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,11 +12,19 @@ import { COMPLAINT_DOCUMENT_TYPES } from "@/lib/constants";
 const selectCls =
   "flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+interface DuplicateWarning {
+  severity: string;
+  count: number;
+  sameDivision: boolean;
+  matches: { jobNumber: string | null; caseNumber: string | null; road: string | null; division: string | null; severity: string; sameDivision: boolean }[];
+}
+
 interface UploadOutcome {
   fileName: string;
   ok: boolean;
   ocrStatus?: string;
   error?: string;
+  duplicateWarning?: DuplicateWarning | null;
 }
 
 export function DocumentUpload({
@@ -57,7 +66,7 @@ export function DocumentUpload({
       try {
         const res = await fetch(`/api/complaints/${complaintId}/documents/upload`, { method: "POST", body: fd });
         const json = await res.json();
-        out.push({ fileName: file.name, ok: res.ok && json.ok, ocrStatus: json.ocrStatus, error: json.error });
+        out.push({ fileName: file.name, ok: res.ok && json.ok, ocrStatus: json.ocrStatus, error: json.error, duplicateWarning: json.duplicateWarning });
       } catch (e) {
         out.push({ fileName: file.name, ok: false, error: e instanceof Error ? e.message : "Upload failed" });
       }
@@ -132,11 +141,26 @@ export function DocumentUpload({
       )}
 
       {results.length > 0 && (
-        <ul className="space-y-1 text-sm">
+        <ul className="space-y-2 text-sm">
           {results.map((r, i) => (
-            <li key={i} className={r.ok ? "text-teal" : "text-destructive"}>
-              {r.ok ? <Check className="mr-1 inline h-3.5 w-3.5" /> : <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />}
-              {r.fileName} — {r.ok ? `uploaded (OCR: ${r.ocrStatus})` : r.error}
+            <li key={i}>
+              <span className={r.ok ? "text-teal" : "text-destructive"}>
+                {r.ok ? <Check className="mr-1 inline h-3.5 w-3.5" /> : <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />}
+                {r.fileName} — {r.ok ? `uploaded (OCR: ${r.ocrStatus})` : r.error}
+              </span>
+              {r.duplicateWarning && (
+                <div className="mt-1 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                  <span className="font-semibold">
+                    ⚠ Possible duplicate photo ({r.duplicateWarning.severity})
+                    {r.duplicateWarning.sameDivision ? " — same division" : ""}
+                  </span>
+                  <span> — this image already appears on {r.duplicateWarning.count} other case(s): </span>
+                  {r.duplicateWarning.matches
+                    .map((m) => `${m.jobNumber ?? m.caseNumber ?? "?"}${m.road ? ` (${m.road})` : ""}`)
+                    .join(", ")}
+                  . <Link href="/complaints/duplicates" className="underline">Review audit →</Link>
+                </div>
+              )}
             </li>
           ))}
         </ul>

@@ -136,6 +136,7 @@ export function RoadWorkGenerator({
     fd.set("description", finalText);
     if (wardId) fd.set("wardId", wardId);
     if (roadName) fd.set("locationText", roadName);
+    if (jobNumber) fd.set("jobNumber", jobNumber);
     if (jobNumber) fd.set("requestedAction", `Inquiry into road work ${jobNumber}`);
     const r = await createComplaint({}, fd);
     if (!r.success || !r.id) return { ok: false, error: r.error ?? "Could not create complaint." };

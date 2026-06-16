@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, RefreshCw, Sparkles, ClipboardCheck, Loader2, FileText, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ const OCR_VARIANT: Record<string, BadgeProps["variant"]> = {
 };
 const VERIF_VARIANT: Record<string, BadgeProps["variant"]> = {
   Verified: "success", "Pending Review": "muted", "Needs Correction": "warning",
-  Rejected: "destructive", Duplicate: "outline", "Low Confidence": "warning",
+  Rejected: "destructive", Duplicate: "destructive", "Low Confidence": "warning",
 };
 
 export function DocumentList({
@@ -82,6 +83,11 @@ export function DocumentList({
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge variant={OCR_VARIANT[d.ocr_status] ?? "muted"}>OCR: {d.ocr_status}</Badge>
                   <Badge variant={VERIF_VARIANT[d.verification_status] ?? "muted"}>{d.verification_status}</Badge>
+                  {d.is_duplicate && (
+                    <Link href="/complaints/duplicates" title="Same image found on another job/case">
+                      <Badge variant="destructive">⚠ Duplicate{d.dup_severity ? ` · ${d.dup_severity}` : ""}</Badge>
+                    </Link>
+                  )}
                   {d.ai_confidence && <Badge variant="outline">AI {d.ai_confidence}</Badge>}
                 </div>
               </div>

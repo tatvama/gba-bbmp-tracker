@@ -94,6 +94,9 @@ export function ComplaintForm({
         <Field label="External complaint no." error={fe.externalComplaintNumber}>
           <Input name="externalComplaintNumber" defaultValue={initial?.complaint_number ?? ""} placeholder="From the portal / acknowledgement" />
         </Field>
+        <Field label="Job / work-order no." error={fe.jobNumber}>
+          <Input name="jobNumber" defaultValue={initial?.job_number ?? ""} placeholder="Govt contract job code, e.g. RR-2026-0456" />
+        </Field>
         <Field label="RTI no. (if any)" error={fe.rtiNumber}>
           <Input name="rtiNumber" defaultValue={initial?.rti_number ?? ""} />
         </Field>
