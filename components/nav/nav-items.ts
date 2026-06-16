@@ -61,6 +61,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/complaints/duplicates", label: "Duplicate Photos", icon: Images, group: "complaints" },
   { href: "/complaints/map", label: "Complaint Map", icon: MapPinned, group: "complaints" },
   { href: "/complaints/risk", label: "Risk & Red Flags", icon: Gauge, group: "complaints" },
+  { href: "/complaints/analytics", label: "Fraud Analytics", icon: BarChart3, group: "complaints" },
   { href: "/complaints/mobile/upload", label: "Mobile Upload", icon: Smartphone, group: "complaints" },
   { href: "/complaints/ocr-queue", label: "OCR Queue", icon: ScanLine, group: "complaints" },
   { href: "/complaints/reports", label: "Complaint Reports", icon: BarChart3, group: "complaints" },

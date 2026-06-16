@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { CORP_NAME, CORPORATION_CODES, COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
 import { getDeadlineRules } from "@/lib/settings";
 import { activeDeadline } from "@/lib/rti-deadlines";
+import { benford, thresholdClusters, iqrOutliers, type BenfordResult } from "@/lib/forensics/analytics";
+import { haversineMeters } from "@/lib/geo";
 import type {
   Contact,
   ContactWithRelations,
@@ -1397,6 +1399,100 @@ export async function getPublicCaseStatus(id: string): Promise<PublicCaseStatus 
   }
 
   return null;
+}
+
+const APPROVAL_THRESHOLDS = [100_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000];
+
+export interface FraudAnalytics {
+  amountCount: number;
+  benford: BenfordResult;
+  thresholds: { threshold: number; count: number }[];
+  outliers: { high: number | null; values: number[] };
+  monthly: { month: string; bills: number; flagged: number }[];
+  collusion: { contractor: string; engineer: string; flaggedBills: number }[];
+}
+
+/** Portfolio-wide statistical fraud signals from the bill_audits table. */
+export async function getFraudAnalytics(): Promise<FraudAnalytics> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("bill_audits")
+    .select("grand_total, red_flag_count, created_at, complaint:complaints!complaint_id(contractor, assigned_engineer:contacts!assigned_engineer_id(full_name))")
+    .limit(8000);
+  logErr("fraudAnalytics", error);
+  const rows = (data ?? []) as Record<string, unknown>[];
+
+  const amounts = rows.map((r) => Number(r.grand_total)).filter((n) => Number.isFinite(n) && n > 0);
+
+  const monthMap = new Map<string, { bills: number; flagged: number }>();
+  const collMap = new Map<string, { contractor: string; engineer: string; flaggedBills: number }>();
+  for (const r of rows) {
+    const month = String(r.created_at ?? "").slice(0, 7);
+    if (month) {
+      const m = monthMap.get(month) ?? { bills: 0, flagged: 0 };
+      m.bills++;
+      if ((r.red_flag_count as number) > 0) m.flagged++;
+      monthMap.set(month, m);
+    }
+    if ((r.red_flag_count as number) > 0) {
+      const c = r.complaint as { contractor?: string | null; assigned_engineer?: { full_name?: string } | null } | null;
+      const contractor = c?.contractor ?? null;
+      const engineer = c?.assigned_engineer?.full_name ?? null;
+      if (contractor && engineer) {
+        const key = `${contractor}|${engineer}`;
+        const e = collMap.get(key) ?? { contractor, engineer, flaggedBills: 0 };
+        e.flaggedBills++;
+        collMap.set(key, e);
+      }
+    }
+  }
+
+  const out = iqrOutliers(amounts);
+  return {
+    amountCount: amounts.length,
+    benford: benford(amounts),
+    thresholds: thresholdClusters(amounts, APPROVAL_THRESHOLDS),
+    outliers: { high: out.high, values: out.outliers },
+    monthly: [...monthMap.entries()].sort().map(([month, v]) => ({ month, ...v })),
+    collusion: [...collMap.values()].filter((c) => c.flaggedBills >= 2).sort((a, b) => b.flaggedBills - a.flaggedBills),
+  };
+}
+
+export interface LocationOverlap {
+  meters: number;
+  a: { complaintId: string; caseNumber: string | null; jobNumber: string | null; contractor: string | null; road: string | null };
+  b: { complaintId: string; caseNumber: string | null; jobNumber: string | null; contractor: string | null; road: string | null };
+}
+
+/** Different works whose reported locations are < `maxMeters` apart (possible double-work / overlap). */
+export async function getLocationOverlaps(maxMeters = 60): Promise<LocationOverlap[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("complaints")
+    .select("id, internal_case_number, job_number, contractor, location, latitude, longitude")
+    .not("latitude", "is", null)
+    .is("deleted_at", null)
+    .limit(3000);
+  logErr("locationOverlaps", error);
+  const rows = (data ?? []) as Record<string, unknown>[];
+
+  const out: LocationOverlap[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = i + 1; j < rows.length; j++) {
+      const a = rows[i]!, b = rows[j]!;
+      const sameJob = a.job_number && b.job_number && a.job_number === b.job_number;
+      if (sameJob) continue; // same job legitimately shares a location
+      const d = haversineMeters(a.latitude as number, a.longitude as number, b.latitude as number, b.longitude as number);
+      if (d <= maxMeters) {
+        out.push({
+          meters: Math.round(d),
+          a: { complaintId: a.id as string, caseNumber: (a.internal_case_number as string) ?? null, jobNumber: (a.job_number as string) ?? null, contractor: (a.contractor as string) ?? null, road: (a.location as string) ?? null },
+          b: { complaintId: b.id as string, caseNumber: (b.internal_case_number as string) ?? null, jobNumber: (b.job_number as string) ?? null, contractor: (b.contractor as string) ?? null, road: (b.location as string) ?? null },
+        });
+      }
+    }
+  }
+  return out.sort((x, y) => x.meters - y.meters).slice(0, 200);
 }
 
 export interface MapPoint {
