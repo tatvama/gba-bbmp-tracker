@@ -1,0 +1,12 @@
+[
+  { "sr_code": "R-1.1", "description": "Excavation in ordinary soil for road work and disposal", "unit": "cum", "rate": 180, "sr_year": "2023-24" },
+  { "sr_code": "R-2.1", "description": "Granular Sub Base GSB Grade-I", "unit": "cum", "rate": 1850, "sr_year": "2023-24" },
+  { "sr_code": "R-3.1", "description": "Wet Mix Macadam WMM", "unit": "cum", "rate": 2100, "sr_year": "2023-24" },
+  { "sr_code": "R-4.1", "description": "Cement concrete M20 for drain kerb channel", "unit": "cum", "rate": 6200, "sr_year": "2023-24" },
+  { "sr_code": "R-5.1", "description": "Dense Bituminous Macadam DBM", "unit": "cum", "rate": 8200, "sr_year": "2023-24" },
+  { "sr_code": "R-6.1", "description": "Bituminous Concrete BC wearing course", "unit": "cum", "rate": 9100, "sr_year": "2023-24" },
+  { "sr_code": "R-7.1", "description": "Tack coat with bitumen emulsion", "unit": "sqm", "rate": 18, "sr_year": "2023-24" },
+  { "sr_code": "R-7.2", "description": "Prime coat with bitumen emulsion", "unit": "sqm", "rate": 32, "sr_year": "2023-24" },
+  { "sr_code": "R-8.1", "description": "Providing and laying paver block footpath 60mm", "unit": "sqm", "rate": 720, "sr_year": "2023-24" },
+  { "sr_code": "R-9.1", "description": "Reinforcement steel TMR Fe500 for RCC", "unit": "kg", "rate": 78, "sr_year": "2023-24" }
+]

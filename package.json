@@ -21,6 +21,7 @@
     "db:reset": "tsx scripts/migrate.ts && tsx scripts/seed.ts && tsx scripts/seed-gba.ts && tsx scripts/seed-rti.ts && tsx scripts/seed-complaints.ts",
     "db:create-admin": "tsx scripts/create-admin.ts",
     "db:backfill-fingerprints": "tsx scripts/backfill-fingerprints.ts",
+    "db:seed-sr": "tsx scripts/seed-sr-rates.ts",
     "mcp:start": "tsx mcp/bbmp-server.ts"
   },
   "dependencies": {

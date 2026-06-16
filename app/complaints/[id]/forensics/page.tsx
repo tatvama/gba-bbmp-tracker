@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { BillForensicsPanel } from "@/components/complaints/bill-forensics";
+import { StructuredBillAudit } from "@/components/complaints/structured-bill-audit";
 import { getComplaint } from "@/lib/queries";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { getSessionUser, hasRole } from "@/lib/auth";
@@ -35,7 +36,20 @@ export default async function ComplaintForensicsPage({ params }: { params: Promi
         title="Cross-document forensic audit"
         description={`${complaint.internal_case_number ?? ""} — recompute bill arithmetic and cross-check quantities/amounts across this case's bill, MB book, work order, estimate and trip sheet. Findings are suspicions for review.`}
       />
-      <BillForensicsPanel complaintId={id} aiConfigured={isAiConfigured()} />
+      <div className="space-y-8">
+        <section>
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Structured bill audit (exact recompute + rate check)
+          </h2>
+          <StructuredBillAudit complaintId={id} aiConfigured={isAiConfigured()} />
+        </section>
+        <section>
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Cross-document consistency (AI)
+          </h2>
+          <BillForensicsPanel complaintId={id} aiConfigured={isAiConfigured()} />
+        </section>
+      </div>
     </div>
   );
 }
