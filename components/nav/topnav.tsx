@@ -22,7 +22,7 @@ export function TopNav({ email, role }: UserMenuProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-13 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/85 shadow-sm">
+    <header className="sticky top-0 z-40 flex h-13 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/85">
       {/* Mobile nav */}
       <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
         <Button
@@ -53,7 +53,7 @@ export function TopNav({ email, role }: UserMenuProps) {
           <span className="text-[13px] font-semibold leading-tight text-foreground">
             BBMP Ward Tracker
           </span>
-          <span className="text-[10px] leading-none text-muted-foreground">
+          <span className="text-[10px] leading-none text-muted-foreground/70">
             Bengaluru · 225 wards
           </span>
         </div>
@@ -63,18 +63,19 @@ export function TopNav({ email, role }: UserMenuProps) {
       <button
         onClick={openPalette}
         className={[
-          "ml-4 hidden h-8 max-w-sm flex-1 items-center gap-2.5 rounded-lg",
-          "border border-border/70 bg-muted/40 px-3 text-sm text-muted-foreground",
-          "transition-all duration-150 hover:border-primary/40 hover:bg-muted hover:text-foreground",
+          "ml-4 hidden h-8 max-w-[320px] flex-1 items-center gap-2 rounded-lg",
+          "border border-border/60 bg-muted/40 px-3",
+          "text-xs text-muted-foreground",
+          "transition-all duration-150",
+          "hover:border-primary/35 hover:bg-muted/70 hover:text-foreground/80",
+          "focus:outline-none focus:border-ring/60 focus:ring-2 focus:ring-ring/25",
           "sm:flex",
         ].join(" ")}
         aria-label="Open command palette"
       >
-        <Search className="h-3.5 w-3.5 shrink-0" />
-        <span className="flex-1 text-left text-xs">Search wards, contacts…</span>
-        <kbd className="hidden rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground lg:block">
-          ⌘K
-        </kbd>
+        <Search className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        <span className="flex-1 text-left">Search wards, contacts…</span>
+        <kbd className="hidden lg:inline-flex">⌘K</kbd>
       </button>
 
       {/* Mobile: icon-only search */}

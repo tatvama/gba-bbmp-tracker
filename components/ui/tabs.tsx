@@ -16,7 +16,7 @@ const TabsList = React.forwardRef<
     ref={ref}
     className={cn(
       variant === "pill"
-        ? "inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground"
+        ? "inline-flex h-9 items-center gap-1 rounded-lg bg-muted/70 p-1 text-muted-foreground"
         : "flex items-end gap-0 border-b bg-transparent text-muted-foreground",
       className,
     )}
@@ -36,13 +36,13 @@ const TabsTrigger = React.forwardRef<
     className={cn(
       "inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium",
       "ring-offset-background transition-all duration-150",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-1",
       "disabled:pointer-events-none disabled:opacity-50",
       variant === "pill"
         ? [
             "rounded-md px-3 py-1.5",
             "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-            "hover:text-foreground",
+            "hover:text-foreground/80",
           ].join(" ")
         : [
             "relative border-b-2 border-transparent px-3 pb-2.5 pt-2",
@@ -65,7 +65,7 @@ const TabsContent = React.forwardRef<
     ref={ref}
     className={cn(
       "mt-3 ring-offset-background",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-1",
       className,
     )}
     {...props}

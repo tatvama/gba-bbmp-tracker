@@ -21,11 +21,11 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {title}
           </h1>
-          {badge && <span className="shrink-0">{badge}</span>}
+          {badge && <span className="shrink-0 translate-y-px">{badge}</span>}
         </div>
         {description && (
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">

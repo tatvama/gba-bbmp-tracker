@@ -18,27 +18,32 @@ export function Sidebar({ className }: { className?: string }) {
     const Icon = item.icon;
     const active = item.href === activeHref;
     return (
-      <li>
+      <li className="relative">
+        {active && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-[60%] w-[3px] rounded-r-full bg-primary"
+          />
+        )}
         <Link
           href={item.href}
           aria-current={active ? "page" : undefined}
           className={cn(
-            "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
+            "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150",
             active
-              ? "bg-primary/10 font-semibold text-primary"
-              : "font-medium text-foreground/55 hover:bg-muted/70 hover:text-foreground",
+              ? "bg-primary/[0.08] font-semibold text-primary"
+              : "font-medium text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground/80",
           )}
         >
           <Icon
             className={cn(
-              "h-[15px] w-[15px] shrink-0 transition-colors",
-              active ? "text-primary" : "text-foreground/35 group-hover:text-foreground/70",
+              "h-4 w-4 shrink-0 transition-colors duration-150",
+              active
+                ? "text-primary"
+                : "text-foreground/35 group-hover:text-foreground/65",
             )}
           />
           <span className="truncate">{item.label}</span>
-          {active && (
-            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
-          )}
         </Link>
       </li>
     );
@@ -46,16 +51,16 @@ export function Sidebar({ className }: { className?: string }) {
 
   return (
     <nav
-      className={cn("flex h-full flex-col gap-0 overflow-y-auto px-3 py-4", className)}
+      className={cn("flex h-full flex-col gap-0 overflow-y-auto px-2 py-3", className)}
       aria-label="Primary navigation"
     >
       {NAV_SECTIONS.map((section, i) => {
         const items = NAV_ITEMS.filter((it) => it.group === section.group);
         if (items.length === 0) return null;
         return (
-          <div key={section.group} className={cn("flex flex-col gap-0.5", i > 0 && "mt-4")}>
+          <div key={section.group} className={cn("flex flex-col gap-0.5", i > 0 && "mt-5")}>
             {section.label && (
-              <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
                 {section.label}
               </p>
             )}
@@ -65,7 +70,7 @@ export function Sidebar({ className }: { className?: string }) {
               ))}
             </ul>
             {i < NAV_SECTIONS.length - 1 && items.length > 0 && (
-              <div className="mt-4 border-t" />
+              <div className="mx-3 mt-5 border-t border-border/60" />
             )}
           </div>
         );

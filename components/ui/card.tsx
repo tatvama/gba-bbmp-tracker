@@ -3,15 +3,19 @@ import { cn } from "@/lib/utils";
 
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { elevated?: boolean }
->(({ className, elevated, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { elevated?: boolean; interactive?: boolean }
+>(({ className, elevated, interactive, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
       "rounded-xl border bg-card text-card-foreground",
-      elevated
-        ? "shadow-md hover:shadow-lg transition-shadow duration-200"
-        : "shadow-sm",
+      elevated && "shadow-md hover:shadow-lg transition-shadow duration-200",
+      interactive && [
+        "cursor-pointer transition-all duration-200",
+        "hover:-translate-y-0.5 hover:shadow-md hover:border-foreground/15",
+        "active:translate-y-0 active:shadow-sm",
+      ],
+      !elevated && !interactive && "shadow-sm",
       className,
     )}
     {...props}
@@ -70,7 +74,7 @@ const CardFooter = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex items-center gap-2 border-t bg-muted/30 px-5 py-3",
+      "flex items-center gap-2 border-t bg-muted/25 px-5 py-3",
       className,
     )}
     {...props}
