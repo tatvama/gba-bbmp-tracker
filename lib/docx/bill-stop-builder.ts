@@ -114,6 +114,12 @@ export async function buildLetterDocx(sk: LetterSkeleton, opts: DocxOptions = {}
   children.push(para(""));
 
   children.push(para(sk.subject, { bold: true }));
+  if (sk.flagSummary) {
+    children.push(para(
+      `ಧ್ವಜ ಸಾರಾಂಶ (Flags): RED ${sk.flagSummary.red} · ORANGE ${sk.flagSummary.orange} · AMBER ${sk.flagSummary.amber}`,
+      { bold: true, color: ACCENT, size: 20 },
+    ));
+  }
   if (sk.references.length) {
     children.push(para("ಉಲ್ಲೇಖಗಳು:", { bold: true, size: 20 }));
     for (const r of sk.references) children.push(para(`• ${r}`, { size: 20 }));
@@ -131,6 +137,22 @@ export async function buildLetterDocx(sk: LetterSkeleton, opts: DocxOptions = {}
       rows: rows.map((r) => [String(r.slNo), r.ground, r.documentReference, r.whySuspicious, r.risk, r.recordDemanded]),
     }));
     if (omitted) children.push(para(`… and ${omitted} more (see the full audit report).`, { italics: true, size: 18 }));
+    children.push(para(""));
+  }
+
+  // Loss estimate (figures + words)
+  if (sk.lossBox) {
+    children.push(para("ನಷ್ಟ ಲೆಕ್ಕ (Loss estimate)", { bold: true, color: ACCENT }));
+    children.push(para(`ಖಚಿತ (Definite): ${sk.lossBox.definiteFigures} — ${sk.lossBox.definiteWords}`, { size: 20 }));
+    children.push(para(`ಶಂಕಿತ (Suspected): ${sk.lossBox.suspectedFigures} — ${sk.lossBox.suspectedWords}`, { size: 20 }));
+    if (sk.lossBox.lines.length) {
+      children.push(dataTable({
+        title: "",
+        columns: ["ಅಂಶ (Item)", "ಮೊತ್ತ (Amount)"],
+        rows: sk.lossBox.lines.map((l) => [l.note ? `${l.label} (${l.note})` : l.label, l.figures]),
+      }));
+    }
+    children.push(para("ಮೇಲಿನ ಮೊತ್ತಗಳು ಶಂಕಿತ ಸಂಭಾವ್ಯ ನಷ್ಟ; ದಾಖಲೆ ಪರಿಶೀಲನೆಯ ನಂತರವೇ ಖಚಿತ.", { italics: true, size: 18 }));
     children.push(para(""));
   }
 
@@ -205,6 +227,13 @@ export async function buildLetterDocx(sk: LetterSkeleton, opts: DocxOptions = {}
   children.push(para(""));
 
   for (const line of sk.closing) children.push(para(line, { bold: line === sk.closing.at(-1) }));
+
+  // Copy-to (escalation chain)
+  if (sk.ccBlock.length) {
+    children.push(para(""));
+    children.push(para("ಪ್ರತಿ (Copy to):", { bold: true, size: 20 }));
+    sk.ccBlock.forEach((c, i) => children.push(para(`${i + 1}. ${c}`, { size: 20 })));
+  }
 
   const doc = new Document({
     sections: [{

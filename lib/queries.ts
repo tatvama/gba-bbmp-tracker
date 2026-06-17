@@ -1190,6 +1190,58 @@ export async function getOfficer(id: string): Promise<OfficerRow | null> {
   return (data as unknown as OfficerRow) ?? null;
 }
 
+/** Trimmed officer record for the Audit & Draft "To Whom" recipient picker. */
+export interface RecipientOfficer {
+  id: string;
+  full_name: string;
+  designation: string | null;
+  role_level: string | null;
+  office_address: string | null;
+  phone: string | null;
+  email: string | null;
+  division: string | null;
+  corporation: string | null;
+  eng_subdivision: string | null;
+}
+
+interface RecipientOfficerRaw {
+  id: string;
+  full_name: string;
+  designation: string | null;
+  role_level: string | null;
+  office_address: string | null;
+  phone: string | null;
+  email: string | null;
+  division: { name: string } | null;
+  corporation: { name: string } | null;
+  eng_subdivision: { name: string } | null;
+}
+
+/** Officers/contacts for the recipient picker — id, posting, contact + jurisdiction. */
+export async function listRecipientOfficers(): Promise<RecipientOfficer[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select(
+      "id, full_name, designation, role_level, office_address, phone, email, division:divisions!division_id(name), corporation:corporations!corporation_id(name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name)",
+    )
+    .order("full_name");
+  logErr("listRecipientOfficers", error);
+  const rows = (data as unknown as RecipientOfficerRaw[]) ?? [];
+  return rows.map((r) => ({
+    id: r.id,
+    full_name: r.full_name,
+    designation: r.designation ?? null,
+    role_level: r.role_level ?? null,
+    office_address: r.office_address ?? null,
+    phone: r.phone ?? null,
+    email: r.email ?? null,
+    division: r.division?.name ?? null,
+    corporation: r.corporation?.name ?? null,
+    eng_subdivision: r.eng_subdivision?.name ?? null,
+  }));
+}
+
 /** Officers who report to this officer. */
 export async function listDirectReports(officerId: string): Promise<OfficerRow[]> {
   const supabase = await sb();

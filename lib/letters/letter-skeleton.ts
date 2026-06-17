@@ -5,12 +5,19 @@
  * SAFETY: resolveSignatory() refuses to sign as Guruji / the Trust / Samsthana.
  */
 import { LETTER_SIGNATORIES, type SignatoryKey, type LetterVariant } from "@/lib/constants";
-import type { LetterContext, LetterSkeleton } from "./types";
+import type { LetterContext, LetterSkeleton, LetterRecipient } from "./types";
 import { buildGrounds, buildSummaryBox } from "./evidence-block";
 import { buildEvidenceIndex, buildOfficerResponsibility } from "./evidence-index";
 import { CAUTIOUS_SENTENCE_BANK } from "./letter-knowledge";
 
 const FORBIDDEN_SIGNATORY = /guruji|samsthana|trust|sri\s+sai\s+samsthana/i;
+
+/** Render a recipient/cc party into address lines. */
+function partyLines(r: LetterRecipient): string[] {
+  return [r.name, r.designation, r.office, r.address]
+    .map((x) => (x ?? "").trim())
+    .filter(Boolean);
+}
 
 /** Resolve a signatory; never permit signing on behalf of Guruji / the Trust. */
 export function resolveSignatory(key: SignatoryKey) {
@@ -30,6 +37,11 @@ const TITLES: Record<LetterVariant, string> = {
 };
 
 function recipientBlock(variant: LetterVariant, ctx: LetterContext): string[] {
+  // Explicit "To Whom" from the Audit & Draft wizard overrides the variant default.
+  if (ctx.recipient) {
+    const lines = partyLines(ctx.recipient);
+    if (lines.length) return lines;
+  }
   switch (variant) {
     case "lokayukta":
       return ["ಮಾನ್ಯ ಲೋಕಾಯುಕ್ತರು / ಉಪ ಲೋಕಾಯುಕ್ತರು", "ಕರ್ನಾಟಕ ಲೋಕಾಯುಕ್ತ", "ಬೆಂಗಳೂರು"];
@@ -59,8 +71,26 @@ function demandsFor(variant: LetterVariant): string[] {
 
 /** Assemble the full letter skeleton from context. */
 export function assembleSkeleton(ctx: LetterContext): LetterSkeleton {
-  const s = resolveSignatory(ctx.signatoryKey);
-  const fromBlock = [s.name, s.address, s.mobile ? `ದೂರವಾಣಿ: ${s.mobile}` : ""].filter(Boolean) as string[];
+  // "From Whom": a custom applicant, or a registered signatory. Either way the
+  // forbidden-signatory guard applies — never sign for Guruji / the Trust.
+  let fromBlock: string[];
+  let signerName: string;
+  if (ctx.customSender && ctx.customSender.name.trim()) {
+    const cs = ctx.customSender;
+    if (FORBIDDEN_SIGNATORY.test(`${cs.name} ${cs.address ?? ""}`)) {
+      throw new Error("Letters must not be signed on behalf of Guruji or the Trust.");
+    }
+    fromBlock = [cs.name, cs.address ?? "", cs.mobile ? `ದೂರವಾಣಿ: ${cs.mobile}` : ""].filter(Boolean) as string[];
+    signerName = cs.name;
+  } else {
+    const s = resolveSignatory(ctx.signatoryKey);
+    fromBlock = [s.name, s.address, s.mobile ? `ದೂರವಾಣಿ: ${s.mobile}` : ""].filter(Boolean) as string[];
+    signerName = s.name;
+  }
+
+  const ccBlock = (ctx.ccChain ?? [])
+    .map((r) => partyLines(r).join(", "))
+    .filter(Boolean);
 
   const refs: string[] = [];
   if (ctx.jobCode) refs.push(`ಕೆಲಸ ಸಂಕೇತ (Job code): ${ctx.jobCode}`);
@@ -79,6 +109,7 @@ export function assembleSkeleton(ctx: LetterContext): LetterSkeleton {
     title: TITLES[ctx.variant],
     fromBlock,
     toBlock: recipientBlock(ctx.variant, ctx),
+    ccBlock,
     subject,
     references: refs,
     introduction: CAUTIOUS_SENTENCE_BANK.introduction,
@@ -86,10 +117,12 @@ export function assembleSkeleton(ctx: LetterContext): LetterSkeleton {
     grounds: buildGrounds(ctx.findings),
     demands: demandsFor(ctx.variant),
     escalation: CAUTIOUS_SENTENCE_BANK.escalation,
-    closing: ["ತಮ್ಮ ವಿಶ್ವಾಸಿ,", s.name],
+    closing: ["ತಮ್ಮ ವಿಶ್ವಾಸಿ,", signerName],
     evidenceIndex: buildEvidenceIndex(ctx.findings),
     officerResponsibility: buildOfficerResponsibility(ctx.findings),
     caveat: CAUTIOUS_SENTENCE_BANK.caveat,
+    flagSummary: ctx.flagSummary ?? null,
+    lossBox: ctx.lossBox ?? null,
   };
 }
 
@@ -100,11 +133,21 @@ export function skeletonToPlainText(sk: LetterSkeleton): string {
   L.push("ರವರಿಂದ (From):", ...sk.fromBlock, "");
   L.push("ಗೆ (To):", ...sk.toBlock, "");
   L.push(sk.subject, "");
+  if (sk.flagSummary) {
+    L.push(`ಧ್ವಜ ಸಾರಾಂಶ (Flags): RED ${sk.flagSummary.red}, ORANGE ${sk.flagSummary.orange}, AMBER ${sk.flagSummary.amber}`, "");
+  }
   if (sk.references.length) L.push("ಉಲ್ಲೇಖಗಳು:", ...sk.references, "");
   L.push(sk.introduction, "");
   if (sk.summaryBox.length) {
     L.push("ಸಾರಾಂಶ (Summary):");
     for (const r of sk.summaryBox) L.push(`${r.slNo}. ${r.ground} — ${r.documentReference} — ${r.whySuspicious} [${r.risk}] → ${r.recordDemanded}`);
+    L.push("");
+  }
+  if (sk.lossBox) {
+    L.push("ನಷ್ಟ ಲೆಕ್ಕ (Loss estimate):");
+    L.push(`ಖಚಿತ (Definite): ${sk.lossBox.definiteFigures} — ${sk.lossBox.definiteWords}`);
+    L.push(`ಶಂಕಿತ (Suspected): ${sk.lossBox.suspectedFigures} — ${sk.lossBox.suspectedWords}`);
+    for (const ln of sk.lossBox.lines) L.push(`   • ${ln.label}: ${ln.figures}${ln.note ? ` (${ln.note})` : ""}`);
     L.push("");
   }
   for (const g of sk.grounds) {
@@ -130,6 +173,10 @@ export function skeletonToPlainText(sk: LetterSkeleton): string {
   }
   L.push(sk.caveat, "");
   L.push(...sk.closing);
+  if (sk.ccBlock.length) {
+    L.push("", "ಪ್ರತಿ (Copy to):");
+    sk.ccBlock.forEach((c, i) => L.push(`${i + 1}. ${c}`));
+  }
   return L.join("\n");
 }
 

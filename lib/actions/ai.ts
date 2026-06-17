@@ -18,6 +18,7 @@ import {
   buildRoadWorkLetterPrompt,
   buildRoadWorkReplyAnalysisPrompt,
   buildRoadWorkEscalationPrompt,
+  buildSuspicionSelectPrompt,
   type RoadWorkLetterInput,
   type RoadWorkReplyInput,
   type RoadWorkEscalationInput,
@@ -77,6 +78,39 @@ export async function generateRoadWorkLetter(input: RoadWorkLetterInput): Promis
   const { system, prompt } = buildRoadWorkLetterPrompt(input);
   const r = await generateText({ system, prompt, maxTokens: 4000 });
   return { ok: r.ok, text: r.text, error: r.error };
+}
+
+export interface SuspicionSuggestResult { ok: boolean; codes?: string[]; error?: string }
+
+/**
+ * AI assist for the Audit & Draft wizard: map free-text facts to relevant 180-bank
+ * suspicion codes. Conservative, role-gated, never files anything. Returns only
+ * valid "Q\d+" codes; merged with the deterministic preselect on the client.
+ */
+export async function suggestSuspicions(input: {
+  summary?: string | null;
+  workOrderExtract?: string | null;
+  outputType?: "rti" | "complaint";
+}): Promise<SuspicionSuggestResult> {
+  const roles = input.outputType === "complaint" ? COMPLAINT_WRITE_ROLES : RTI_WRITE_ROLES;
+  const denied = await gate(roles);
+  if (denied) return { ok: false, error: denied.error };
+  if (!input.summary?.trim() && !input.workOrderExtract?.trim()) return { ok: true, codes: [] };
+
+  const { system, prompt } = buildSuspicionSelectPrompt(input);
+  const r = await generateText({ system, prompt, temperature: 0, maxTokens: 1200 });
+  if (!r.ok) return { ok: false, error: r.error };
+
+  const cleaned = (r.text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  try {
+    const parsed = JSON.parse(cleaned) as { codes?: unknown };
+    const codes = Array.isArray(parsed.codes)
+      ? parsed.codes.filter((c): c is string => typeof c === "string" && /^Q\d+$/.test(c))
+      : [];
+    return { ok: true, codes };
+  } catch {
+    return { ok: true, codes: [], error: "Could not parse AI suggestions." };
+  }
 }
 
 // ── Road-work reply analysis + escalation ──────────────────────────────────

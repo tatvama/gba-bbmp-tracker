@@ -24,6 +24,7 @@ import {
   MapPinned,
   Gauge,
   Gavel,
+  FileSearch,
   type LucideIcon,
 } from "lucide-react";
 
@@ -48,6 +49,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/rti", label: "RTI Dashboard", icon: FileText, group: "rti" },
   { href: "/rti/all", label: "All RTIs", icon: Files, group: "rti" },
   { href: "/rti/new", label: "New RTI", icon: FilePlus2, group: "rti" },
+  { href: "/rti/audit", label: "Audit & Draft Wizard", icon: FileSearch, group: "rti" },
   { href: "/rti/road-work", label: "Road Work RTI", icon: Construction, group: "rti" },
   { href: "/rti/road-work/analyze", label: "Reply Analyzer", icon: ScanSearch, group: "rti" },
   { href: "/rti/calendar", label: "RTI Calendar", icon: CalendarClock, group: "rti" },
@@ -57,6 +59,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/complaints/dashboard", label: "Complaint Dashboard", icon: LayoutDashboard, group: "complaints" },
   { href: "/complaints", label: "Complaints", icon: ClipboardList, group: "complaints" },
   { href: "/complaints/new", label: "New Complaint", icon: FilePlus2, group: "complaints" },
+  { href: "/complaints/audit", label: "Audit & Draft Wizard", icon: FileSearch, group: "complaints" },
   { href: "/complaints/road-work", label: "Road Work Complaint", icon: Construction, group: "complaints" },
   { href: "/complaints/road-work/audit", label: "Bill / MB Audit", icon: ShieldAlert, group: "complaints" },
   { href: "/complaints/jobs", label: "Job Forensic Audit", icon: Gavel, group: "complaints" },

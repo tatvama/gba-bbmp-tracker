@@ -30,6 +30,34 @@ export interface SummaryBoxRow { slNo: number; ground: string; documentReference
 export interface RenderedGroundLabel { label: string; value: string; styleKey: string }
 export interface RenderedGround { number: number; title: string; labels: RenderedGroundLabel[] }
 
+/** A "To Whom" recipient / "Copy to" party (Audit & Draft wizard). */
+export interface LetterRecipient {
+  name?: string | null;
+  designation?: string | null;
+  office?: string | null;
+  address?: string | null;
+}
+
+/** A custom "From Whom" sender supplied at draft time (not in the signatory registry). */
+export interface CustomSender {
+  name: string;
+  address?: string | null;
+  mobile?: string | null;
+}
+
+/** RED / ORANGE / AMBER tallies for the flag-summary block (PDF output spec). */
+export interface FlagSummary { red: number; orange: number; amber: number }
+
+export interface LossBoxLine { label: string; figures: string; note?: string }
+/** Loss estimate block — definite + suspected, each in figures and words. */
+export interface LossBox {
+  definiteFigures: string;
+  definiteWords: string;
+  suspectedFigures: string;
+  suspectedWords: string;
+  lines: LossBoxLine[];
+}
+
 export interface LetterContext {
   jobCode: string;
   ward?: string | null;
@@ -45,12 +73,24 @@ export interface LetterContext {
   quantities?: QuantityRow[];
   /** Free-text references that must be whitelisted by the linter (job code etc.). */
   references?: string[];
+  /** "To Whom" — explicit primary recipient; overrides the variant default block. */
+  recipient?: LetterRecipient | null;
+  /** Officers / authorities to mark a copy to (the escalation chain). */
+  ccChain?: LetterRecipient[] | null;
+  /** "From Whom" — a custom applicant instead of a registered signatory. */
+  customSender?: CustomSender | null;
+  /** Pre-computed loss estimate (figures + words). */
+  lossBox?: LossBox | null;
+  /** Pre-computed RED/ORANGE/AMBER flag tallies. */
+  flagSummary?: FlagSummary | null;
 }
 
 export interface LetterSkeleton {
   title: string;
   fromBlock: string[];
   toBlock: string[];
+  /** "Copy to" lines (escalation chain). Empty when none. */
+  ccBlock: string[];
   subject: string;
   references: string[];
   introduction: string;
@@ -62,4 +102,7 @@ export interface LetterSkeleton {
   evidenceIndex: EvidenceIndexRow[];
   officerResponsibility: OfficerResponsibilityRow[];
   caveat: string;
+  /** Optional flag-summary + loss-estimate blocks (Audit & Draft wizard). */
+  flagSummary?: FlagSummary | null;
+  lossBox?: LossBox | null;
 }

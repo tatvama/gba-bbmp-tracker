@@ -12,19 +12,45 @@
  * intelligently selects the relevant points and cites the right law.
  */
 import type { DraftLanguage } from "../constants";
+import { ROAD_WORK_180 } from "./road-work-questions";
 
 export type RoadWorkOutputType = "rti" | "complaint";
 export type RoadWorkLanguage = Extract<DraftLanguage, "English" | "Kannada"> | "Bilingual";
 export type RoadWorkScope = "smart" | "all";
 
+/** Suspicion flag in the 180-point bank. RED = serious, ORANGE = high, AMBER = medium. */
+export type Severity180 = "RED" | "ORANGE" | "AMBER";
+
+/** A single forensic question in the 180-bank (carries a code + severity). */
+export interface RoadWorkQuestion {
+  /** Stable code, "Q1".."Q180". */
+  code: string;
+  en: string;
+  kn: string;
+  severity: Severity180;
+}
+
 export interface RoadWorkSection {
   id: string;
   titleEn: string;
   titleKn: string;
-  /** Inspection questions, English + Kannada. */
-  questions: { en: string; kn: string }[];
+  /** Question-number range for the 180-bank, e.g. "Q1-12" (omitted for the legacy 60-point sections). */
+  range?: string;
+  /**
+   * Inspection questions. Legacy 60-point sections use `{ en, kn }`; the 180-bank
+   * uses the richer `RoadWorkQuestion` (code + severity). The union keeps both valid.
+   */
+  questions: ({ en: string; kn: string } | RoadWorkQuestion)[];
   /** One-line statutory basis for this section. */
   legalBasis: string;
+}
+
+/** A "To Whom" / "From Whom" party rendered into the letter facts. */
+export interface LetterParty {
+  name?: string | null;
+  designation?: string | null;
+  office?: string | null;
+  address?: string | null;
 }
 
 /** The 8 inspection sections (A–H) + geo-tag photos, 60+ points total. */
@@ -243,6 +269,67 @@ ${duties}
 OVERALL PRINCIPLE: Public money is held on public trust. Payment is due only after contract conditions, quality, measurement, insurance, royalty and records are all complete. Any payment made before these are met is irregular expenditure and attracts the personal liability of the certifying officer (AE/AEE/EE), recoverable by the government.`;
 })();
 
+// ── 180-bank knowledge-text builders ─────────────────────────────────────────
+
+/** Render ONLY the selected sections/questions of the 180-bank (smart scope). */
+export function buildKnowledgeTextForCodes(codes: string[]): string {
+  const set = new Set(codes);
+  const blocks: string[] = [];
+  for (const s of ROAD_WORK_180) {
+    const picked = s.questions.filter((q): q is RoadWorkQuestion => "code" in q && set.has(q.code));
+    if (!picked.length) continue;
+    const qs = picked.map((q) => `   ${q.code} [${q.severity}]: ${q.en}`).join("\n");
+    blocks.push(`Section ${s.id} — ${s.titleEn} (${s.titleKn})\n   Legal basis: ${s.legalBasis}\n${qs}`);
+  }
+  if (!blocks.length) return "";
+  return `SELECTED FORENSIC SUSPICIONS (from the 180-point bank — treat each as a documented suspicion, not an accusation):\n\n${blocks.join("\n\n")}`;
+}
+
+/** Full 180-point bank text. Large — inject only on an explicit "all" scope. */
+export const ROAD_WORK_180_FULL_TEXT = (() => {
+  const blocks = ROAD_WORK_180.map((s) => {
+    const qs = s.questions
+      .map((q) => ("code" in q ? `   ${q.code} [${q.severity}]: ${q.en}` : `   - ${q.en}`))
+      .join("\n");
+    return `Section ${s.id} — ${s.titleEn} (${s.titleKn})${s.range ? `  [${s.range}]` : ""}\n   Legal basis: ${s.legalBasis}\n${qs}`;
+  }).join("\n\n");
+  return `BBMP / GBA ROAD-WORK 180-POINT FORENSIC BANK\n${"=".repeat(44)}\n\n${blocks}`;
+})();
+
+// ── suspicion selection (AI assist) ──────────────────────────────────────────
+
+export interface SuspicionSelectInput {
+  summary?: string | null;
+  workOrderExtract?: string | null;
+}
+
+/** Ask the model to map free-text facts to the relevant 180-bank codes. STRICT JSON. */
+export function buildSuspicionSelectPrompt(input: SuspicionSelectInput): { system: string; prompt: string } {
+  const catalog = ROAD_WORK_180.map((s) => {
+    const qs = s.questions
+      .filter((q): q is RoadWorkQuestion => "code" in q)
+      .map((q) => `${q.code} [${q.severity}] ${q.en}`)
+      .join("\n");
+    return `## ${s.id} — ${s.titleEn}\n${qs}`;
+  }).join("\n\n");
+
+  const system = `You map a citizen's road-work complaint facts to the relevant forensic suspicion codes from a FIXED 180-point BBMP/GBA audit bank. Be precise and conservative: include a code ONLY if the facts plausibly raise that specific suspicion. Treat every item as a "suspicion", never a proven accusation. Use ONLY codes that exist in the catalog. Output STRICT JSON only — no prose, no markdown, no code fences.
+
+CATALOG (code [severity] question):
+${catalog}`;
+
+  const prompt = `Facts provided by the citizen:
+"""
+${(input.summary ?? "").slice(0, 4000)}
+${(input.workOrderExtract ?? "").slice(0, 4000)}
+"""
+
+Return JSON of EXACTLY this shape — the codes whose suspicion these facts plausibly raise (most relevant first):
+{"codes":["Q1","Q18"]}`;
+
+  return { system, prompt };
+}
+
 // ── prompt builder ───────────────────────────────────────────────────────────
 
 export interface RoadWorkLetterInput {
@@ -257,8 +344,21 @@ export interface RoadWorkLetterInput {
   roadName?: string | null;
   contractor?: string | null;
   applicantName?: string | null;
-  /** 'smart' = relevant subset; 'all' = full 60-point inspection. */
+  applicantAddress?: string | null;
+  applicantPhone?: string | null;
+  /** 'smart' = relevant subset; 'all' = full inspection. */
   scope?: RoadWorkScope;
+  /** Selected 180-bank codes — when present, only these suspicions are injected. */
+  selectedCodes?: string[];
+  /** "To Whom" — primary recipient; overrides the variant default salutation. */
+  recipient?: LetterParty | null;
+  /** Officers/authorities to mark a copy (ಪ್ರತಿ) to — the escalation chain. */
+  ccChain?: LetterParty[] | null;
+}
+
+/** One-line render of a letter party for the FACTS block. */
+function partyLine(p: LetterParty): string {
+  return [p.name, p.designation, p.office, p.address].filter(Boolean).join(", ");
 }
 
 function languageLine(language: RoadWorkLanguage): string {
@@ -291,15 +391,28 @@ export function buildRoadWorkLetterPrompt(input: RoadWorkLetterInput): {
 } {
   const scope = input.scope ?? "smart";
   const isRti = input.outputType === "rti";
+  const hasCodes = Boolean(input.selectedCodes && input.selectedCodes.length);
+  const recipient = input.recipient && partyLine(input.recipient) ? partyLine(input.recipient) : null;
 
   const docLine = isRti
-    ? "Draft a complete RTI application under the Right to Information Act, 2005, addressed to: The Public Information Officer, [PUBLIC AUTHORITY / BBMP ENGINEERING DIVISION], requesting certified copies of the records below."
-    : "Draft a formal written COMPLAINT to the jurisdictional BBMP / GBA authority (Chief Engineer / Executive Engineer, with copy to the Commissioner and the Lokayukta where appropriate), alleging apparent irregularities in the road work below and requesting an inquiry, fixing of officer liability, and recovery.";
+    ? `Draft a complete RTI application under the Right to Information Act, 2005, addressed to ${recipient ? "the recipient named in the FACTS below" : "The Public Information Officer, [PUBLIC AUTHORITY / BBMP ENGINEERING DIVISION]"}, requesting certified copies of the records below.`
+    : `Draft a formal written COMPLAINT to ${recipient ? "the recipient named in the FACTS below" : "the jurisdictional BBMP / GBA authority (Chief Engineer / Executive Engineer)"}, alleging apparent irregularities in the road work below and requesting an inquiry, fixing of officer liability, and recovery. Mark a copy to each officer listed under "Copy to" below.`;
 
-  const scopeLine =
-    scope === "all"
+  // Knowledge text: the wizard passes explicit 180-bank codes; the legacy generator
+  // passes none and keeps the original 60-point framework text.
+  const knowledgeText = hasCodes
+    ? buildKnowledgeTextForCodes(input.selectedCodes!)
+    : ROAD_WORK_KNOWLEDGE_TEXT;
+
+  const scopeLine = hasCodes
+    ? "Cover the SELECTED SUSPICIONS shown above, grouped by section. Do not add suspicions that are not listed."
+    : scope === "all"
       ? "Cover ALL sections (A–I) of the inspection framework, grouped by section, as a full inspection."
       : "Select only the framework sections and points that are clearly relevant to the facts provided. Do not pad with irrelevant sections.";
+
+  const ccLines = (input.ccChain ?? [])
+    .map((p) => partyLine(p))
+    .filter(Boolean);
 
   const lines: string[] = [
     docLine,
@@ -307,22 +420,27 @@ export function buildRoadWorkLetterPrompt(input: RoadWorkLetterInput): {
     scopeLine,
     "",
     "--- KNOWLEDGE BASE ---",
-    ROAD_WORK_KNOWLEDGE_TEXT,
+    knowledgeText,
     "--- END KNOWLEDGE BASE ---",
     "",
     "--- FACTS PROVIDED ---",
+    recipient ? `Addressed to (To): ${recipient}` : "",
+    ccLines.length ? `Copy to:\n${ccLines.map((c, i) => `   ${i + 1}. ${c}`).join("\n")}` : "",
     input.summary ? `Summary of the issue: ${input.summary}` : "",
     input.workOrderExtract ? `Work order / document details:\n${input.workOrderExtract}` : "",
     input.wardName ? `Ward: ${input.wardName}` : "",
     input.jobNumber ? `Work / job number: ${input.jobNumber}` : "",
     input.roadName ? `Road / location: ${input.roadName}` : "",
     input.contractor ? `Contractor (if known): ${input.contractor}` : "",
-    input.applicantName ? `Applicant: ${input.applicantName}` : "",
+    input.applicantName ? `Applicant (From): ${input.applicantName}` : "",
+    input.applicantAddress ? `Applicant address: ${input.applicantAddress}` : "",
+    input.applicantPhone ? `Applicant phone: ${input.applicantPhone}` : "",
     "--- END FACTS ---",
     "",
     isRti
       ? "Include a line that the applicant is willing to pay the prescribed RTI fee and a request for the records in [PHYSICAL COPY / EMAIL] form, and (if applicable) a statement that the applicant is below the poverty line and exempt from fee."
       : "Include a clear prayer: inquiry into the apparent irregularities, fixing of personal liability on the certifying officers, recovery of any irregular payment, and action under the Prevention of Corruption Act 1988 / BNS 2023 where warranted.",
+    ccLines.length ? "End with a 'ಪ್ರತಿ (Copy to):' block listing each copy recipient." : "",
     languageLine(input.language),
   ].filter(Boolean);
 

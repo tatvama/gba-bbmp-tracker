@@ -555,3 +555,50 @@ export const LETTER_DRAFT_KINDS: Record<LetterVariant, string> = {
   rti: "RTI application (from findings)",
   bilingual_summary: "Bilingual forensic summary",
 };
+
+// =============================================================================
+// Audit & Draft wizard — recipient escalation chain + draft kinds (180-Q spec)
+// =============================================================================
+
+/** Officer escalation / copy chain for forensic letters (PDF output spec). */
+export const ESCALATION_CHAIN = ["AE", "AEE", "EE", "CE", "Commissioner", "Lokayukta", "ACB"] as const;
+export type EscalationLevel = (typeof ESCALATION_CHAIN)[number];
+
+export const ESCALATION_LABEL: Record<EscalationLevel, string> = {
+  AE: "Assistant Engineer (AE)",
+  AEE: "Assistant Executive Engineer (AEE)",
+  EE: "Executive Engineer (EE)",
+  CE: "Chief Engineer (CE)",
+  Commissioner: "Commissioner, GBA / BBMP",
+  Lokayukta: "Karnataka Lokayukta",
+  ACB: "Anti-Corruption Bureau (ACB)",
+};
+
+/**
+ * Fixed institutional recipients (no DB officer row). Kannada strings mirror the
+ * blocks used in lib/letters/letter-skeleton.ts so letters stay consistent.
+ */
+export const INSTITUTIONAL_RECIPIENTS: Record<
+  "Lokayukta" | "ACB",
+  { name: string; office: string; nameKn: string; officeKn: string }
+> = {
+  Lokayukta: {
+    name: "Hon'ble Lokayukta / Upa-Lokayukta",
+    office: "Karnataka Lokayukta, Bengaluru",
+    nameKn: "ಮಾನ್ಯ ಲೋಕಾಯುಕ್ತರು / ಉಪ ಲೋಕಾಯುಕ್ತರು",
+    officeKn: "ಕರ್ನಾಟಕ ಲೋಕಾಯುಕ್ತ, ಬೆಂಗಳೂರು",
+  },
+  ACB: {
+    name: "The Director General of Police",
+    office: "Anti-Corruption Bureau, Karnataka, Bengaluru",
+    nameKn: "ಪೊಲೀಸ್ ಮಹಾನಿರ್ದೇಶಕರು",
+    officeKn: "ಭ್ರಷ್ಟಾಚಾರ ನಿಗ್ರಹ ದಳ (ACB), ಕರ್ನಾಟಕ, ಬೆಂಗಳೂರು",
+  },
+};
+
+/** AI draft kinds produced by the Audit & Draft wizard (persisted via saveAiDraft). */
+export const AUDIT_DRAFT_KINDS = {
+  road_work_audit_rti: "Road-work audit RTI",
+  road_work_audit_complaint: "Road-work audit complaint",
+} as const;
+export type AuditDraftKind = keyof typeof AUDIT_DRAFT_KINDS;
