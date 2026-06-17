@@ -1827,6 +1827,18 @@ export async function listJobNumbers(): Promise<{ jobNumber: string; complaints:
   return [...counts.entries()].map(([jobNumber, complaints]) => ({ jobNumber, complaints })).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
 }
 
+/** Finding codes the verifier has dismissed for a job (false positives). */
+export async function listDismissedFindings(jobNumber: string): Promise<string[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("finding_review")
+    .select("finding_code, status")
+    .eq("job_number", jobNumber)
+    .eq("status", "dismissed");
+  logErr("listDismissedFindings", error);
+  return (data ?? []).map((r) => (r as { finding_code: string }).finding_code);
+}
+
 export interface JobAuditHistoryRow {
   id: string;
   riskScore: number;
@@ -1900,6 +1912,67 @@ export async function listLetterDrafts(jobNumber: string): Promise<LetterDraftRo
     .limit(50);
   logErr("listLetterDrafts", error);
   return (data ?? []).map((r) => toLetterDraftRow(r as Record<string, unknown>));
+}
+
+export interface JobDossierComplaint {
+  id: string;
+  caseNumber: string | null;
+  title: string;
+  location: string | null;
+  contractor: string | null;
+  division: string | null;
+  documents: { id: string; title: string | null; documentType: string | null; sha256: string | null; isDuplicate: boolean; visionVerdict: string | null; geoFlag: string | null; uploadedAt: string | null }[];
+}
+
+/** All complaints + documents under a job number — for the consolidated PIL dossier. */
+export async function getJobDossier(jobNumber: string): Promise<JobDossierComplaint[]> {
+  const supabase = await sb();
+  const { data: comps, error } = await supabase
+    .from("complaints")
+    .select("id, internal_case_number, title, location, contractor, division:divisions!division_id(name)")
+    .eq("job_number", jobNumber)
+    .is("deleted_at", null);
+  logErr("getJobDossier:complaints", error);
+  const ids = (comps ?? []).map((c) => (c as Record<string, unknown>).id as string);
+  if (ids.length === 0) return [];
+
+  const { data: docs, error: dErr } = await supabase
+    .from("complaint_documents")
+    .select("id, complaint_id, title, document_type, file_sha256, is_duplicate, vision_verdict, geo_flag, uploaded_at")
+    .in("complaint_id", ids)
+    .limit(2000);
+  logErr("getJobDossier:docs", dErr);
+
+  const byComplaint = new Map<string, JobDossierComplaint["documents"]>();
+  for (const d of docs ?? []) {
+    const r = d as Record<string, unknown>;
+    const cid = r.complaint_id as string;
+    const list = byComplaint.get(cid) ?? byComplaint.set(cid, []).get(cid)!;
+    list.push({
+      id: r.id as string,
+      title: (r.title as string) ?? null,
+      documentType: (r.document_type as string) ?? null,
+      sha256: (r.file_sha256 as string) ?? null,
+      isDuplicate: (r.is_duplicate as boolean) ?? false,
+      visionVerdict: (r.vision_verdict as string) ?? null,
+      geoFlag: (r.geo_flag as string) ?? null,
+      uploadedAt: (r.uploaded_at as string) ?? null,
+    });
+  }
+
+  return (comps ?? []).map((c) => {
+    const r = c as Record<string, unknown>;
+    const div = r.division as { name?: string } | { name?: string }[] | null;
+    return {
+      id: r.id as string,
+      caseNumber: (r.internal_case_number as string) ?? null,
+      title: r.title as string,
+      location: (r.location as string) ?? null,
+      contractor: (r.contractor as string) ?? null,
+      division: (Array.isArray(div) ? div[0]?.name : div?.name) ?? null,
+      documents: byComplaint.get(r.id as string) ?? [],
+    };
+  });
 }
 
 /** A single letter draft (for reopening into the drafter). */

@@ -192,3 +192,28 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
 
   return { ok: true, report, auditId: (ins as { id: string }).id, docCount: allDocs.length, coverage: report.coverage };
 }
+
+/** Accept / dismiss a finding (by code) for a job. Dismissed findings are excluded
+ *  from the drafted letter and the review-adjusted score. */
+export async function setFindingReview(
+  jobNumber: string,
+  findingCode: string,
+  status: "dismissed" | "accepted",
+  reason?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  let user;
+  try {
+    user = await requireRole(COMPLAINT_VERIFY_ROLES);
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("finding_review")
+    .upsert(
+      { job_number: jobNumber, finding_code: findingCode, status, reason: reason ?? null, reviewed_by: user.id, updated_at: new Date().toISOString() },
+      { onConflict: "job_number,finding_code" },
+    );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

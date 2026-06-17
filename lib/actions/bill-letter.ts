@@ -63,9 +63,19 @@ export async function generateLetter(input: GenerateLetterInput): Promise<Letter
     return { ok: false, error: `No forensic audit found for job "${input.jobNumber}". Run the Job-Number Forensic Audit first.` };
   }
   const report = audit.report as JobAuditReport;
-  const findings: LetterFinding[] = (report.rankedFindings ?? report.findings ?? []).map(mapBillFindingToLetter);
+  // Exclude findings the verifier has dismissed (false positives) so they never
+  // ship as a ground in the notice.
+  const { data: dismissedRows } = await admin
+    .from("finding_review")
+    .select("finding_code")
+    .eq("job_number", input.jobNumber)
+    .eq("status", "dismissed");
+  const dismissed = new Set((dismissedRows ?? []).map((r) => (r as { finding_code: string }).finding_code));
+  const findings: LetterFinding[] = (report.rankedFindings ?? report.findings ?? [])
+    .filter((f) => !dismissed.has(f.code))
+    .map(mapBillFindingToLetter);
   if (findings.length === 0) {
-    return { ok: false, error: "The audit produced no findings to base a letter on." };
+    return { ok: false, error: "No findings to base a letter on (all may have been dismissed)." };
   }
 
   const ctx: LetterContext = {

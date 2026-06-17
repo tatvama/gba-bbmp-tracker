@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { JobAuditRunner } from "@/components/complaints/job-audit-runner";
-import { getJobAudit, listJobNumbers, listJobAudits } from "@/lib/queries";
+import { getJobAudit, listJobNumbers, listJobAudits, listDismissedFindings } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
@@ -26,7 +26,7 @@ export default async function JobAuditPage({ params }: { params: Promise<{ jobNu
     );
   }
 
-  const [audit, jobs, history] = await Promise.all([getJobAudit(jobNumber), listJobNumbers(), listJobAudits(jobNumber)]);
+  const [audit, jobs, history, dismissed] = await Promise.all([getJobAudit(jobNumber), listJobNumbers(), listJobAudits(jobNumber), listDismissedFindings(jobNumber)]);
   const known = jobs.find((j) => j.jobNumber === jobNumber);
   const bandVariant = (b: string | null) => (b === "bill_stop" || b === "serious" ? "destructive" : b === "procedural" ? "warning" : "muted");
 
@@ -44,6 +44,7 @@ export default async function JobAuditPage({ params }: { params: Promise<{ jobNu
         initialReport={audit?.report ?? null}
         initialMeta={audit ? { docCount: audit.docCount, createdAt: audit.createdAt } : null}
         aiConfigured={isAiConfigured()}
+        initialDismissed={dismissed}
       />
 
       {history.length > 1 && (
