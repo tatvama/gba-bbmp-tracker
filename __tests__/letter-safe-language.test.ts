@@ -13,6 +13,20 @@ describe("safe-language transformer", () => {
     expect(out).toContain("222-12-345678"); // identifier preserved
     expect(out).not.toMatch(/[–—―]/); // em/en dash removed from prose
   });
+
+  it("identifier-mask round-trip never leaks an ID token or drops the code", () => {
+    const inputs = [
+      "ಕೆಲಸ 222-12-345678 — GST 29ABCDE1234F1Z5 — AIR 2011 SCC 1 ಪರಿಶೀಲನೆ",
+      "PAN ABCDE1234F ರ ದಾಖಲೆ — ಪರಿಶೀಲನೆ ಅಗತ್ಯ",
+      "ಬಿಲ್ — ಎಂ.ಬಿ ಪುಸ್ತಕ – ಪರಿಶೀಲನೆ", // dashes with no identifier
+    ];
+    for (const s of inputs) {
+      const out = stripKannadaDashes(s);
+      expect(out).not.toMatch(/ ID\d+ /); // no un-restored placeholder leaked
+    }
+    const withCode = stripKannadaDashes("ಕೆಲಸ ಸಂಕೇತ 222-12-345678 ರ ಪರಿಶೀಲನೆ");
+    expect(withCode).toContain("222-12-345678"); // the job code survives intact
+  });
 });
 
 describe("lintLetter (hard safety gate)", () => {

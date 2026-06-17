@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { listJobNumbers, getJobAudit } from "@/lib/queries";
+import { listJobNumbersWithAudits } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 
@@ -33,8 +33,7 @@ export default async function JobsPage() {
     );
   }
 
-  const jobs = await listJobNumbers();
-  const audits = await Promise.all(jobs.map((j) => getJobAudit(j.jobNumber)));
+  const jobs = await listJobNumbersWithAudits();
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -46,8 +45,8 @@ export default async function JobsPage() {
         <EmptyState title="No job numbers yet" description="Set a job number on complaints (in the complaint form) to group their documents for a job-level audit." />
       ) : (
         <div className="space-y-2">
-          {jobs.map((j, i) => {
-            const a = audits[i];
+          {jobs.map((j) => {
+            const a = j.audit;
             const b = band(a?.riskBand ?? null);
             return (
               <Card key={j.jobNumber}>

@@ -1,5 +1,7 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { SrRate } from "@/lib/forensics/rate-check";
 
 /**
@@ -27,3 +29,14 @@ export async function loadSrRates(client: SupabaseClient): Promise<SrRate[]> {
   }
   return out;
 }
+
+/**
+ * Cached Schedule-of-Rates book (cross-request, 1h). The SR book rarely changes
+ * but is re-read on every audit run; cache it so a job audit doesn't pay for a
+ * full table scan each time. Call `revalidateTag("sr-rates")` after a re-import.
+ */
+export const loadSrRatesCached = unstable_cache(
+  async (): Promise<SrRate[]> => loadSrRates(createAdminClient()),
+  ["sr-rates-book"],
+  { revalidate: 3600, tags: ["sr-rates"] },
+);

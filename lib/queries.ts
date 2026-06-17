@@ -1827,6 +1827,47 @@ export async function listJobNumbers(): Promise<{ jobNumber: string; complaints:
   return [...counts.entries()].map(([jobNumber, complaints]) => ({ jobNumber, complaints })).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
 }
 
+export interface JobNumberWithAudit {
+  jobNumber: string;
+  complaints: number;
+  audit: { riskBand: string | null; riskScore: number; findingCount: number; redFlagCount: number } | null;
+}
+
+/**
+ * Job numbers with their latest audit summary — in TWO queries total (not N+1).
+ * Replaces a per-job getJobAudit() loop on the jobs index page.
+ */
+export async function listJobNumbersWithAudits(): Promise<JobNumberWithAudit[]> {
+  const supabase = await sb();
+  const [compRes, auditRes] = await Promise.all([
+    supabase.from("complaints").select("job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
+    supabase.from("job_audits").select("job_number, risk_band, risk_score, finding_count, red_flag_count, created_at").order("created_at", { ascending: false }).limit(5000),
+  ]);
+  logErr("listJobNumbersWithAudits:complaints", compRes.error);
+  logErr("listJobNumbersWithAudits:audits", auditRes.error);
+
+  const counts = new Map<string, number>();
+  for (const r of compRes.data ?? []) {
+    const j = (r as { job_number: string }).job_number;
+    if (j) counts.set(j, (counts.get(j) ?? 0) + 1);
+  }
+  const latest = new Map<string, JobNumberWithAudit["audit"]>();
+  for (const a of auditRes.data ?? []) {
+    const r = a as Record<string, unknown>;
+    const jn = r.job_number as string;
+    if (!jn || latest.has(jn)) continue; // ordered desc → first is latest
+    latest.set(jn, {
+      riskBand: (r.risk_band as string) ?? null,
+      riskScore: (r.risk_score as number) ?? 0,
+      findingCount: (r.finding_count as number) ?? 0,
+      redFlagCount: (r.red_flag_count as number) ?? 0,
+    });
+  }
+  return [...counts.entries()]
+    .map(([jobNumber, complaints]) => ({ jobNumber, complaints, audit: latest.get(jobNumber) ?? null }))
+    .sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
+}
+
 /** Finding codes the verifier has dismissed for a job (false positives). */
 export async function listDismissedFindings(jobNumber: string): Promise<string[]> {
   const supabase = await sb();

@@ -3,7 +3,7 @@
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
-import { loadSrRates } from "@/lib/sr-rates";
+import { loadSrRatesCached } from "@/lib/sr-rates";
 import { runJobAudit, type JobAuditInput, type JobAuditReport, type DocumentMatrixRow, type AuditCoverage } from "@/lib/forensics/job-audit";
 import { scoreFinding, gradeEvidence, scoreJobRisk } from "@/lib/forensics/risk-score";
 import { extractBillStructure } from "@/lib/ai/bill-extractor";
@@ -138,7 +138,7 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     }
   }
 
-  const srBook = await loadSrRates(admin);
+  const srBook = await loadSrRatesCached();
 
   const input: JobAuditInput = {
     jobNumber,

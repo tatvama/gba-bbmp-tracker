@@ -97,9 +97,12 @@ export interface DocxOptions {
   riskTable?: TableModel | null;
 }
 
+const ROW_CAP = 80; // bound table size so generation stays inside the serverless window
+
 /** Build the Word document for a letter skeleton. Returns the .docx bytes. */
 export async function buildLetterDocx(sk: LetterSkeleton, opts: DocxOptions = {}): Promise<Buffer> {
   const children: (Paragraph | Table)[] = [];
+  const cap = <T,>(rows: T[]): { rows: T[]; omitted: number } => ({ rows: rows.slice(0, ROW_CAP), omitted: Math.max(0, rows.length - ROW_CAP) });
 
   children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [run(sk.title, { bold: true, size: 28, color: ACCENT })] }));
 
@@ -120,12 +123,14 @@ export async function buildLetterDocx(sk: LetterSkeleton, opts: DocxOptions = {}
 
   // Summary box
   if (sk.summaryBox.length) {
+    const { rows, omitted } = cap(sk.summaryBox);
     children.push(para("ಸಾರಾಂಶ (Summary)", { bold: true, color: ACCENT }));
     children.push(dataTable({
       title: "",
       columns: ["#", "ಆಧಾರ", "ದಾಖಲೆ", "ಸಂದೇಹ", "ಅಪಾಯ", "ಬೇಕಾದ ದಾಖಲೆ"],
-      rows: sk.summaryBox.map((r) => [String(r.slNo), r.ground, r.documentReference, r.whySuspicious, r.risk, r.recordDemanded]),
+      rows: rows.map((r) => [String(r.slNo), r.ground, r.documentReference, r.whySuspicious, r.risk, r.recordDemanded]),
     }));
+    if (omitted) children.push(para(`… and ${omitted} more (see the full audit report).`, { italics: true, size: 18 }));
     children.push(para(""));
   }
 
@@ -163,12 +168,14 @@ export async function buildLetterDocx(sk: LetterSkeleton, opts: DocxOptions = {}
 
   // Evidence index
   if (sk.evidenceIndex.length) {
+    const { rows, omitted } = cap(sk.evidenceIndex);
     children.push(para("ಸಾಕ್ಷ್ಯ ಸೂಚಿ (Evidence index)", { bold: true, color: ACCENT }));
     children.push(dataTable({
       title: "",
       columns: ["Annexure", "ದಾಖಲೆ", "Grade", "ಸಾಬೀತಾಗುವ ಅಂಶ", "ಬೇಕಾದ ದಾಖಲೆ"],
-      rows: sk.evidenceIndex.map((e) => [e.annexure, e.document, e.evidenceGrade, e.factProved, e.recordDemanded]),
+      rows: rows.map((e) => [e.annexure, e.document, e.evidenceGrade, e.factProved, e.recordDemanded]),
     }));
+    if (omitted) children.push(para(`… and ${omitted} more annexures (see the full audit report / CSV export).`, { italics: true, size: 18 }));
     children.push(para(""));
   }
 
