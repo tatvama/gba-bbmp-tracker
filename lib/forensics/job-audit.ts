@@ -47,6 +47,14 @@ export interface JobAuditInput {
   lossLines?: LossLineInput[];
 }
 
+export interface AuditCoverage {
+  documentsTotal: number;
+  documentsExtractable: number;
+  documentsExtracted: number;
+  /** true when more OCR'd documents existed than the AI-extraction cap allowed. */
+  capped: boolean;
+}
+
 export interface JobAuditReport {
   jobNumber: string;
   documentMatrix: DocumentMatrixRow[];
@@ -55,6 +63,7 @@ export interface JobAuditReport {
   risk: JobRisk;
   loss: { lines: { type: string; label: string; exposure: number; formula: string; caveat: string }[]; totalPossibleExposure: number };
   counts: { findings: number; redFlags: number };
+  coverage?: AuditCoverage;
 }
 
 /** Best-effort category inference for base rule-engine findings lacking one. */
@@ -93,10 +102,22 @@ export function runJobAudit(input: JobAuditInput): JobAuditReport {
     if (f.riskPoints == null) f.riskPoints = scoreFinding(f);
   }
 
-  // Loss: explicit lines + any per-finding lossExposure.
+  // Loss: explicit lines + any per-finding lossExposure, itemised so every rupee
+  // in the headline total is traceable to a finding (a free-floating total is
+  // trivially discredited as "matching nothing").
   const loss = computeLossExposure(input.lossLines ?? []);
-  const findingExposure = findings.reduce((s, f) => s + (f.lossExposure ?? 0), 0);
-  loss.totalPossibleExposure = Math.round((loss.totalPossibleExposure + findingExposure) * 100) / 100;
+  for (const f of findings) {
+    if (f.lossExposure && f.lossExposure > 0) {
+      loss.lines.push({
+        type: f.code,
+        label: f.title,
+        exposure: f.lossExposure,
+        formula: f.detail ?? "",
+        caveat: "possible exposure requiring verification, not final loss",
+      });
+    }
+  }
+  loss.totalPossibleExposure = Math.round(loss.lines.reduce((s, l) => s + l.exposure, 0) * 100) / 100;
 
   const rankedFindings = [...findings].sort((a, b) => (b.riskPoints ?? 0) - (a.riskPoints ?? 0));
   const risk = scoreJobRisk(findings);

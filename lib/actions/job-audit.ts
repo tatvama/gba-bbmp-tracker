@@ -4,8 +4,8 @@ import { requireRole, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { loadSrRates } from "@/lib/sr-rates";
-import { runJobAudit, type JobAuditInput, type JobAuditReport, type DocumentMatrixRow } from "@/lib/forensics/job-audit";
-import { scoreFinding, gradeEvidence } from "@/lib/forensics/risk-score";
+import { runJobAudit, type JobAuditInput, type JobAuditReport, type DocumentMatrixRow, type AuditCoverage } from "@/lib/forensics/job-audit";
+import { scoreFinding, gradeEvidence, scoreJobRisk } from "@/lib/forensics/risk-score";
 import { extractBillStructure } from "@/lib/ai/bill-extractor";
 import { extractMbBill, extractTimelineDates, extractEligibility, extractInsurance, extractRoyalty } from "@/lib/ai/forensic-extractors";
 import type { BillFinding, StructuredBill, ScheduleBItem, RunningBill, JobTimelineDates, EligibilityRequirement, InsurancePolicy } from "@/lib/forensics/types";
@@ -15,6 +15,7 @@ export interface JobAuditResult {
   report?: JobAuditReport;
   auditId?: string;
   docCount?: number;
+  coverage?: AuditCoverage;
   error?: string;
 }
 
@@ -69,6 +70,7 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
   const extraFindings: BillFinding[] = [];
 
   let processed = 0;
+  let usableOcr = 0;
   for (const d of allDocs) {
     const type = ((d.document_type as string) ?? "").toLowerCase();
     const ocr = ((d.ocr_clean_text as string) || (d.ocr_raw_text as string) || "").trim();
@@ -79,7 +81,9 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     if (d.geo_flag === "far") extraFindings.push({ code: "PHOTO-GEO", title: "Photo GPS off-site", severity: "High", category: "PHOTO", findingClass: "technical_redflag", evidenceGrade: "E", detail: `Photo EXIF GPS is ${d.geo_distance_m ? `${Math.round(d.geo_distance_m as number)} m` : "far"} from the reported work location.`, recordToDemand: "Original geotagged photo + portal log", sourceDocId: d.id as string });
     if (d.vision_verdict && d.vision_verdict !== "ok") extraFindings.push({ code: "PHOTO-VISION", title: `Photo vision flag: ${d.vision_verdict}`, severity: "Medium", category: "PHOTO", findingClass: "technical_redflag", evidenceGrade: "D", detail: "AI vision review flagged this image (screenshot / stock / mismatch) — verify the original.", recordToDemand: "Original photo + metadata", sourceDocId: d.id as string });
 
-    if (!ocr || ocr.length < 12 || processed >= DOC_CAP) continue;
+    if (!ocr || ocr.length < 12) continue;
+    usableOcr++;
+    if (processed >= DOC_CAP) continue; // bound AI cost — surfaced as coverage below
     processed++;
 
     // Lifecycle dates from any document.
@@ -132,10 +136,13 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
   report.findings.push(...extraFindings);
   report.rankedFindings = [...report.findings].sort((a, b) => (b.riskPoints ?? 0) - (a.riskPoints ?? 0));
   report.counts = { findings: report.findings.length, redFlags: report.findings.filter((f) => f.severity !== "Low").length };
-  // recompute risk including photo findings
-  const total = Math.min(100, report.findings.reduce((s, f) => s + (f.riskPoints ?? 0), 0));
-  report.risk.score = total;
-  report.risk.band = total >= 76 ? "bill_stop" : total >= 51 ? "serious" : total >= 26 ? "procedural" : "low";
+  // Recompute risk through the single source of truth (additive + bandFor), now
+  // that the photo-forensic findings are merged in.
+  report.risk = scoreJobRisk(report.findings);
+
+  // Coverage — be honest about how much of the evidence was actually extracted.
+  const capped = usableOcr > processed;
+  report.coverage = { documentsTotal: allDocs.length, documentsExtracted: processed, documentsExtractable: usableOcr, capped };
 
   // Persist the aggregate report.
   const { data: ins, error } = await admin
@@ -153,7 +160,7 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     })
     .select("id")
     .single();
-  if (error) return { ok: false, error: error.message, report, docCount: allDocs.length };
+  if (error) return { ok: false, error: error.message, report, docCount: allDocs.length, coverage: report.coverage };
 
-  return { ok: true, report, auditId: (ins as { id: string }).id, docCount: allDocs.length };
+  return { ok: true, report, auditId: (ins as { id: string }).id, docCount: allDocs.length, coverage: report.coverage };
 }

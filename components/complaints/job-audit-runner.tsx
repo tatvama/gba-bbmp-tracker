@@ -52,6 +52,7 @@ export function JobAuditRunner({
   const report = res?.report ?? null;
   const band = report ? bandStyle(report.risk.band) : null;
   const ranked = report?.rankedFindings ?? [];
+  const coverage = report?.coverage ?? res?.coverage ?? null;
 
   return (
     <div className="space-y-5">
@@ -85,8 +86,17 @@ export function JobAuditRunner({
                 <Stat label="Findings" value={String(report.counts.findings)} />
                 <Stat label="Red flags" value={String(report.counts.redFlags)} accent={report.counts.redFlags > 0} />
                 <Stat label="Possible exposure" value={money(report.loss.totalPossibleExposure)} accent={report.loss.totalPossibleExposure > 0} />
-                <Stat label="Documents read" value={String(res?.docCount ?? "—")} />
+                <Stat
+                  label="Documents extracted"
+                  value={coverage ? `${coverage.documentsExtracted} / ${coverage.documentsExtractable}` : String(res?.docCount ?? "—")}
+                  accent={Boolean(coverage?.capped)}
+                />
               </div>
+              {coverage?.capped && (
+                <div className="mt-3 rounded-md border border-amber/50 bg-amber/10 p-2 text-xs text-amber-dark">
+                  ⚠ Partial audit — only {coverage.documentsExtracted} of {coverage.documentsExtractable} readable documents were AI-extracted (cap to bound cost). The risk band reflects the extracted subset only; do not treat a low band as a clean bill until the rest are reviewed.
+                </div>
+              )}
               <p className="mt-3 text-xs text-muted-foreground">
                 Findings are documented suspicions requiring records and explanation — not findings of guilt. Exposure figures are possible amounts requiring verification, not proven loss.
               </p>
