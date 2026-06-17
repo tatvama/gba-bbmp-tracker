@@ -12,7 +12,17 @@ import { generateLetter, saveLetterEdit, lintLetterAction, type LetterResult } f
 import { LETTER_SIGNATORIES, LETTER_DRAFT_KINDS, LETTER_VARIANTS, type LetterVariant, type SignatoryKey } from "@/lib/constants";
 import type { LintResult } from "@/lib/letters/safe-language";
 
-export function LetterDrafter({ jobNumber, aiConfigured, hasAudit }: { jobNumber: string; aiConfigured: boolean; hasAudit: boolean }) {
+export interface SavedDraft {
+  id: string;
+  variant: string;
+  language: string;
+  content: string | null;
+  lintOk: boolean;
+  signatoryKey: string;
+  createdAt: string;
+}
+
+export function LetterDrafter({ jobNumber, aiConfigured, hasAudit, savedDrafts = [] }: { jobNumber: string; aiConfigured: boolean; hasAudit: boolean; savedDrafts?: SavedDraft[] }) {
   const [variant, setVariant] = React.useState<LetterVariant>("bill_stop");
   const [language, setLanguage] = React.useState<"Kannada" | "Bilingual">("Kannada");
   const [signatory, setSignatory] = React.useState<SignatoryKey>("raghav_gowda");
@@ -55,6 +65,18 @@ export function LetterDrafter({ jobNumber, aiConfigured, hasAudit }: { jobNumber
 
   async function onCheck() {
     const r = await lintLetterAction(draft);
+    setLint(r.lint);
+  }
+
+  async function reopen(s: SavedDraft) {
+    setDraft(s.content ?? "");
+    setDraftId(s.id);
+    setVariant(s.variant as LetterVariant);
+    setLanguage(s.language === "Bilingual" ? "Bilingual" : "Kannada");
+    setSignatory(s.signatoryKey as SignatoryKey);
+    setError(null);
+    setMeta(null);
+    const r = await lintLetterAction(s.content ?? ""); // reflect lint of the reopened text
     setLint(r.lint);
   }
 
@@ -114,6 +136,29 @@ export function LetterDrafter({ jobNumber, aiConfigured, hasAudit }: { jobNumber
         <p className="text-[11px] leading-snug text-muted-foreground">
           AI prose is run through a safe-language gate. If it produces any accusatory wording the AI text is discarded and the deterministic draft is used. Drafts are editable and never auto-filed.
         </p>
+
+        {savedDrafts.length > 0 && (
+          <div className="space-y-1.5 border-t pt-3">
+            <Label className="text-xs">Saved drafts ({savedDrafts.length})</Label>
+            <div className="max-h-56 space-y-1 overflow-y-auto">
+              {savedDrafts.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => reopen(s)}
+                  className={`flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs hover:bg-muted ${s.id === draftId ? "border-primary bg-muted" : ""}`}
+                >
+                  <span className="truncate">
+                    {LETTER_DRAFT_KINDS[s.variant as LetterVariant] ?? s.variant}
+                    <span className="ml-1 text-muted-foreground">{s.createdAt.slice(0, 10)}</span>
+                  </span>
+                  <Badge variant={s.lintOk ? "success" : "destructive"} className="shrink-0">{s.lintOk ? "✓" : "✗"}</Badge>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">Click a draft to reopen and edit it.</p>
+          </div>
+        )}
       </div>
 
       {/* Draft + actions */}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, ShieldAlert, FolderArchive, Gavel } from "lucide-react";
+import { ArrowLeft, Pencil, ShieldAlert, FolderArchive, Gavel, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/print-button";
@@ -56,7 +56,10 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
             <>
               <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/forensics`}><ShieldAlert className="h-4 w-4" /> Forensic audit</Link></Button>
               {complaint.job_number && (
-                <Button asChild size="sm" variant="outline"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/audit`}><Gavel className="h-4 w-4" /> Job-number audit</Link></Button>
+                <>
+                  <Button asChild size="sm" variant="outline"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/audit`}><Gavel className="h-4 w-4" /> Job-number audit</Link></Button>
+                  <Button asChild size="sm" variant="outline"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/letter`}><ScrollText className="h-4 w-4" /> Draft letter</Link></Button>
+                </>
               )}
               <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/dossier`}><FolderArchive className="h-4 w-4" /> Dossier</Link></Button>
             </>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Loader2, ShieldAlert, ShieldCheck, FileWarning, ScrollText, Gavel } from "lucide-react";
+import { Loader2, ShieldAlert, ShieldCheck, FileWarning, ScrollText, Gavel, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,6 +139,11 @@ export function JobAuditRunner({
                     {f.ruleRef && <span>ನಿಯಮ: {f.ruleRef}</span>}
                     {f.recordToDemand && <span>ಬೇಕಾದ ದಾಖಲೆ: {f.recordToDemand}</span>}
                     {typeof f.lossExposure === "number" && f.lossExposure > 0 && <span>Possible exposure: {money(f.lossExposure)}</span>}
+                    {f.sourceComplaintId && (
+                      <Link href={`/complaints/${f.sourceComplaintId}?tab=documents`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                        <FileSearch className="h-3 w-3" /> View source document
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}

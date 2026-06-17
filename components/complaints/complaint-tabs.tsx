@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,8 @@ export function ComplaintTabs({
   flags: { canEdit: boolean; canVerify: boolean; canField: boolean; aiConfigured: boolean };
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") ?? "overview"; // deep-linkable (e.g. ?tab=documents)
   const docOpts = documents.map((d) => ({ id: d.id, title: d.title }));
   const c = complaint;
 
@@ -47,7 +49,7 @@ export function ComplaintTabs({
   }
 
   return (
-    <Tabs defaultValue="overview">
+    <Tabs defaultValue={initialTab}>
       <div className="overflow-x-auto">
         <TabsList className="mb-4 inline-flex w-max">
           <TabsTrigger value="overview">Overview</TabsTrigger>

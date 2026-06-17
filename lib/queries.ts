@@ -1826,3 +1826,90 @@ export async function listJobNumbers(): Promise<{ jobNumber: string; complaints:
   }
   return [...counts.entries()].map(([jobNumber, complaints]) => ({ jobNumber, complaints })).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
 }
+
+export interface JobAuditHistoryRow {
+  id: string;
+  riskScore: number;
+  riskBand: string | null;
+  findingCount: number;
+  redFlagCount: number;
+  totalExposure: number | null;
+  createdAt: string;
+}
+
+/** Prior audit runs for a job (newest first) — for the run-over-run history/diff. */
+export async function listJobAudits(jobNumber: string): Promise<JobAuditHistoryRow[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("job_audits")
+    .select("id, risk_score, risk_band, finding_count, red_flag_count, total_exposure, created_at")
+    .eq("job_number", jobNumber)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  logErr("listJobAudits", error);
+  return (data ?? []).map((r) => {
+    const x = r as Record<string, unknown>;
+    return {
+      id: x.id as string,
+      riskScore: (x.risk_score as number) ?? 0,
+      riskBand: (x.risk_band as string) ?? null,
+      findingCount: (x.finding_count as number) ?? 0,
+      redFlagCount: (x.red_flag_count as number) ?? 0,
+      totalExposure: (x.total_exposure as number) ?? null,
+      createdAt: x.created_at as string,
+    };
+  });
+}
+
+export interface LetterDraftRow {
+  id: string;
+  jobNumber: string;
+  variant: string;
+  language: string;
+  signatoryKey: string;
+  content: string | null;
+  lintOk: boolean;
+  aiUsed: boolean;
+  fileName: string | null;
+  createdAt: string;
+}
+
+function toLetterDraftRow(r: Record<string, unknown>): LetterDraftRow {
+  return {
+    id: r.id as string,
+    jobNumber: r.job_number as string,
+    variant: (r.variant as string) ?? "bill_stop",
+    language: (r.language as string) ?? "Kannada",
+    signatoryKey: (r.signatory_key as string) ?? "raghav_gowda",
+    content: (r.content as string) ?? null,
+    lintOk: (r.lint_ok as boolean) ?? false,
+    aiUsed: (r.ai_used as boolean) ?? false,
+    fileName: (r.file_name as string) ?? null,
+    createdAt: r.created_at as string,
+  };
+}
+
+/** Saved letter drafts for a job (newest first) — so drafts can be reopened. */
+export async function listLetterDrafts(jobNumber: string): Promise<LetterDraftRow[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("letter_drafts")
+    .select("id, job_number, variant, language, signatory_key, content, lint_ok, ai_used, file_name, created_at")
+    .eq("job_number", jobNumber)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  logErr("listLetterDrafts", error);
+  return (data ?? []).map((r) => toLetterDraftRow(r as Record<string, unknown>));
+}
+
+/** A single letter draft (for reopening into the drafter). */
+export async function getLetterDraft(id: string): Promise<LetterDraftRow | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("letter_drafts")
+    .select("id, job_number, variant, language, signatory_key, content, lint_ok, ai_used, file_name, created_at")
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getLetterDraft", error);
+  return data ? toLetterDraftRow(data as Record<string, unknown>) : null;
+}

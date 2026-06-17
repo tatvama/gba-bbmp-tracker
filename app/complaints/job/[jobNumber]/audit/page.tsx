@@ -3,10 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { JobAuditRunner } from "@/components/complaints/job-audit-runner";
-import { getJobAudit, listJobNumbers } from "@/lib/queries";
+import { getJobAudit, listJobNumbers, listJobAudits } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
+import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Job-Number Forensic Audit" };
@@ -25,8 +26,9 @@ export default async function JobAuditPage({ params }: { params: Promise<{ jobNu
     );
   }
 
-  const [audit, jobs] = await Promise.all([getJobAudit(jobNumber), listJobNumbers()]);
+  const [audit, jobs, history] = await Promise.all([getJobAudit(jobNumber), listJobNumbers(), listJobAudits(jobNumber)]);
   const known = jobs.find((j) => j.jobNumber === jobNumber);
+  const bandVariant = (b: string | null) => (b === "bill_stop" || b === "serious" ? "destructive" : b === "procedural" ? "warning" : "muted");
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -43,6 +45,29 @@ export default async function JobAuditPage({ params }: { params: Promise<{ jobNu
         initialMeta={audit ? { docCount: audit.docCount, createdAt: audit.createdAt } : null}
         aiConfigured={isAiConfigured()}
       />
+
+      {history.length > 1 && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Audit history (what changed between runs is itself evidence)</h2>
+          <div className="space-y-1">
+            {history.map((h, i) => {
+              const prev = history[i + 1];
+              const delta = prev ? h.riskScore - prev.riskScore : 0;
+              return (
+                <div key={h.id} className="flex flex-wrap items-center gap-3 rounded-md border px-3 py-1.5 text-sm">
+                  <span className="text-muted-foreground">{new Date(h.createdAt).toLocaleString()}</span>
+                  <Badge variant={bandVariant(h.riskBand)}>{h.riskBand ?? "—"} · {h.riskScore}</Badge>
+                  {prev && delta !== 0 && (
+                    <span className={delta > 0 ? "text-destructive" : "text-emerald-700"}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)} pts vs previous</span>
+                  )}
+                  <span className="text-muted-foreground">{h.findingCount} findings · {h.redFlagCount} red flags</span>
+                  {i === 0 && <span className="text-xs text-muted-foreground">(latest)</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

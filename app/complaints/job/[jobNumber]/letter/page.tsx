@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { LetterDrafter } from "@/components/letters/letter-drafter";
-import { getJobAudit } from "@/lib/queries";
+import { getJobAudit, listLetterDrafts } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
@@ -25,7 +25,10 @@ export default async function JobLetterPage({ params }: { params: Promise<{ jobN
     );
   }
 
-  const audit = await getJobAudit(jobNumber);
+  const [audit, drafts] = await Promise.all([getJobAudit(jobNumber), listLetterDrafts(jobNumber)]);
+  const savedDrafts = drafts.map((d) => ({
+    id: d.id, variant: d.variant, language: d.language, content: d.content, lintOk: d.lintOk, signatoryKey: d.signatoryKey, createdAt: d.createdAt,
+  }));
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -36,7 +39,7 @@ export default async function JobLetterPage({ params }: { params: Promise<{ jobN
         title={`Draft letter — Job ${jobNumber}`}
         description="Build a Kannada bill-stop notice, Lokayukta complaint, RTI application or bilingual summary from the forensic findings. Every adverse point is a documented suspicion seeking records — never an accusation. Drafts are editable and never auto-filed."
       />
-      <LetterDrafter jobNumber={jobNumber} aiConfigured={isAiConfigured()} hasAudit={Boolean(audit?.report)} />
+      <LetterDrafter jobNumber={jobNumber} aiConfigured={isAiConfigured()} hasAudit={Boolean(audit?.report)} savedDrafts={savedDrafts} />
     </div>
   );
 }

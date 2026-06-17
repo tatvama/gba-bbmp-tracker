@@ -75,6 +75,7 @@ export interface BillFinding {
   recordToDemand?: string;
   ruleRef?: string;
   sourceDocId?: string;
+  sourceComplaintId?: string; // enables a finding → source-document deep link in the UI
   safeText?: string; // verbatim cautious string
   workedExample?: string; // ಸರಳ ಉದಾಹರಣೆ content
 }
