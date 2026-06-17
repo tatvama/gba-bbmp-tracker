@@ -6,7 +6,7 @@
  */
 import type { BillFinding, StructuredBill, Severity, ScheduleBItem } from "./types";
 import {
-  IT_TDS_PCT, GST_TDS_PCT, GST_TDS_MIN_CONTRACT,
+  IT_TDS_PCT, GST_TDS_PCT, GST_TDS_MIN_CONTRACT, BOCW_CESS_PCT,
   QTY_PER_ITEM_QUOTED_CAP_PCT, CONTRACT_OVERALL_CAP,
 } from "../constants";
 import { expectedGstPct } from "./gst";
@@ -129,10 +129,12 @@ export function runBillRules(bill: StructuredBill, opts: RuleOptions = {}): Bill
     out.push({ code: "ROUND_NUMBER", title: "Grand total is an exact round figure", severity: "Low", detail: `${money(grand)} is an exact multiple of ₹1,00,000 — genuine measured bills rarely are. Worth a closer look.` });
   }
 
-  // 8) Just below an approval threshold (possible splitting).
+  // 8) Just below an approval threshold (possible splitting). Strictly below — a
+  // total exactly AT a limit is not "below" it, and excluding the exact value also
+  // avoids double-flagging round figures that already triggered ROUND_NUMBER.
   if (grand !== null) {
     for (const th of APPROVAL_THRESHOLDS) {
-      if (grand <= th && grand >= th * 0.97) {
+      if (grand < th && grand >= th * 0.97) {
         out.push({ code: "THRESHOLD", title: "Total sits just below an approval limit", severity: "Medium", detail: `${money(grand)} is within 3% below ${money(th)} — a common pattern when a work is split to stay under a sanction/tender ceiling.` });
         break;
       }
@@ -173,15 +175,30 @@ export function checkDeductionMath(bill: StructuredBill, ctx: DeductionContext, 
     out.push({ code: "DD-IT-VERIFY", title: "IT-TDS rate depends on payee type — confirm", severity: "Low", category: "DEDUCTION", findingClass: "missing_proof", evidenceGrade: "C", detail: "Income-Tax TDS under s.194C is 1% for an individual/HUF and 2% for others. The payee type is not in the supplied records, so the correct rate cannot be confirmed.", recordToDemand: "Contractor PAN/constitution to fix the TDS rate" });
   } else {
     const pct = IT_TDS_PCT[ctx.payeeType];
-    const expected = (grand * pct) / 100;
+    // s.194C TDS is on the taxable value excluding GST when GST is shown
+    // separately (CBDT Circular 23/2017) — same base as GST-TDS, so the two
+    // checks are consistent rather than mixing gross and taxable.
+    const expected = (base * pct) / 100;
     if (itDed) {
       const amt = num(itDed.amount);
-      if (amt !== null && mismatch(amt, expected, tolPct, Math.max(tolAbs, grand * 0.002))) {
-        out.push({ code: "DD-IT", title: `IT-TDS (${pct}%) appears miscalculated`, severity: "Medium", category: "DEDUCTION", findingClass: "calc_variance", evidenceGrade: "B", detail: `${pct}% of ${money(grand)} is ${money(expected)}, but the bill deducts ${money(amt)}.`, expected: money(expected), actual: money(amt) });
+      if (amt !== null && mismatch(amt, expected, tolPct, Math.max(tolAbs, base * 0.002))) {
+        out.push({ code: "DD-IT", title: `IT-TDS (${pct}%) appears miscalculated`, severity: "Medium", category: "DEDUCTION", findingClass: "calc_variance", evidenceGrade: "B", detail: `${pct}% of taxable ${money(base)} (ex-GST, per CBDT Circular 23/2017) is ${money(expected)}, but the bill deducts ${money(amt)}. If TDS was correctly taken on a different base, produce the deduction worksheet.`, expected: money(expected), actual: money(amt) });
       }
     } else {
-      out.push({ code: "DD-IT-MISSING", title: "No Income-Tax TDS deduction shown", severity: "Medium", category: "DEDUCTION", findingClass: "missing_proof", evidenceGrade: "C", detail: `No IT-TDS (${pct}%) deduction is shown; expected about ${money(expected)} on gross ${money(grand)}.`, recordToDemand: "Deduction worksheet showing IT-TDS" });
+      out.push({ code: "DD-IT-MISSING", title: "No Income-Tax TDS deduction shown", severity: "Medium", category: "DEDUCTION", findingClass: "missing_proof", evidenceGrade: "C", detail: `No IT-TDS (${pct}%) deduction is shown; expected about ${money(expected)} on taxable ${money(base)}.`, recordToDemand: "Deduction worksheet showing IT-TDS" });
     }
+  }
+
+  // BOCW / building & other construction workers welfare cess (1% of construction cost).
+  const cessDed = find(/labour\s*cess|bocw|welfare\s*cess|building.*cess|construction.*cess/i);
+  const cessExpected = (base * BOCW_CESS_PCT) / 100;
+  if (cessDed) {
+    const amt = num(cessDed.amount);
+    if (amt !== null && mismatch(amt, cessExpected, tolPct, Math.max(tolAbs, base * 0.002))) {
+      out.push({ code: "DD-CESS", title: `Labour welfare cess (${BOCW_CESS_PCT}%) appears miscalculated`, severity: "Medium", category: "DEDUCTION", findingClass: "calc_variance", evidenceGrade: "B", detail: `${BOCW_CESS_PCT}% of construction cost ${money(base)} is ${money(cessExpected)}, but the bill deducts ${money(amt)}. The cess base must exclude GST.`, expected: money(cessExpected), actual: money(amt) });
+    }
+  } else {
+    out.push({ code: "DD-CESS-MISSING", title: "No labour welfare (BOCW) cess deduction shown", severity: "Medium", category: "DEDUCTION", findingClass: "missing_proof", evidenceGrade: "C", detail: `No BOCW labour-welfare cess (${BOCW_CESS_PCT}% of construction cost) is shown; it is due on building & construction works. Expected about ${money(cessExpected)} on ${money(base)}.`, recordToDemand: "Deduction worksheet / cess challan showing labour-welfare cess" });
   }
 
   // GST-TDS (CGST+SGST 2%) — only above ₹2.5L contract value.

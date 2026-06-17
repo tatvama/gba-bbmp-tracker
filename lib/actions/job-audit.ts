@@ -8,6 +8,10 @@ import { runJobAudit, type JobAuditInput, type JobAuditReport, type DocumentMatr
 import { scoreFinding, gradeEvidence, scoreJobRisk } from "@/lib/forensics/risk-score";
 import { extractBillStructure } from "@/lib/ai/bill-extractor";
 import { extractMbBill, extractTimelineDates, extractEligibility, extractInsurance, extractRoyalty } from "@/lib/ai/forensic-extractors";
+import { analyzeDocFormIntegrity } from "@/lib/ai/form-integrity";
+import { crossDocFieldMismatch } from "@/lib/forensics/pattern-detector";
+import { downloadBuffer } from "@/lib/storage/supabase-upload";
+import { isAiConfigured } from "@/lib/ai/provider";
 import type { BillFinding, StructuredBill, ScheduleBItem, RunningBill, JobTimelineDates, EligibilityRequirement, InsurancePolicy } from "@/lib/forensics/types";
 
 export interface JobAuditResult {
@@ -51,7 +55,7 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
   // Their documents (with OCR + the photo-forensic flags already computed).
   const { data: docs } = await admin
     .from("complaint_documents")
-    .select("id, complaint_id, document_type, ocr_clean_text, ocr_raw_text, is_duplicate, dup_severity, vision_verdict, geo_flag, geo_distance_m")
+    .select("id, complaint_id, document_type, ocr_clean_text, ocr_raw_text, is_duplicate, dup_severity, vision_verdict, geo_flag, geo_distance_m, storage_bucket, storage_path, mime_type")
     .in("complaint_id", complaintIds)
     .limit(2000);
   const allDocs = docs ?? [];
@@ -68,6 +72,11 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
   const salvage: JobAuditInput["salvage"] = [];
   const matrix: DocumentMatrixRow[] = [];
   const extraFindings: BillFinding[] = [];
+  const docFields: Record<string, string | number | null>[] = []; // for cross-doc field mismatch
+  const formFlags: Record<string, boolean> = {}; // aggregated vision form-integrity flags
+  let formScreened = 0;
+  const FORM_CAP = 6; // bound vision calls
+  const aiOn = isAiConfigured();
 
   let processed = 0;
   let usableOcr = 0;
@@ -81,6 +90,19 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     if (d.geo_flag === "far") extraFindings.push({ code: "PHOTO-GEO", title: "Photo GPS off-site", severity: "High", category: "PHOTO", findingClass: "technical_redflag", evidenceGrade: "E", detail: `Photo EXIF GPS is ${d.geo_distance_m ? `${Math.round(d.geo_distance_m as number)} m` : "far"} from the reported work location.`, recordToDemand: "Original geotagged photo + portal log", sourceDocId: d.id as string });
     if (d.vision_verdict && d.vision_verdict !== "ok") extraFindings.push({ code: "PHOTO-VISION", title: `Photo vision flag: ${d.vision_verdict}`, severity: "Medium", category: "PHOTO", findingClass: "technical_redflag", evidenceGrade: "D", detail: "AI vision review flagged this image (screenshot / stock / mismatch) — verify the original.", recordToDemand: "Original photo + metadata", sourceDocId: d.id as string });
 
+    // Vision form-integrity screen on bill / MB image pages (bounded). Boolean
+    // red flags only — fed into checkMbIntegrity, which words them as grade-D
+    // "requires original / metadata / expert verification".
+    const mime = (d.mime_type as string) ?? "";
+    if (aiOn && formScreened < FORM_CAP && (isBill(type) || isMb(type)) && /^image\//.test(mime) && d.storage_bucket && d.storage_path) {
+      const buf = await downloadBuffer(d.storage_bucket as string, d.storage_path as string);
+      if (buf) {
+        formScreened++;
+        const fi = await analyzeDocFormIntegrity(buf, mime);
+        if (fi.ok) for (const [k, v] of Object.entries(fi.flags)) { if (typeof v === "boolean" && v) formFlags[k] = true; }
+      }
+    }
+
     if (!ocr || ocr.length < 12) continue;
     usableOcr++;
     if (processed >= DOC_CAP) continue; // bound AI cost — surfaced as coverage below
@@ -93,6 +115,7 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     if (isBill(type)) {
       const b = await extractBillStructure(ocr);
       if (b.bill.lineItems.length) bills.push(b.bill);
+      docFields.push({ contractor: b.bill.contractor ?? null, work_order_amount: b.bill.sanctionedAmount ?? null });
       const mb = await extractMbBill(ocr);
       scheduleB.push(...mb.data.scheduleB.filter((s) => s.description));
       runningBills.push(...mb.data.runningBills);
@@ -123,8 +146,12 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     insurance: insurance.length ? { policies: insurance, ctx: { completion: timeline.completion ?? null, commencement: timeline.commencement ?? null } } : undefined,
     royalty, disposal, salvage,
     srBook,
+    mb: Object.keys(formFlags).length ? { formFlags } : undefined,
     documentsForMatrix: matrix,
   };
+
+  // Cross-document field mismatch (e.g. contractor legal name differing between bills).
+  if (docFields.length >= 2) extraFindings.push(...crossDocFieldMismatch(docFields, ["contractor", "work_order_amount"]));
 
   const report = runJobAudit(input);
 

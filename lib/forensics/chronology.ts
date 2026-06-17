@@ -43,6 +43,53 @@ export function buildTimeline(dates: JobTimelineDates): { event: string; date: D
     .sort((a, b) => (a.date?.getTime() ?? Infinity) - (b.date?.getTime() ?? Infinity));
 }
 
+/**
+ * Completion-certificate & defect-liability-period presence checks. A work that
+ * was measured/billed/paid must have a completion certificate and a defined DLP;
+ * their absence is a standard recoverable red flag (security can't be released
+ * without a closed DLP). Optionally computes the expected DLP end date.
+ */
+export function checkCompletionAndDlp(dates: JobTimelineDates, opts: { dlpMonths?: number } = {}): BillFinding[] {
+  const out: BillFinding[] = [];
+  const d = (k: string) => parseIndianDate(dates[k] ?? null);
+  const wasExecuted = Boolean(d("measurement") || d("bill") || d("payment"));
+  const completion = d("completion");
+
+  if (wasExecuted && !completion) {
+    out.push({
+      code: "CH-20",
+      title: "No completion certificate date on a billed work",
+      severity: "Medium",
+      category: "CHRONOLOGY",
+      findingClass: "missing_proof",
+      evidenceGrade: "C",
+      detail: "The work appears measured/billed but no completion certificate date is in the supplied records. A final payment without a recorded completion certificate is irregular.",
+      recordToDemand: "Completion certificate with date and certifying officer",
+    });
+  }
+
+  if (completion && !d("dlp_end")) {
+    let extra = "";
+    if (opts.dlpMonths && opts.dlpMonths > 0) {
+      const end = new Date(completion.getTime());
+      end.setUTCMonth(end.getUTCMonth() + opts.dlpMonths);
+      extra = ` Based on a ${opts.dlpMonths}-month DLP, the defect-liability period would end about ${end.toISOString().slice(0, 10)}.`;
+    }
+    out.push({
+      code: "CH-21",
+      title: "Defect-liability period end not recorded",
+      severity: "Low",
+      category: "CHRONOLOGY",
+      findingClass: "missing_proof",
+      evidenceGrade: "C",
+      detail: `The work has a completion date but no recorded defect-liability-period (DLP) end. Security/retention should not be released before the DLP closes.${extra}`,
+      recordToDemand: "Agreement DLP clause + DLP end date and security-release record",
+    });
+  }
+
+  return out;
+}
+
 export function checkChronology(dates: JobTimelineDates): BillFinding[] {
   const out: BillFinding[] = [];
   const d = (k: string) => parseIndianDate(dates[k] ?? null);
@@ -83,6 +130,8 @@ export function checkChronology(dates: JobTimelineDates): BillFinding[] {
       });
     }
   });
+
+  out.push(...checkCompletionAndDlp(dates));
 
   const missing = KEY_DATES.filter((k) => !d(k));
   if (missing.length) {

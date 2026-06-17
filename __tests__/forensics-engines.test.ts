@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { scoreFinding, gradeEvidence, bandFor, scoreJobRisk } from "../lib/forensics/risk-score";
-import { checkChronology } from "../lib/forensics/chronology";
+import { checkChronology, checkCompletionAndDlp } from "../lib/forensics/chronology";
 import { checkEligibility } from "../lib/forensics/eligibility";
 import { checkInsurance, checkSecurityFsd } from "../lib/forensics/insurance-security";
 import { reconcileCarryForward, checkMbIntegrity } from "../lib/forensics/mb-integrity";
@@ -137,10 +137,11 @@ describe("rule-engine — deductions / overrun / rate", () => {
   const baseBill: StructuredBill = {
     lineItems: [{ description: "x", qty: 1, rate: 100000, amount: 100000 }],
     taxes: [{ name: "GST", pct: 18, amount: 18000 }],
-    deductions: [{ name: "Income Tax (TDS)", amount: 2360 }, { name: "GST TDS", amount: 2000 }],
+    // IT-TDS & GST-TDS both on the taxable value (₹100000 ex-GST): 2% = ₹2000 each.
+    deductions: [{ name: "Income Tax (TDS)", amount: 2000 }, { name: "GST TDS", amount: 2000 }],
     subTotal: 100000, grandTotal: 118000,
   };
-  it("payee=company → 2% IT-TDS not flagged as error", () => {
+  it("payee=company → 2% IT-TDS (on taxable ex-GST base) not flagged as error", () => {
     const f = checkDeductionMath(baseBill, { payeeType: "company", contractValue: 1_000_000 });
     expect(codes(f)).not.toContain("DD-IT");
   });
@@ -166,5 +167,37 @@ describe("rule-engine — deductions / overrun / rate", () => {
     expect(codes(within)).not.toContain("EXCESS_SANCTION");
     const over = runBillRules({ ...baseBill, sanctionedAmount: 100000 }); // allowed 110000 < 118000
     expect(codes(over)).toContain("EXCESS_SANCTION");
+  });
+  it("flags missing BOCW labour-welfare cess; accepts correct 1%", () => {
+    const missing = checkDeductionMath(baseBill, { payeeType: "company", contractValue: 1_000_000 });
+    expect(codes(missing)).toContain("DD-CESS-MISSING");
+    const withCess = checkDeductionMath(
+      { ...baseBill, deductions: [...baseBill.deductions, { name: "Labour cess", amount: 1000 }] }, // 1% of 100000
+      { payeeType: "company", contractValue: 1_000_000 },
+    );
+    expect(codes(withCess)).not.toContain("DD-CESS-MISSING");
+    expect(codes(withCess)).not.toContain("DD-CESS");
+  });
+  it("THRESHOLD: exactly AT a limit is not flagged 'below'; just under is", () => {
+    const at = runBillRules({ lineItems: [{ description: "x", qty: 1, rate: 500000, amount: 500000 }], taxes: [], deductions: [], subTotal: 500000, grandTotal: 500000 });
+    expect(codes(at)).not.toContain("THRESHOLD");
+    const under = runBillRules({ lineItems: [{ description: "x", qty: 1, rate: 495000, amount: 495000 }], taxes: [], deductions: [], subTotal: 495000, grandTotal: 495000 });
+    expect(codes(under)).toContain("THRESHOLD");
+  });
+});
+
+describe("completion certificate / DLP", () => {
+  it("flags a billed work with no completion certificate", () => {
+    const f = checkCompletionAndDlp({ bill: "01-02-2024", measurement: "20-01-2024" });
+    expect(codes(f)).toContain("CH-20");
+  });
+  it("flags completion with no DLP end, and computes the expected end", () => {
+    const f = checkCompletionAndDlp({ measurement: "20-01-2024", completion: "01-03-2024" }, { dlpMonths: 12 });
+    const dlp = f.find((x) => x.code === "CH-21");
+    expect(dlp).toBeTruthy();
+    expect(dlp!.detail).toContain("2025-03-01");
+  });
+  it("no completion finding when nothing was executed", () => {
+    expect(checkCompletionAndDlp({})).toHaveLength(0);
   });
 });
