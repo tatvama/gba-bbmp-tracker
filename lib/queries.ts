@@ -1269,7 +1269,8 @@ export interface NotificationDigest {
   overdueRtis: { id: string; ref: string | null; subject: string; due: string; label: string }[];
   overdueComplaints: { id: string; caseNumber: string | null; title: string; followUp: string | null }[];
   dueReminders: { id: string; title: string; dueDate: string | null; entityType: string; entityId: string | null }[];
-  counts: { overdueRtis: number; overdueComplaints: number; dueReminders: number };
+  highRiskAudits: { jobNumber: string; band: string; score: number; exposure: number; auditedAt: string }[];
+  counts: { overdueRtis: number; overdueComplaints: number; dueReminders: number; highRiskAudits: number };
 }
 
 /** Everything currently due/overdue — for the scheduled notification job. */
@@ -1279,7 +1280,7 @@ export async function getNotificationDigest(): Promise<NotificationDigest> {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
 
-  const [rtiRes, cmpRes, remRes] = await Promise.all([
+  const [rtiRes, cmpRes, remRes, auditRes] = await Promise.all([
     supabase
       .from("rti_applications")
       .select("id, internal_ref, subject, status, is_life_liberty, normal_due, life_liberty_due, first_appeal_due, second_appeal_due")
@@ -1297,10 +1298,17 @@ export async function getNotificationDigest(): Promise<NotificationDigest> {
       .eq("status", "Pending")
       .lte("due_date", today)
       .order("due_date"),
+    supabase
+      .from("job_audits")
+      .select("job_number, risk_band, risk_score, total_exposure, created_at")
+      .in("risk_band", ["bill_stop", "serious"])
+      .order("created_at", { ascending: false })
+      .limit(2000),
   ]);
   logErr("digest:rti", rtiRes.error);
   logErr("digest:complaints", cmpRes.error);
   logErr("digest:reminders", remRes.error);
+  logErr("digest:audits", auditRes.error);
 
   const overdueRtis = (rtiRes.data ?? [])
     .map((r: Record<string, unknown>) => {
@@ -1326,15 +1334,35 @@ export async function getNotificationDigest(): Promise<NotificationDigest> {
     entityId: (r.entity_id as string) ?? null,
   }));
 
+  // Latest high-risk forensic audit per job (so the daily digest surfaces
+  // bill-stop / serious jobs instead of them dying in a DB row).
+  const seenAuditJob = new Set<string>();
+  const highRiskAudits: NotificationDigest["highRiskAudits"] = [];
+  for (const a of auditRes.data ?? []) {
+    const r = a as Record<string, unknown>;
+    const jn = r.job_number as string;
+    if (!jn || seenAuditJob.has(jn)) continue;
+    seenAuditJob.add(jn);
+    highRiskAudits.push({
+      jobNumber: jn,
+      band: (r.risk_band as string) ?? "",
+      score: (r.risk_score as number) ?? 0,
+      exposure: (r.total_exposure as number) ?? 0,
+      auditedAt: (r.created_at as string) ?? "",
+    });
+  }
+
   return {
     generatedAt: now.toISOString(),
     overdueRtis,
     overdueComplaints,
     dueReminders,
+    highRiskAudits,
     counts: {
       overdueRtis: overdueRtis.length,
       overdueComplaints: overdueComplaints.length,
       dueReminders: dueReminders.length,
+      highRiskAudits: highRiskAudits.length,
     },
   };
 }
@@ -1511,6 +1539,12 @@ export interface ContractorRisk {
   duplicatePhotos: number;
   visionFlags: number;
   offSitePhotos: number;
+  // Aggregated from job_audits (the forensic audit outcome).
+  jobsAudited: number;
+  billStopJobs: number;
+  seriousJobs: number;
+  auditFindings: number;
+  totalExposure: number;
   score: number;
 }
 
@@ -1527,10 +1561,10 @@ export async function getContractorRisk(): Promise<{ summary: RedFlagSummary; co
   const supabase = await sb();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [compRes, docRes] = await Promise.all([
+  const [compRes, docRes, auditRes] = await Promise.all([
     supabase
       .from("complaints")
-      .select("id, contractor, status, next_follow_up_date")
+      .select("id, contractor, job_number, status, next_follow_up_date")
       .is("deleted_at", null)
       .limit(5000),
     supabase
@@ -1538,9 +1572,15 @@ export async function getContractorRisk(): Promise<{ summary: RedFlagSummary; co
       .select("complaint_id, is_duplicate, vision_verdict, geo_flag")
       .or("is_duplicate.eq.true,vision_verdict.not.is.null,geo_flag.eq.far")
       .limit(8000),
+    supabase
+      .from("job_audits")
+      .select("job_number, risk_band, total_exposure, red_flag_count, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5000),
   ]);
   logErr("risk:complaints", compRes.error);
   logErr("risk:docs", docRes.error);
+  logErr("risk:audits", auditRes.error);
 
   const comps = compRes.data ?? [];
   const openSet = new Set(COMPLAINT_OPEN_STATUSES as readonly string[]);
@@ -1557,7 +1597,7 @@ export async function getContractorRisk(): Promise<{ summary: RedFlagSummary; co
 
   const map = new Map<string, ContractorRisk>();
   const ensure = (name: string) =>
-    map.get(name) ?? map.set(name, { contractor: name, complaints: 0, overdue: 0, duplicatePhotos: 0, visionFlags: 0, offSitePhotos: 0, score: 0 }).get(name)!;
+    map.get(name) ?? map.set(name, { contractor: name, complaints: 0, overdue: 0, duplicatePhotos: 0, visionFlags: 0, offSitePhotos: 0, jobsAudited: 0, billStopJobs: 0, seriousJobs: 0, auditFindings: 0, totalExposure: 0, score: 0 }).get(name)!;
 
   // complaints + overdue per contractor
   for (const c of byComplaint.values()) {
@@ -1586,14 +1626,97 @@ export async function getContractorRisk(): Promise<{ summary: RedFlagSummary; co
     if (offSite) e.offSitePhotos++;
   }
 
+  // Job-audit outcomes per contractor (the forensic signal — strongest weight).
+  const jobToContractor = new Map<string, string>();
+  for (const c of comps) {
+    const r = c as Record<string, unknown>;
+    const jn = r.job_number as string | null;
+    const ct = r.contractor as string | null;
+    if (jn && ct && !jobToContractor.has(jn)) jobToContractor.set(jn, ct);
+  }
+  const seenJob = new Set<string>();
+  for (const a of auditRes.data ?? []) {
+    const r = a as Record<string, unknown>;
+    const jn = r.job_number as string;
+    if (!jn || seenJob.has(jn)) continue; // ordered desc → first row is the latest audit
+    seenJob.add(jn);
+    const ct = jobToContractor.get(jn);
+    if (!ct) continue;
+    const e = ensure(ct);
+    e.jobsAudited++;
+    if (r.risk_band === "bill_stop") e.billStopJobs++;
+    if (r.risk_band === "serious") e.seriousJobs++;
+    e.auditFindings += (r.red_flag_count as number) ?? 0;
+    e.totalExposure += (r.total_exposure as number) ?? 0;
+  }
+
   const contractors = [...map.values()].map((e) => {
-    e.score = e.duplicatePhotos * 5 + e.visionFlags * 4 + e.offSitePhotos * 4 + e.overdue * 1;
+    e.score =
+      e.billStopJobs * 15 + e.seriousJobs * 8 + e.auditFindings * 1 +
+      e.duplicatePhotos * 5 + e.visionFlags * 4 + e.offSitePhotos * 4 + e.overdue * 1;
     return e;
   });
   summary.contractorsAtRisk = contractors.filter((c) => c.score > 0).length;
   contractors.sort((a, b) => b.score - a.score);
 
   return { summary, contractors };
+}
+
+export interface CrossJobPattern {
+  code: string;
+  title: string;
+  severity: "High" | "Medium" | "Low";
+  detail: string;
+  jobNumbers: string[];
+}
+
+/**
+ * Cross-job repeat-pattern detection — the strongest corruption signal: the same
+ * contractor / finding-type / recycled photo recurring across ≥2 job codes. Runs
+ * the pure detectRepeatPatterns engine over every persisted job audit.
+ */
+export async function getCrossJobPatterns(): Promise<CrossJobPattern[]> {
+  const supabase = await sb();
+  const [auditRes, compRes] = await Promise.all([
+    supabase.from("job_audits").select("job_number, report, created_at").order("created_at", { ascending: false }).limit(2000),
+    supabase.from("complaints").select("job_number, contractor").not("job_number", "is", null).is("deleted_at", null).limit(5000),
+  ]);
+  logErr("patterns:audits", auditRes.error);
+  logErr("patterns:complaints", compRes.error);
+
+  const jobToContractor = new Map<string, string>();
+  for (const c of compRes.data ?? []) {
+    const r = c as Record<string, unknown>;
+    const jn = r.job_number as string | null;
+    const ct = r.contractor as string | null;
+    if (jn && ct && !jobToContractor.has(jn)) jobToContractor.set(jn, ct);
+  }
+
+  const seen = new Set<string>();
+  const rows: import("@/lib/forensics/pattern-detector").JobPatternRow[] = [];
+  for (const a of auditRes.data ?? []) {
+    const r = a as Record<string, unknown>;
+    const jn = r.job_number as string;
+    if (!jn || seen.has(jn)) continue; // latest audit per job only
+    seen.add(jn);
+    const report = r.report as JobAuditReport | null;
+    const findings = report?.findings ?? [];
+    rows.push({
+      jobNumber: jn,
+      contractor: jobToContractor.get(jn) ?? null,
+      findingTypes: findings.map((f) => f.code.replace(/-\d+$/, "")),
+      photoHashes: [], // photo recycling is covered by the dedupe audit
+    });
+  }
+
+  const { detectRepeatPatterns } = await import("@/lib/forensics/pattern-detector");
+  return detectRepeatPatterns(rows).map((f) => ({
+    code: f.code,
+    title: f.title,
+    severity: f.severity,
+    detail: f.detail,
+    jobNumbers: /codes?:\s*(.+?)\.?$/i.exec(f.detail)?.[1]?.split(",").map((s) => s.trim()) ?? [],
+  }));
 }
 
 /** Points for the forensic map: complaint reported locations + photo EXIF GPS. */

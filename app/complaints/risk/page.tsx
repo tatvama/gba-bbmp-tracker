@@ -3,10 +3,13 @@ import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getContractorRisk } from "@/lib/queries";
+import { getContractorRisk, getCrossJobPatterns } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
-import { ShieldAlert, Copy, MapPin, ScanEye, Clock } from "lucide-react";
+import { ShieldAlert, Copy, MapPin, ScanEye, Clock, GitMerge, Gavel } from "lucide-react";
+import Link from "next/link";
+
+const inr = (n: number) => (n > 0 ? `₹${Math.round(n).toLocaleString("en-IN")}` : "—");
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Risk & Red Flags" };
@@ -34,13 +37,13 @@ export default async function RiskPage() {
     );
   }
 
-  const { summary, contractors } = await getContractorRisk();
+  const [{ summary, contractors }, patterns] = await Promise.all([getContractorRisk(), getCrossJobPatterns()]);
 
   return (
     <div>
       <PageHeader
         title="Risk & Red Flags"
-        description="Fraud signals aggregated across all cases — and contractors ranked by a combined risk score (duplicate photos, off-site GPS, vision flags, overdue follow-ups). Signals are for review, not proof."
+        description="Fraud signals aggregated across all cases — and contractors ranked by a combined risk score (forensic bill-stop audits, duplicate photos, off-site GPS, vision flags, overdue follow-ups). Signals are for review, not proof."
         badge={<Badge variant={summary.contractorsAtRisk > 0 ? "destructive" : "success"}>{summary.contractorsAtRisk} contractor(s) at risk</Badge>}
       />
 
@@ -50,6 +53,33 @@ export default async function RiskPage() {
         <Stat icon={ScanEye} label="Vision flags" value={summary.visionFlags} danger />
         <Stat icon={Clock} label="Overdue follow-ups" value={summary.overdueComplaints} danger />
       </div>
+
+      {/* Cross-job repeat patterns — the strongest corruption signal. */}
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <GitMerge className="h-4 w-4" /> Cross-job repeat patterns
+      </h2>
+      {patterns.length === 0 ? (
+        <p className="mb-6 text-sm text-muted-foreground">No repeat patterns across audited jobs yet. Run the Job Forensic Audit on more jobs to surface contractors / finding-types that recur across job codes.</p>
+      ) : (
+        <div className="mb-6 space-y-2">
+          {patterns.map((p) => (
+            <Card key={p.code} className="p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={p.severity === "High" ? "destructive" : "warning"}>{p.severity}</Badge>
+                <span className="text-sm font-semibold">{p.title}</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{p.detail}</p>
+              {p.jobNumbers.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {p.jobNumbers.map((j) => (
+                    <Link key={j} href={`/complaints/job/${encodeURIComponent(j)}/audit`} className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs hover:underline">{j}</Link>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
 
       <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         <ShieldAlert className="h-4 w-4" /> Contractor risk ranking
@@ -62,6 +92,8 @@ export default async function RiskPage() {
             <TableRow>
               <TableHead>Contractor</TableHead>
               <TableHead className="text-right">Risk</TableHead>
+              <TableHead className="text-right">Bill-stop</TableHead>
+              <TableHead className="text-right">Exposure</TableHead>
               <TableHead className="text-right">Cases</TableHead>
               <TableHead className="text-right">Dup photos</TableHead>
               <TableHead className="text-right">Off-site</TableHead>
@@ -76,6 +108,10 @@ export default async function RiskPage() {
                 <TableCell className="text-right">
                   <Badge variant={c.score >= 15 ? "destructive" : c.score >= 5 ? "warning" : "muted"}>{c.score}</Badge>
                 </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {c.billStopJobs > 0 ? <span className="font-semibold text-destructive"><Gavel className="mr-0.5 inline h-3 w-3" />{c.billStopJobs}</span> : "—"}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{inr(c.totalExposure)}</TableCell>
                 <TableCell className="text-right tabular-nums">{c.complaints}</TableCell>
                 <TableCell className="text-right tabular-nums">{c.duplicatePhotos || "—"}</TableCell>
                 <TableCell className="text-right tabular-nums">{c.offSitePhotos || "—"}</TableCell>
