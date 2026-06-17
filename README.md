@@ -100,6 +100,7 @@ All data lives in **Supabase (PostgreSQL)** with Row-Level Security. Auth is Sup
 - **Safe-language hard gate** (`lib/letters/safe-language.ts`): every adverse point is a *documented suspicion seeking records*, never an accusation. The linter fails on 8 prohibited patterns (4 English + 4 Kannada); if the AI emits any, its draft is **discarded** and the deterministic draft is used. Letters never sign as Guruji / the Trust. Drafts are editable and never auto-filed.
 - **DOCX / CSV export** (`/api/job-audit/[jobNumber]/letter`): A4 Word with Kannada via the complex-script font slot, shaded ground tables and a quantity-variation bar chart; evidence index as CSV.
 - **MCP tools:** `get_job_audit` and `draft_job_letter` expose the audit + safety-gated letter drafting to Claude/MCP clients.
+- **Hardening round** (after a 15-agent self-audit): tightened RLS so audits/drafts are no longer world-readable (migration 0010); the export route refuses to serve a draft that failed the safe-language gate and scopes `draftId` to its job (no IDOR); extraction **coverage** is surfaced so a partial audit is never shown as complete; previously-dead engines are now wired in (forgery-vision screen, cross-document field mismatch) plus new BOCW-cess and completion-certificate/DLP checks; **cross-job repeat patterns** + a **contractor forensic profile** on `/complaints/risk`; saved-draft reopen, audit-run history/diff, per-finding accept/dismiss triage (migration 0011), and a consolidated **job-level PIL dossier** (`/complaints/job/[jobNumber]/dossier`).
 
 ---
 
