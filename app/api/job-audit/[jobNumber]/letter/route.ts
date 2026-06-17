@@ -26,18 +26,27 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ jobNumber: 
   const draftId = url.searchParams.get("draftId");
 
   const admin = createAdminClient();
+  const cols = "id, skeleton, quantities, file_name, evidence_index, lint_ok";
+  // Always scope by job_number — a draftId from another job must not be served (IDOR).
   let q = admin
     .from("letter_drafts")
-    .select("id, skeleton, quantities, file_name, evidence_index")
+    .select(cols)
     .eq("job_number", jobNumber)
     .order("created_at", { ascending: false })
     .limit(1);
-  if (draftId) q = admin.from("letter_drafts").select("id, skeleton, quantities, file_name, evidence_index").eq("id", draftId).limit(1);
+  if (draftId) q = admin.from("letter_drafts").select(cols).eq("id", draftId).eq("job_number", jobNumber).limit(1);
 
   const { data, error } = await q.maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data?.skeleton) {
-    return NextResponse.json({ error: "No letter draft found. Generate the letter first." }, { status: 404 });
+    return NextResponse.json({ error: "No letter draft found for this job. Generate the letter first." }, { status: 404 });
+  }
+  // Never export a draft that failed the safe-language gate (would file accusatory wording).
+  if (data.lint_ok === false) {
+    return NextResponse.json(
+      { error: "This draft did not pass the safe-language check and cannot be exported. Edit it to remove prohibited wording, re-check, then download." },
+      { status: 422 },
+    );
   }
 
   const skeleton = data.skeleton as LetterSkeleton;
