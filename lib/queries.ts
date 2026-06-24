@@ -43,7 +43,7 @@ async function sb() {
 }
 
 function logErr(where: string, error: unknown) {
-  if (error) console.error(`[queries:${where}]`, error);
+  if (error) console.warn(`[queries:${where}]`, error);
 }
 
 const WARD_SELECT =
@@ -532,7 +532,34 @@ export async function listContactsForCorporation(corpId: string): Promise<Contac
 // Complaints / Sources / Audit
 // --------------------------------------------------------------------------
 const COMPLAINT_SELECT =
-  "*, ward:wards!ward_id(id,new_no,new_name), division:divisions!division_id(id,name), corporation:corporations!corporation_id(id,code,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), assigned_engineer:contacts!assigned_engineer_id(id,full_name,designation,phone,whatsapp,email), assigned_officer:contacts!assigned_officer_id(id,full_name,designation)";
+  "*, ward:wards!ward_id(id,new_no,new_name), gba_ward:gba_wards!gba_ward_id(id,ward_no,ward_name_en,ward_name_kn), division:divisions!division_id(id,name), corporation:corporations!corporation_id(id,code,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), assigned_engineer:contacts!assigned_engineer_id(id,full_name,designation,phone,whatsapp,email), assigned_officer:contacts!assigned_officer_id(id,full_name,designation)";
+
+function mapGbaComplaint(c: any) {
+  if (!c) return c;
+  if (c.ward_type === "GBA" || c.gba_ward_id) {
+    if (c.gba_ward) {
+      c.ward = {
+        id: c.gba_ward.id,
+        new_no: c.gba_ward.ward_no,
+        new_name: c.gba_ward.ward_name_en,
+        name_kn: c.gba_ward.ward_name_kn,
+      };
+    }
+    if (c.gba_division) {
+      c.division = {
+        id: c.gba_division,
+        name: c.gba_division,
+      };
+    }
+    if (c.gba_subdivision) {
+      c.eng_subdivision = {
+        id: c.gba_subdivision,
+        name: c.gba_subdivision,
+      };
+    }
+  }
+  return c;
+}
 
 export async function listComplaints(): Promise<ComplaintWithRelations[]> {
   const supabase = await sb();
@@ -542,7 +569,8 @@ export async function listComplaints(): Promise<ComplaintWithRelations[]> {
     .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   logErr("listComplaints", error);
-  return (data as unknown as ComplaintWithRelations[]) ?? [];
+  const rows = (data as unknown as ComplaintWithRelations[]) ?? [];
+  return rows.map(mapGbaComplaint);
 }
 
 export async function listComplaintsForWard(wardId: string): Promise<Complaint[]> {
@@ -678,20 +706,12 @@ export async function countDerivedWards(corpId: string): Promise<number> {
 }
 
 export async function getComplaintFormOptions() {
-  const supabase = await sb();
-  const [corps, divs, wards, subs, contacts] = await Promise.all([
-    supabase.from("corporations").select("id,code,name").order("name"),
-    supabase.from("divisions").select("id,name").order("name"),
-    supabase.from("wards").select("id,new_no,new_name").order("new_no"),
-    supabase.from("eng_subdivisions").select("id,name").order("name"),
-    supabase.from("contacts").select("id,full_name,designation").order("full_name"),
-  ]);
   return {
-    corporations: (corps.data as { id: string; code: string; name: string }[]) ?? [],
-    divisions: (divs.data as { id: string; name: string }[]) ?? [],
-    wards: (wards.data as { id: string; new_no: number; new_name: string }[]) ?? [],
-    subdivisions: (subs.data as { id: string; name: string }[]) ?? [],
-    contacts: (contacts.data as { id: string; full_name: string; designation: string }[]) ?? [],
+    corporations: [],
+    divisions: [],
+    wards: [],
+    subdivisions: [],
+    contacts: [],
   };
 }
 
@@ -896,7 +916,7 @@ export async function getComplaint(id: string): Promise<ComplaintWithRelations |
     .is("deleted_at", null)
     .maybeSingle();
   logErr("getComplaint", error);
-  return (data as unknown as ComplaintWithRelations) ?? null;
+  return mapGbaComplaint(data as unknown as ComplaintWithRelations);
 }
 
 export async function listComplaintDocuments(complaintId: string): Promise<ComplaintDocument[]> {

@@ -113,7 +113,38 @@ function parse(formData: FormData) {
   return complaintSchema.safeParse(obj);
 }
 
-function toRow(input: Record<string, any>) {
+async function toRow(admin: SupabaseClient, input: Record<string, any>) {
+  let divisionId = input.divisionId ?? null;
+  let engSubDivisionId = input.engSubDivisionId ?? null;
+  let gbaWardId = null;
+  let gbaDivision = null;
+  let gbaSubdivision = null;
+  const wardType = input.wardType || "BBMP";
+
+  if (wardType === "GBA") {
+    gbaWardId = input.wardId ?? null;
+    gbaDivision = input.divisionId ?? null;
+    gbaSubdivision = input.engSubDivisionId ?? null;
+
+    // Find matching BBMP division and subdivision IDs by name for compatibility
+    if (gbaDivision) {
+      const { data: d } = await admin
+        .from("divisions")
+        .select("id")
+        .eq("name", gbaDivision)
+        .maybeSingle();
+      divisionId = d?.id ?? null;
+    }
+    if (gbaSubdivision) {
+      const { data: s } = await admin
+        .from("eng_subdivisions")
+        .select("id")
+        .eq("name", gbaSubdivision)
+        .maybeSingle();
+      engSubDivisionId = s?.id ?? null;
+    }
+  }
+
   return {
     title: input.title,
     type: input.type,
@@ -132,9 +163,9 @@ function toRow(input: Record<string, any>) {
     acknowledgment_date: input.acknowledgementDate ?? null,
     expected_resolution_date: input.expectedResolutionDate ?? null,
     corporation_id: input.corporationId ?? null,
-    division_id: input.divisionId ?? null,
-    ward_id: input.wardId ?? null,
-    eng_subdivision_id: input.engSubDivisionId ?? null,
+    division_id: divisionId,
+    ward_id: wardType === "BBMP" ? (input.wardId ?? null) : null,
+    eng_subdivision_id: engSubDivisionId,
     assigned_engineer_id: input.assignedEngineerId ?? null,
     assigned_officer_id: input.assignedOfficerId ?? null,
     responsible_department: input.responsibleDepartment ?? null,
@@ -148,6 +179,12 @@ function toRow(input: Record<string, any>) {
     next_action_date: input.nextFollowUpDate ?? null,
     reminder_flag: input.reminderEnabled ?? false,
     notes: input.notes ?? null,
+
+    // GBA columns
+    ward_type: wardType,
+    gba_ward_id: gbaWardId,
+    gba_division: gbaDivision,
+    gba_subdivision: gbaSubdivision,
   };
 }
 
@@ -173,7 +210,7 @@ export async function createComplaint(_prev: ActionState, formData: FormData): P
   const caseNumber = rpc as string;
 
   const row: Record<string, unknown> = {
-    ...toRow(parsed.data),
+    ...(await toRow(admin, parsed.data)),
     internal_case_number: caseNumber,
     created_by: user.id,
     updated_by: user.id,
@@ -229,7 +266,7 @@ export async function updateComplaint(id: string, _prev: ActionState, formData: 
   if (!parsed.success) return { error: "Please fix the errors below.", fieldErrors: fieldErrors(parsed.error) };
 
   const { data: before } = await admin.from("complaints").select("*").eq("id", id).single();
-  const row = { ...toRow(parsed.data), updated_by: user.id };
+  const row = { ...(await toRow(admin, parsed.data)), updated_by: user.id };
   const { error } = await admin.from("complaints").update(row).eq("id", id);
   if (error) return { error: error.message };
 
@@ -601,4 +638,174 @@ export async function saveComplaintAiDraft(input: {
   await addTimeline(admin, { complaintId: input.complaintId, eventType: "Note", title: `AI draft saved: ${input.title ?? input.kind}`, createdBy: user.id });
   revalidatePath(`/complaints/${input.complaintId}`);
   return { ok: true, id: data.id };
+}
+
+export async function getCorporationsAction() {
+  const user = await getSessionUser();
+  if (!user) throw new Error("Not authorized");
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("corporations")
+    .select("id, code, name")
+    .order("name");
+  if (error) {
+    console.error("getCorporationsAction error:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getDivisionsAction(corporationId: string, wardType: string = "BBMP") {
+  const user = await getSessionUser();
+  if (!user) throw new Error("Not authorized");
+  const admin = createAdminClient();
+
+  if (wardType === "GBA") {
+    // 1. Get corporation code
+    const { data: corp } = await admin
+      .from("corporations")
+      .select("code")
+      .eq("id", corporationId)
+      .single();
+    if (!corp) return [];
+
+    // 2. Query distinct divisions from gba_wards
+    const { data, error } = await admin
+      .from("gba_wards")
+      .select("division")
+      .eq("corporation_code", corp.code)
+      .order("division");
+    if (error) {
+      console.error("getDivisionsAction GBA error:", error);
+      return [];
+    }
+    const uniqueDivs = Array.from(new Set(data?.map((d) => d.division) || []));
+    return uniqueDivs.map((name) => ({ id: name, name }));
+  }
+
+  const { data, error } = await admin
+    .from("divisions")
+    .select("id, name")
+    .eq("corporation_id", corporationId)
+    .order("name");
+  if (error) {
+    console.error("getDivisionsAction error:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getSubdivisionsAction(divisionId: string, corporationId: string, wardType: string = "BBMP") {
+  const user = await getSessionUser();
+  if (!user) throw new Error("Not authorized");
+  const admin = createAdminClient();
+
+  if (wardType === "GBA") {
+    // divisionId is text
+    const { data: corp } = await admin
+      .from("corporations")
+      .select("code")
+      .eq("id", corporationId)
+      .single();
+    if (!corp) return [];
+
+    const { data, error } = await admin
+      .from("gba_wards")
+      .select("subdivision")
+      .eq("corporation_code", corp.code)
+      .eq("division", divisionId)
+      .order("subdivision");
+    if (error) {
+      console.error("getSubdivisionsAction GBA error:", error);
+      return [];
+    }
+    const uniqueSubs = Array.from(new Set(data?.map((s) => s.subdivision) || []));
+    return uniqueSubs.map((name) => ({ id: name, name }));
+  }
+
+  const { data, error } = await admin
+    .from("eng_subdivisions")
+    .select("id, name")
+    .eq("division_id", divisionId)
+    .order("name");
+  if (error) {
+    console.error("getSubdivisionsAction error:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getWardsAction(subdivisionId: string, divisionId: string, corporationId: string, wardType: string = "BBMP") {
+  const user = await getSessionUser();
+  if (!user) throw new Error("Not authorized");
+  const admin = createAdminClient();
+
+  if (wardType === "GBA") {
+    // subdivisionId, divisionId are text strings
+    const { data: corp } = await admin
+      .from("corporations")
+      .select("code")
+      .eq("id", corporationId)
+      .single();
+    if (!corp) return [];
+
+    const { data, error } = await admin
+      .from("gba_wards")
+      .select("id, ward_no, ward_name_en")
+      .eq("corporation_code", corp.code)
+      .eq("division", divisionId)
+      .eq("subdivision", subdivisionId)
+      .order("ward_no");
+    if (error) {
+      console.error("getWardsAction GBA error:", error);
+      return [];
+    }
+    return (data || []).map((w) => ({
+      id: w.id,
+      new_no: w.ward_no,
+      new_name: w.ward_name_en,
+    }));
+  }
+
+  const { data, error } = await admin
+    .from("wards")
+    .select("id, new_no, new_name")
+    .eq("eng_subdivision_id", subdivisionId)
+    .order("new_no");
+  if (error) {
+    console.error("getWardsAction error:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getContactsAction(subdivisionId: string, wardType: string = "BBMP") {
+  const user = await getSessionUser();
+  if (!user) throw new Error("Not authorized");
+  const admin = createAdminClient();
+
+  let subUuid = subdivisionId;
+
+  if (wardType === "GBA") {
+    // subdivisionId is subdivision text name
+    const { data: sub } = await admin
+      .from("eng_subdivisions")
+      .select("id")
+      .eq("name", subdivisionId)
+      .maybeSingle();
+    if (!sub) return [];
+    subUuid = sub.id;
+  }
+
+  const { data, error } = await admin
+    .from("contacts")
+    .select("id, full_name, designation")
+    .eq("eng_subdivision_id", subUuid)
+    .order("full_name");
+  if (error) {
+    console.error("getContactsAction error:", error);
+    return [];
+  }
+  return data ?? [];
 }

@@ -178,6 +178,11 @@ export interface Complaint {
   closure_date: string | null;
   closure_summary: string | null;
   deleted_at: string | null;
+  // GBA fields
+  ward_type: string | null;
+  gba_ward_id: string | null;
+  gba_division: string | null;
+  gba_subdivision: string | null;
 }
 
 export interface ComplaintWithRelations extends Complaint {
@@ -187,6 +192,7 @@ export interface ComplaintWithRelations extends Complaint {
   eng_subdivision?: Pick<EngSubDivision, "id" | "name"> | null;
   assigned_engineer?: Pick<Contact, "id" | "full_name" | "designation" | "phone" | "whatsapp" | "email"> | null;
   assigned_officer?: Pick<Contact, "id" | "full_name" | "designation"> | null;
+  gba_ward?: { id: string; ward_no: number; ward_name_en: string; ward_name_kn: string | null } | null;
 }
 
 export interface ComplaintDocument {

@@ -1,11 +1,16 @@
 import crypto from "node:crypto";
-import sharp from "sharp";
 import exifr from "exifr";
 
 // No "server-only" guard: this is a pure Node utility (crypto/sharp/exifr) shared
 // by the server upload route/OCR pipeline AND the tsx backfill script, so the
 // fingerprint algorithm is identical everywhere. sharp/exifr keep it server-side
 // in practice (they can't bundle into a client component).
+
+// Dynamically import sharp to avoid AppLocker failures on environments where native addons are blocked during build or imports
+async function getSharp() {
+  const s = await import("sharp");
+  return s.default || s;
+}
 
 const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"];
 function isImageMime(mime: string | null | undefined): boolean {
@@ -37,8 +42,9 @@ export function sha256(buffer: Buffer): string {
 /** Difference hash: 9×8 grayscale, compare horizontally adjacent pixels → 64 bits. */
 export async function dhash(input: Buffer): Promise<string | null> {
   try {
+    const sharpInstance = await getSharp();
     const W = 9, H = 8;
-    const px = await sharp(input).rotate().grayscale().resize(W, H, { fit: "fill" }).raw().toBuffer();
+    const px = await sharpInstance(input).rotate().grayscale().resize(W, H, { fit: "fill" }).raw().toBuffer();
     let bits = 0n;
     for (let r = 0; r < H; r++) {
       for (let c = 0; c < W - 1; c++) {
@@ -67,8 +73,9 @@ function dct1d(vec: number[]): number[] {
 /** Perceptual hash: 32×32 grayscale → 2D DCT → top-left 8×8 (drop DC) vs median → 64 bits. */
 export async function phash(input: Buffer): Promise<string | null> {
   try {
+    const sharpInstance = await getSharp();
     const N = 32;
-    const px = await sharp(input).rotate().grayscale().resize(N, N, { fit: "fill" }).raw().toBuffer();
+    const px = await sharpInstance(input).rotate().grayscale().resize(N, N, { fit: "fill" }).raw().toBuffer();
     const rows: number[][] = [];
     for (let y = 0; y < N; y++) {
       const row = new Array<number>(N);

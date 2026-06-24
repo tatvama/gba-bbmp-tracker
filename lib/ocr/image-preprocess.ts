@@ -1,5 +1,4 @@
 import "server-only";
-import sharp from "sharp";
 
 /**
  * Server-side image preprocessing for OCR (sharp). Produces an OCR-friendly image
@@ -7,6 +6,12 @@ import sharp from "sharp";
  * All functions are defensive: on failure they return the original buffer so an
  * upload is never blocked by preprocessing.
  */
+
+// Dynamically import sharp to avoid AppLocker failures on environments where native addons are blocked during build or imports
+async function getSharp() {
+  const s = await import("sharp");
+  return s.default || s;
+}
 
 export interface PreprocessResult {
   ocrImage: Buffer; // grayscale, contrast-enhanced PNG for OCR
@@ -24,8 +29,9 @@ export function isImageMime(mime: string | null | undefined): boolean {
 
 export async function preprocessForOcr(input: Buffer): Promise<PreprocessResult> {
   try {
-    const meta = await sharp(input).metadata();
-    const ocrImage = await sharp(input)
+    const sharpInstance = await getSharp();
+    const meta = await sharpInstance(input).metadata();
+    const ocrImage = await sharpInstance(input)
       .rotate() // auto-orient from EXIF
       .resize({
         width: MAX_OCR_DIMENSION,
@@ -50,7 +56,8 @@ export async function preprocessForOcr(input: Buffer): Promise<PreprocessResult>
 
 export async function makeThumbnail(input: Buffer): Promise<Buffer> {
   try {
-    return await sharp(input)
+    const sharpInstance = await getSharp();
+    return await sharpInstance(input)
       .rotate()
       .resize({ width: THUMB_DIMENSION, height: THUMB_DIMENSION, fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 70 })
@@ -59,3 +66,4 @@ export async function makeThumbnail(input: Buffer): Promise<Buffer> {
     return input;
   }
 }
+

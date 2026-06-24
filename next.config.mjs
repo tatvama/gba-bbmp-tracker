@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ["tesseract.js"],
   // Server Actions are enabled by default in Next 15.
   // Map provider/API keys intentionally omitted in v1 (placeholder only).
   eslint: {
