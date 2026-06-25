@@ -244,10 +244,14 @@ export const rtiSchema = z.object({
   faaEmail: optionalEmailSchema,
   // jurisdiction
   corporationId: optUuid,
-  divisionId: optUuid,
-  engSubDivisionId: optUuid,
+  divisionId: optText,
+  engSubDivisionId: optText,
   wardId: optUuid,
   contactId: optUuid,
+  wardType: z.enum(["BBMP", "GBA"], { errorMap: () => ({ message: "Ward Type is required" }) }).default("BBMP"),
+  gbaWardId: optUuid,
+  gbaDivision: optText,
+  gbaSubdivision: optText,
   // filing details
   applicationFeePaid: z.coerce.boolean().default(false),
   feeMode: optText,

@@ -11,6 +11,11 @@ import { cn } from "@/lib/utils";
 import { DESIGNATIONS, VERIFICATION_STATUSES, CONFIDENCE_SCORES } from "@/lib/constants";
 import type { ContactWithRelations } from "@/lib/types";
 import type { ActionState } from "@/lib/actions/contacts";
+import {
+  getCorporationsAction,
+  getDivisionsAction,
+  getSubdivisionsAction,
+} from "@/lib/actions/complaints";
 
 type Options = {
   corporations: { id: string; code: string; name: string }[];
@@ -32,6 +37,115 @@ export function ContactForm({
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, {});
+
+  // Selected values
+  const [corpId, setCorpId] = React.useState<string>(initial?.corporation_id ?? "");
+  const [divId, setDivId] = React.useState<string>(initial?.division_id ?? "");
+  const [subDivId, setSubDivId] = React.useState<string>(initial?.eng_subdivision_id ?? "");
+
+  // Options lists
+  const [corporations, setCorporations] = React.useState<{ id: string; code: string; name: string }[]>(() => {
+    if (initial?.corporation_id && initial?.corporation) {
+      return [{ id: initial.corporation_id, code: initial.corporation.code, name: initial.corporation.name }];
+    }
+    return [];
+  });
+  const [divisions, setDivisions] = React.useState<{ id: string; name: string }[]>(() => {
+    if (initial?.division_id && initial?.division) {
+      return [{ id: initial.division_id, name: initial.division.name }];
+    }
+    return [];
+  });
+  const [subdivisions, setSubdivisions] = React.useState<{ id: string; name: string }[]>(() => {
+    if (initial?.eng_subdivision_id && initial?.eng_subdivision) {
+      return [{ id: initial.eng_subdivision_id, name: initial.eng_subdivision.name }];
+    }
+    return [];
+  });
+
+  // Loading states
+  const [loadingCorps, setLoadingCorps] = React.useState(false);
+  const [loadingDivs, setLoadingDivs] = React.useState(false);
+  const [loadingSubs, setLoadingSubs] = React.useState(false);
+
+  // Load corporations on mount, and division/subdivisions if initial values are set
+  React.useEffect(() => {
+    async function loadData() {
+      const fetches: Promise<any>[] = [];
+
+      // Always fetch corporations on mount
+      fetches.push(
+        getCorporationsAction()
+          .then(setCorporations)
+          .catch((e) => console.error("Error loading corporations:", e))
+      );
+
+      if (initial?.corporation_id) {
+        fetches.push(
+          getDivisionsAction(initial.corporation_id, "BBMP")
+            .then(setDivisions)
+            .catch((e) => console.error("Error loading divisions:", e))
+        );
+      }
+
+      if (initial?.division_id && initial?.corporation_id) {
+        fetches.push(
+          getSubdivisionsAction(initial.division_id, initial.corporation_id, "BBMP")
+            .then(setSubdivisions)
+            .catch((e) => console.error("Error loading subdivisions:", e))
+        );
+      }
+
+      if (fetches.length > 0) {
+        await Promise.all(fetches);
+      }
+    }
+
+    loadData();
+  }, [initial]);
+
+  // Handlers
+  const handleCorpChange = async (val: string) => {
+    setCorpId(val);
+    setDivId("");
+    setSubDivId("");
+    setDivisions([]);
+    setSubdivisions([]);
+
+    if (val) {
+      setLoadingDivs(true);
+      try {
+        const divs = await getDivisionsAction(val, "BBMP");
+        setDivisions(divs);
+      } catch (error) {
+        console.error("Failed to load divisions:", error);
+      } finally {
+        setLoadingDivs(false);
+      }
+    }
+  };
+
+  const handleDivChange = async (val: string) => {
+    setDivId(val);
+    setSubDivId("");
+    setSubdivisions([]);
+
+    if (val && corpId) {
+      setLoadingSubs(true);
+      try {
+        const subs = await getSubdivisionsAction(val, corpId, "BBMP");
+        setSubdivisions(subs);
+      } catch (error) {
+        console.error("Failed to load subdivisions:", error);
+      } finally {
+        setLoadingSubs(false);
+      }
+    }
+  };
+
+  const handleSubDivChange = (val: string) => {
+    setSubDivId(val);
+  };
 
   React.useEffect(() => {
     if (state.success && state.id) router.push(`/contacts/${state.id}`);
@@ -71,24 +185,109 @@ export function ContactForm({
           <Input name="department" defaultValue={initial?.department ?? ""} />
         </Field>
 
-        <Field label="Engineering sub-division" error={fe.engSubDivisionId}>
-          <select name="engSubDivisionId" defaultValue={initial?.eng_subdivision_id ?? ""} className={selectCls}>
-            <option value="">—</option>
-            {options.subdivisions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Division" error={fe.divisionId}>
-          <select name="divisionId" defaultValue={initial?.division_id ?? ""} className={selectCls}>
-            <option value="">—</option>
-            {options.divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </Field>
+        {/* Selected Path Breadcrumb */}
+        {corpId && (
+          <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground bg-muted/30 border border-muted/50 p-2.5 rounded-md sm:col-span-2">
+            <span className="font-medium text-foreground">Hierarchy:</span>
+            <span>BBMP Wards</span>
+            <>
+              <span className="text-muted-foreground/60">&gt;</span>
+              <span>{corporations.find((c) => c.id === corpId)?.name || (loadingCorps ? "Loading..." : corpId)}</span>
+            </>
+            {divId && (
+              <>
+                <span className="text-muted-foreground/60">&gt;</span>
+                <span>{divisions.find((d) => d.id === divId)?.name || (loadingDivs ? "Loading..." : divId)}</span>
+              </>
+            )}
+            {subDivId && (
+              <>
+                <span className="text-muted-foreground/60">&gt;</span>
+                <span>{subdivisions.find((s) => s.id === subDivId)?.name || (loadingSubs ? "Loading..." : subDivId)}</span>
+              </>
+            )}
+          </div>
+        )}
+
         <Field label="Corporation" error={fe.corporationId}>
-          <select name="corporationId" defaultValue={initial?.corporation_id ?? ""} className={selectCls}>
-            <option value="">—</option>
-            {options.corporations.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <select
+            name="corporationId"
+            value={corpId}
+            onChange={(e) => handleCorpChange(e.target.value)}
+            disabled={loadingCorps}
+            className={selectCls}
+          >
+            {loadingCorps ? (
+              <option value="">Loading Corporations...</option>
+            ) : corporations.length === 0 ? (
+              <option value="">No Corporations Found</option>
+            ) : (
+              <>
+                <option value="">—</option>
+                {corporations.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
         </Field>
+
+        <Field label="Division" error={fe.divisionId}>
+          <select
+            name="divisionId"
+            value={divId}
+            onChange={(e) => handleDivChange(e.target.value)}
+            disabled={!corpId || loadingDivs}
+            className={selectCls}
+          >
+            {loadingDivs ? (
+              <option value="">Loading Divisions...</option>
+            ) : !corpId ? (
+              <option value="">Select Corporation First</option>
+            ) : divisions.length === 0 ? (
+              <option value="">No Divisions Found</option>
+            ) : (
+              <>
+                <option value="">—</option>
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </Field>
+
+        <Field label="Engineering sub-division" error={fe.engSubDivisionId}>
+          <select
+            name="engSubDivisionId"
+            value={subDivId}
+            onChange={(e) => handleSubDivChange(e.target.value)}
+            disabled={!divId || loadingSubs}
+            className={selectCls}
+          >
+            {loadingSubs ? (
+              <option value="">Loading Sub-Divisions...</option>
+            ) : !divId ? (
+              <option value="">Select Division First</option>
+            ) : subdivisions.length === 0 ? (
+              <option value="">No Sub-Divisions Found</option>
+            ) : (
+              <>
+                <option value="">—</option>
+                {subdivisions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </Field>
+
         <Field label="Office timing" error={fe.officeTiming}>
           <Input name="officeTiming" defaultValue={initial?.office_timing ?? ""} placeholder="10am–5:30pm Mon–Sat" />
         </Field>

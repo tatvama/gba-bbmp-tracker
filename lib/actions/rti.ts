@@ -39,7 +39,8 @@ function parseRti(formData: FormData) {
   return rtiSchema.safeParse(obj);
 }
 
-function rtiToRow(
+async function rtiToRow(
+  supabase: any,
   input: Record<string, any>,
   deadlines: { normalDue: string | null; lifeLibertyDue: string | null; firstAppealDue: string | null; secondAppealDue: string | null },
 ) {
@@ -47,6 +48,37 @@ function rtiToRow(
     typeof input.tags === "string" && input.tags.trim()
       ? input.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
       : [];
+
+  let divisionId = input.divisionId ?? null;
+  let engSubDivisionId = input.engSubDivisionId ?? null;
+  let gbaWardId = null;
+  let gbaDivision = null;
+  let gbaSubdivision = null;
+  const wardType = input.wardType || "BBMP";
+
+  if (wardType === "GBA") {
+    gbaWardId = input.wardId ?? null;
+    gbaDivision = input.divisionId ?? null;
+    gbaSubdivision = input.engSubDivisionId ?? null;
+
+    if (gbaDivision) {
+      const { data: d } = await supabase
+        .from("divisions")
+        .select("id")
+        .eq("name", gbaDivision)
+        .maybeSingle();
+      divisionId = d?.id ?? null;
+    }
+    if (gbaSubdivision) {
+      const { data: s } = await supabase
+        .from("eng_subdivisions")
+        .select("id")
+        .eq("name", gbaSubdivision)
+        .maybeSingle();
+      engSubDivisionId = s?.id ?? null;
+    }
+  }
+
   return {
     subject: input.subject,
     info_requested: input.infoRequested ?? null,
@@ -71,9 +103,9 @@ function rtiToRow(
     faa_phone: input.faaPhone ?? null,
     faa_email: input.faaEmail ?? null,
     corporation_id: input.corporationId ?? null,
-    division_id: input.divisionId ?? null,
-    eng_subdivision_id: input.engSubDivisionId ?? null,
-    ward_id: input.wardId ?? null,
+    division_id: divisionId,
+    eng_subdivision_id: engSubDivisionId,
+    ward_id: wardType === "BBMP" ? (input.wardId ?? null) : null,
     contact_id: input.contactId ?? null,
     application_fee_paid: input.applicationFeePaid ?? false,
     fee_mode: input.feeMode ?? null,
@@ -95,6 +127,12 @@ function rtiToRow(
     life_liberty_due: deadlines.lifeLibertyDue,
     first_appeal_due: deadlines.firstAppealDue,
     second_appeal_due: deadlines.secondAppealDue,
+
+    // GBA columns
+    ward_type: wardType,
+    gba_ward_id: gbaWardId,
+    gba_division: gbaDivision,
+    gba_subdivision: gbaSubdivision,
   };
 }
 
@@ -125,7 +163,7 @@ export async function createRti(_prev: ActionState, formData: FormData): Promise
   const supabase = await createClient();
   const deadlines = await deadlinesFor(parsed.data);
   const row = {
-    ...rtiToRow(parsed.data, deadlines),
+    ...await rtiToRow(supabase, parsed.data, deadlines),
     internal_ref: genRef("RTI"),
     created_by: user.id,
     updated_by: user.id,
@@ -165,7 +203,7 @@ export async function updateRti(
   const supabase = await createClient();
   const { data: before } = await supabase.from("rti_applications").select("*").eq("id", id).single();
   const deadlines = await deadlinesFor(parsed.data);
-  const row = { ...rtiToRow(parsed.data, deadlines), updated_by: user.id };
+  const row = { ...await rtiToRow(supabase, parsed.data, deadlines), updated_by: user.id };
   const { error } = await supabase.from("rti_applications").update(row).eq("id", id);
   if (error) return { error: error.message };
 

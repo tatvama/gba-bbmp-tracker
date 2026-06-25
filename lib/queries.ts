@@ -717,16 +717,10 @@ export async function getComplaintFormOptions() {
 
 /** Lightweight options for select inputs (forms / filters). */
 export async function getFormOptions() {
-  const supabase = await sb();
-  const [corps, divs, subs] = await Promise.all([
-    supabase.from("corporations").select("id,code,name").order("name"),
-    supabase.from("divisions").select("id,name").order("name"),
-    supabase.from("eng_subdivisions").select("id,name").order("name"),
-  ]);
   return {
-    corporations: (corps.data as { id: string; code: string; name: string }[]) ?? [],
-    divisions: (divs.data as { id: string; name: string }[]) ?? [],
-    subdivisions: (subs.data as { id: string; name: string }[]) ?? [],
+    corporations: [],
+    divisions: [],
+    subdivisions: [],
   };
 }
 
@@ -735,7 +729,34 @@ export async function getFormOptions() {
 // ==========================================================================
 
 const RTI_SELECT =
-  "*, corporation:corporations!corporation_id(id,code,name), division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), ward:wards!ward_id(id,new_no,new_name), contact:contacts!contact_id(id,full_name,designation)";
+  "*, corporation:corporations!corporation_id(id,code,name), division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), ward:wards!ward_id(id,new_no,new_name), contact:contacts!contact_id(id,full_name,designation), gba_ward:gba_wards!gba_ward_id(id,ward_no,ward_name_en,ward_name_kn)";
+
+function mapGbaRti(r: any) {
+  if (!r) return r;
+  if (r.ward_type === "GBA" || r.gba_ward_id) {
+    if (r.gba_ward) {
+      r.ward = {
+        id: r.gba_ward.id,
+        new_no: r.gba_ward.ward_no,
+        new_name: r.gba_ward.ward_name_en,
+        name_kn: r.gba_ward.ward_name_kn,
+      };
+    }
+    if (r.gba_division) {
+      r.division = {
+        id: r.gba_division,
+        name: r.gba_division,
+      };
+    }
+    if (r.gba_subdivision) {
+      r.eng_subdivision = {
+        id: r.gba_subdivision,
+        name: r.gba_subdivision,
+      };
+    }
+  }
+  return r;
+}
 
 export async function listRtis(): Promise<RtiWithRelations[]> {
   const supabase = await sb();
@@ -744,7 +765,8 @@ export async function listRtis(): Promise<RtiWithRelations[]> {
     .select(RTI_SELECT)
     .order("updated_at", { ascending: false });
   logErr("listRtis", error);
-  return (data as unknown as RtiWithRelations[]) ?? [];
+  const rows = (data as unknown as RtiWithRelations[]) ?? [];
+  return rows.map(mapGbaRti);
 }
 
 export async function getRti(id: string): Promise<RtiWithRelations | null> {
@@ -755,26 +777,17 @@ export async function getRti(id: string): Promise<RtiWithRelations | null> {
     .eq("id", id)
     .maybeSingle();
   logErr("getRti", error);
-  return (data as unknown as RtiWithRelations) ?? null;
+  return mapGbaRti(data as unknown as RtiWithRelations);
 }
 
 /** Options for the RTI wizard / form selects. */
 export async function getRtiFormOptions() {
-  const supabase = await sb();
-  const [corps, divs, subs, wards, contacts] = await Promise.all([
-    supabase.from("corporations").select("id,code,name").order("name"),
-    supabase.from("divisions").select("id,name").order("name"),
-    supabase.from("eng_subdivisions").select("id,name").order("name"),
-    supabase.from("wards").select("id,new_no,new_name").order("new_no"),
-    supabase.from("contacts").select("id,full_name,designation").order("full_name"),
-  ]);
   return {
-    corporations: (corps.data as { id: string; code: string; name: string }[]) ?? [],
-    divisions: (divs.data as { id: string; name: string }[]) ?? [],
-    subdivisions: (subs.data as { id: string; name: string }[]) ?? [],
-    wards: (wards.data as { id: string; new_no: number; new_name: string }[]) ?? [],
-    contacts:
-      (contacts.data as { id: string; full_name: string; designation: string }[]) ?? [],
+    corporations: [],
+    divisions: [],
+    subdivisions: [],
+    wards: [],
+    contacts: [],
   };
 }
 

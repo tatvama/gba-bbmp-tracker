@@ -419,6 +419,10 @@ export interface RtiApplication {
   eng_subdivision_id: string | null;
   ward_id: string | null;
   contact_id: string | null;
+  ward_type: string | null;
+  gba_ward_id: string | null;
+  gba_division: string | null;
+  gba_subdivision: string | null;
   subject: string;
   info_requested: string | null;
   category: RtiCategory | null;
@@ -459,6 +463,7 @@ export interface RtiWithRelations extends RtiApplication {
   eng_subdivision?: Pick<EngSubDivision, "id" | "name"> | null;
   ward?: Pick<Ward, "id" | "new_no" | "new_name"> | null;
   contact?: Pick<Contact, "id" | "full_name" | "designation"> | null;
+  gba_ward?: { id: string; ward_no: number; ward_name_en: string; ward_name_kn: string | null } | null;
 }
 
 export interface RtiFirstAppeal {
