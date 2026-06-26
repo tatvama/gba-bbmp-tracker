@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { writeAudit, diffFields } from "@/lib/audit";
 import {
@@ -9,13 +10,21 @@ import {
   rtiFirstAppealSchema,
   rtiSecondAppealSchema,
 } from "@/lib/validators";
-import { RTI_WRITE_ROLES, RTI_STATUSES } from "@/lib/constants";
+import { RTI_WRITE_ROLES, RTI_STATUSES, RTI_DOCUMENT_TYPES, STORAGE_BUCKETS } from "@/lib/constants";
 import { getDeadlineRules } from "@/lib/settings";
 import { computeRtiDeadlines } from "@/lib/rti-deadlines";
 import type { ActionState } from "@/lib/actions/contacts";
+import { uploadBuffer, downloadBuffer, getSignedUrl, removeObject } from "@/lib/storage/supabase-upload";
+import { runOcr } from "@/lib/ocr/ocr-service";
+import { analyzeRtiAcknowledgement } from "@/lib/ai/rti-acknowledgement-analyzer";
+import { summarizeRtiDocument } from "@/lib/ai/rti-document-summarizer";
+import { buildMergedPdf } from "@/lib/pdf/merge";
+import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 
 function genRef(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36).slice(-5).toUpperCase()}`;
+  const year = new Date().getFullYear();
+  const suffix = Date.now().toString(36).slice(-4).toUpperCase();
+  return `${prefix}-${year}-${suffix}`;
 }
 
 function fieldErrors(error: { issues: { path: (string | number)[]; message: string }[] }) {
@@ -415,6 +424,1151 @@ export async function createSecondAppeal(
     entityId: data.id,
     changedBy: user.id,
     changes: [{ field: "created", oldValue: null, newValue: rtiId }],
+  });
+  revalidatePath(`/rti/${rtiId}`);
+  revalidatePath("/rti");
+  return { success: true, id: rtiId };
+}
+
+// ── RTI Acknowledgement Image Verification ───────────────────────────────────
+
+export async function uploadRtiAcknowledgementAction(
+  rtiId: string,
+  formData: FormData,
+): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const file = formData.get("file") as File;
+  if (!file) return { error: "No file provided" };
+  
+  const isImage = file.type.startsWith("image/");
+  const isPdf = file.type === "application/pdf" || file.name.endsWith(".pdf");
+  if (!isImage && !isPdf) {
+    return { error: "Only image files (JPEG, PNG, WebP) and PDF documents are supported" };
+  }
+
+  const supabase = await createClient();
+
+  // Get current user name for history
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .single();
+  const userName = profile?.name || user.email || "Unknown User";
+
+  try {
+    const startTime = Date.now();
+
+    // 1. Read existing record to check if we are replacing/superseding
+    const { data: before } = await supabase
+      .from("rti_applications")
+      .select("*")
+      .eq("id", rtiId)
+      .single();
+
+    if (!before) return { error: "RTI application not found" };
+
+    const archive = Array.isArray(before.ack_archive) ? before.ack_archive : [];
+    const history = Array.isArray(before.ack_history) ? before.ack_history : [];
+
+    // If an acknowledgement already exists, copy current fields to archive (Supersede)
+    if (before.ack_image_path) {
+      archive.push({
+        ack_image_path: before.ack_image_path,
+        ack_status: before.ack_status,
+        ack_file_metadata: before.ack_file_metadata,
+        ack_ocr_text: before.ack_ocr_text,
+        ack_ocr_confidence: before.ack_ocr_confidence,
+        ack_document_type: before.ack_document_type,
+        ack_visual_elements: before.ack_visual_elements,
+        ack_extracted_info: before.ack_extracted_info,
+        ack_verification_summary: before.ack_verification_summary,
+        ack_confidence_score: before.ack_confidence_score,
+        ack_recommended_action: before.ack_recommended_action,
+        archivedAt: new Date().toISOString(),
+      });
+      history.push({
+        event: "Acknowledgement replaced",
+        timestamp: new Date().toISOString(),
+        user: userName,
+      });
+      await writeAudit(supabase, {
+        entityType: "rti",
+        entityId: rtiId,
+        changedBy: user.id,
+        changes: [{ field: "ack_replaced", oldValue: before.ack_image_path, newValue: null }],
+      });
+    } else {
+      history.push({
+        event: "Acknowledgement uploaded",
+        timestamp: new Date().toISOString(),
+        user: userName,
+      });
+      await writeAudit(supabase, {
+        entityType: "rti",
+        entityId: rtiId,
+        changedBy: user.id,
+        changes: [{ field: "ack_uploaded", oldValue: null, newValue: file.name }],
+      });
+    }
+
+    // 2. Upload original file permanently and unmodified to storage
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const extension = file.name.split(".").pop() || (isPdf ? "pdf" : "png");
+    const storagePath = `${rtiId}/acknowledgement-${Date.now()}.${extension}`;
+
+    await uploadBuffer({
+      bucket: STORAGE_BUCKETS.rti,
+      path: storagePath,
+      body: buffer,
+      contentType: file.type,
+    });
+
+    // Set initial status to Uploaded
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_image_path: storagePath,
+        ack_status: "Uploaded",
+        ack_history: history,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    // Rasterize PDF pages using pluggable pdfRenderer or wrap image
+    let pageImages: { buffer: Buffer; mimeType: string }[] = [];
+    if (isPdf) {
+      const pages = await pdfRenderer.renderPages(buffer);
+      pageImages = pages.map(p => ({ buffer: p.buffer, mimeType: p.mimeType }));
+    } else {
+      pageImages = [{ buffer, mimeType: file.type }];
+    }
+
+    // 3. Stage 1: OCR Processing
+    history.push({
+      event: "OCR processing started",
+      timestamp: new Date().toISOString(),
+      user: "System (Tesseract)",
+    });
+
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_status: "OCR Processing",
+        ack_history: history,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    // Process OCR page-by-page
+    const pagesOcr: { page: number; text: string; confidence: number | null }[] = [];
+    let combinedOcrText = "";
+    let totalConfidence = 0;
+    let confidenceCount = 0;
+
+    for (let i = 0; i < pageImages.length; i++) {
+      const pageImage = pageImages[i];
+      if (!pageImage) continue;
+      const ocrResult = await runOcr({
+        buffer: pageImage.buffer,
+        mimeType: pageImage.mimeType,
+        language: "eng+kan",
+      });
+
+      pagesOcr.push({
+        page: i + 1,
+        text: ocrResult.cleanText,
+        confidence: ocrResult.confidence,
+      });
+
+      if (pageImages.length > 1) {
+        combinedOcrText += `--- Page ${i + 1} ---\n${ocrResult.cleanText}\n\n`;
+      } else {
+        combinedOcrText = ocrResult.cleanText;
+      }
+
+      if (ocrResult.confidence !== null) {
+        totalConfidence += ocrResult.confidence;
+        confidenceCount++;
+      }
+    }
+
+    const avgOcrConfidence = confidenceCount > 0 ? Math.round(totalConfidence / confidenceCount) : null;
+
+    history.push({
+      event: "OCR completed",
+      timestamp: new Date().toISOString(),
+      user: "System (Tesseract)",
+    });
+
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_ocr_text: combinedOcrText,
+        ack_ocr_confidence: avgOcrConfidence,
+        ack_status: "OCR Completed",
+        ack_history: history,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    // 4. Stage 2: AI Verification
+    history.push({
+      event: "AI verification started",
+      timestamp: new Date().toISOString(),
+      user: "System (AI)",
+    });
+
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_status: "AI Processing",
+        ack_history: history,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    const aiResult = await analyzeRtiAcknowledgement({
+      images: pageImages,
+      ocrText: combinedOcrText,
+      rti: {
+        publicAuthority: before.public_authority || "",
+        department: before.department || "",
+        applicantName: before.applicant_name || "",
+        dateFiled: before.date_filed || "",
+        subject: before.subject || "",
+        internalRef: before.internal_ref || "",
+      },
+    });
+
+    const finalAckStatus =
+      aiResult.recommendedAction === "Ready to Mark as Filed"
+        ? "Verified"
+        : aiResult.recommendedAction === "Verification Failed"
+          ? "Verification Failed"
+          : "Manual Review Required";
+
+    const durationMs = Date.now() - startTime;
+    const fileMetadata = {
+      fileName: file.name,
+      originalFileName: file.name,
+      mimeType: file.type,
+      fileSize: file.size,
+      fileType: isPdf ? "PDF" : "Image",
+      uploadedAt: new Date().toISOString(),
+      uploadTimestamp: new Date().toISOString(),
+      uploadedBy: user.id,
+      uploaderName: userName,
+      totalPages: pageImages.length,
+      ocrEngine: "Tesseract",
+      aiModel: "claude-sonnet-4-6",
+      processingDurationMs: durationMs,
+      processingDuration: `${(durationMs / 1000).toFixed(2)}s`,
+      processingVersion: "1.0.0",
+      pagesOcr,
+    };
+
+    history.push({
+      event: "AI verification completed",
+      timestamp: new Date().toISOString(),
+      user: "System (AI)",
+    });
+
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_status: finalAckStatus,
+        ack_document_type: aiResult.documentType,
+        ack_visual_elements: aiResult.visualElements,
+        ack_extracted_info: {
+          extractedInfo: aiResult.extractedInfo,
+          verifications: aiResult.verifications
+        },
+        ack_verification_summary: aiResult.verificationSummary,
+        ack_confidence_score: aiResult.confidenceScore,
+        ack_recommended_action: aiResult.recommendedAction,
+        ack_file_metadata: fileMetadata,
+        ack_history: history,
+        ack_archive: archive,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    // Audit trace for all changes
+    await writeAudit(supabase, {
+      entityType: "rti",
+      entityId: rtiId,
+      changedBy: user.id,
+      changes: [
+        { field: "ack_status", oldValue: before.ack_status, newValue: finalAckStatus },
+        { field: "ack_recommended_action", oldValue: before.ack_recommended_action, newValue: aiResult.recommendedAction },
+      ],
+    });
+
+    revalidatePath(`/rti/${rtiId}`);
+    revalidatePath("/rti");
+    return { success: true, id: rtiId };
+  } catch (e) {
+    console.error("[uploadRtiAcknowledgementAction]", e);
+    // Safe fall-back: set status to Verification Failed, but keep uploaded details
+    try {
+      const { data: current } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", user.id)
+        .single();
+      const fallbackUserName = current?.name || user.email || "Unknown User";
+
+      const { data: currentRti } = await supabase
+        .from("rti_applications")
+        .select("ack_history")
+        .eq("id", rtiId)
+        .single();
+      const currentHistory = Array.isArray(currentRti?.ack_history) ? currentRti.ack_history : [];
+      currentHistory.push({
+        event: "Verification Failed",
+        timestamp: new Date().toISOString(),
+        user: `System (Error: ${e instanceof Error ? e.message : "Pipeline error"})`,
+      });
+      await supabase
+        .from("rti_applications")
+        .update({
+          ack_status: "Verification Failed",
+          ack_history: currentHistory,
+          updated_by: user.id,
+        })
+        .eq("id", rtiId);
+    } catch {}
+    
+    revalidatePath(`/rti/${rtiId}`);
+    return { error: e instanceof Error ? e.message : "Processing failed" };
+  }
+}
+
+export async function runAiVerificationOnlyAction(rtiId: string): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .single();
+  const userName = profile?.name || user.email || "Unknown User";
+
+  try {
+    const rti = await supabase
+      .from("rti_applications")
+      .select("*")
+      .eq("id", rtiId)
+      .single();
+
+    if (rti.error) return { error: rti.error.message };
+    const record = rti.data;
+    if (!record) return { error: "RTI application not found" };
+    if (!record.ack_image_path) return { error: "No acknowledgement file has been uploaded" };
+
+    const startTime = Date.now();
+
+    // Set stage to AI Processing
+    const history = Array.isArray(record.ack_history) ? record.ack_history : [];
+    history.push({
+      event: "Verification Re-run",
+      timestamp: new Date().toISOString(),
+      user: userName,
+    });
+
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_status: "AI Processing",
+        ack_history: history,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    // Download original file from storage (can be PDF or Image)
+    const buffer = await downloadBuffer(STORAGE_BUCKETS.rti, record.ack_image_path);
+    if (!buffer) return { error: "Could not retrieve original file from storage" };
+
+    const fileMetadata = record.ack_file_metadata || {};
+    const mimeType = fileMetadata.mimeType || "image/png";
+    const isPdf = fileMetadata.fileType === "PDF" || mimeType === "application/pdf" || record.ack_image_path.endsWith(".pdf");
+
+    // Retrieve/rasterize images for vision
+    let pageImages: { buffer: Buffer; mimeType: string }[] = [];
+    if (isPdf) {
+      const pages = await pdfRenderer.renderPages(buffer);
+      pageImages = pages.map(p => ({ buffer: p.buffer, mimeType: p.mimeType }));
+    } else {
+      pageImages = [{ buffer, mimeType }];
+    }
+
+    // Run Vision verification
+    const aiResult = await analyzeRtiAcknowledgement({
+      images: pageImages,
+      ocrText: record.ack_ocr_text || "",
+      rti: {
+        publicAuthority: record.public_authority || "",
+        department: record.department || "",
+        applicantName: record.applicant_name || "",
+        dateFiled: record.date_filed || "",
+        subject: record.subject || "",
+        internalRef: record.internal_ref || "",
+      },
+    });
+
+    const finalAckStatus =
+      aiResult.recommendedAction === "Ready to Mark as Filed"
+        ? "Verified"
+        : aiResult.recommendedAction === "Verification Failed"
+          ? "Verification Failed"
+          : "Manual Review Required";
+
+    const durationMs = Date.now() - startTime;
+    const updatedMetadata = {
+      ...fileMetadata,
+      originalFileName: fileMetadata.originalFileName || fileMetadata.fileName || record.ack_image_path?.split("/").pop() || "unknown",
+      fileName: fileMetadata.fileName || record.ack_image_path?.split("/").pop() || "unknown",
+      uploadTimestamp: fileMetadata.uploadTimestamp || fileMetadata.uploadedAt || new Date().toISOString(),
+      uploadedAt: fileMetadata.uploadedAt || new Date().toISOString(),
+      processingDurationMs: (fileMetadata.processingDurationMs || 0) + durationMs,
+      processingDuration: `${(((fileMetadata.processingDurationMs || 0) + durationMs) / 1000).toFixed(2)}s`,
+      processingVersion: "1.0.0",
+      aiModel: "claude-sonnet-4-6",
+    };
+
+    // Update DB
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_status: finalAckStatus,
+        ack_document_type: aiResult.documentType,
+        ack_visual_elements: aiResult.visualElements,
+        ack_extracted_info: {
+          extractedInfo: aiResult.extractedInfo,
+          verifications: aiResult.verifications
+        },
+        ack_verification_summary: aiResult.verificationSummary,
+        ack_confidence_score: aiResult.confidenceScore,
+        ack_recommended_action: aiResult.recommendedAction,
+        ack_file_metadata: updatedMetadata,
+        ack_history: history,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    await writeAudit(supabase, {
+      entityType: "rti",
+      entityId: rtiId,
+      changedBy: user.id,
+      changes: [
+        { field: "ack_status", oldValue: record.ack_status, newValue: finalAckStatus },
+        { field: "ack_recommended_action", oldValue: record.ack_recommended_action, newValue: aiResult.recommendedAction },
+      ],
+    });
+
+    revalidatePath(`/rti/${rtiId}`);
+    return { success: true, id: rtiId };
+  } catch (e) {
+    console.error("[runAiVerificationOnlyAction]", e);
+    return { error: e instanceof Error ? e.message : "AI re-run failed" };
+  }
+}
+
+export async function confirmRtiFiledAction(rtiId: string): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .single();
+  const userName = profile?.name || user.email || "Unknown User";
+
+  try {
+    const { data: before } = await supabase
+      .from("rti_applications")
+      .select("status, date_filed, ack_history")
+      .eq("id", rtiId)
+      .single();
+
+    if (!before) return { error: "RTI application not found" };
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const targetDateFiled = before.date_filed || todayStr;
+
+    const history = Array.isArray(before.ack_history) ? before.ack_history : [];
+    history.push({
+      event: "User confirmed RTI as Filed",
+      timestamp: new Date().toISOString(),
+      user: userName,
+    });
+
+    // Update status to Filed, update filing date if it was null
+    await supabase
+      .from("rti_applications")
+      .update({
+        status: "Filed",
+        date_filed: targetDateFiled,
+        ack_history: history,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    await writeAudit(supabase, {
+      entityType: "rti",
+      entityId: rtiId,
+      changedBy: user.id,
+      changes: [
+        { field: "status", oldValue: before.status, newValue: "Filed" },
+        { field: "date_filed", oldValue: before.date_filed, newValue: targetDateFiled },
+      ],
+    });
+
+    revalidatePath(`/rti/${rtiId}`);
+    revalidatePath("/rti");
+    return { success: true, id: rtiId };
+  } catch (e) {
+    console.error("[confirmRtiFiledAction]", e);
+    return { error: e instanceof Error ? e.message : "Confirmation failed" };
+  }
+}
+
+export async function deleteRtiAcknowledgementAction(rtiId: string): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .single();
+  const userName = profile?.name || user.email || "Unknown User";
+
+  try {
+    const { data: before } = await supabase
+      .from("rti_applications")
+      .select("*")
+      .eq("id", rtiId)
+      .single();
+
+    if (!before) return { error: "RTI application not found" };
+
+    const archive = Array.isArray(before.ack_archive) ? before.ack_archive : [];
+    const history = Array.isArray(before.ack_history) ? before.ack_history : [];
+
+    // Push the current details into the archive (Supersede/Mark as deleted)
+    if (before.ack_image_path) {
+      archive.push({
+        ack_image_path: before.ack_image_path,
+        ack_status: before.ack_status,
+        ack_file_metadata: before.ack_file_metadata,
+        ack_ocr_text: before.ack_ocr_text,
+        ack_ocr_confidence: before.ack_ocr_confidence,
+        ack_document_type: before.ack_document_type,
+        ack_visual_elements: before.ack_visual_elements,
+        ack_extracted_info: before.ack_extracted_info,
+        ack_verification_summary: before.ack_verification_summary,
+        ack_confidence_score: before.ack_confidence_score,
+        ack_recommended_action: before.ack_recommended_action,
+        archivedAt: new Date().toISOString(),
+        isDeletedCopy: true,
+      });
+    }
+
+    history.push({
+      event: "Acknowledgement deleted",
+      timestamp: new Date().toISOString(),
+      user: userName,
+    });
+
+    // Reset current acknowledgement columns
+    await supabase
+      .from("rti_applications")
+      .update({
+        ack_image_path: null,
+        ack_status: "Not Uploaded",
+        ack_file_metadata: null,
+        ack_ocr_text: null,
+        ack_ocr_confidence: null,
+        ack_document_type: null,
+        ack_visual_elements: [],
+        ack_extracted_info: null,
+        ack_verification_summary: null,
+        ack_confidence_score: null,
+        ack_recommended_action: null,
+        ack_history: history,
+        ack_archive: archive,
+        updated_by: user.id,
+      })
+      .eq("id", rtiId);
+
+    await writeAudit(supabase, {
+      entityType: "rti",
+      entityId: rtiId,
+      changedBy: user.id,
+      changes: [{ field: "ack_deleted", oldValue: before.ack_image_path, newValue: null }],
+    });
+
+    revalidatePath(`/rti/${rtiId}`);
+    revalidatePath("/rti");
+    return { success: true, id: rtiId };
+  } catch (e) {
+    console.error("[deleteRtiAcknowledgementAction]", e);
+    return { error: e instanceof Error ? e.message : "Deletion failed" };
+  }
+}
+
+export async function getSignedUrlAction(path: string): Promise<string | null> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return null;
+  }
+  return getSignedUrl(STORAGE_BUCKETS.rti, path);
+}
+
+// ── RTI documents (capture/scan → merge PDF → OCR → summarise) ────────────────
+//   Flexible, typed document list per RTI (Application, Acknowledgement, Reply,
+//   FAA Order, …). Replaces the single-slot acknowledgement flow. See
+//   supabase/migrations/0015_rti_documents.sql.
+
+/** Doc types whose upload starts/seeds the statutory reply clock. */
+const CLOCK_DOC_TYPES = new Set(["Application", "Acknowledgement"]);
+
+/** The status an uploaded document advances the RTI to (applied forward-only). */
+const STATUS_FOR_DOC_TYPE: Record<string, string> = {
+  Application: "Filed",
+  Acknowledgement: "Filed",
+  Reply: "Reply Received",
+  "FAA Order": "FAA Order Received",
+  "Second Appeal Order": "Second Appeal Filed",
+  "Higher Appeal Order": "Second Appeal Filed",
+};
+
+/** Lifecycle rank of a status (index in RTI_STATUSES); unknown → -1. */
+function statusRank(status: string | null | undefined): number {
+  return status ? (RTI_STATUSES as readonly string[]).indexOf(status) : -1;
+}
+
+function slugifyDocType(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "document";
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Rasterise a merged PDF, OCR every page (eng+kan), then summarise via AI. */
+async function ocrAndSummarize(
+  pdfBuffer: Buffer,
+  rti: { subject?: string | null; internal_ref?: string | null; public_authority?: string | null },
+): Promise<{
+  ocrText: string;
+  ocrConfidence: number | null;
+  summary: Awaited<ReturnType<typeof summarizeRtiDocument>>;
+}> {
+  const pages = await pdfRenderer.renderPages(pdfBuffer);
+  const pageImages = pages.map((p) => ({ buffer: p.buffer, mimeType: p.mimeType }));
+
+  let combined = "";
+  let totalConf = 0;
+  let confCount = 0;
+  for (let i = 0; i < pageImages.length; i++) {
+    const pi = pageImages[i];
+    if (!pi) continue;
+    const r = await runOcr({ buffer: pi.buffer, mimeType: pi.mimeType, language: "eng+kan" });
+    if (pageImages.length > 1) combined += `--- Page ${i + 1} ---\n${r.cleanText}\n\n`;
+    else combined = r.cleanText;
+    if (r.confidence !== null) {
+      totalConf += r.confidence;
+      confCount++;
+    }
+  }
+  const ocrConfidence = confCount > 0 ? Math.round(totalConf / confCount) : null;
+
+  const summary = await summarizeRtiDocument({
+    images: pageImages,
+    ocrText: combined,
+    rti: { subject: rti.subject, internalRef: rti.internal_ref, publicAuthority: rti.public_authority },
+  });
+
+  return { ocrText: combined, ocrConfidence, summary };
+}
+
+function buildExtracted(summary: Awaited<ReturnType<typeof summarizeRtiDocument>>) {
+  return {
+    authority: summary.authority,
+    subject: summary.subject,
+    referenceNumber: summary.referenceNumber,
+    documentDate: summary.documentDate,
+    keyDates: summary.keyDates,
+    documentType: summary.documentType,
+  };
+}
+
+/**
+ * Upload one document: merge the captured pages / scanned PDF into a single PDF,
+ * store it, OCR it, summarise it, and (for Application/Acknowledgement) start the
+ * 30-day reply clock from the filing date.
+ */
+export async function uploadRtiDocumentAction(
+  rtiId: string,
+  formData: FormData,
+): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const rawType = String(formData.get("docType") ?? "Other");
+  const docType = (RTI_DOCUMENT_TYPES as readonly string[]).includes(rawType) ? rawType : "Other";
+  const title = ((formData.get("title") as string | null) ?? "").trim() || null;
+  const source = ((formData.get("source") as string | null) ?? "").trim() || "upload";
+  const docDateRaw = ((formData.get("docDate") as string | null) ?? "").trim() || null;
+
+  let rawFiles = formData.getAll("files");
+  if (rawFiles.length === 0) rawFiles = formData.getAll("file");
+  const files = rawFiles.filter(
+    (x): x is File =>
+      typeof x === "object" && x !== null && typeof (x as { arrayBuffer?: unknown }).arrayBuffer === "function",
+  );
+  if (files.length === 0) return { error: "No files provided" };
+
+  const parts: { buffer: Buffer; mimeType: string }[] = [];
+  for (const f of files) {
+    const isImage = f.type.startsWith("image/");
+    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    if (!isImage && !isPdf) {
+      return { error: `Unsupported file "${f.name}". Use images (JPEG, PNG, WebP) or PDF.` };
+    }
+    parts.push({ buffer: Buffer.from(await f.arrayBuffer()), mimeType: isPdf ? "application/pdf" : f.type });
+  }
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+  const userName = profile?.name || user.email || "Unknown User";
+
+  const { data: rti } = await supabase
+    .from("rti_applications")
+    .select("id, subject, internal_ref, public_authority, date_filed, date_received, reply_date, is_life_liberty, status")
+    .eq("id", rtiId)
+    .single();
+  if (!rti) return { error: "RTI application not found" };
+
+  let docId: string | null = null;
+  try {
+    // 1. Merge captured pages / scanned PDF into one canonical PDF.
+    const { pdf, pageCount } = await buildMergedPdf(parts);
+
+    // 2. Store it.
+    const storagePath = `${rtiId}/${slugifyDocType(docType)}-${Date.now()}.pdf`;
+    await uploadBuffer({
+      bucket: STORAGE_BUCKETS.rti,
+      path: storagePath,
+      body: pdf,
+      contentType: "application/pdf",
+    });
+
+    // 3. Create the document row (processing).
+    const { data: inserted, error: insErr } = await supabase
+      .from("rti_documents")
+      .insert({
+        rti_id: rtiId,
+        doc_type: docType,
+        title,
+        pdf_path: storagePath,
+        page_count: pageCount,
+        file_size: pdf.length,
+        source,
+        doc_date: docDateRaw,
+        ocr_status: "Processing",
+        ai_status: "Pending",
+        uploaded_by: user.id,
+        uploader_name: userName,
+      })
+      .select("id")
+      .single();
+    if (insErr || !inserted) throw new Error(insErr?.message || "Failed to create document record");
+    docId = inserted.id;
+
+    await writeAudit(supabase, {
+      entityType: "rti",
+      entityId: rtiId,
+      changedBy: user.id,
+      changes: [{ field: "document_uploaded", oldValue: null, newValue: `${docType} (${pageCount} pg)` }],
+    });
+
+    // 4. OCR + AI summary.
+    const { ocrText, ocrConfidence, summary } = await ocrAndSummarize(pdf, rti);
+    await supabase
+      .from("rti_documents")
+      .update({
+        ocr_text: ocrText,
+        ocr_confidence: ocrConfidence,
+        ocr_status: ocrText.trim() ? "Completed" : "Skipped",
+        ai_summary: summary.summary,
+        ai_extracted: buildExtracted(summary),
+        ai_status: "Completed",
+      })
+      .eq("id", docId);
+
+    // 5. Advance the statutory dates / deadlines / status from this document.
+    //    - Application / Acknowledgement → filing date → reply clock (only if unset)
+    //    - Reply                         → reply date → first-appeal clock (only if unset)
+    //    - FAA Order                     → FAA decision date → second-appeal clock
+    //    - Second / Higher Appeal Order  → status only (terminal statutory stages)
+    {
+      const eventDate = docDateRaw || summary.documentDate || todayIso();
+      const patch: Record<string, unknown> = {};
+      const changes: { field: string; oldValue: unknown; newValue: unknown }[] = [];
+      let deadlineInput: Parameters<typeof computeRtiDeadlines>[0] | null = null;
+
+      if (CLOCK_DOC_TYPES.has(docType)) {
+        if (!rti.date_filed) {
+          patch.date_filed = eventDate;
+          changes.push({ field: "date_filed", oldValue: rti.date_filed, newValue: eventDate });
+          deadlineInput = {
+            dateReceived: rti.date_received,
+            dateFiled: eventDate,
+            isLifeLiberty: rti.is_life_liberty,
+            replyDate: rti.reply_date,
+          };
+        }
+      } else if (docType === "Reply") {
+        const replyDate = rti.reply_date || eventDate;
+        if (!rti.reply_date) {
+          patch.reply_date = replyDate;
+          changes.push({ field: "reply_date", oldValue: rti.reply_date, newValue: replyDate });
+        }
+        deadlineInput = {
+          dateReceived: rti.date_received,
+          dateFiled: rti.date_filed,
+          isLifeLiberty: rti.is_life_liberty,
+          replyDate,
+        };
+      } else if (docType === "FAA Order") {
+        // The FAA order date is authoritative for the second-appeal clock.
+        deadlineInput = {
+          dateReceived: rti.date_received,
+          dateFiled: rti.date_filed,
+          isLifeLiberty: rti.is_life_liberty,
+          replyDate: rti.reply_date,
+          firstAppealDecisionDate: eventDate,
+        };
+      }
+
+      if (deadlineInput) {
+        const rules = await getDeadlineRules();
+        const d = computeRtiDeadlines(deadlineInput, rules);
+        patch.normal_due = d.normalDue;
+        patch.life_liberty_due = d.lifeLibertyDue;
+        patch.first_appeal_due = d.firstAppealDue;
+        patch.second_appeal_due = d.secondAppealDue;
+      }
+
+      // Forward-only status advance — never regress, never touch a closed case.
+      const target = STATUS_FOR_DOC_TYPE[docType];
+      if (target && rti.status !== "Closed" && statusRank(target) > statusRank(rti.status)) {
+        patch.status = target;
+        changes.push({ field: "status", oldValue: rti.status, newValue: target });
+      }
+
+      if (Object.keys(patch).length > 0) {
+        patch.updated_by = user.id;
+        await supabase.from("rti_applications").update(patch).eq("id", rtiId);
+        if (changes.length > 0) {
+          await writeAudit(supabase, { entityType: "rti", entityId: rtiId, changedBy: user.id, changes });
+        }
+      }
+    }
+
+    revalidatePath(`/rti/${rtiId}`);
+    revalidatePath("/rti");
+    return { success: true, id: rtiId };
+  } catch (e) {
+    console.error("[uploadRtiDocumentAction]", e);
+    if (docId) {
+      try {
+        await supabase
+          .from("rti_documents")
+          .update({ ocr_status: "Failed", ai_status: "Failed" })
+          .eq("id", docId);
+      } catch {}
+    }
+    revalidatePath(`/rti/${rtiId}`);
+    return { error: e instanceof Error ? e.message : "Processing failed" };
+  }
+}
+
+/** Re-run OCR + AI summary on an already-stored document. */
+export async function reprocessRtiDocumentAction(docId: string): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: doc } = await supabase
+    .from("rti_documents")
+    .select("id, rti_id, pdf_path")
+    .eq("id", docId)
+    .single();
+  if (!doc) return { error: "Document not found" };
+
+  const { data: rti } = await supabase
+    .from("rti_applications")
+    .select("subject, internal_ref, public_authority")
+    .eq("id", doc.rti_id)
+    .single();
+
+  try {
+    await supabase
+      .from("rti_documents")
+      .update({ ocr_status: "Processing", ai_status: "Pending" })
+      .eq("id", docId);
+
+    const pdf = await downloadBuffer(STORAGE_BUCKETS.rti, doc.pdf_path);
+    if (!pdf) throw new Error("Stored PDF could not be downloaded");
+
+    const { ocrText, ocrConfidence, summary } = await ocrAndSummarize(pdf, rti ?? {});
+    await supabase
+      .from("rti_documents")
+      .update({
+        ocr_text: ocrText,
+        ocr_confidence: ocrConfidence,
+        ocr_status: ocrText.trim() ? "Completed" : "Skipped",
+        ai_summary: summary.summary,
+        ai_extracted: buildExtracted(summary),
+        ai_status: "Completed",
+      })
+      .eq("id", docId);
+
+    revalidatePath(`/rti/${doc.rti_id}`);
+    return { success: true, id: doc.rti_id };
+  } catch (e) {
+    console.error("[reprocessRtiDocumentAction]", e);
+    try {
+      await supabase
+        .from("rti_documents")
+        .update({ ocr_status: "Failed", ai_status: "Failed" })
+        .eq("id", docId);
+    } catch {}
+    return { error: e instanceof Error ? e.message : "Reprocessing failed" };
+  }
+}
+
+/** Delete a document row + its stored PDF. Uses the admin client (RLS delete is admin-only). */
+export async function deleteRtiDocumentAction(docId: string): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: doc } = await supabase
+    .from("rti_documents")
+    .select("id, rti_id, pdf_path, doc_type")
+    .eq("id", docId)
+    .single();
+  if (!doc) return { error: "Document not found" };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("rti_documents").delete().eq("id", docId);
+  if (error) return { error: error.message };
+  await removeObject(STORAGE_BUCKETS.rti, doc.pdf_path);
+
+  await writeAudit(supabase, {
+    entityType: "rti",
+    entityId: doc.rti_id,
+    changedBy: user.id,
+    changes: [{ field: "document_deleted", oldValue: doc.doc_type, newValue: null }],
+  });
+  revalidatePath(`/rti/${doc.rti_id}`);
+  return { success: true, id: doc.rti_id };
+}
+
+/** Set/clear the filing date and recompute the statutory deadlines. */
+export async function updateRtiFilingDateAction(
+  rtiId: string,
+  date: string | null,
+): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: rti } = await supabase
+    .from("rti_applications")
+    .select("date_filed, date_received, reply_date, is_life_liberty, status")
+    .eq("id", rtiId)
+    .single();
+  if (!rti) return { error: "RTI application not found" };
+
+  const filingDate = date && date.trim() ? date.trim() : null;
+  const rules = await getDeadlineRules();
+  const deadlines = computeRtiDeadlines(
+    {
+      dateReceived: rti.date_received,
+      dateFiled: filingDate,
+      isLifeLiberty: rti.is_life_liberty,
+      replyDate: rti.reply_date,
+    },
+    rules,
+  );
+
+  await supabase
+    .from("rti_applications")
+    .update({
+      date_filed: filingDate,
+      normal_due: deadlines.normalDue,
+      life_liberty_due: deadlines.lifeLibertyDue,
+      first_appeal_due: deadlines.firstAppealDue,
+      second_appeal_due: deadlines.secondAppealDue,
+      updated_by: user.id,
+    })
+    .eq("id", rtiId);
+
+  await writeAudit(supabase, {
+    entityType: "rti",
+    entityId: rtiId,
+    changedBy: user.id,
+    changes: [{ field: "date_filed", oldValue: rti.date_filed, newValue: filingDate }],
+  });
+  revalidatePath(`/rti/${rtiId}`);
+  revalidatePath("/rti");
+  return { success: true, id: rtiId };
+}
+
+// ── Case closure ──────────────────────────────────────────────────────────────
+
+/** Document types that carry an official response/decision — required to close a case. */
+const CLOSEABLE_DOC_TYPES = new Set(["Reply", "FAA Order", "Second Appeal Order", "Higher Appeal Order"]);
+
+/** Most-advanced status implied by the documents on file (used when reopening). */
+function impliedStatusFromDocTypes(types: Set<string>): string {
+  if (types.has("Second Appeal Order") || types.has("Higher Appeal Order")) return "Second Appeal Filed";
+  if (types.has("FAA Order")) return "FAA Order Received";
+  if (types.has("Reply")) return "Reply Received";
+  if (types.has("Application") || types.has("Acknowledgement")) return "Filed";
+  return "Draft";
+}
+
+/**
+ * Close the RTI case (status → Closed). Requires at least one response/order
+ * document (Reply / FAA Order / Second Appeal Order / Higher Appeal Order) —
+ * an Application/Acknowledgement alone is not enough to close.
+ */
+export async function closeRtiCaseAction(rtiId: string): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: rti } = await supabase
+    .from("rti_applications")
+    .select("status")
+    .eq("id", rtiId)
+    .single();
+  if (!rti) return { error: "RTI application not found" };
+
+  const { data: docs } = await supabase
+    .from("rti_documents")
+    .select("doc_type")
+    .eq("rti_id", rtiId);
+  const hasResponse = (docs ?? []).some((d) => CLOSEABLE_DOC_TYPES.has(d.doc_type));
+  if (!hasResponse) {
+    return { error: "Upload a reply or an appeal order before closing this case." };
+  }
+
+  const { error } = await supabase
+    .from("rti_applications")
+    .update({ status: "Closed", updated_by: user.id })
+    .eq("id", rtiId);
+  if (error) return { error: error.message };
+
+  await writeAudit(supabase, {
+    entityType: "rti",
+    entityId: rtiId,
+    changedBy: user.id,
+    changes: [{ field: "status", oldValue: rti.status, newValue: "Closed" }],
+  });
+  revalidatePath(`/rti/${rtiId}`);
+  revalidatePath("/rti");
+  return { success: true, id: rtiId };
+}
+
+/** Reopen a closed case → the most-advanced status implied by its documents. */
+export async function reopenRtiCaseAction(rtiId: string): Promise<ActionState> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const supabase = await createClient();
+  const { data: rti } = await supabase
+    .from("rti_applications")
+    .select("status")
+    .eq("id", rtiId)
+    .single();
+  if (!rti) return { error: "RTI application not found" };
+
+  const { data: docs } = await supabase
+    .from("rti_documents")
+    .select("doc_type")
+    .eq("rti_id", rtiId);
+  const reopened = impliedStatusFromDocTypes(new Set((docs ?? []).map((d) => d.doc_type)));
+
+  const { error } = await supabase
+    .from("rti_applications")
+    .update({ status: reopened, updated_by: user.id })
+    .eq("id", rtiId);
+  if (error) return { error: error.message };
+
+  await writeAudit(supabase, {
+    entityType: "rti",
+    entityId: rtiId,
+    changedBy: user.id,
+    changes: [{ field: "status", oldValue: rti.status, newValue: reopened }],
   });
   revalidatePath(`/rti/${rtiId}`);
   revalidatePath("/rti");

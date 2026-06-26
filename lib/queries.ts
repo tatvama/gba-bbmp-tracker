@@ -20,6 +20,7 @@ import type {
   RtiWithRelations,
   RtiFirstAppeal,
   RtiSecondAppeal,
+  RtiDocument,
   Template,
   AiDraft,
   Reminder,
@@ -813,6 +814,17 @@ export async function listSecondAppeals(rtiId: string): Promise<RtiSecondAppeal[
   return (data as RtiSecondAppeal[]) ?? [];
 }
 
+export async function listRtiDocuments(rtiId: string): Promise<RtiDocument[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_documents")
+    .select("*")
+    .eq("rti_id", rtiId)
+    .order("created_at", { ascending: true });
+  logErr("listRtiDocuments", error);
+  return (data as RtiDocument[]) ?? [];
+}
+
 export async function listAllFirstAppeals(): Promise<RtiFirstAppeal[]> {
   const supabase = await sb();
   const { data, error } = await supabase
@@ -832,6 +844,29 @@ export async function listAllSecondAppeals(): Promise<RtiSecondAppeal[]> {
   logErr("listAllSecondAppeals", error);
   return (data as RtiSecondAppeal[]) ?? [];
 }
+
+export async function getFirstAppeal(id: string): Promise<RtiFirstAppeal | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_first_appeals")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getFirstAppeal", error);
+  return data as RtiFirstAppeal | null;
+}
+
+export async function getSecondAppeal(id: string): Promise<RtiSecondAppeal | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_second_appeals")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  logErr("getSecondAppeal", error);
+  return data as RtiSecondAppeal | null;
+}
+
 
 export async function listRtiTemplates(kind?: string): Promise<Template[]> {
   const supabase = await sb();

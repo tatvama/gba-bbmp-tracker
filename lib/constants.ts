@@ -226,6 +226,18 @@ export const RTI_SATISFACTION = [
 ] as const;
 export type RtiSatisfaction = (typeof RTI_SATISFACTION)[number];
 
+/** Types of document that can be attached to an RTI (uploaded as merged PDFs). */
+export const RTI_DOCUMENT_TYPES = [
+  "Application",
+  "Acknowledgement",
+  "Reply",
+  "FAA Order",
+  "Second Appeal Order",
+  "Higher Appeal Order",
+  "Other",
+] as const;
+export type RtiDocumentType = (typeof RTI_DOCUMENT_TYPES)[number];
+
 /** Grounds available when drafting a first appeal (spec §4). */
 export const FIRST_APPEAL_GROUNDS = [
   "No reply within time",
@@ -441,6 +453,7 @@ export const STORAGE_BUCKETS = {
   evidence: "complaint-evidence",
   processed: "complaint-processed-images",
   exports: "complaint-exports",
+  rti: "rti-documents",
 } as const;
 
 /** Default complaint module settings (mirrors app_settings 'complaint_settings'). */

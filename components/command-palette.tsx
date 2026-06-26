@@ -77,6 +77,7 @@ export function CommandPalette() {
           aria-label="Command palette"
           className="fixed left-1/2 top-[12%] z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-2xl border bg-card shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[4%] data-[state=open]:slide-in-from-top-[4%]"
         >
+          <Dialog.Title className="sr-only">Command Palette</Dialog.Title>
           {/* Search input */}
           <div className="flex items-center gap-3 border-b px-4 py-3.5">
             <Search className="h-4.5 w-4.5 shrink-0 text-muted-foreground" aria-hidden />

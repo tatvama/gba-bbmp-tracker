@@ -8,6 +8,11 @@ const nextConfig = {
     // Lint is run explicitly via `npm run lint`; don't fail production builds on it.
     ignoreDuringBuilds: false,
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "6mb",
+    },
+  },
 };
 
 export default nextConfig;

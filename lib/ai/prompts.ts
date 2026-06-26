@@ -226,3 +226,59 @@ Return JSON of exactly this shape:
 
   return { system, prompt };
 }
+
+export interface ReplyAnalysisFromDocsInput {
+  applicationText: string;
+  replyText: string;
+  /** What the response document is — "Public Information Officer (PIO) reply",
+   *  "First Appellate Authority (FAA) order", "Information Commission order"… */
+  responseLabel?: string;
+  /** The escalation to recommend if the response is deficient — "first appeal",
+   *  "second appeal", or "" when no further statutory appeal exists. */
+  escalationLabel?: string;
+}
+
+/**
+ * Document-aware response analyzer. Receives the full RTI application text and a
+ * response document's text (a PIO reply, an FAA order, or a Commission order) —
+ * both typically from OCR — and asks the model to extract the distinct questions
+ * itself, judge whether the response satisfies each, and flag whether the next
+ * statutory escalation is warranted. Same JSON output shape as the basic prompt.
+ */
+export function buildReplyAnalysisFromDocsPrompt(input: ReplyAnalysisFromDocsInput): {
+  system: string;
+  prompt: string;
+} {
+  const respLabel = input.responseLabel || "Public Information Officer (PIO) reply";
+  const escalation = input.escalationLabel || "first appeal";
+  const escalationClause =
+    escalation
+      ? `is the ${escalation} recommended (recommend it whenever any point is "Not answered", "Partially answered", or "Denied" without a clearly valid exemption)`
+      : `is any further remedy recommended (note that no further statutory appeal exists beyond this order)`;
+
+  const system = `You analyse Right to Information (RTI) correspondence in India. Given the text of an RTI APPLICATION and the text of a RESPONSE document (the ${respLabel}), first identify each distinct question or point of information the applicant requested, then judge whether the response satisfies it. Be precise and conservative: if a point is not clearly and fully addressed, do not mark it "Answered". The texts come from OCR and may be noisy — ignore letterheads, addresses, and boilerplate. Output STRICT JSON only — no prose, no markdown.`;
+
+  const prompt = `RTI APPLICATION text (extract the questions / points of information requested from this):
+"""
+${(input.applicationText || "").slice(0, 12000)}
+"""
+
+${respLabel.toUpperCase()} text:
+"""
+${(input.replyText || "").slice(0, 12000)}
+"""
+
+Identify each distinct question/point the applicant asked. For each, return an object with:
+- "question": the question/point in clear words
+- "replyExtract": the relevant snippet of the response (or "" if none)
+- "status": one of "Answered" | "Partially answered" | "Not answered" | "Denied" | "Irrelevant" | "Needs clarification"
+- "appealGround": a short suggested ground for the ${escalation || "next remedy"} if the answer is deficient, else ""
+- "notes": a brief note
+
+Also assess overall: was the response delayed, was an exemption section cited, was extra fee demanded, and ${escalationClause}. Put that recommendation in "firstAppealRecommended".
+
+Return JSON of exactly this shape:
+{"items":[{"question":"","replyExtract":"","status":"","appealGround":"","notes":""}],"overall":{"complete":false,"exemptionCited":false,"extraFeeDemanded":false,"delayed":false,"firstAppealRecommended":false,"summary":""}}`;
+
+  return { system, prompt };
+}

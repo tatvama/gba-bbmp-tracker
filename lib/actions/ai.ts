@@ -9,6 +9,7 @@ import {
   buildFirstAppealPrompt,
   buildSecondAppealPrompt,
   buildReplyAnalysisPrompt,
+  buildReplyAnalysisFromDocsPrompt,
   buildTransformPrompt,
   type RtiDraftInput,
   type FirstAppealInput,
@@ -222,6 +223,36 @@ export async function analyzeRtiReply(input: {
   if (!r.ok) return { ok: false, error: r.error };
 
   // Strip code fences if present, then parse.
+  const cleaned = (r.text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  try {
+    const analysis = JSON.parse(cleaned) as ReplyAnalysis;
+    return { ok: true, analysis, raw: r.text };
+  } catch {
+    return { ok: true, raw: r.text, error: "Could not parse structured output; showing raw text." };
+  }
+}
+
+/**
+ * Document-aware reply analysis: compares the RTI application text (questions)
+ * against the PIO reply text — both usually from OCR — and reports, per point,
+ * whether it was answered, plus whether a first appeal is recommended.
+ */
+export async function analyzeRtiReplyFromDocuments(input: {
+  applicationText: string;
+  replyText: string;
+  responseLabel?: string;
+  escalationLabel?: string;
+}): Promise<ReplyAnalysisResult> {
+  const denied = await gate();
+  if (denied) return { ok: false, error: denied.error };
+  if (!input.replyText.trim()) return { ok: false, error: "No response document text to analyse yet." };
+  if (!input.applicationText.trim())
+    return { ok: false, error: "No application text found — upload the RTI Application document first." };
+
+  const { system, prompt } = buildReplyAnalysisFromDocsPrompt(input);
+  const r = await generateText({ system, prompt, temperature: 0 });
+  if (!r.ok) return { ok: false, error: r.error };
+
   const cleaned = (r.text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   try {
     const analysis = JSON.parse(cleaned) as ReplyAnalysis;

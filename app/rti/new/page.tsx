@@ -1,9 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { RtiWizard } from "@/components/rti/rti-wizard";
-import { getRtiFormOptions, listRtiTemplates } from "@/lib/queries";
-import { createRti } from "@/lib/actions/rti";
-import { isAiConfigured } from "@/lib/ai/provider";
+import { RtiQuickCreateForm } from "@/components/rti/rti-quick-create-form";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
 
@@ -24,23 +21,13 @@ export default async function NewRtiPage() {
     );
   }
 
-  const [options, templates] = await Promise.all([
-    getRtiFormOptions(),
-    listRtiTemplates("rti_application"),
-  ]);
-
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-2xl">
       <PageHeader
         title="New RTI application"
-        description="Step through jurisdiction, authority, applicant, the information you want, and filing details. AI drafting is optional and never files anything."
+        description="Open a tracking record for an RTI you have filed (or are about to file). Add the request copy and the filing acknowledgement on the next screen — the 30-day reply clock starts from the filing date."
       />
-      <RtiWizard
-        action={createRti}
-        options={options}
-        templates={templates}
-        aiConfigured={isAiConfigured()}
-      />
+      <RtiQuickCreateForm />
     </div>
   );
 }

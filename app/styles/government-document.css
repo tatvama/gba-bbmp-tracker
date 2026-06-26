@@ -1,0 +1,193 @@
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 25mm;
+}
+
+/* =============================================================
+   Screen Print Preview & Parent Layout Overrides
+   ============================================================= */
+
+/* When the print view is active, hide the dashboard TopNav, Sidebar, and Skip-Link */
+html:has(.gov-doc-print-mode) header,
+html:has(.gov-doc-print-mode) aside,
+html:has(.gov-doc-print-mode) .skip-link,
+html:has(.gov-doc-print-mode) .no-print-layout {
+  display: none !important;
+}
+
+/* Centered A4 paper preview on screen */
+html:has(.gov-doc-print-mode) {
+  background-color: #f5f5f5 !important;
+}
+
+html:has(.gov-doc-print-mode) body {
+  background-color: #f5f5f5 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html:has(.gov-doc-print-mode) main {
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: 100% !important;
+  border: none !important;
+  background-color: #f5f5f5 !important;
+}
+
+.gov-doc-print-wrapper {
+  background: white;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 2rem auto;
+  padding: 25mm;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* Reset sheet simulation styles when printing */
+@media print {
+  html:has(.gov-doc-print-mode),
+  html:has(.gov-doc-print-mode) body,
+  html:has(.gov-doc-print-mode) main {
+    background: white !important;
+  }
+
+  .gov-doc-print-wrapper {
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* =============================================================
+   Government Document Core Styling
+   ============================================================= */
+
+.gov-doc-container {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12pt;
+  line-height: 1.5;
+  color: black;
+  background: white;
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+}
+
+.gov-doc-title {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+}
+
+.gov-doc-header-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+}
+
+.gov-doc-header-table td {
+  vertical-align: top;
+  padding: 2px 0;
+}
+
+.gov-doc-subject-ref {
+  margin-left: 2.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.gov-doc-subject-ref table {
+  border-collapse: collapse;
+}
+
+.gov-doc-subject-ref td {
+  vertical-align: top;
+  padding: 2px 0;
+}
+
+.gov-doc-body {
+  margin-top: 1.5rem;
+  margin-bottom: 2rem;
+  text-align: justify;
+}
+
+.gov-doc-paragraph {
+  margin-bottom: 1.5rem;
+  text-indent: 2.5rem;
+}
+
+.gov-doc-list {
+  margin-left: 2.5rem;
+  margin-bottom: 1.5rem;
+  padding-left: 0;
+}
+
+.gov-doc-list-item {
+  margin-bottom: 0.75rem;
+  text-align: justify;
+}
+
+.gov-doc-signature-block {
+  margin-top: 3rem;
+  float: right;
+  width: 250px;
+  text-align: left;
+}
+
+.gov-doc-footer-clear {
+  clear: both;
+}
+
+/* Extensibility/Branding Elements (only visible when configured) */
+.gov-doc-emblem {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.gov-doc-emblem img {
+  max-height: 80px;
+  margin: 0 auto;
+}
+
+.gov-doc-watermark {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 4.5rem;
+  color: rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+  z-index: -1000;
+  text-transform: uppercase;
+  font-family: inherit;
+  font-weight: bold;
+}
+
+.gov-doc-qr-code {
+  margin-top: 1.5rem;
+  text-align: left;
+}
+
+.gov-doc-digital-signature {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  border: 1px dashed #ccc;
+  font-size: 9pt;
+  color: #555;
+  display: inline-block;
+}

@@ -455,6 +455,44 @@ export interface RtiApplication {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  ack_image_path?: string | null;
+  ack_status?: string | null;
+  ack_file_metadata?: {
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    uploadedAt: string;
+    uploadedBy: string;
+    uploaderName?: string;
+  } | null;
+  ack_ocr_text?: string | null;
+  ack_ocr_confidence?: number | null;
+  ack_document_type?: string | null;
+  ack_visual_elements?: string[] | null;
+  ack_extracted_info?: any | null;
+  ack_verification_summary?: string | null;
+  ack_confidence_score?: number | null;
+  ack_recommended_action?: string | null;
+  ack_history?: Array<{
+    event: string;
+    timestamp: string;
+    user: string;
+    userName?: string;
+  }> | null;
+  ack_archive?: Array<{
+    ack_image_path?: string | null;
+    ack_status?: string | null;
+    ack_file_metadata?: any | null;
+    ack_ocr_text?: string | null;
+    ack_ocr_confidence?: number | null;
+    ack_document_type?: string | null;
+    ack_visual_elements?: string[] | null;
+    ack_extracted_info?: any | null;
+    ack_verification_summary?: string | null;
+    ack_confidence_score?: number | null;
+    ack_recommended_action?: string | null;
+    archivedAt: string;
+  }> | null;
 }
 
 export interface RtiWithRelations extends RtiApplication {
@@ -508,6 +546,38 @@ export interface RtiSecondAppeal {
   notes: string | null;
   created_by: string | null;
   updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Structured fields the AI extracts from an uploaded RTI document. */
+export interface RtiDocumentExtracted {
+  authority?: string | null;
+  subject?: string | null;
+  referenceNumber?: string | null;
+  documentDate?: string | null;
+  keyDates?: { label: string; date: string }[];
+}
+
+/** A single uploaded RTI document (merged PDF) — see 0015_rti_documents.sql. */
+export interface RtiDocument {
+  id: string;
+  rti_id: string;
+  doc_type: string;
+  title: string | null;
+  pdf_path: string;
+  page_count: number;
+  file_size: number | null;
+  source: string | null;
+  doc_date: string | null;
+  ocr_text: string | null;
+  ocr_confidence: number | null;
+  ocr_status: string;
+  ai_summary: string | null;
+  ai_extracted: RtiDocumentExtracted | null;
+  ai_status: string;
+  uploaded_by: string | null;
+  uploader_name: string | null;
   created_at: string;
   updated_at: string;
 }

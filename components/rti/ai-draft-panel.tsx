@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Check,
   FileCheck,
+  FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +57,7 @@ export function AiDraftPanel({
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const [downloadingPdf, setDownloadingPdf] = React.useState(false);
 
   async function onApproveClick() {
     if (!onApprove || !draft.trim()) return;
@@ -98,6 +100,47 @@ export function AiDraftPanel({
       setTimeout(() => setCopied(false), 1500);
     } catch {
       /* clipboard unavailable */
+    }
+  }
+
+  async function onDownloadPdf() {
+    if (!draft.trim()) return;
+    setDownloadingPdf(true);
+    setError(null);
+    try {
+      // Determine a friendly title based on document kind
+      let docTitle = "Government Document Draft";
+      if (kind === "rti") docTitle = "RTI Application Draft";
+      else if (kind === "first_appeal") docTitle = "First Appeal Draft";
+      else if (kind === "second_appeal") docTitle = "Second Appeal Draft";
+
+      const res = await fetch("/api/pdf/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: docTitle,
+          text: draft,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to download PDF");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${kind}_draft.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not download PDF");
+    } finally {
+      setDownloadingPdf(false);
     }
   }
 
@@ -159,8 +202,9 @@ export function AiDraftPanel({
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? "Copied" : "Copy"}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!draft}>
-            <Printer className="h-4 w-4" /> Print / PDF
+          <Button variant="outline" size="sm" onClick={onDownloadPdf} disabled={!draft || downloadingPdf}>
+            {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {downloadingPdf ? "Generating PDF…" : "Download PDF"}
           </Button>
           <Button variant="outline" size="sm" onClick={onSave} disabled={!draft}>
             {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
