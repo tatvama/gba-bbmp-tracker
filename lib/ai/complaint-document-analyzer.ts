@@ -165,12 +165,26 @@ export function buildComplaintDraftPrompt(input: {
   language?: DraftLanguage;
 }): { system: string; prompt: string } {
   const what = COMPLAINT_DRAFT_KINDS[input.kind];
-  const extra =
-    input.kind === "whatsapp"
-      ? "Keep it concise (a short WhatsApp message), polite, with the case number and the single clear ask."
-      : input.kind === "rti_from_complaint"
-        ? "Frame it as a Right to Information Act 2005 application with numbered, specific information requests derived from the complaint history."
-        : "";
+  const CAUTION =
+    "CAUTIOUS FRAMING (non-negotiable): every adverse point is a documented suspicion or red flag that calls for records and explanation. NEVER state that any named officer, engineer or contractor committed fraud, theft, forgery or corruption — write 'requires production of records / verification / enquiry'. Build on the chronology and the unanswered points already in the case history; do not invent facts.";
+  const extraByKind: Partial<Record<ComplaintDraftKind, string>> = {
+    whatsapp: "Keep it concise (a short WhatsApp message), polite, with the case number and the single clear ask.",
+    rti_from_complaint:
+      "Frame it as a Right to Information Act 2005 application with numbered, specific information requests derived from the complaint history.",
+    escalation_letter:
+      "Escalate to the NEXT authority in the chain (AE → AEE → EE → Chief Engineer → Commissioner). Open with the case number, summarise the chronology and the time elapsed without an adequate response, list the specific unresolved points, and reserve the right to approach higher forums (Lokayukta, Chief Secretary, Urban Development Department) if records and a reply are not received within a stated period. " +
+      CAUTION,
+    lokayukta_complaint:
+      "Frame as a complaint to the Karnataka Lokayukta. Lay out the chronology, the records relied upon, the public-interest impact, the authorities already approached without adequate response, and the SPECIFIC enquiry sought. " +
+      CAUTION,
+    chief_secretary_letter:
+      "Address to the Chief Secretary / Additional Chief Secretary, Urban Development Department, Government of Karnataka. Summarise the systemic failure to act despite the complaint and follow-ups, give the chronology, and request administrative intervention and a special enquiry. " +
+      CAUTION,
+    records_preservation:
+      "Request that ALL original records (MB books, measurement sheets, QC/quality tests, geo-tagged photographs, the contractor-eligibility set, insurance, and the IFMS / eProc audit logs) be preserved in status-quo pending production, and NOT weeded, altered, or the work completed, while this matter is under examination. Cite the case number and the risk of alteration. " +
+      CAUTION,
+  };
+  const extra = extraByKind[input.kind] ?? "";
   return {
     system: DRAFT_SYSTEM,
     prompt: `Draft: ${what}.

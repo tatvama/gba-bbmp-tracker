@@ -41,24 +41,29 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
   }
   const admin = createAdminClient();
 
-  // All complaints sharing this job number.
+  // All complaints sharing this job number (manual uploads).
   const { data: comps } = await admin
     .from("complaints")
     .select("id, contractor, latitude, longitude, location")
     .eq("job_number", jobNumber)
     .is("deleted_at", null);
   const complaintIds = (comps ?? []).map((c) => c.id as string);
-  if (complaintIds.length === 0) {
-    return { ok: false, error: `No complaints are linked to job number "${jobNumber}". Set the job number on the relevant complaints first.` };
-  }
 
-  // Their documents (with OCR + the photo-forensic flags already computed).
-  const { data: docs } = await admin
-    .from("complaint_documents")
-    .select("id, complaint_id, document_type, ocr_clean_text, ocr_raw_text, is_duplicate, dup_severity, vision_verdict, geo_flag, geo_distance_m, storage_bucket, storage_path, mime_type")
-    .in("complaint_id", complaintIds)
-    .limit(2000);
-  const allDocs = docs ?? [];
+  // Documents from BOTH sources: complaint uploads AND portal-imported job documents.
+  // job_documents (migration 0016) mirrors the columns read here, so a portal job can
+  // be audited before any complaint is attached. Photo-forensic flags carry forward.
+  const DOC_COLS =
+    "id, document_type, ocr_clean_text, ocr_raw_text, is_duplicate, dup_severity, vision_verdict, geo_flag, geo_distance_m, storage_bucket, storage_path, mime_type";
+  const complaintDocs = complaintIds.length
+    ? (await admin.from("complaint_documents").select(`complaint_id, ${DOC_COLS}`).in("complaint_id", complaintIds).limit(2000)).data ?? []
+    : [];
+  const jobDocs = ((await admin.from("job_documents").select(DOC_COLS).eq("job_number", jobNumber).limit(2000)).data ?? []).map(
+    (d) => ({ ...d, complaint_id: null as string | null }),
+  );
+  const allDocs = [...complaintDocs, ...jobDocs];
+  if (allDocs.length === 0) {
+    return { ok: false, error: `No documents found for job "${jobNumber}". Download it from the BBMP portal, or link complaints carrying this job number.` };
+  }
 
   // Aggregated structured inputs.
   const bills: StructuredBill[] = [];

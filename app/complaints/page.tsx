@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, LayoutDashboard, Smartphone } from "lucide-react";
+import { Plus, LayoutDashboard, Smartphone, Download } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ComplaintTable } from "@/components/complaints/complaint-table";
@@ -22,6 +22,7 @@ export default async function ComplaintsPage() {
       >
         <Button asChild size="sm" variant="outline"><Link href="/complaints/dashboard"><LayoutDashboard className="h-4 w-4" /> Dashboard</Link></Button>
         <Button asChild size="sm" variant="outline"><Link href="/complaints/mobile/upload"><Smartphone className="h-4 w-4" /> Mobile</Link></Button>
+        {canEdit && <Button asChild size="sm" variant="outline"><Link href="/complaints/portal"><Download className="h-4 w-4" /> Portal import</Link></Button>}
         {canEdit && <Button asChild size="sm"><Link href="/complaints/new"><Plus className="h-4 w-4" /> New</Link></Button>}
       </PageHeader>
       <ComplaintTable data={complaints} />

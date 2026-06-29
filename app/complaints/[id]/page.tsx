@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/print-button";
 import { ComplaintTabs } from "@/components/complaints/complaint-tabs";
+import { CaseWorkflow } from "@/components/complaints/case-workflow";
 import {
   getComplaint, listComplaintDocuments, listComplaintTimeline, listComplaintReplies,
   listComplaintActions, listComplaintCommunications, listComplaintReminders,
@@ -80,6 +81,16 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           {complaint.next_follow_up_date && <Badge variant="warning">Next follow-up {formatDate(complaint.next_follow_up_date)}</Badge>}
         </div>
       </div>
+
+      {flags.canField && (
+        <CaseWorkflow
+          complaintId={complaint.id}
+          status={complaint.status}
+          jobNumber={complaint.job_number ?? null}
+          caseNumber={complaint.internal_case_number ?? null}
+          aiConfigured={flags.aiConfigured}
+        />
+      )}
 
       <ComplaintTabs
         complaint={complaint}

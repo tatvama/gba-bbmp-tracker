@@ -18,6 +18,7 @@ const BUCKETS = [
   "complaint-processed-images",
   "complaint-exports",
   "rti-documents",
+  "job-documents",
 ];
 
 async function main() {
