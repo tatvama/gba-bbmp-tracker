@@ -173,9 +173,11 @@ export function activeDeadline(
     due = rti.first_appeal_filed_date
       ? addDays(rti.first_appeal_filed_date, rules.faaDisposalDays)
       : addDays(rti.first_appeal_due, rules.faaDisposalDays);
-  } else if (status === "FAA Order Received") {
+  } else if (status === "FAA Order Received" || status === "Second Appeal Drafted") {
     label = "Second appeal";
     due = rti.second_appeal_due;
+  } else if (status === "Second Appeal Filed" || status === "Complaint Filed") {
+    return null;
   } else if (
     status === "Reply Received" ||
     status === "Partial Reply" ||

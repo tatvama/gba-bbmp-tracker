@@ -15,7 +15,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
-import { OcrPreview } from "@/components/rti/ocr-preview";
 import { DocumentCapture } from "@/components/rti/document-capture";
 import type { RtiDocument } from "@/lib/types";
 import {
@@ -153,7 +152,6 @@ function DocumentRow({
         </dl>
       )}
 
-      {doc.ocr_text && <OcrPreview ocrText={doc.ocr_text} className="mt-3" />}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => onView(doc.pdf_path)}>

@@ -7,12 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { updateRtiFilingDateAction } from "@/lib/actions/rti";
 
+import { formatDate } from "@/lib/format";
+
 function fmt(d: string | null): string {
   if (!d) return "—";
-  const p = new Date(d);
-  return Number.isNaN(p.getTime())
-    ? d
-    : p.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  return formatDate(d);
 }
 
 /**
