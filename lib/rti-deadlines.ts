@@ -144,6 +144,7 @@ export interface RtiDeadlineFields {
   life_liberty_due?: string | null;
   first_appeal_due?: string | null;
   second_appeal_due?: string | null;
+  first_appeal_filed_date?: string | null;
 }
 
 export interface ActiveDeadline {
@@ -167,7 +168,12 @@ export function activeDeadline(
   let label: string;
   let due: string | null | undefined;
 
-  if (status === "First Appeal Filed" || status === "FAA Order Received") {
+  if (status === "First Appeal Filed") {
+    label = "First appeal decision";
+    due = rti.first_appeal_filed_date
+      ? addDays(rti.first_appeal_filed_date, rules.faaDisposalDays)
+      : addDays(rti.first_appeal_due, rules.faaDisposalDays);
+  } else if (status === "FAA Order Received") {
     label = "Second appeal";
     due = rti.second_appeal_due;
   } else if (

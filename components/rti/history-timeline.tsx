@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import {
-  PlusCircle,
+  Plus,
   FileText,
-  FileCheck,
-  BadgeCheck,
-  RefreshCw,
+  Award,
+  Flag,
   Calendar,
   Trash2,
   History,
+  UploadCloud,
   Eye,
   ChevronDown,
   ArrowRight,
@@ -27,106 +27,114 @@ import type { RtiHistoryEvent, RtiHistoryType } from "@/lib/rti-history";
 interface EventStyle {
   label: string;
   Icon: LucideIcon;
-  nodeCls: string; // node bg + text + ring
+  circleCls: string; // large circle background + border + text
+  dotCls: string;    // small dot color
+  textCls: string;   // text color for sub-info
+  hoverCls: string;  // color-matched hover shadow and border classes
 }
 
 const STYLES: Record<RtiHistoryType, EventStyle> = {
   created: {
-    label: "Application Created",
-    Icon: PlusCircle,
-    nodeCls: "bg-emerald-500 text-white ring-emerald-200 dark:ring-emerald-800",
+    label: "Case Created",
+    Icon: Plus,
+    circleCls: "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-400",
+    dotCls: "bg-blue-500 dark:bg-blue-400",
+    textCls: "text-blue-600 dark:text-blue-400",
+    hoverCls: "hover:border-blue-300/50 hover:shadow-[0_8px_30px_rgba(59,130,246,0.08)] dark:hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)]",
   },
   document_uploaded: {
     label: "Document Uploaded",
     Icon: FileText,
-    nodeCls: "bg-blue-500 text-white ring-blue-200 dark:ring-blue-800",
+    circleCls: "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-400",
+    dotCls: "bg-emerald-500 dark:bg-emerald-400",
+    textCls: "text-emerald-600 dark:text-emerald-400",
+    hoverCls: "hover:border-emerald-300/50 hover:shadow-[0_8px_30px_rgba(16,185,129,0.08)] dark:hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]",
   },
   reply_uploaded: {
-    label: "Reply Uploaded",
-    Icon: FileCheck,
-    // bg-teal uses the project's custom teal (#1F7A6E); teal-500 doesn't exist in this config
-    nodeCls: "bg-teal text-white ring-emerald-200 dark:ring-emerald-900",
+    label: "Document Uploaded",
+    Icon: FileText,
+    circleCls: "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-400",
+    dotCls: "bg-emerald-500 dark:bg-emerald-400",
+    textCls: "text-emerald-600 dark:text-emerald-400",
+    hoverCls: "hover:border-emerald-300/50 hover:shadow-[0_8px_30px_rgba(16,185,129,0.08)] dark:hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]",
   },
   ack_uploaded: {
-    label: "Acknowledgement Uploaded",
-    Icon: BadgeCheck,
-    nodeCls: "bg-cyan-600 text-white ring-cyan-200 dark:ring-cyan-900",
+    label: "Document Uploaded",
+    Icon: Award,
+    circleCls: "bg-purple-50 border-purple-200 text-purple-650 dark:bg-purple-950/40 dark:border-purple-900 dark:text-purple-450",
+    dotCls: "bg-purple-500 dark:bg-purple-400",
+    textCls: "text-purple-600 dark:text-purple-400",
+    hoverCls: "hover:border-purple-300/50 hover:shadow-[0_8px_30px_rgba(168,85,247,0.08)] dark:hover:shadow-[0_8px_30px_rgba(168,85,247,0.15)]",
   },
   status_changed: {
     label: "Status Updated",
-    Icon: RefreshCw,
-    nodeCls: "bg-amber-500 text-white ring-amber-200 dark:ring-amber-800",
+    Icon: Flag,
+    circleCls: "bg-orange-50 border-orange-200 text-orange-600 dark:bg-orange-950/40 dark:border-orange-900 dark:text-orange-400",
+    dotCls: "bg-orange-500 dark:bg-orange-400",
+    textCls: "text-orange-600 dark:text-orange-400",
+    hoverCls: "hover:border-orange-300/50 hover:shadow-[0_8px_30px_rgba(249,115,22,0.08)] dark:hover:shadow-[0_8px_30px_rgba(249,115,22,0.15)]",
   },
   date_filed: {
-    label: "Filing Date Set",
+    label: "Date Filed",
     Icon: Calendar,
-    nodeCls: "bg-violet-500 text-white ring-violet-200 dark:ring-violet-800",
+    circleCls: "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-400",
+    dotCls: "bg-blue-500 dark:bg-blue-400",
+    textCls: "text-blue-600 dark:text-blue-400",
+    hoverCls: "hover:border-blue-300/50 hover:shadow-[0_8px_30px_rgba(59,130,246,0.08)] dark:hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)]",
   },
   document_deleted: {
     label: "Document Removed",
     Icon: Trash2,
-    nodeCls: "bg-rose-500 text-white ring-rose-200 dark:ring-rose-800",
+    circleCls: "bg-red-50 border-red-200 text-red-600 dark:bg-red-950/40 dark:border-red-900 dark:text-red-400",
+    dotCls: "bg-red-500 dark:bg-red-400",
+    textCls: "text-red-650 dark:text-red-400",
+    hoverCls: "hover:border-red-350/50 hover:shadow-[0_8px_30px_rgba(239,68,68,0.08)] dark:hover:shadow-[0_8px_30px_rgba(239,68,68,0.15)]",
   },
   changed: {
     label: "Updated",
     Icon: History,
-    nodeCls: "bg-slate-400 text-white ring-slate-200 dark:ring-slate-700",
+    circleCls: "bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400",
+    dotCls: "bg-slate-500 dark:bg-slate-400",
+    textCls: "text-slate-650 dark:text-slate-400",
+    hoverCls: "hover:border-slate-350/50 hover:shadow-[0_8px_30px_rgba(100,116,139,0.08)] dark:hover:shadow-[0_8px_30px_rgba(100,116,139,0.15)]",
   },
 };
 
 const DOC_TYPES: RtiHistoryType[] = ["document_uploaded", "reply_uploaded", "ack_uploaded"];
 
-// ── Stage logic ─────────────────────────────────────────────────────────────
-
-function getStage(ev: RtiHistoryEvent): string | null {
-  switch (ev.type) {
-    case "created":
-    case "date_filed":
-      return "Application";
-    case "document_uploaded":
-      if (ev.docType === "Application") return "Application";
-      if (ev.docType === "FAA Order") return "First Appeal";
-      if (ev.docType === "Second Appeal Order") return "Second Appeal";
-      if (ev.docType === "Higher Appeal Order") return "Higher Appeal";
-      return "Documents";
-    case "ack_uploaded":
-      return "Acknowledgement";
-    case "reply_uploaded":
-      return "Reply";
-    default:
-      return null; // inherits previous stage
-  }
-}
-
-type TlItem =
-  | { kind: "sep"; label: string; key: string }
-  | { kind: "ev"; event: RtiHistoryEvent; isLeft: boolean; isLast: boolean; key: string };
-
-function buildItems(events: RtiHistoryEvent[]): TlItem[] {
-  const out: TlItem[] = [];
-  let stage: string | null = null;
-  let n = 0;
-  events.forEach((ev, i) => {
-    const s = getStage(ev);
-    if (s && s !== stage) {
-      stage = s;
-      out.push({ kind: "sep", label: s, key: `sep-${s}-${i}` });
-    }
-    out.push({ kind: "ev", event: ev, isLeft: n % 2 === 0, isLast: i === events.length - 1, key: ev.id });
-    n++;
-  });
-  return out;
-}
-
 // ── Formatters ──────────────────────────────────────────────────────────────
 
-function fmtTs(v: string) {
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return { date: v, time: "" };
-  return {
-    date: d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-    time: d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).toUpperCase(),
-  };
+function formatTimestamp(dateString: string): string {
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return dateString;
+  
+  const day = d.getDate();
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "pm" : "am";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  
+  return `${day} ${month} ${year}, ${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
+}
+
+function timeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  return `${days} days ago`;
 }
 
 function fmtLong(v: string | null | undefined) {
@@ -152,118 +160,33 @@ function ViewBtn({ pdfPath }: { pdfPath: string }) {
   return (
     <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={busy} onClick={open}>
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
-      Preview
+      Preview Detail
     </Button>
   );
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  Draft: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  Filed: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  "Awaiting Reply": "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  "Reply Received": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  "First Appeal Draft": "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-  "First Appeal Filed": "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  "Second Appeal Filed": "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-};
+// ── One timeline event row ──────────────────────────────────────────────────
 
-function StatusChip({ v }: { v: string | null | undefined }) {
-  const cls = v ? (STATUS_COLORS[v] ?? "bg-muted text-muted-foreground") : "bg-muted text-muted-foreground";
-  return (
-    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", cls)}>
-      {v || "—"}
-    </span>
-  );
-}
-
-/* One-line summary shown in collapsed state */
-function Summary({ ev }: { ev: RtiHistoryEvent }) {
-  if (DOC_TYPES.includes(ev.type)) {
-    const parts = [
-      ev.documentName ?? "Document.pdf",
-      typeof ev.pageCount === "number" ? `${ev.pageCount} pg` : null,
-      ev.performedBy ?? null,
-    ].filter(Boolean);
-    return <p className="text-[12px] text-muted-foreground truncate">{parts.join(" · ")}</p>;
-  }
-  if (ev.type === "status_changed") {
-    return (
-      <div className="flex items-center gap-1 flex-wrap mt-0.5">
-        <StatusChip v={ev.oldValue} />
-        <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-        <StatusChip v={ev.newValue} />
-      </div>
-    );
-  }
-  if (ev.type === "date_filed") {
-    return <p className="text-[12px] text-muted-foreground">{fmtLong(ev.newValue)}</p>;
-  }
-  if (ev.type === "created") {
-    return <p className="text-[12px] text-muted-foreground truncate">{ev.newValue || ""}</p>;
-  }
-  if (ev.type === "changed" && ev.fieldLabel) {
-    return (
-      <p className="text-[12px] text-muted-foreground truncate">
-        {ev.fieldLabel}: {ev.oldValue || "—"} → {ev.newValue || "—"}
-      </p>
-    );
-  }
-  if (ev.type === "document_deleted") {
-    return <p className="text-[12px] text-muted-foreground">Removed: {ev.oldValue ?? "document"}</p>;
-  }
-  return null;
-}
-
-/* Extra detail shown when expanded */
-function Detail({ ev }: { ev: RtiHistoryEvent }) {
-  if (!DOC_TYPES.includes(ev.type)) return null;
-  const has = ev.documentTitle || ev.performedBy || ev.pdfPath;
-  if (!has) return null;
-  return (
-    <div className="pt-2 mt-2 space-y-1 border-t border-border/40">
-      {ev.documentTitle && (
-        <p className="text-[12px] font-medium text-foreground">{ev.documentTitle}</p>
-      )}
-      {ev.performedBy && (
-        <p className="text-[11px] text-muted-foreground">Uploaded by {ev.performedBy}</p>
-      )}
-      {ev.pdfPath && <ViewBtn pdfPath={ev.pdfPath} />}
-    </div>
-  );
-}
-
-/* Node circle */
-function Node({ style }: { style: EventStyle }) {
-  const { Icon } = style;
-  return (
-    <span className={cn(
-      "flex h-8 w-8 items-center justify-center rounded-full shadow-sm ring-4 shrink-0 z-10",
-      style.nodeCls,
-    )}>
-      <Icon className="h-[15px] w-[15px]" aria-hidden />
-    </span>
-  );
-}
-
-/* Stage separator spanning full width */
-function StageSep({ label }: { label: string }) {
-  return (
-    <div className="relative flex items-center justify-center my-5 z-10" aria-hidden>
-      <div className="absolute inset-x-0 top-1/2 h-px bg-border/40" />
-      <span className="relative px-3 py-0.5 rounded-full border border-border/60 bg-background text-[10px] font-bold tracking-widest uppercase text-muted-foreground select-none">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-/* One timeline event row */
-function EventRow({ event, isLeft, isLast }: { event: RtiHistoryEvent; isLeft: boolean; isLast: boolean }) {
+function EventRow({ event, isLast }: { event: RtiHistoryEvent; isLast: boolean }) {
   const [open, setOpen] = React.useState(false);
-  const style = STYLES[event.type];
-  const { Icon: _Icon, ..._ } = style; // prevent unused lint
-  void _;
-  const { date, time } = fmtTs(event.createdAt);
+  const [busy, setBusy] = React.useState(false);
+
+  const style = STYLES[event.type] || STYLES.changed;
+  
+  // Dynamic Icon & styles overrides
+  let Icon = style.Icon;
+  let circleCls = style.circleCls;
+  let dotCls = style.dotCls;
+  let textCls = style.textCls;
+  let hoverCls = style.hoverCls;
+
+  if (event.type === "document_uploaded" && event.docType === "Application") {
+    Icon = UploadCloud;
+    circleCls = "bg-cyan-50 border-cyan-200 text-cyan-600 dark:bg-cyan-950/40 dark:border-cyan-900 dark:text-cyan-400";
+    dotCls = "bg-cyan-500 dark:bg-cyan-400";
+    textCls = "text-cyan-600 dark:text-cyan-400";
+    hoverCls = "hover:border-cyan-300/50 hover:shadow-[0_8px_30px_rgba(6,182,212,0.08)] dark:hover:shadow-[0_8px_30px_rgba(6,182,212,0.15)]";
+  }
 
   const heading =
     DOC_TYPES.includes(event.type) && event.docType && event.type === "document_uploaded"
@@ -273,84 +196,131 @@ function EventRow({ event, isLeft, isLast }: { event: RtiHistoryEvent; isLeft: b
   const canExpand = DOC_TYPES.includes(event.type) &&
     !!(event.documentTitle || event.performedBy || event.pdfPath);
 
-  const card = (
-    <div
-      role={canExpand ? "button" : undefined}
-      tabIndex={canExpand ? 0 : undefined}
-      aria-expanded={canExpand ? open : undefined}
-      onClick={canExpand ? () => setOpen((v) => !v) : undefined}
-      onKeyDown={canExpand ? (e) => { if (e.key === "Enter" || e.key === " ") setOpen((v) => !v); } : undefined}
-      className={cn(
-        "relative rounded-xl border bg-card shadow-sm px-3 py-2.5 w-full",
-        "transition-all duration-150",
-        canExpand && "cursor-pointer hover:shadow-md hover:-translate-y-px",
-        // speech-bubble pointer classes (CSS in globals.css, desktop only)
-        isLeft ? "tl-arrow-r" : "tl-arrow-l",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-foreground leading-snug truncate">{heading}</p>
-          <Summary ev={event} />
-        </div>
-        <div className="shrink-0 text-right leading-none space-y-0.5">
-          <p className="text-[11px] text-muted-foreground whitespace-nowrap">{date}</p>
-          {time && <p className="text-[10px] text-muted-foreground/60">{time}</p>}
-          {canExpand && (
-            <ChevronDown className={cn(
-              "h-3 w-3 text-muted-foreground/40 ml-auto transition-transform duration-200",
-              open && "rotate-180",
-            )} />
-          )}
-        </div>
-      </div>
-
-      {/* Smooth expand via CSS grid trick */}
-      <div style={{
-        display: "grid",
-        gridTemplateRows: open ? "1fr" : "0fr",
-        transition: "grid-template-rows 220ms ease",
-      }}>
-        <div style={{ overflow: "hidden" }}>
-          <Detail ev={event} />
-        </div>
-      </div>
-    </div>
-  );
+  const handleDownload = async () => {
+    if (!event.pdfPath) return;
+    setBusy(true);
+    try {
+      const url = await getSignedUrlAction(event.pdfPath);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <div className={cn(
-      // Mobile: left-rail flex layout
-      "relative flex items-start gap-2 mb-2",
-      // Desktop: center-rail 3-col grid
-      "md:grid md:grid-cols-[1fr_40px_1fr] md:gap-0 md:mb-3 md:items-start",
-    )}>
-      {/* Mobile node (hidden md+) */}
-      <div className="flex flex-col items-center md:hidden shrink-0">
-        <Node style={style} />
-        {!isLast && <div className="w-px flex-1 mt-1 min-h-[20px] bg-border/40" />}
+    <div className="grid grid-cols-[48px_32px_1fr] gap-2 items-stretch">
+      {/* Column 1: Large Circle */}
+      <div className="flex items-start justify-center">
+        <div className={cn("w-12 h-12 rounded-full flex items-center justify-center border shadow-xs z-10 bg-card", circleCls)}>
+          <Icon className="h-5 w-5" />
+        </div>
       </div>
-
-      {/* Left slot: shows card when isLeft (always visible on mobile) */}
+      
+      {/* Column 2: Connector & Dot */}
+      <div className="relative flex items-start justify-center">
+        {/* Horizontal Connector */}
+        <div className="absolute left-0 right-0 h-px bg-border/50 top-6" />
+        {/* Dot */}
+        <div className={cn("w-2.5 h-2.5 rounded-full z-10 mt-[19px] ring-4 ring-background animate-indicator-blink", dotCls)} />
+      </div>
+      
+      {/* Column 3: Event Card */}
       <div className={cn(
-        "md:flex md:items-start md:justify-end md:pr-5",
-        isLeft ? "flex-1" : "hidden md:block",
+        "border rounded-xl bg-card p-3.5 mb-2.5 flex flex-col justify-between transition-all duration-300 ease-out",
+        "shadow-[0_2px_8px_rgba(0,0,0,0.02)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.15)]",
+        "hover:-translate-y-0.5",
+        hoverCls
       )}>
-        {isLeft && card}
-      </div>
+        <div className="flex items-start justify-between gap-4">
+          {/* Left part: Event details */}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground leading-snug">{heading}</p>
+            
+            {/* Sub-info */}
+            {DOC_TYPES.includes(event.type) ? (
+              <div className="mt-1">
+                <p className={cn("text-xs font-semibold", textCls)}>
+                  {event.docType === "Application" ? "Application" : event.docType === "FAA Order" ? "First Appeal" : event.docType === "Second Appeal Order" ? "Second Appeal" : event.docType || "Document"} ({event.pageCount || 1} pg)
+                </p>
+                {event.documentName && (
+                  <button
+                    onClick={handleDownload}
+                    disabled={busy}
+                    className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-red-500 shrink-0" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-red-500 shrink-0" />
+                    )}
+                    <span className="underline truncate max-w-[250px] sm:max-w-md">{event.documentName}</span>
+                  </button>
+                )}
+              </div>
+            ) : event.type === "status_changed" ? (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {event.oldValue || "Draft"}
+                </span>
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  {event.newValue}
+                </span>
+              </div>
+            ) : event.type === "date_filed" ? (
+              <div className="mt-1">
+                <p className={cn("text-xs font-semibold", textCls)}>Filing Date</p>
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Calendar className="h-4 w-4 text-blue-500 shrink-0" />
+                  <span>{fmtLong(event.newValue)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{event.newValue || event.oldValue || "—"}</p>
+            )}
+          </div>
+          
+          {/* Right part: Time / Date / Actions */}
+          <div className="flex items-start gap-3 shrink-0">
+            <div className="text-right leading-normal">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground justify-end">
+                <Calendar className="h-3.5 w-3.5 opacity-60" />
+                <span>{formatTimestamp(event.createdAt)}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">{timeAgo(event.createdAt)}</p>
+            </div>
+            
+            {/* Chevron/Details Toggle (if expandable) */}
+            {canExpand && (
+              <button
+                onClick={() => setOpen(!open)}
+                className="p-1 hover:bg-muted rounded transition-colors text-muted-foreground/55 hover:text-foreground"
+                aria-label="Toggle details"
+              >
+                <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", open && "rotate-180")} />
+              </button>
+            )}
+          </div>
+        </div>
 
-      {/* Desktop center node (hidden on mobile) */}
-      <div className="hidden md:flex md:flex-col md:items-center">
-        <Node style={style} />
-        {!isLast && <div className="w-px flex-1 mt-1 min-h-[20px] bg-border/40" />}
-      </div>
-
-      {/* Right slot: shows card when !isLeft (always visible on mobile) */}
-      <div className={cn(
-        "md:pl-5",
-        !isLeft ? "flex-1" : "hidden md:block",
-      )}>
-        {!isLeft && card}
+        {/* Smooth expand details */}
+        <div style={{
+          display: "grid",
+          gridTemplateRows: open ? "1fr" : "0fr",
+          transition: "grid-template-rows 220ms ease",
+        }}>
+          <div style={{ overflow: "hidden" }}>
+            <div className="pt-2 mt-2 space-y-1 border-t border-border/40">
+              {event.documentTitle && (
+                <p className="text-[12px] font-medium text-foreground">{event.documentTitle}</p>
+              )}
+              {event.performedBy && (
+                <p className="text-[11px] text-muted-foreground">Uploaded by {event.performedBy}</p>
+              )}
+              {event.pdfPath && <ViewBtn pdfPath={event.pdfPath} />}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -371,26 +341,20 @@ export function HistoryTimeline({ events }: { events: RtiHistoryEvent[] }) {
     );
   }
 
-  const items = buildItems(events);
-
   return (
     <div className="relative" aria-label="Change history timeline">
-      {/* Desktop center rail */}
-      <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-border/50" aria-hidden />
-      {/* Mobile left rail */}
-      <div className="block md:hidden absolute left-4 top-0 bottom-0 w-px bg-border/50" aria-hidden />
+      {/* Continuous Vertical Timeline Line */}
+      <div className="absolute left-[64px] top-6 bottom-6 w-px bg-border/50" aria-hidden />
 
-      {items.map((item) => {
-        if (item.kind === "sep") return <StageSep key={item.key} label={item.label} />;
-        return (
+      <div className="space-y-1">
+        {events.map((event, index) => (
           <EventRow
-            key={item.key}
-            event={item.event}
-            isLeft={item.isLeft}
-            isLast={item.isLast}
+            key={event.id}
+            event={event}
+            isLast={index === events.length - 1}
           />
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }

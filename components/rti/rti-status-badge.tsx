@@ -20,5 +20,13 @@ const VARIANT: Record<string, BadgeProps["variant"]> = {
 };
 
 export function RtiStatusBadge({ status }: { status: string }) {
-  return <Badge variant={VARIANT[status] ?? "outline"}>{status}</Badge>;
+  return (
+    <Badge
+      variant={VARIANT[status] ?? "outline"}
+      className="text-[11px] px-2.5 h-6 rounded-md font-semibold tracking-wide select-none inline-flex items-center gap-1.5 leading-none"
+      dot
+    >
+      {status}
+    </Badge>
+  );
 }

@@ -50,12 +50,12 @@ describe("computeRtiDeadlines", () => {
     expect(daysBetween(d.normalDue!, d.firstAppealDue!)).toBe(30);
   });
 
-  it("second appeal is 90 days from the FAA decision date", () => {
+  it("second appeal is 15 days from the FAA decision date", () => {
     const d = computeRtiDeadlines({
       dateReceived: "2026-01-01",
       firstAppealDecisionDate: "2026-03-01",
     });
-    expect(daysBetween("2026-03-01", d.secondAppealDue!)).toBe(90);
+    expect(daysBetween("2026-03-01", d.secondAppealDue!)).toBe(15);
   });
 
   it("returns null deadlines when no base date is available", () => {
@@ -130,9 +130,17 @@ describe("activeDeadline", () => {
     expect(a?.label).toBe("First appeal");
   });
 
-  it("switches to the second-appeal deadline after a first appeal is filed", () => {
+  it("switches to the first-appeal decision deadline after a first appeal is filed", () => {
     const a = activeDeadline(
-      { status: "First Appeal Filed", second_appeal_due: addDays(today, 40) },
+      { status: "First Appeal Filed", first_appeal_due: today },
+      today,
+    );
+    expect(a?.label).toBe("First appeal decision");
+  });
+
+  it("switches to the second-appeal deadline after an FAA order is received", () => {
+    const a = activeDeadline(
+      { status: "FAA Order Received", second_appeal_due: addDays(today, 10) },
       today,
     );
     expect(a?.label).toBe("Second appeal");

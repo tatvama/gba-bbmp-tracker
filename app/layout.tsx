@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { TopNav } from "@/components/nav/topnav";
 import { Sidebar } from "@/components/nav/sidebar";
 import { getSessionUser } from "@/lib/auth";
+import { PageTransition } from "@/components/nav/page-transition";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -50,7 +51,7 @@ export default async function RootLayout({
                 id="main-content"
                 className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10"
               >
-                {children}
+                <PageTransition>{children}</PageTransition>
               </main>
             </div>
           </div>
