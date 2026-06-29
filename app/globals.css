@@ -264,9 +264,42 @@
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.65; }
 }
+@keyframes indicator-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.15; transform: scale(0.9); }
+}
+@keyframes blur-reveal {
+  0% {
+    filter: blur(16px);
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  100% {
+    filter: blur(0);
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes page-slide {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .animate-fade-in       { animation: fadeIn 200ms ease both; }
 .animate-slide-in      { animation: slideInRight 200ms ease both; }
 .animate-pulse-subtle  { animation: pulse-subtle 2s ease-in-out infinite; }
+.animate-indicator-blink { animation: indicator-blink 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.animate-blur-reveal   { animation: blur-reveal 600ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-page-slide    { animation: page-slide 450ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
 
 /* Activity timeline: connector draws top→bottom, cards fade + rise (staggered) */
 @keyframes timelineDraw {

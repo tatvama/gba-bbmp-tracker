@@ -66,15 +66,12 @@ export default async function AnalyzePage({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <Button asChild variant="ghost" size="sm" className="mb-3 -ml-2">
+      <Button asChild variant="ghost" size="sm" className="mb-3 -ml-2 no-print">
         <Link href={`/rti/${id}`}><ArrowLeft className="h-4 w-4" /> Back to RTI</Link>
       </Button>
-      <PageHeader
-        title="Response analyzer"
-        description="Compares your RTI application against a response document — PIO reply, FAA order, or Information Commission order — point by point, and recommends the next escalation."
-      />
       <ReplyAnalyzer
         rtiId={id}
+        rti={rti}
         aiConfigured={isAiConfigured()}
         applicationText={applicationText}
         applicationSource={applicationSource}

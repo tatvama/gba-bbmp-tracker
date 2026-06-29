@@ -92,25 +92,19 @@ export default async function RtiDetailPage({
     summary: generateInformationSummary(sa.reason_detail),
   }));
 
+  const filedFirstAppeal = firstAppeals.find((fa) => fa.status === "Filed");
+  const rtiWithAppealDate = {
+    ...rti,
+    first_appeal_filed_date: filedFirstAppeal?.date_filed || null,
+  };
+
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between animate-blur-reveal">
         <Button asChild variant="ghost" size="sm" className="no-print -ml-2">
           <Link href="/rti/all"><ArrowLeft className="h-4 w-4" /> All RTIs</Link>
         </Button>
         <div className="no-print flex flex-wrap gap-2">
-          {/* Main RTI Print Preview & Server PDF compile triggers */}
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/rti/${id}/print?type=rti`} target="_blank">
-              <Printer className="h-4 w-4" /> Print Preview
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <a href={`/api/rti/${id}/pdf`} download>
-              <FileDown className="h-4 w-4" /> Download PDF
-            </a>
-          </Button>
-
           {canEdit && (
             <>
               <Button asChild size="sm" variant="outline">
@@ -125,20 +119,20 @@ export default async function RtiDetailPage({
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 animate-blur-reveal">
         <p className="font-mono text-xs text-muted-foreground">{rti.internal_ref ?? "—"}</p>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{rti.subject}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <RtiStatusBadge status={rti.status} />
           <Badge variant="outline">{rti.priority} priority</Badge>
           {rti.is_life_liberty && <Badge variant="destructive">Life / liberty</Badge>}
-          <DeadlineBadge rti={rti} rules={rules} />
+          <DeadlineBadge rti={rtiWithAppealDate} rules={rules} />
         </div>
       </div>
 
       {/* Main RTI Full-Width Document Summary Card */}
       {rti.info_requested && (
-        <div className="mb-6">
+        <div className="mb-6 animate-blur-reveal stagger-1">
           <DocumentSummaryCard
             title="Information Requested"
             content={rti.info_requested}
@@ -152,13 +146,12 @@ export default async function RtiDetailPage({
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 animate-blur-reveal stagger-2">
         <Card>
           <CardHeader><CardTitle className="text-base">Request</CardTitle></CardHeader>
           <CardContent>
             <DetailRow label="Category">{orDash(rti.category)}</DetailRow>
-            <DetailRow label="Filing mode">{orDash(rti.filing_mode)}</DetailRow>
-            <DetailRow label="Tags">{rti.tags.length ? rti.tags.join(", ") : "—"}</DetailRow>
+            <DetailRow label="Public authority">{orDash(rti.public_authority)}</DetailRow>
           </CardContent>
         </Card>
 
@@ -168,7 +161,6 @@ export default async function RtiDetailPage({
             <DetailRow label="Date filed">
               <FilingDateEditor rtiId={id} dateFiled={rti.date_filed} canEdit={canEdit} />
             </DetailRow>
-            <DetailRow label="Date received">{formatDate(rti.date_received)}</DetailRow>
             <DetailRow label="Normal reply due"><DueChip due={rti.normal_due} rules={rules} /></DetailRow>
             {rti.is_life_liberty && (
               <DetailRow label="Life/liberty due (48h)"><DueChip due={rti.life_liberty_due} rules={rules} /></DetailRow>
@@ -177,38 +169,14 @@ export default async function RtiDetailPage({
             <DetailRow label="Second appeal due"><DueChip due={rti.second_appeal_due} rules={rules} /></DetailRow>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Public authority / PIO / FAA</CardTitle></CardHeader>
-          <CardContent>
-            <DetailRow label="Public authority">{orDash(rti.public_authority)}</DetailRow>
-            <DetailRow label="Department">{orDash(rti.department)}</DetailRow>
-            <DetailRow label="PIO">{orDash(rti.pio_name)}{rti.pio_designation ? ` · ${rti.pio_designation}` : ""}</DetailRow>
-            <DetailRow label="PIO contact">{[rti.pio_phone, rti.pio_email].filter(Boolean).join(" · ") || "—"}</DetailRow>
-            <DetailRow label="FAA">{orDash(rti.faa_name)}{rti.faa_designation ? ` · ${rti.faa_designation}` : ""}</DetailRow>
-            <DetailRow label="FAA contact">{[rti.faa_phone, rti.faa_email].filter(Boolean).join(" · ") || "—"}</DetailRow>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Jurisdiction & reply</CardTitle></CardHeader>
-          <CardContent>
-            <DetailRow label="Corporation">{orDash(rti.corporation?.name)}</DetailRow>
-            <DetailRow label="Division">{orDash(rti.division?.name)}</DetailRow>
-            <DetailRow label="Sub-division">{orDash(rti.eng_subdivision?.name)}</DetailRow>
-            <DetailRow label="Ward">{rti.ward ? `${rti.ward.new_no} · ${rti.ward.new_name}` : "—"}</DetailRow>
-            <DetailRow label="Officer on record">{rti.contact ? `${rti.contact.full_name} — ${rti.contact.designation}` : "—"}</DetailRow>
-            <DetailRow label="Reply date">{formatDate(rti.reply_date)}</DetailRow>
-            <DetailRow label="Satisfaction">{orDash(rti.satisfaction_status)}</DetailRow>
-            <DetailRow label="Reply summary"><span className="whitespace-pre-wrap">{orDash(rti.reply_summary)}</span></DetailRow>
-          </CardContent>
-        </Card>
       </div>
 
-      <RtiDocumentsPanel rtiId={id} documents={documents} canEdit={canEdit} />
+      <div className="animate-blur-reveal stagger-3">
+        <RtiDocumentsPanel rtiId={id} documents={documents} canEdit={canEdit} />
+      </div>
 
       {(rti.applicant_name || rti.public_notes || (canVerify && rti.internal_notes)) && (
-        <Card className="mt-6">
+        <Card className="mt-6 animate-blur-reveal stagger-4">
           <CardHeader><CardTitle className="text-base">Applicant & notes</CardTitle></CardHeader>
           <CardContent>
             <DetailRow label="Applicant">{orDash(rti.applicant_name)}</DetailRow>
@@ -220,96 +188,97 @@ export default async function RtiDetailPage({
       )}
 
       {/* Appeals */}
-      <Separator className="my-8" />
-      <h2 className="mb-3 font-serif text-xl font-semibold">Appeals</h2>
-      {firstAppeals.length === 0 && secondAppeals.length === 0 ? (
-        <EmptyState title="No appeals filed" description="First and second appeals will appear here once created." />
-      ) : (
-        <div className="space-y-3">
-          {firstAppeals.map((fa) => {
-            const faSum = faSummaries.find((s) => s.id === fa.id)?.summary;
-            return (
-              <div key={fa.id} className="rounded-md border p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">First appeal · {fa.status}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {fa.date_filed ? `Filed ${formatDate(fa.date_filed)}` : "Draft"}
-                  </span>
-                </div>
-                <p className="mt-1 text-muted-foreground">Grounds: {fa.grounds.join(", ") || "—"}</p>
-                {fa.grounds_detail && faSum && (
-                  <div className="mt-2">
-                    <DocumentSummaryCard
-                      title="Appeal Grounds Detail"
-                      content={fa.grounds_detail}
-                      summary={faSum}
-                      documentType="First Appeal"
-                      lastUpdatedDate={fa.updated_at}
-                      printUrl={`/rti/${id}/print?type=first_appeal&appealId=${fa.id}`}
-                      pdfUrl={`/api/rti/${id}/first-appeal/pdf?appealId=${fa.id}`}
-                      variant="nested"
-                    />
+      {(firstAppeals.length > 0 || secondAppeals.length > 0) && (
+        <>
+          <Separator className="my-8" />
+          <h2 className="mb-3 font-serif text-xl font-semibold">Appeals</h2>
+          <div className="space-y-3">
+            {firstAppeals.map((fa) => {
+              const faSum = faSummaries.find((s) => s.id === fa.id)?.summary;
+              return (
+                <div key={fa.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">First appeal · {fa.status}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {fa.date_filed ? `Filed ${formatDate(fa.date_filed)}` : "Draft"}
+                    </span>
                   </div>
-                )}
-                {fa.decision_summary && <p className="mt-1 text-muted-foreground">FAA: {fa.decision_summary}</p>}
-                
-                <div className="mt-2 flex gap-2">
-                  <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                    <Link href={`/rti/${id}/print?type=first_appeal&appealId=${fa.id}`} target="_blank">
-                      <Printer className="h-3 w-3 mr-1" /> Print
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                    <a href={`/api/rti/${id}/first-appeal/pdf?appealId=${fa.id}`} download>
-                      <FileDown className="h-3 w-3 mr-1" /> PDF
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            );
-          })}             {secondAppeals.map((sa) => {
-            const saSum = saSummaries.find((s) => s.id === sa.id)?.summary;
-            return (
-              <div key={sa.id} className="rounded-md border p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Second appeal · {sa.status}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {sa.filing_date ? `Filed ${formatDate(sa.filing_date)}` : "Draft"}
-                  </span>
-                </div>
-                <p className="mt-1 text-muted-foreground">Reasons: {sa.reason.join(", ") || "—"}</p>
-                {sa.reason_detail && saSum && (
-                  <div className="mt-2">
-                    <DocumentSummaryCard
-                      title="Appeal Reason Detail"
-                      content={sa.reason_detail}
-                      summary={saSum}
-                      documentType="Second Appeal"
-                      lastUpdatedDate={sa.updated_at}
-                      printUrl={`/rti/${id}/print?type=second_appeal&appealId=${sa.id}`}
-                      pdfUrl={`/api/rti/${id}/second-appeal/pdf?appealId=${sa.id}`}
-                      variant="nested"
-                    />
+                  <p className="mt-1 text-muted-foreground">Grounds: {fa.grounds.join(", ") || "—"}</p>
+                  {fa.grounds_detail && faSum && (
+                    <div className="mt-2">
+                      <DocumentSummaryCard
+                        title="Appeal Grounds Detail"
+                        content={fa.grounds_detail}
+                        summary={faSum}
+                        documentType="First Appeal"
+                        lastUpdatedDate={fa.updated_at}
+                        printUrl={`/rti/${id}/print?type=first_appeal&appealId=${fa.id}`}
+                        pdfUrl={`/api/rti/${id}/first-appeal/pdf?appealId=${fa.id}`}
+                        variant="nested"
+                      />
+                    </div>
+                  )}
+                  {fa.decision_summary && <p className="mt-1 text-muted-foreground">FAA: {fa.decision_summary}</p>}
+                  
+                  <div className="mt-2 flex gap-2">
+                    <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
+                      <Link href={`/rti/${id}/print?type=first_appeal&appealId=${fa.id}`} target="_blank">
+                        <Printer className="h-3 w-3 mr-1" /> Print
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
+                      <a href={`/api/rti/${id}/first-appeal/pdf?appealId=${fa.id}`} download>
+                        <FileDown className="h-3 w-3 mr-1" /> PDF
+                      </a>
+                    </Button>
                   </div>
-                )}
-                {sa.diary_number && <p className="mt-1 text-muted-foreground">Diary: {sa.diary_number}</p>}
-                
-                <div className="mt-2 flex gap-2">
-                  <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                    <Link href={`/rti/${id}/print?type=second_appeal&appealId=${sa.id}`} target="_blank">
-                      <Printer className="h-3 w-3 mr-1" /> Print
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                    <a href={`/api/rti/${id}/second-appeal/pdf?appealId=${sa.id}`} download>
-                      <FileDown className="h-3 w-3 mr-1" /> PDF
-                    </a>
-                  </Button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+            {secondAppeals.map((sa) => {
+              const saSum = saSummaries.find((s) => s.id === sa.id)?.summary;
+              return (
+                <div key={sa.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Second appeal · {sa.status}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {sa.filing_date ? `Filed ${formatDate(sa.filing_date)}` : "Draft"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">Reasons: {sa.reason.join(", ") || "—"}</p>
+                  {sa.reason_detail && saSum && (
+                    <div className="mt-2">
+                      <DocumentSummaryCard
+                        title="Appeal Reason Detail"
+                        content={sa.reason_detail}
+                        summary={saSum}
+                        documentType="Second Appeal"
+                        lastUpdatedDate={sa.updated_at}
+                        printUrl={`/rti/${id}/print?type=second_appeal&appealId=${sa.id}`}
+                        pdfUrl={`/api/rti/${id}/second-appeal/pdf?appealId=${sa.id}`}
+                        variant="nested"
+                      />
+                    </div>
+                  )}
+                  {sa.diary_number && <p className="mt-1 text-muted-foreground">Diary: {sa.diary_number}</p>}
+                  
+                  <div className="mt-2 flex gap-2">
+                    <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
+                      <Link href={`/rti/${id}/print?type=second_appeal&appealId=${sa.id}`} target="_blank">
+                        <Printer className="h-3 w-3 mr-1" /> Print
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
+                      <a href={`/api/rti/${id}/second-appeal/pdf?appealId=${sa.id}`} download>
+                        <FileDown className="h-3 w-3 mr-1" /> PDF
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Communication timeline */}

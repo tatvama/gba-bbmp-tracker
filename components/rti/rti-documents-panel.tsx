@@ -55,6 +55,39 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   );
 }
 
+function DocTypeBadge({ type }: { type: string }) {
+  if (type === "Application") {
+    return (
+      <Badge variant="info" className="text-[12px] px-3 py-1 font-semibold shadow-sm" dot>
+        {type}
+      </Badge>
+    );
+  }
+  if (type === "Acknowledgement") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-purple-250 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.1)] dark:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-[12px] px-3 py-1 font-semibold"
+        dot
+      >
+        {type}
+      </Badge>
+    );
+  }
+  if (type === "Reply") {
+    return (
+      <Badge variant="success" className="text-[12px] px-3 py-1 font-semibold shadow-sm" dot>
+        {type}
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-[12px] px-3 py-1 font-semibold shadow-sm" dot>
+      {type}
+    </Badge>
+  );
+}
+
 function DocumentRow({
   doc,
   canEdit,
@@ -71,12 +104,15 @@ function DocumentRow({
   pending: boolean;
 }) {
   const ex = doc.ai_extracted ?? null;
+  const ocrProcessing = doc.ocr_status === "Processing" || doc.ocr_status === "Pending";
+  const aiProcessing = doc.ai_status === "Processing" || doc.ai_status === "Pending";
+
   return (
     <div className="rounded-lg border p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Badge variant="outline">{doc.doc_type}</Badge>
+            <DocTypeBadge type={doc.doc_type} />
             <span className="text-sm font-medium">{doc.title || "Untitled document"}</span>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -87,8 +123,20 @@ function DocumentRow({
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <Badge variant={statusVariant(doc.ocr_status)}>OCR: {doc.ocr_status}</Badge>
-          <Badge variant={statusVariant(doc.ai_status)}>AI: {doc.ai_status}</Badge>
+          <Badge
+            variant={statusVariant(doc.ocr_status)}
+            className="text-[12px] px-3 py-1 font-semibold shadow-sm"
+            dot={ocrProcessing}
+          >
+            OCR: {doc.ocr_status}
+          </Badge>
+          <Badge
+            variant={statusVariant(doc.ai_status)}
+            className="text-[12px] px-3 py-1 font-semibold shadow-sm"
+            dot={aiProcessing}
+          >
+            AI: {doc.ai_status}
+          </Badge>
         </div>
       </div>
 

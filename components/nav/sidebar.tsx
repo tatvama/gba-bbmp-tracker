@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, NAV_SECTIONS } from "./nav-items";
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const activeHref = NAV_ITEMS.map((i) => i.href)
     .filter((href) =>
@@ -17,21 +18,37 @@ export function Sidebar({ className }: { className?: string }) {
   const NavLink = ({ item }: { item: (typeof NAV_ITEMS)[number] }) => {
     const Icon = item.icon;
     const active = item.href === activeHref;
+
+    const handleClick = (e: React.MouseEvent) => {
+      // Avoid intercepting modifier clicks (Ctrl+Click, CMD+Click, etc.)
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      
+      e.preventDefault();
+      if (typeof document !== "undefined" && (document as any).startViewTransition) {
+        (document as any).startViewTransition(() => {
+          router.push(item.href);
+        });
+      } else {
+        router.push(item.href);
+      }
+    };
+
     return (
       <li className="relative">
         {active && (
           <span
             aria-hidden
-            className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-[60%] w-[3px] rounded-r-full bg-primary"
+            className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-[60%] w-[3.5px] rounded-r-md bg-primary"
           />
         )}
         <Link
           href={item.href}
+          onClick={handleClick}
           aria-current={active ? "page" : undefined}
           className={cn(
             "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150",
             active
-              ? "bg-primary/[0.08] font-semibold text-primary"
+              ? "bg-primary/[0.08] dark:bg-primary/[0.12] font-bold text-primary"
               : "font-medium text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground/80",
           )}
         >
