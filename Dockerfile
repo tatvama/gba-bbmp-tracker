@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Tell puppeteer to skip its own Chrome download and use system Chromium instead
+# puppeteer v20+ uses PUPPETEER_SKIP_DOWNLOAD (older PUPPETEER_SKIP_CHROMIUM_DOWNLOAD is ignored)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
