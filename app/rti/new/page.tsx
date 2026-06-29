@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { RtiQuickCreateForm } from "@/components/rti/rti-quick-create-form";
+import { RtiNewModes } from "@/components/rti/rti-new-modes";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
 import { Scale, Calendar } from "lucide-react";
@@ -95,7 +95,7 @@ export default async function NewRtiPage() {
       {/* Grid layout (Form + Side Info Panel) */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <RtiQuickCreateForm />
+          <RtiNewModes />
         </div>
         <div className="lg:col-span-1">
           {/* 9. SIDE INFORMATION PANEL (Desktop/Tablet) */}

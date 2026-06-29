@@ -18,8 +18,17 @@ import { uploadBuffer, downloadBuffer, getSignedUrl, removeObject } from "@/lib/
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { analyzeRtiAcknowledgement } from "@/lib/ai/rti-acknowledgement-analyzer";
 import { summarizeRtiDocument } from "@/lib/ai/rti-document-summarizer";
-import { buildMergedPdf } from "@/lib/pdf/merge";
+import { detectRtiLetters } from "@/lib/ai/rti-letter-detector";
+import { isAiConfigured } from "@/lib/ai/provider";
+import { buildMergedPdf, extractPdfPages } from "@/lib/pdf/merge";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
+import { randomUUID } from "node:crypto";
+import type {
+  AnalyzeRtiResult,
+  AnalyzedLetter,
+  CommitLetterInput,
+  CommitRtiLettersResult,
+} from "@/lib/rti/letter-import";
 
 function genRef(prefix: string): string {
   const year = new Date().getFullYear();
@@ -1125,11 +1134,250 @@ function buildExtracted(summary: Awaited<ReturnType<typeof summarizeRtiDocument>
   return {
     authority: summary.authority,
     subject: summary.subject,
+    category: summary.category,
     referenceNumber: summary.referenceNumber,
     documentDate: summary.documentDate,
     keyDates: summary.keyDates,
     documentType: summary.documentType,
   };
+}
+
+// ── Multi-letter import (one PDF holding several RTIs → one case per letter) ───
+
+/** Like the OCR half of {@link ocrAndSummarize}, but exposes per-page text so the
+ *  commit step can slice it per detected letter without re-running OCR. */
+async function renderAndOcr(pdfBuffer: Buffer): Promise<{
+  combined: string;
+  perPage: string[];
+  pageImages: { buffer: Buffer; mimeType: string }[];
+}> {
+  const pages = await pdfRenderer.renderPages(pdfBuffer);
+  const pageImages = pages.map((p) => ({ buffer: p.buffer, mimeType: p.mimeType }));
+
+  const perPage: string[] = [];
+  for (const pi of pageImages) {
+    const r = await runOcr({ buffer: pi.buffer, mimeType: pi.mimeType, language: "eng+kan" });
+    perPage.push(r.cleanText || "");
+  }
+  const combined =
+    perPage.length > 1
+      ? perPage.map((t, i) => `--- Page ${i + 1} ---\n${t}\n`).join("\n")
+      : (perPage[0] || "");
+  return { combined, perPage, pageImages };
+}
+
+/** Join a 1-indexed inclusive slice of per-page OCR text, re-adding page markers. */
+function sliceOcr(perPage: string[], startPage: number, endPage: number): string {
+  const seg = perPage.slice(startPage - 1, endPage);
+  if (seg.length <= 1) return seg[0] || "";
+  return seg.map((t, i) => `--- Page ${startPage + i} ---\n${t}\n`).join("\n");
+}
+
+/** Collision-resistant case ref — randomUUID-based (Date.now() can repeat in a loop). */
+function genUniqueRef(): string {
+  const year = new Date().getFullYear();
+  const suffix = randomUUID().replace(/-/g, "").slice(0, 5).toUpperCase();
+  return `RTI-${year}-${suffix}`;
+}
+
+/**
+ * Phase 1 of multi-letter import: merge the uploaded file(s) into one PDF, store
+ * it, OCR every page once, and ask the AI to find the letter boundaries. Creates
+ * NO cases — returns the detected letters (with per-letter OCR sliced in) for the
+ * user to review/edit before {@link commitRtiLettersAction} creates the cases.
+ */
+export async function analyzeRtiOfficeCopyAction(formData: FormData): Promise<AnalyzeRtiResult> {
+  try {
+    await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  if (!isAiConfigured()) {
+    return {
+      error:
+        "AI is not configured on the server, so letters can't be detected automatically. Set ANTHROPIC_API_KEY (and AI_PROVIDER=anthropic) and try again.",
+    };
+  }
+
+  let rawFiles = formData.getAll("files");
+  if (rawFiles.length === 0) rawFiles = formData.getAll("file");
+  const files = rawFiles.filter(
+    (x): x is File =>
+      typeof x === "object" && x !== null && typeof (x as { arrayBuffer?: unknown }).arrayBuffer === "function",
+  );
+  if (files.length === 0) return { error: "No files provided" };
+
+  const parts: { buffer: Buffer; mimeType: string }[] = [];
+  for (const f of files) {
+    const isImage = f.type.startsWith("image/");
+    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    if (!isImage && !isPdf) {
+      return { error: `Unsupported file "${f.name}". Use images (JPEG, PNG, WebP) or PDF.` };
+    }
+    parts.push({ buffer: Buffer.from(await f.arrayBuffer()), mimeType: isPdf ? "application/pdf" : f.type });
+  }
+
+  try {
+    const { pdf, pageCount } = await buildMergedPdf(parts);
+
+    // Hold the merged PDF under a staging prefix until the user commits.
+    const storagePath = `_imports/${randomUUID()}.pdf`;
+    await uploadBuffer({
+      bucket: STORAGE_BUCKETS.rti,
+      path: storagePath,
+      body: pdf,
+      contentType: "application/pdf",
+    });
+
+    const { combined, perPage, pageImages } = await renderAndOcr(pdf);
+    const detected = await detectRtiLetters({ pageImages, ocrText: combined, pageCount });
+    const letters: AnalyzedLetter[] = detected.map((l) => ({
+      ...l,
+      ocrText: sliceOcr(perPage, l.startPage, l.endPage),
+    }));
+
+    return { success: true, storagePath, pageCount, letters };
+  } catch (e) {
+    console.error("[analyzeRtiOfficeCopyAction]", e);
+    return { error: e instanceof Error ? e.message : "Analysis failed" };
+  }
+}
+
+/**
+ * Phase 2 of multi-letter import: for each (reviewed) letter, create a new RTI
+ * case, split its pages out of the staged PDF, attach it as an Application
+ * document, and seed the filing date / reply clock. Reuses the OCR text captured
+ * in phase 1 — only re-renders page images for the per-letter AI summary.
+ */
+export async function commitRtiLettersAction(params: {
+  storagePath: string;
+  letters: CommitLetterInput[];
+}): Promise<CommitRtiLettersResult> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  const { storagePath, letters } = params;
+  if (!storagePath || !Array.isArray(letters) || letters.length === 0) {
+    return { error: "Nothing to create." };
+  }
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+  const userName = profile?.name || user.email || "Unknown User";
+
+  const stagingPdf = await downloadBuffer(STORAGE_BUCKETS.rti, storagePath);
+  if (!stagingPdf) return { error: "The uploaded file is no longer available — please re-upload." };
+
+  // Render all page images once (cheap vs OCR) for the per-letter AI summary.
+  let pageImages: { buffer: Buffer; mimeType: string }[] = [];
+  try {
+    const pages = await pdfRenderer.renderPages(stagingPdf);
+    pageImages = pages.map((p) => ({ buffer: p.buffer, mimeType: p.mimeType }));
+  } catch (e) {
+    console.warn("[commitRtiLettersAction] page render failed; summarising from OCR text only", e);
+  }
+
+  const rules = await getDeadlineRules();
+  const createdIds: string[] = [];
+
+  try {
+    for (const letter of letters) {
+      const subject = (letter.subject || "").trim() || "Untitled RTI";
+      const dateFiled = (letter.documentDate || "").trim() || todayIso();
+
+      // 1. Create the case (Application copy ⇒ status "Filed", filing clock seeded).
+      const input = {
+        subject,
+        category: letter.category ?? null,
+        publicAuthority: letter.authority ?? null,
+        pioName: letter.pioName ?? null,
+        pioDesignation: letter.pioDesignation ?? null,
+        status: "Filed",
+        priority: "Medium",
+        wardType: "BBMP",
+        dateFiled,
+        isLifeLiberty: false,
+      };
+      const deadlines = computeRtiDeadlines(
+        { dateReceived: null, dateFiled, isLifeLiberty: false, replyDate: null },
+        rules,
+      );
+      const row = {
+        ...(await rtiToRow(supabase, input, deadlines)),
+        internal_ref: genUniqueRef(),
+        created_by: user.id,
+        updated_by: user.id,
+      };
+      const { data: created, error: cErr } = await supabase
+        .from("rti_applications")
+        .insert(row)
+        .select("id")
+        .single();
+      if (cErr || !created) throw new Error(cErr?.message || "Failed to create RTI case");
+      const newId = created.id as string;
+      createdIds.push(newId);
+
+      await writeAudit(supabase, {
+        entityType: "rti",
+        entityId: newId,
+        changedBy: user.id,
+        changes: [{ field: "created", oldValue: null, newValue: subject }],
+      });
+
+      // 2. Carve this letter's pages out of the staged PDF and store them.
+      const split = await extractPdfPages(stagingPdf, letter.startPage, letter.endPage);
+      const splitPath = `${newId}/application-${Date.now().toString(36)}.pdf`;
+      await uploadBuffer({
+        bucket: STORAGE_BUCKETS.rti,
+        path: splitPath,
+        body: split.pdf,
+        contentType: "application/pdf",
+      });
+
+      // 3. Summarise the letter — reuse phase-1 OCR text + the rendered pages.
+      const letterImages = pageImages.slice(letter.startPage - 1, letter.endPage);
+      const summary = await summarizeRtiDocument({
+        images: letterImages,
+        ocrText: letter.ocrText || "",
+        rti: { subject, internalRef: row.internal_ref, publicAuthority: letter.authority ?? null },
+      });
+
+      // 4. Attach the split as this case's Application document.
+      await supabase.from("rti_documents").insert({
+        rti_id: newId,
+        doc_type: "Application",
+        title: null,
+        pdf_path: splitPath,
+        page_count: split.pageCount,
+        file_size: split.pdf.length,
+        source: "upload",
+        doc_date: (letter.documentDate || "").trim() || null,
+        ocr_text: letter.ocrText || null,
+        ocr_confidence: null,
+        ocr_status: (letter.ocrText || "").trim() ? "Completed" : "Skipped",
+        ai_summary: summary.summary,
+        ai_extracted: buildExtracted(summary),
+        ai_status: "Completed",
+        uploaded_by: user.id,
+        uploader_name: userName,
+      });
+
+      revalidatePath(`/rti/${newId}`);
+    }
+
+    // The staged bundle is now redundant (each letter has its own split PDF).
+    await removeObject(STORAGE_BUCKETS.rti, storagePath);
+    revalidatePath("/rti");
+    return { success: true, createdIds, primaryId: createdIds[0] };
+  } catch (e) {
+    console.error("[commitRtiLettersAction]", e);
+    return { error: e instanceof Error ? e.message : "Failed to create cases", createdIds };
+  }
 }
 
 /**
@@ -1178,7 +1426,7 @@ export async function uploadRtiDocumentAction(
 
   const { data: rti } = await supabase
     .from("rti_applications")
-    .select("id, subject, internal_ref, public_authority, date_filed, date_received, reply_date, is_life_liberty, status")
+    .select("id, subject, internal_ref, public_authority, category, date_filed, date_received, reply_date, is_life_liberty, status")
     .eq("id", rtiId)
     .single();
   if (!rti) return { error: "RTI application not found" };
@@ -1261,6 +1509,22 @@ export async function uploadRtiDocumentAction(
             isLifeLiberty: rti.is_life_liberty,
             replyDate: rti.reply_date,
           };
+        }
+
+        // Auto-extract and update Subject, Public Authority, and Category from Acknowledgement
+        if (docType === "Acknowledgement") {
+          if (summary.subject && summary.subject.trim()) {
+            patch.subject = summary.subject.trim();
+            changes.push({ field: "subject", oldValue: rti.subject, newValue: summary.subject.trim() });
+          }
+          if (summary.authority && summary.authority.trim()) {
+            patch.public_authority = summary.authority.trim();
+            changes.push({ field: "public_authority", oldValue: rti.public_authority, newValue: summary.authority.trim() });
+          }
+          if (summary.category && summary.category.trim()) {
+            patch.category = summary.category.trim();
+            changes.push({ field: "category", oldValue: rti.category, newValue: summary.category.trim() });
+          }
         }
       } else if (docType === "Reply") {
         const replyDate = rti.reply_date || eventDate;
