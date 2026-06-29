@@ -1,119 +1,137 @@
-"use client";
-
 import * as React from "react";
-import { FileImage, FileText } from "lucide-react";
+import { Eye, FileDown, FileImage, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
-export interface FilePreviewProps {
+interface FilePreviewProps {
   imageUrl: string | null;
   isPdf: boolean;
-  alt?: string;
-  className?: string;
+  isLoading: boolean;
+  originalFileName?: string;
 }
 
-type PdfLoadState = "placeholder" | "loading" | "loaded";
-
-/**
- * Renders the acknowledgement file preview.
- *
- * - Images are shown directly with lazy loading.
- * - PDFs use a two-step lazy load (placeholder → click → iframe) to avoid
- *   blocking the main thread on large documents.
- * - A skeleton is shown while imageUrl is null (signed URL not yet available).
- * - Sticky on md+ screens so the preview stays in view while scrolling.
- *
- * Wrapped in React.memo because imageUrl is stable between uploads and
- * re-rendering after an iframe has loaded is expensive.
- */
-export const FilePreview = React.memo(function FilePreview({
+export function FilePreview({
   imageUrl,
   isPdf,
-  alt = "RTI Acknowledgement Copy",
-  className,
+  isLoading,
+  originalFileName = "acknowledgement",
 }: FilePreviewProps) {
-  const [pdfState, setPdfState] = React.useState<PdfLoadState>("placeholder");
+  const [loadPdf, setLoadPdf] = React.useState(false);
+  const [hasError, setHasError] = React.useState(false);
 
-  // Reset PDF state when a new URL arrives (e.g. after replace).
+  // Reset states when URL changes
   React.useEffect(() => {
-    if (isPdf) setPdfState("placeholder");
-  }, [imageUrl, isPdf]);
+    setLoadPdf(false);
+    setHasError(false);
+  }, [imageUrl]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 md:sticky md:top-6 self-start w-full">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block font-mono">
+          Acknowledgement File
+        </span>
+        <Skeleton className="w-full aspect-[4/3] min-h-[250px] rounded-xl" />
+        <Skeleton className="h-8 w-full rounded-md" />
+      </div>
+    );
+  }
+
+  const handleDownload = async () => {
+    if (!imageUrl) return;
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = originalFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      // Fallback: open in new tab if blob download fails
+      window.open(imageUrl, "_blank");
+    }
+  };
 
   return (
-    <div className={cn("space-y-3", className)}>
-      <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">
+    <div className="space-y-3 md:sticky md:top-6 self-start w-full">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block font-mono">
         Acknowledgement File
       </span>
 
-      {/* Preview box */}
-      <div className="relative flex min-h-[220px] w-full items-center justify-center overflow-hidden rounded-lg border bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-900/20">
-        {/* No URL yet — skeleton */}
-        {!imageUrl && (
-          <Skeleton className="absolute inset-0 rounded-lg" />
-        )}
-
-        {/* Image */}
-        {imageUrl && !isPdf && (
-          <img
-            src={imageUrl}
-            alt={alt}
-            loading="lazy"
-            className="max-h-full max-w-full rounded-md object-contain shadow-sm"
-          />
-        )}
-
-        {/* PDF — placeholder state */}
-        {imageUrl && isPdf && pdfState === "placeholder" && (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <FileText className="h-10 w-10 text-slate-400" aria-hidden="true" />
-            <p className="text-xs text-muted-foreground">PDF document uploaded</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setPdfState("loading")}
-              aria-label="Load PDF preview"
-            >
-              Load PDF Preview
-            </Button>
+      <div className="relative border border-slate-200/80 rounded-xl bg-slate-50/50 p-2 overflow-hidden aspect-[4/3] flex flex-col items-center justify-center dark:border-slate-800 dark:bg-slate-900/20 w-full min-h-[250px] shadow-sm">
+        {hasError ? (
+          <div className="flex flex-col items-center text-center p-4 text-rose-500">
+            <AlertCircle className="h-10 w-10 mb-2" />
+            <span className="text-xs font-semibold">Failed to load preview</span>
+            <p className="text-[10px] text-slate-400 mt-1">Please try viewing the original file instead.</p>
           </div>
-        )}
-
-        {/* PDF — loading state */}
-        {imageUrl && isPdf && pdfState === "loading" && (
-          <>
-            <Skeleton className="absolute inset-0 rounded-lg" />
+        ) : !imageUrl ? (
+          <div className="flex flex-col items-center text-muted-foreground text-center p-4">
+            <FileImage className="h-10 w-10 mb-2 text-slate-300 dark:text-slate-700" />
+            <span className="text-xs font-medium">No preview available</span>
+          </div>
+        ) : isPdf ? (
+          !loadPdf ? (
+            <div className="flex flex-col items-center text-center p-4">
+              <FileText className="h-10 w-10 mb-3 text-indigo-500" />
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">PDF Document</span>
+              <p className="text-[10px] text-slate-400 mt-1 mb-4">Click to load the interactive PDF previewer.</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setLoadPdf(true)}
+                className="text-xs font-medium"
+              >
+                Load Preview
+              </Button>
+            </div>
+          ) : (
             <iframe
               src={imageUrl}
+              className="w-full h-full border-0 rounded-lg bg-white"
               title="PDF Preview"
-              aria-label="PDF Preview"
-              className="absolute inset-0 h-full w-full rounded-md border-0 opacity-0"
-              onLoad={() => setPdfState("loaded")}
+              onError={() => setHasError(true)}
             />
-          </>
-        )}
-
-        {/* PDF — loaded state */}
-        {imageUrl && isPdf && pdfState === "loaded" && (
-          <iframe
+          )
+        ) : (
+          <img
             src={imageUrl}
-            title="PDF Preview"
-            aria-label="PDF Preview"
-            className="h-full w-full rounded-md border-0"
-            style={{ minHeight: 220 }}
+            alt="RTI Acknowledgement Copy"
+            className="max-h-full max-w-full object-contain rounded-lg shadow-sm"
+            onError={() => setHasError(true)}
           />
-        )}
-
-        {/* Explicit no-preview fallback (imageUrl truthy but rendering failed) */}
-        {!imageUrl && (
-          <div className="flex flex-col items-center text-muted-foreground">
-            <FileImage className="mb-1 h-10 w-10" aria-hidden="true" />
-            <span className="text-xs">No preview available</span>
-          </div>
         )}
       </div>
 
+      {imageUrl && (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs font-medium gap-1.5 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            onClick={() => window.open(imageUrl, "_blank")}
+            aria-label="View original file full size"
+          >
+            <Eye className="h-3.5 w-3.5 text-slate-400" />
+            <span>Full Size</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs font-medium gap-1.5 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            onClick={handleDownload}
+            aria-label="Download original file"
+          >
+            <FileDown className="h-3.5 w-3.5 text-slate-400" />
+            <span>Download</span>
+          </Button>
+        </div>
+      )}
     </div>
   );
-});
+}
