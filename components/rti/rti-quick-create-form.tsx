@@ -80,7 +80,7 @@ export function RtiQuickCreateForm() {
                 required
                 minLength={3}
                 placeholder="e.g. Road work bills for Jayanagar 4th Block"
-                className="h-11 px-3.5 rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-850 focus-visible:ring-primary placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                className="h-11 px-3.5 rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-primary placeholder:text-slate-400 dark:placeholder:text-slate-600"
               />
               {state?.fieldErrors?.subject && (
                 <p className="text-xs font-medium text-rose-600 dark:text-rose-400 mt-1">
@@ -105,7 +105,7 @@ export function RtiQuickCreateForm() {
                 id="publicAuthority"
                 name="publicAuthority"
                 placeholder="e.g. BBMP South Zone — PIO, Engineering"
-                className="h-11 px-3.5 rounded-lg bg-white dark:bg-slate-955 border-slate-200 dark:border-slate-850 focus-visible:ring-primary placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                className="h-11 px-3.5 rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-primary placeholder:text-slate-400 dark:placeholder:text-slate-600"
               />
             </div>
           </div>
