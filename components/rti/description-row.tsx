@@ -1,58 +1,54 @@
-"use client";
-
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-export interface DescriptionRowProps {
+interface DescriptionRowProps {
   label: string;
-  children: React.ReactNode;
-  className?: string;
+  value: React.ReactNode;
+  icon?: React.ReactNode;
+  badge?: React.ReactNode;
+  onCopy?: () => void;
 }
 
-/**
- * Horizontal label/value row using a 12-column grid.
- * Label occupies 4 columns; value occupies the remaining 8.
- * Callers control typography (font-mono, font-medium, etc.) on children.
- */
-export function DescriptionRow({ label, children, className }: DescriptionRowProps) {
+export function DescriptionRow({
+  label,
+  value,
+  icon,
+  badge,
+  onCopy,
+}: DescriptionRowProps) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    if (onCopy) {
+      onCopy();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
-    <div
-      className={cn(
-        "grid grid-cols-12 gap-x-3 border-b border-border/40 py-2.5 last:border-0",
-        className,
-      )}
-    >
-      <dt className="col-span-4 text-sm text-muted-foreground self-start pt-px">
-        {label}
+    <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-1 py-2.5 border-b border-slate-50 dark:border-slate-800/60 last:border-0 min-w-0 items-start">
+      <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 sm:col-span-4 lg:col-span-5 flex items-center gap-1.5 pt-0.5 whitespace-normal break-words">
+        {icon && <span className="text-slate-400 shrink-0">{icon}</span>}
+        <span>{label}</span>
       </dt>
-      <dd className="col-span-8 min-w-0 break-words whitespace-normal text-sm font-medium text-slate-700 dark:text-slate-300">
-        {children}
+      <dd className="text-xs font-semibold text-slate-800 dark:text-slate-200 sm:col-span-8 lg:col-span-7 min-w-0 break-words whitespace-normal flex flex-wrap items-center gap-1.5">
+        <span className="flex-1 min-w-0 break-words overflow-wrap-anywhere">{value}</span>
+        {badge && <span className="shrink-0">{badge}</span>}
+        {onCopy && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleCopy}
+            className="h-5 w-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
+            aria-label={`Copy ${label}`}
+          >
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+          </Button>
+        )}
       </dd>
-    </div>
-  );
-}
-
-/**
- * Optional container that wraps a set of DescriptionRow items in a <dl>.
- * Accepts an optional heading rendered above the rows.
- */
-export function DescriptionList({
-  heading,
-  children,
-  className,
-}: {
-  heading?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("space-y-0", className)}>
-      {heading && (
-        <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          {heading}
-        </p>
-      )}
-      <dl>{children}</dl>
     </div>
   );
 }
