@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadBuffer, uploadBuffer } from "@/lib/storage/supabase-upload";
 import { runOcr } from "@/lib/ocr/ocr-service";
+import { ocrAnyDocument } from "@/lib/ocr/process-job-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { analyzeComplaintDocument } from "@/lib/ai/complaint-document-analyzer";
 import { getComplaintSettings } from "@/lib/settings";
@@ -51,11 +52,14 @@ export async function processDocumentOcr(
   }
 
   const settings = await getComplaintSettings();
-  const res = await runOcr({
-    buffer,
-    mimeType: doc.mime_type ?? "application/octet-stream",
-    language: doc.ocr_language || settings.ocrLanguage,
-  });
+  const mime = doc.mime_type ?? "application/octet-stream";
+  const language = doc.ocr_language || settings.ocrLanguage;
+  // PDFs (e.g. merged scans/acknowledgements) are rasterised page-by-page; runOcr
+  // alone skips PDFs. Images keep the processed-image + thumbnail path.
+  const res =
+    mime === "application/pdf"
+      ? { ...(await ocrAnyDocument(buffer, mime, language)), language, processedImage: undefined as Buffer | undefined, thumbnail: undefined as Buffer | undefined, error: undefined as string | undefined }
+      : await runOcr({ buffer, mimeType: mime, language });
 
   // Upload processed image + thumbnail (best-effort).
   let processedPath: string | null = null;

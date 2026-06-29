@@ -454,6 +454,7 @@ export const STORAGE_BUCKETS = {
   processed: "complaint-processed-images",
   exports: "complaint-exports",
   rti: "rti-documents",
+  jobDocuments: "job-documents",
 } as const;
 
 /** Default complaint module settings (mirrors app_settings 'complaint_settings'). */
@@ -474,13 +475,24 @@ export interface ComplaintSettings {
 export const COMPLAINT_DRAFT_KINDS = {
   followup_letter: "Follow-up letter",
   whatsapp: "WhatsApp message to officer",
-  escalation_letter: "Escalation letter",
+  escalation_letter: "Escalation letter (next authority)",
   reminder_email: "Reminder email",
   rti_from_complaint: "RTI based on this complaint",
   action_taken_request: "Action Taken Report request",
   site_inspection_request: "Site inspection request",
+  lokayukta_complaint: "Lokayukta complaint",
+  chief_secretary_letter: "Chief Secretary / UDD letter",
+  records_preservation: "Records-preservation request",
 } as const;
 export type ComplaintDraftKind = keyof typeof COMPLAINT_DRAFT_KINDS;
+
+/** Draft kinds that escalate to a higher forum — these pass the safe-language gate. */
+export const ESCALATION_DRAFT_KINDS: ComplaintDraftKind[] = [
+  "escalation_letter",
+  "lokayukta_complaint",
+  "chief_secretary_letter",
+  "records_preservation",
+];
 
 export const DEFAULT_COMPLAINT_SETTINGS: ComplaintSettings = {
   caseNumberPrefix: "DM-CMP",

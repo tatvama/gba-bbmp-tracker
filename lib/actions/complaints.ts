@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError, type SessionUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getSignedUrl } from "@/lib/storage/supabase-upload";
+import { getSignedUrl, uploadBuffer, buildPath, validateUpload } from "@/lib/storage/supabase-upload";
+import { buildMergedPdf } from "@/lib/pdf/merge";
+import { processDocumentOcr } from "@/lib/ocr/process-document";
 import { writeAudit, diffFields } from "@/lib/audit";
 import {
   complaintSchema,
@@ -15,8 +17,11 @@ import {
 import {
   COMPLAINT_WRITE_ROLES,
   COMPLAINT_VERIFY_ROLES,
+  ESCALATION_DRAFT_KINDS,
+  STORAGE_BUCKETS,
   type UserRole,
 } from "@/lib/constants";
+import { sanitizeDraft } from "@/lib/letters/safe-language";
 import { getComplaintSettings } from "@/lib/settings";
 import { addDays } from "@/lib/rti-deadlines";
 import { generateText } from "@/lib/ai/provider";
@@ -546,6 +551,105 @@ export async function setDocumentVerification(documentId: string, complaintId: s
   return { success: true, id: complaintId };
 }
 
+// ── Capture-first scan upload (live photos / PDF → one optimised PDF) ─────────
+
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "document";
+}
+
+/** Map an uploaded document type to a timeline event type (CHECK-constrained). */
+function docTypeToEvent(docType: string): string {
+  const t = docType.toLowerCase();
+  if (t.includes("acknowledge")) return "Acknowledged";
+  if (t.includes("reply")) return "Reply Received";
+  if (t.includes("action")) return "Action Taken";
+  if (t.includes("photo")) return "Photo Evidence";
+  return "Note";
+}
+
+/**
+ * Capture-first upload: merge live-camera photos and/or a scanned PDF into ONE
+ * optimised PDF (sharp normalises photos like a scan), store it, then OCR + AI
+ * summarise via the shared pipeline. Used for acknowledgements / replies / reports.
+ */
+export async function uploadComplaintScanAction(
+  complaintId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; documentId?: string; ocrStatus?: string; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const { user, admin } = a;
+
+  const docType = String(formData.get("documentType") ?? "Complaint acknowledgement");
+  const title = (formData.get("title") as string) || null;
+  const docDate = (formData.get("documentDate") as string) || null;
+  const files = formData.getAll("files").filter((f): f is File => f instanceof File);
+  if (!files.length) return { ok: false, error: "No pages provided." };
+
+  const settings = await getComplaintSettings();
+  const maxBytes = (settings.maxUploadMb || 15) * 1024 * 1024;
+
+  const parts: { buffer: Buffer; mimeType: string }[] = [];
+  for (const f of files) {
+    const v = validateUpload(f.type || "", f.size, maxBytes);
+    if (!v.ok) return { ok: false, error: v.error };
+    parts.push({ buffer: Buffer.from(await f.arrayBuffer()), mimeType: f.type || "application/octet-stream" });
+  }
+
+  let merged: { pdf: Buffer; pageCount: number };
+  try {
+    merged = await buildMergedPdf(parts);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not merge the pages into a PDF." };
+  }
+
+  const fileName = `${slugify(docType)}.pdf`;
+  const path = buildPath(complaintId, fileName, Date.now(), Math.random().toString(36).slice(2, 8));
+  try {
+    await uploadBuffer({ bucket: STORAGE_BUCKETS.documents, path, body: merged.pdf, contentType: "application/pdf" });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
+  }
+
+  const { data: doc, error } = await admin
+    .from("complaint_documents")
+    .insert({
+      complaint_id: complaintId,
+      document_type: docType,
+      title: title ?? docType,
+      original_file_name: fileName,
+      storage_bucket: STORAGE_BUCKETS.documents,
+      storage_path: path,
+      mime_type: "application/pdf",
+      file_size: merged.pdf.byteLength,
+      page_count: merged.pageCount,
+      uploaded_by: user.id,
+      document_date: docDate,
+      ocr_status: "Processing",
+      ocr_language: settings.ocrLanguage,
+    })
+    .select("id")
+    .single();
+  if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the document." };
+  const documentId = doc.id as string;
+
+  await addTimeline(admin, { complaintId, eventType: docTypeToEvent(docType), title: `Uploaded: ${docType}`, createdBy: user.id, relatedDocumentId: documentId });
+  await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "scan_uploaded", oldValue: null, newValue: docType }] });
+
+  // OCR (PDF-capable) + AI summary. Never blocks the upload.
+  let ocrStatus = "Processing";
+  try {
+    const r = await processDocumentOcr(documentId, { buffer: merged.pdf, analyze: settings.aiAutoSummary });
+    ocrStatus = r.status;
+  } catch (e) {
+    console.error("[complaint-scan] OCR failed (upload preserved)", e);
+    ocrStatus = "Failed";
+  }
+
+  revalidatePath(`/complaints/${complaintId}`);
+  return { ok: true, documentId, ocrStatus };
+}
+
 // ── AI drafts ───────────────────────────────────────────────────────────────
 
 function complaintContext(c: Record<string, any>): string {
@@ -565,12 +669,58 @@ function complaintContext(c: Record<string, any>): string {
   ].filter(Boolean).join("\n");
 }
 
+/** Build a dated case-history block (chronology + replies + actions + escalations +
+ *  linked job-audit findings) so escalation drafts argue from the real timeline. */
+async function buildCaseHistory(admin: SupabaseClient, complaintId: string, jobNumber: string | null): Promise<string> {
+  const [timeline, replies, actions, escalations] = await Promise.all([
+    admin.from("complaint_timeline").select("event_date,event_type,title,summary").eq("complaint_id", complaintId).order("event_date", { ascending: true }).limit(40),
+    admin.from("complaint_replies").select("reply_date,replied_by_name,reply_summary,issues_remaining,is_satisfactory").eq("complaint_id", complaintId).order("reply_date", { ascending: true }).limit(20),
+    admin.from("complaint_action_taken").select("action_taken_date,action_summary,pending_work").eq("complaint_id", complaintId).order("action_taken_date", { ascending: true }).limit(20),
+    admin.from("escalation_logs").select("escalated_on,to_level,reason,response_received").eq("entity_id", complaintId).eq("entity_type", "complaint").order("escalated_on", { ascending: true }).limit(20),
+  ]);
+
+  const lines: string[] = [];
+  const tl = timeline.data ?? [];
+  if (tl.length) {
+    lines.push("Chronology:");
+    for (const e of tl) lines.push(`  - ${e.event_date ?? "?"} [${e.event_type}] ${e.title}${e.summary ? `: ${e.summary}` : ""}`);
+  }
+  for (const r of replies.data ?? []) {
+    lines.push(`Reply (${r.reply_date ?? "?"}${r.replied_by_name ? `, ${r.replied_by_name}` : ""}): ${r.reply_summary ?? ""}${r.issues_remaining ? ` | Unresolved: ${r.issues_remaining}` : ""}${r.is_satisfactory === false ? " | marked NOT satisfactory" : ""}`);
+  }
+  for (const ac of actions.data ?? []) {
+    lines.push(`Action taken (${ac.action_taken_date ?? "?"}): ${ac.action_summary ?? ""}${ac.pending_work ? ` | Still pending: ${ac.pending_work}` : ""}`);
+  }
+  for (const es of escalations.data ?? []) {
+    lines.push(`Escalation (${es.escalated_on ?? "?"}) to ${es.to_level ?? "?"}: ${es.reason ?? ""}${es.response_received ? "" : " | no response recorded"}`);
+  }
+
+  // Linked forensic job-audit findings (top, by risk) — gives concrete grounds.
+  if (jobNumber) {
+    const { data: audit } = await admin
+      .from("job_audits")
+      .select("report, risk_band, risk_score, total_exposure")
+      .eq("job_number", jobNumber)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const report = (audit?.report ?? null) as { rankedFindings?: { title?: string; detail?: string; recordToDemand?: string }[] } | null;
+    const findings = report?.rankedFindings ?? [];
+    if (findings.length) {
+      lines.push(`\nForensic job audit (job ${jobNumber}, risk ${audit?.risk_band ?? "?"} ${audit?.risk_score ?? ""}${audit?.total_exposure ? `, possible exposure ₹${audit.total_exposure}` : ""}). Top documented suspicions (records to demand):`);
+      for (const f of findings.slice(0, 12)) lines.push(`  - ${f.title ?? ""}${f.recordToDemand ? ` → demand: ${f.recordToDemand}` : ""}`);
+    }
+  }
+
+  return lines.length ? lines.join("\n") : "No case history recorded yet.";
+}
+
 export async function generateComplaintDraft(input: {
   complaintId: string;
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
-}): Promise<{ ok: boolean; text?: string; error?: string }> {
+}): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
   const { admin } = a;
@@ -580,14 +730,31 @@ export async function generateComplaintDraft(input: {
     .eq("id", input.complaintId)
     .single();
   if (!c) return { ok: false, error: "Complaint not found." };
+
+  // Escalation drafts argue from the full chronology + the forensic audit findings.
+  const isEscalation = ESCALATION_DRAFT_KINDS.includes(input.kind);
+  let context = complaintContext(c as Record<string, any>);
+  if (isEscalation) {
+    const history = await buildCaseHistory(admin, input.complaintId, (c as { job_number?: string | null }).job_number ?? null);
+    context = `${context}\n\n=== CASE HISTORY ===\n${history}`;
+  }
+
   const { system, prompt } = buildComplaintDraftPrompt({
     kind: input.kind,
-    complaintContext: complaintContext(c as Record<string, any>),
+    complaintContext: context,
     tone: input.tone,
     language: input.language,
   });
   const r = await generateText({ system, prompt });
-  return { ok: r.ok, text: r.text, error: r.error };
+  if (!r.ok || !r.text) return { ok: r.ok, text: r.text, error: r.error };
+
+  // Escalation forums get the hard safe-language gate: rewrite accusatory wording
+  // into documented-suspicion phrasing, then flag anything still prohibited.
+  if (isEscalation) {
+    const { text, lint } = sanitizeDraft(r.text);
+    return { ok: true, text, lintWarning: lint.ok ? undefined : lint.errors.map((e) => e.reason).join("; ") };
+  }
+  return { ok: true, text: r.text };
 }
 
 /** Short-lived signed URL for viewing a private document (original or processed). */
