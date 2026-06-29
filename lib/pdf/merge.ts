@@ -92,3 +92,31 @@ export async function buildMergedPdf(parts: MergePart[]): Promise<MergedPdf> {
   const bytes = await doc.save();
   return { pdf: Buffer.from(bytes), pageCount };
 }
+
+/**
+ * Extract a 1-indexed, inclusive page range from a PDF into a new standalone PDF.
+ * Bounds are clamped to the source's real page count. Used by the multi-letter
+ * RTI import to carve one letter's pages out of the uploaded office-copy bundle.
+ */
+export async function extractPdfPages(
+  pdfBuffer: Buffer,
+  startPage: number,
+  endPage: number,
+): Promise<MergedPdf> {
+  const src = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+  const total = src.getPageCount();
+  if (total === 0) throw new Error("Source PDF has no pages.");
+
+  const from = Math.min(Math.max(1, Math.round(startPage || 1)), total);
+  const to = Math.min(Math.max(from, Math.round(endPage || from)), total);
+
+  const indices: number[] = [];
+  for (let i = from - 1; i <= to - 1; i++) indices.push(i);
+
+  const out = await PDFDocument.create();
+  const copied = await out.copyPages(src, indices);
+  copied.forEach((p) => out.addPage(p));
+
+  const bytes = await out.save();
+  return { pdf: Buffer.from(bytes), pageCount: out.getPageCount() };
+}
