@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireRole, AuthorizationError } from "@/lib/auth";
+import { scanDivisionVisualDuplicates } from "@/lib/forensic/job-photo-dedupe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadFromR2 } from "@/lib/storage/r2-upload";
 import { uploadBuffer, buildPath } from "@/lib/storage/supabase-upload";
@@ -346,9 +348,25 @@ export async function commitForensicImportAction(params: {
     .update({ status: "Committed", created_case_ids: createdCaseIds, created_complaint_ids: createdComplaintIds })
     .eq("id", params.batchId);
 
-  revalidatePath("/complaints/portal");
   revalidatePath("/complaints");
   revalidatePath("/complaints/import");
+  revalidatePath("/complaints/duplicate-photos");
+
+  // Auto-run cross-job duplicate-photo detection for each affected division
+  // (the photo-reuse pattern is within a division). Runs after the response so
+  // the commit returns immediately; bounded + cached inside the scan.
+  const divisions = [...new Set(selected.map((j) => j.dataset?.division?.trim()).filter(Boolean) as string[])];
+  if (divisions.length) {
+    after(async () => {
+      for (const d of divisions) {
+        try {
+          await scanDivisionVisualDuplicates(d);
+        } catch (e) {
+          console.warn("[commitForensicImportAction] auto duplicate-photo scan", d, e);
+        }
+      }
+    });
+  }
 
   return { success: true, perJob, createdComplaintIds };
 }

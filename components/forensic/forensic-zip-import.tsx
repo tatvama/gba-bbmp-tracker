@@ -38,7 +38,7 @@ const CHECKLIST: { label: string; roles: ForensicFileRole[] }[] = [
   { label: "Portal source PDFs", roles: ["portal_pdf"] },
 ];
 
-export function ForensicZipImport() {
+export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [file, setFile] = React.useState<File | null>(null);
@@ -96,7 +96,7 @@ export function ForensicZipImport() {
       }
       if (res.status === "Committed") {
         setImportParam(null);
-        router.push("/complaints/portal");
+        router.push("/complaints");
         return;
       }
       pollRef.current = setTimeout(tick, 2500); // still Processing
@@ -111,6 +111,10 @@ export function ForensicZipImport() {
       setBatchId(existing);
       setPhase("analyzing");
       poll(existing);
+    } else if (presetFile) {
+      // Auto-started by the unified upload (SmartUpload already picked the .zip).
+      setFile(presetFile);
+      void analyze(presetFile);
     }
     return () => {
       activeRef.current = false;
@@ -125,13 +129,13 @@ export function ForensicZipImport() {
     e.target.value = "";
   }
 
-  async function analyze() {
-    if (!file) return;
+  async function analyze(f: File | null = file) {
+    if (!f) return;
     setPhase("uploading");
     setError(null);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", f);
       const r = await fetch("/api/forensic-import", { method: "POST", body: fd });
       const data = (await r.json()) as { batchId?: string; error?: string };
       if (!r.ok || !data.batchId) {
@@ -174,7 +178,7 @@ export function ForensicZipImport() {
         setPhase("review");
         return;
       }
-      router.push("/complaints/portal");
+      router.push("/complaints");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Commit failed");
@@ -413,7 +417,7 @@ export function ForensicZipImport() {
         )}
 
         <div className="flex justify-end border-t border-slate-150 dark:border-slate-800/85 pt-4">
-          <Button type="button" onClick={analyze} disabled={!file} className="h-10 font-bold">
+          <Button type="button" onClick={() => analyze()} disabled={!file} className="h-10 font-bold">
             <Sparkles className="h-4 w-4 mr-1.5" />
             Analyze ZIP
           </Button>

@@ -19,7 +19,7 @@ const COMPLAINT_TYPES = [
 
 type Phase = "idle" | "analyzing" | "review" | "committing";
 
-export function ComplaintIntakeImport() {
+export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } = {}) {
   const router = useRouter();
   const [files, setFiles] = React.useState<File[]>([]);
   const [phase, setPhase] = React.useState<Phase>("idle");
@@ -32,19 +32,28 @@ export function ComplaintIntakeImport() {
     setEx((prev) => (prev ? { ...prev, [k]: v } : prev));
   }
 
+  // Auto-started by the unified upload (SmartUpload already picked the letter/PDF).
+  React.useEffect(() => {
+    if (presetFiles && presetFiles.length) {
+      setFiles(presetFiles);
+      void analyze(presetFiles);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     setFiles(Array.from(e.target.files ?? []));
     setError(null);
     e.target.value = "";
   }
 
-  async function analyze() {
-    if (files.length === 0) return;
+  async function analyze(fs: File[] = files) {
+    if (fs.length === 0) return;
     setPhase("analyzing");
     setError(null);
     try {
       const fd = new FormData();
-      files.forEach((f) => fd.append("files", f));
+      fs.forEach((f) => fd.append("files", f));
       const res = await analyzeComplaintIntakeAction(fd);
       if (res.error || !res.success || !res.extraction) {
         setError(res.error || "Could not analyse the file.");
@@ -192,7 +201,7 @@ export function ComplaintIntakeImport() {
           </ul>
         )}
         <div className="flex justify-end border-t border-slate-150 dark:border-slate-800/85 pt-4">
-          <Button type="button" onClick={analyze} disabled={files.length === 0} className="h-10 font-bold">
+          <Button type="button" onClick={() => analyze()} disabled={files.length === 0} className="h-10 font-bold">
             <Sparkles className="h-4 w-4 mr-1.5" /> Analyze letter
           </Button>
         </div>
