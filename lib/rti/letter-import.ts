@@ -58,3 +58,25 @@ export interface CommitRtiLettersResult {
   createdIds?: string[];
   primaryId?: string;
 }
+
+/** Lifecycle of a background office-copy import job (rti_import_batches). */
+export type RtiImportStatus = "Processing" | "Ready" | "Committed" | "Failed";
+
+/** Result of starting a background import — the job id to poll/resume on. */
+export interface StartRtiImportResult {
+  success?: boolean;
+  error?: string;
+  batchId?: string;
+}
+
+/** Snapshot of a background import job, polled by the client (and after refresh). */
+export interface RtiImportBatch {
+  success?: boolean;
+  error?: string;
+  batchId?: string;
+  status?: RtiImportStatus;
+  storagePath?: string;
+  pageCount?: number;
+  letters?: AnalyzedLetter[];
+  createdIds?: string[];
+}

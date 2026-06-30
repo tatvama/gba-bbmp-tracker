@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2,
   UploadCloud,
@@ -16,7 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { analyzeRtiOfficeCopyAction, commitRtiLettersAction } from "@/lib/actions/rti";
+import {
+  startRtiOfficeCopyImport,
+  getRtiImportBatchAction,
+  commitRtiLettersAction,
+} from "@/lib/actions/rti";
 import type { AnalyzedLetter } from "@/lib/rti/letter-import";
 
 type EditableLetter = AnalyzedLetter & { uid: number };
@@ -25,13 +29,102 @@ type Phase = "idle" | "analyzing" | "review" | "committing";
 
 export function RtiBulkImport() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [files, setFiles] = React.useState<File[]>([]);
   const [phase, setPhase] = React.useState<Phase>("idle");
   const [error, setError] = React.useState<string | null>(null);
+  const [batchId, setBatchId] = React.useState("");
   const [storagePath, setStoragePath] = React.useState("");
   const [pageCount, setPageCount] = React.useState(0);
   const [letters, setLetters] = React.useState<EditableLetter[]>([]);
   const uidRef = React.useRef(0);
+  const pollRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeRef = React.useRef(true);
+
+  // Show the detected PIO in the editable field: prefer a real name, else the
+  // designation (so it's never blank); when folded in, drop the subtext copy.
+  function seedLetters(raw: AnalyzedLetter[]): EditableLetter[] {
+    return raw.map((l) => ({
+      ...l,
+      uid: uidRef.current++,
+      pioName: l.pioName || l.pioDesignation || "",
+      pioDesignation: l.pioName ? l.pioDesignation : null,
+    }));
+  }
+
+  // Keep the batch id in the URL so a refresh can re-attach to the same import.
+  function setImportParam(id: string | null) {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    if (id) params.set("import", id);
+    else params.delete("import");
+    const qs = params.toString();
+    router.replace(qs ? `/rti/new?${qs}` : "/rti/new", { scroll: false });
+  }
+
+  function stopPoll() {
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  // Poll the background job until it is Ready / Failed / Committed.
+  function poll(id: string) {
+    stopPoll();
+    const tick = async () => {
+      let res;
+      try {
+        res = await getRtiImportBatchAction(id);
+      } catch {
+        if (activeRef.current) pollRef.current = setTimeout(tick, 3000);
+        return;
+      }
+      if (!activeRef.current) return;
+      if (res.error) {
+        setError(res.error);
+        setPhase("idle");
+        setImportParam(null);
+        return;
+      }
+      if (res.status === "Ready") {
+        setStoragePath(res.storagePath || "");
+        setPageCount(res.pageCount || 0);
+        setLetters(seedLetters(res.letters || []));
+        setPhase("review");
+        return;
+      }
+      if (res.status === "Failed") {
+        setError("Detection failed — please try again.");
+        setPhase("idle");
+        setImportParam(null);
+        return;
+      }
+      if (res.status === "Committed") {
+        // Cases were already created (e.g. refreshed after committing).
+        setImportParam(null);
+        router.push("/rti");
+        return;
+      }
+      pollRef.current = setTimeout(tick, 2500); // still Processing
+    };
+    void tick();
+  }
+
+  // Resume an in-flight or completed import after a page refresh.
+  React.useEffect(() => {
+    activeRef.current = true;
+    const existing = searchParams.get("import");
+    if (existing) {
+      setBatchId(existing);
+      setPhase("analyzing");
+      poll(existing);
+    }
+    return () => {
+      activeRef.current = false;
+      stopPoll();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     setFiles(Array.from(e.target.files ?? []));
@@ -46,29 +139,17 @@ export function RtiBulkImport() {
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f));
-      const res = await analyzeRtiOfficeCopyAction(fd);
-      if (res.error || !res.success) {
-        setError(res.error || "Could not analyse the file.");
+      const res = await startRtiOfficeCopyImport(fd);
+      if (res.error || !res.success || !res.batchId) {
+        setError(res.error || "Could not start the import.");
         setPhase("idle");
         return;
       }
-      setStoragePath(res.storagePath || "");
-      setPageCount(res.pageCount || 0);
-      setLetters(
-        (res.letters || []).map((l) => ({
-          ...l,
-          uid: uidRef.current++,
-          // Many letters are addressed to a designation ("Executive Engineer …")
-          // with no personal name. Show the detected PIO in the editable field:
-          // prefer a real name, else fall back to the designation so it isn't
-          // left blank. If folded in, don't also keep it as a separate subtext.
-          pioName: l.pioName || l.pioDesignation || "",
-          pioDesignation: l.pioName ? l.pioDesignation : null,
-        })),
-      );
-      setPhase("review");
+      setBatchId(res.batchId);
+      setImportParam(res.batchId);
+      poll(res.batchId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Analysis failed");
+      setError(e instanceof Error ? e.message : "Could not start the import");
       setPhase("idle");
     }
   }
@@ -92,6 +173,7 @@ export function RtiBulkImport() {
     try {
       const res = await commitRtiLettersAction({
         storagePath,
+        batchId: batchId || undefined,
         letters: letters.map((l) => ({
           startPage: l.startPage,
           endPage: l.endPage,
@@ -110,6 +192,8 @@ export function RtiBulkImport() {
         setPhase("review");
         return;
       }
+      stopPoll();
+      setImportParam(null);
       router.push("/rti");
       router.refresh();
     } catch (e) {
@@ -119,8 +203,11 @@ export function RtiBulkImport() {
   }
 
   function reset() {
+    stopPoll();
+    setImportParam(null);
     setFiles([]);
     setLetters([]);
+    setBatchId("");
     setStoragePath("");
     setPageCount(0);
     setError(null);
@@ -140,7 +227,7 @@ export function RtiBulkImport() {
           </p>
           <p className="text-xs text-muted-foreground">
             {phase === "analyzing"
-              ? "Pages are merged, OCR'd, then analysed by AI. This can take a moment."
+              ? "Pages are merged, OCR'd, then analysed by AI. This runs in the background — it's safe to refresh or come back; you'll pick up right here."
               : "Splitting pages, summarising, and seeding filing dates."}
           </p>
         </CardContent>

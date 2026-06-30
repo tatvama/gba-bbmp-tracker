@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole, AuthorizationError } from "@/lib/auth";
@@ -28,6 +29,8 @@ import type {
   AnalyzedLetter,
   CommitLetterInput,
   CommitRtiLettersResult,
+  StartRtiImportResult,
+  RtiImportBatch,
 } from "@/lib/rti/letter-import";
 
 function genRef(prefix: string): string {
@@ -1230,18 +1233,137 @@ export async function analyzeRtiOfficeCopyAction(formData: FormData): Promise<An
       contentType: "application/pdf",
     });
 
-    const { combined, perPage, pageImages } = await renderAndOcr(pdf);
-    const detected = await detectRtiLetters({ pageImages, ocrText: combined, pageCount });
-    const letters: AnalyzedLetter[] = detected.map((l) => ({
-      ...l,
-      ocrText: sliceOcr(perPage, l.startPage, l.endPage),
-    }));
-
+    const letters = await detectLettersFromPdf(pdf, pageCount);
     return { success: true, storagePath, pageCount, letters };
   } catch (e) {
     console.error("[analyzeRtiOfficeCopyAction]", e);
     return { error: e instanceof Error ? e.message : "Analysis failed" };
   }
+}
+
+/** Render → OCR → AI detect → slice per-letter OCR. Shared by the synchronous and
+ *  background (refresh-safe) import paths. */
+async function detectLettersFromPdf(pdf: Buffer, pageCount: number): Promise<AnalyzedLetter[]> {
+  const { combined, perPage, pageImages } = await renderAndOcr(pdf);
+  const detected = await detectRtiLetters({ pageImages, ocrText: combined, pageCount });
+  return detected.map((l) => ({ ...l, ocrText: sliceOcr(perPage, l.startPage, l.endPage) }));
+}
+
+// ── Background (refresh-safe) office-copy import ──────────────────────────────
+//   start → returns a batch id immediately and detects letters in the background
+//   (Next `after()`); the client polls getRtiImportBatchAction and re-attaches by
+//   batch id after a page refresh. Persisted in rti_import_batches (mig 0017).
+
+/**
+ * Begin a background multi-letter import. Merges + stores the upload, records a
+ * Processing batch, then runs detection AFTER the response is sent so a page
+ * refresh can't abort it. Returns the batch id to poll/resume on.
+ */
+export async function startRtiOfficeCopyImport(formData: FormData): Promise<StartRtiImportResult> {
+  let user;
+  try {
+    user = await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+
+  if (!isAiConfigured()) {
+    return {
+      error:
+        "AI is not configured on the server, so letters can't be detected automatically. Set ANTHROPIC_API_KEY (and AI_PROVIDER=anthropic) and try again.",
+    };
+  }
+
+  let rawFiles = formData.getAll("files");
+  if (rawFiles.length === 0) rawFiles = formData.getAll("file");
+  const files = rawFiles.filter(
+    (x): x is File =>
+      typeof x === "object" && x !== null && typeof (x as { arrayBuffer?: unknown }).arrayBuffer === "function",
+  );
+  if (files.length === 0) return { error: "No files provided" };
+
+  const parts: { buffer: Buffer; mimeType: string }[] = [];
+  for (const f of files) {
+    const isImage = f.type.startsWith("image/");
+    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    if (!isImage && !isPdf) {
+      return { error: `Unsupported file "${f.name}". Use images (JPEG, PNG, WebP) or PDF.` };
+    }
+    parts.push({ buffer: Buffer.from(await f.arrayBuffer()), mimeType: isPdf ? "application/pdf" : f.type });
+  }
+
+  // Service-role client: the background detector runs after the response, with no
+  // request/cookie context, so batch rows are written via the admin client.
+  const admin = createAdminClient();
+
+  let pdf: Buffer;
+  let pageCount: number;
+  let storagePath: string;
+  let batchId: string;
+  try {
+    ({ pdf, pageCount } = await buildMergedPdf(parts));
+    storagePath = `_imports/${randomUUID()}.pdf`;
+    await uploadBuffer({ bucket: STORAGE_BUCKETS.rti, path: storagePath, body: pdf, contentType: "application/pdf" });
+
+    const { data, error } = await admin
+      .from("rti_import_batches")
+      .insert({ status: "Processing", storage_path: storagePath, page_count: pageCount, created_by: user.id })
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(error?.message || "Failed to create import batch");
+    batchId = data.id as string;
+  } catch (e) {
+    console.error("[startRtiOfficeCopyImport]", e);
+    return { error: e instanceof Error ? e.message : "Could not start the import" };
+  }
+
+  // Detect AFTER the response is sent — survives a client refresh.
+  const captured = { pdf, pageCount, storagePath, batchId };
+  after(async () => {
+    try {
+      const letters = await detectLettersFromPdf(captured.pdf, captured.pageCount);
+      await admin
+        .from("rti_import_batches")
+        .update({ status: "Ready", letters })
+        .eq("id", captured.batchId);
+    } catch (e) {
+      console.error("[startRtiOfficeCopyImport:after]", e);
+      await admin
+        .from("rti_import_batches")
+        .update({ status: "Failed", error: e instanceof Error ? e.message : "Detection failed" })
+        .eq("id", captured.batchId);
+    }
+  });
+
+  return { success: true, batchId };
+}
+
+/** Poll/resume a background import batch by id (used on refresh too). */
+export async function getRtiImportBatchAction(batchId: string): Promise<RtiImportBatch> {
+  try {
+    await requireRole(RTI_WRITE_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  if (!batchId) return { error: "Missing batch id" };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("rti_import_batches")
+    .select("id, status, storage_path, page_count, letters, created_case_ids, error")
+    .eq("id", batchId)
+    .single();
+  if (error || !data) return { error: "Import not found — it may have expired. Please re-upload." };
+
+  return {
+    success: true,
+    batchId: data.id as string,
+    status: data.status as RtiImportBatch["status"],
+    storagePath: data.storage_path as string,
+    pageCount: (data.page_count as number) ?? 0,
+    letters: (data.letters as AnalyzedLetter[]) ?? [],
+    createdIds: (data.created_case_ids as string[]) ?? [],
+  };
 }
 
 /**
@@ -1253,6 +1375,8 @@ export async function analyzeRtiOfficeCopyAction(formData: FormData): Promise<An
 export async function commitRtiLettersAction(params: {
   storagePath: string;
   letters: CommitLetterInput[];
+  /** Optional background-import batch to mark Committed once cases are created. */
+  batchId?: string;
 }): Promise<CommitRtiLettersResult> {
   let user;
   try {
@@ -1261,7 +1385,7 @@ export async function commitRtiLettersAction(params: {
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const { storagePath, letters } = params;
+  const { storagePath, letters, batchId } = params;
   if (!storagePath || !Array.isArray(letters) || letters.length === 0) {
     return { error: "Nothing to create." };
   }
@@ -1372,6 +1496,19 @@ export async function commitRtiLettersAction(params: {
 
     // The staged bundle is now redundant (each letter has its own split PDF).
     await removeObject(STORAGE_BUCKETS.rti, storagePath);
+
+    // Close out the background-import batch, if this came from one.
+    if (batchId) {
+      try {
+        await createAdminClient()
+          .from("rti_import_batches")
+          .update({ status: "Committed", created_case_ids: createdIds })
+          .eq("id", batchId);
+      } catch (e) {
+        console.warn("[commitRtiLettersAction] could not mark batch committed", e);
+      }
+    }
+
     revalidatePath("/rti");
     return { success: true, createdIds, primaryId: createdIds[0] };
   } catch (e) {
