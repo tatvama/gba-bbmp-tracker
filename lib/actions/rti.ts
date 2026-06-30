@@ -23,6 +23,7 @@ import { detectRtiLetters } from "@/lib/ai/rti-letter-detector";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { buildMergedPdf, extractPdfPages } from "@/lib/pdf/merge";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
+import { uploadToR2, downloadFromR2, deleteFromR2, isR2Url } from "@/lib/storage/r2-upload";
 import { randomUUID } from "node:crypto";
 import type {
   AnalyzeRtiResult,
@@ -1056,12 +1057,14 @@ export async function deleteRtiAcknowledgementAction(rtiId: string): Promise<Act
 }
 
 export async function getSignedUrlAction(path: string): Promise<string | null> {
-  let user;
   try {
-    user = await requireRole(RTI_WRITE_ROLES);
-  } catch (e) {
+    await requireRole(RTI_WRITE_ROLES);
+  } catch {
     return null;
   }
+  // R2 files are stored as full public URLs — return directly, no Supabase lookup.
+  if (isR2Url(path)) return path;
+  // Legacy: Supabase-stored files use a short-lived signed URL.
   return getSignedUrl(STORAGE_BUCKETS.rti, path);
 }
 
@@ -1225,10 +1228,8 @@ export async function analyzeRtiOfficeCopyAction(formData: FormData): Promise<An
     const { pdf, pageCount } = await buildMergedPdf(parts);
 
     // Hold the merged PDF under a staging prefix until the user commits.
-    const storagePath = `_imports/${randomUUID()}.pdf`;
-    await uploadBuffer({
-      bucket: STORAGE_BUCKETS.rti,
-      path: storagePath,
+    const storagePath = await uploadToR2({
+      key: `letters/_imports/${randomUUID()}.pdf`,
       body: pdf,
       contentType: "application/pdf",
     });
@@ -1302,8 +1303,11 @@ export async function startRtiOfficeCopyImport(formData: FormData): Promise<Star
   let batchId: string;
   try {
     ({ pdf, pageCount } = await buildMergedPdf(parts));
-    storagePath = `_imports/${randomUUID()}.pdf`;
-    await uploadBuffer({ bucket: STORAGE_BUCKETS.rti, path: storagePath, body: pdf, contentType: "application/pdf" });
+    storagePath = await uploadToR2({
+      key: `letters/_imports/${randomUUID()}.pdf`,
+      body: pdf,
+      contentType: "application/pdf",
+    });
 
     const { data, error } = await admin
       .from("rti_import_batches")
@@ -1394,7 +1398,9 @@ export async function commitRtiLettersAction(params: {
   const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
   const userName = profile?.name || user.email || "Unknown User";
 
-  const stagingPdf = await downloadBuffer(STORAGE_BUCKETS.rti, storagePath);
+  const stagingPdf = isR2Url(storagePath)
+    ? await downloadFromR2(storagePath)
+    : await downloadBuffer(STORAGE_BUCKETS.rti, storagePath);
   if (!stagingPdf) return { error: "The uploaded file is no longer available — please re-upload." };
 
   // Render all page images once (cheap vs OCR) for the per-letter AI summary.
@@ -1453,12 +1459,11 @@ export async function commitRtiLettersAction(params: {
         changes: [{ field: "created", oldValue: null, newValue: subject }],
       });
 
-      // 2. Carve this letter's pages out of the staged PDF and store them.
+      // 2. Carve this letter's pages out of the staged PDF and store in R2.
       const split = await extractPdfPages(stagingPdf, letter.startPage, letter.endPage);
-      const splitPath = `${newId}/application-${Date.now().toString(36)}.pdf`;
-      await uploadBuffer({
-        bucket: STORAGE_BUCKETS.rti,
-        path: splitPath,
+      const r2Key = `letters/${newId}/application-${Date.now().toString(36)}.pdf`;
+      const splitPath = await uploadToR2({
+        key: r2Key,
         body: split.pdf,
         contentType: "application/pdf",
       });
@@ -1495,7 +1500,8 @@ export async function commitRtiLettersAction(params: {
     }
 
     // The staged bundle is now redundant (each letter has its own split PDF).
-    await removeObject(STORAGE_BUCKETS.rti, storagePath);
+    if (isR2Url(storagePath)) await deleteFromR2(storagePath);
+    else await removeObject(STORAGE_BUCKETS.rti, storagePath);
 
     // Close out the background-import batch, if this came from one.
     if (batchId) {
@@ -1573,11 +1579,9 @@ export async function uploadRtiDocumentAction(
     // 1. Merge captured pages / scanned PDF into one canonical PDF.
     const { pdf, pageCount } = await buildMergedPdf(parts);
 
-    // 2. Store it.
-    const storagePath = `${rtiId}/${slugifyDocType(docType)}-${Date.now()}.pdf`;
-    await uploadBuffer({
-      bucket: STORAGE_BUCKETS.rti,
-      path: storagePath,
+    // 2. Store it in R2.
+    const storagePath = await uploadToR2({
+      key: `letters/${rtiId}/${slugifyDocType(docType)}-${Date.now()}.pdf`,
       body: pdf,
       contentType: "application/pdf",
     });
@@ -1758,7 +1762,9 @@ export async function reprocessRtiDocumentAction(docId: string): Promise<ActionS
       .update({ ocr_status: "Processing", ai_status: "Pending" })
       .eq("id", docId);
 
-    const pdf = await downloadBuffer(STORAGE_BUCKETS.rti, doc.pdf_path);
+    const pdf = isR2Url(doc.pdf_path)
+      ? await downloadFromR2(doc.pdf_path)
+      : await downloadBuffer(STORAGE_BUCKETS.rti, doc.pdf_path);
     if (!pdf) throw new Error("Stored PDF could not be downloaded");
 
     const { ocrText, ocrConfidence, summary } = await ocrAndSummarize(pdf, rti ?? {});
@@ -1808,7 +1814,8 @@ export async function deleteRtiDocumentAction(docId: string): Promise<ActionStat
   const admin = createAdminClient();
   const { error } = await admin.from("rti_documents").delete().eq("id", docId);
   if (error) return { error: error.message };
-  await removeObject(STORAGE_BUCKETS.rti, doc.pdf_path);
+  if (isR2Url(doc.pdf_path)) await deleteFromR2(doc.pdf_path);
+  else await removeObject(STORAGE_BUCKETS.rti, doc.pdf_path);
 
   await writeAudit(supabase, {
     entityType: "rti",
