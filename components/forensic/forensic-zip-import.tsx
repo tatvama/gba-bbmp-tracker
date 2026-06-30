@@ -33,7 +33,6 @@ const CHECKLIST: { label: string; roles: ForensicFileRole[] }[] = [
   { label: "Forensic JSON", roles: ["min_json", "rich_json"] },
   { label: "Kannada letter (DOCX)", roles: ["letter_docx"] },
   { label: "Letter PDF", roles: ["letter_pdf"] },
-  { label: "Evidence index", roles: ["evidence_csv"] },
   { label: "Logs", roles: ["log"] },
   { label: "Portal source PDFs", roles: ["portal_pdf"] },
 ];
