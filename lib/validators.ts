@@ -32,6 +32,11 @@ const optUuid = z.preprocess(emptyToUndef, z.string().uuid().optional());
 const optNum = z.preprocess(emptyToUndef, z.coerce.number().optional());
 const optEnum = <T extends readonly [string, ...string[]]>(values: T) =>
   z.preprocess(emptyToUndef, z.enum(values).optional());
+// BBMP/GBA job code (ddd-yy-nnnnnn). Enforced only when non-empty so drafts/imports pass.
+const optJobCode = z.preprocess(
+  emptyToUndef,
+  z.string().trim().regex(/^\d{3}-\d{2}-\d{6}$/, "Use a job code like 225-25-001234").optional(),
+);
 
 export const phoneSchema = z
   .string()
@@ -257,6 +262,8 @@ export const rtiSchema = z.object({
   feeMode: optText,
   postalReceiptNo: optText,
   onlineRegNo: optText,
+  // link to a BBMP/GBA works job code (ties this RTI to the Complaint + forensic audit)
+  jobNumber: optJobCode,
   // dates
   dateDrafted: optDate,
   dateFiled: optDate,

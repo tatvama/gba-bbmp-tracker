@@ -431,6 +431,7 @@ export interface RtiApplication {
   fee_mode: string | null;
   postal_receipt_no: string | null;
   online_reg_no: string | null;
+  job_number: string | null;
   date_drafted: string | null;
   date_filed: string | null;
   date_received: string | null;

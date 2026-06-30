@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { RtiForm } from "@/components/rti/rti-form";
-import { getRti, getRtiFormOptions } from "@/lib/queries";
+import { getRti, getRtiFormOptions, listKnownJobCodes } from "@/lib/queries";
 import { updateRti } from "@/lib/actions/rti";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
@@ -26,7 +26,7 @@ export default async function EditRtiPage({
     );
   }
 
-  const [rti, options] = await Promise.all([getRti(id), getRtiFormOptions()]);
+  const [rti, options, jobCodes] = await Promise.all([getRti(id), getRtiFormOptions(), listKnownJobCodes()]);
   if (!rti) notFound();
 
   const action = updateRti.bind(null, id);
@@ -34,7 +34,7 @@ export default async function EditRtiPage({
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader title="Edit RTI" description={rti.internal_ref ?? rti.subject} />
-      <RtiForm action={action} options={options} initial={rti} />
+      <RtiForm action={action} options={options} initial={rti} jobCodes={jobCodes} />
     </div>
   );
 }

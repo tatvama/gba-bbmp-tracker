@@ -44,6 +44,7 @@ export interface RtiFormData {
   replyDate: string;
   postalReceiptNo: string;
   onlineRegNo: string;
+  jobNumber: string;
   feeMode: string;
   satisfactionStatus: string;
   applicationFeePaid: boolean;
@@ -96,6 +97,7 @@ export function mapRtiToFormData(initial?: any): RtiFormData {
       replyDate: "",
       postalReceiptNo: "",
       onlineRegNo: "",
+      jobNumber: "",
       feeMode: "",
       satisfactionStatus: "",
       applicationFeePaid: false,
@@ -145,6 +147,7 @@ export function mapRtiToFormData(initial?: any): RtiFormData {
     replyDate: initial.reply_date ?? "",
     postalReceiptNo: initial.postal_receipt_no ?? "",
     onlineRegNo: initial.online_reg_no ?? "",
+    jobNumber: initial.job_number ?? "",
     feeMode: initial.fee_mode ?? "",
     satisfactionStatus: initial.satisfaction_status ?? "",
     applicationFeePaid: initial.application_fee_paid ?? false,

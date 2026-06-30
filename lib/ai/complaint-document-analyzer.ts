@@ -183,6 +183,9 @@ export function buildComplaintDraftPrompt(input: {
     records_preservation:
       "Request that ALL original records (MB books, measurement sheets, QC/quality tests, geo-tagged photographs, the contractor-eligibility set, insurance, and the IFMS / eProc audit logs) be preserved in status-quo pending production, and NOT weeded, altered, or the work completed, while this matter is under examination. Cite the case number and the risk of alteration. " +
       CAUTION,
+    counter_reply:
+      "Respond POINT-BY-POINT to the department's latest reply in the case history. For each original demand, state whether the reply addressed it; list the specific demands and records that remain UNADDRESSED; demand the specific records named in the forensic findings; and reserve escalation if a complete response is not received within a stated period. " +
+      CAUTION,
   };
   const extra = extraByKind[input.kind] ?? "";
   return {

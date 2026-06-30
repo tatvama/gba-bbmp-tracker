@@ -386,7 +386,7 @@ export function RtiTable({
     getPaginationRowModel: getPaginationRowModel(),
     globalFilterFn: (row, _col, value) => {
       const r = row.original;
-      const hay = [r.internal_ref, r.subject, r.category, r.public_authority, r.pio_name]
+      const hay = [r.internal_ref, r.subject, r.category, r.public_authority, r.pio_name, r.job_number]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();

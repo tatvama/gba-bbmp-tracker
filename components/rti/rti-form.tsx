@@ -43,6 +43,7 @@ export function RtiForm(props: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   options: RtiFormOptions;
   initial?: RtiWithRelations;
+  jobCodes?: string[];
 }) {
   return (
     <RtiWizardProvider initial={props.initial}>
@@ -55,10 +56,12 @@ function RtiFormInner({
   action,
   options,
   initial,
+  jobCodes = [],
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   options: RtiFormOptions;
   initial?: RtiWithRelations;
+  jobCodes?: string[];
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, {});
@@ -738,6 +741,23 @@ function RtiFormInner({
             value={formData.onlineRegNo || ""}
             onChange={(e) => updateField("onlineRegNo", e.target.value)}
           />
+        </Field>
+        <Field label="Job / work-order code" error={fe.jobNumber}>
+          <Input
+            name="jobNumber"
+            list="rti-job-codes"
+            value={formData.jobNumber || ""}
+            onChange={(e) => updateField("jobNumber", e.target.value)}
+            placeholder="Link to a job code, e.g. 225-25-001234"
+            pattern="\d{3}-\d{2}-\d{6}"
+          />
+          {jobCodes.length > 0 && (
+            <datalist id="rti-job-codes">
+              {jobCodes.map((j) => (
+                <option key={j} value={j} />
+              ))}
+            </datalist>
+          )}
         </Field>
         <Field label="Fee mode" error={fe.feeMode}>
           <Input

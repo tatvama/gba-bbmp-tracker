@@ -133,6 +133,7 @@ async function rtiToRow(
     fee_mode: input.feeMode ?? null,
     postal_receipt_no: input.postalReceiptNo ?? null,
     online_reg_no: input.onlineRegNo ?? null,
+    job_number: input.jobNumber ?? null,
     date_drafted: input.dateDrafted ?? null,
     date_filed: input.dateFiled ?? null,
     date_received: input.dateReceived ?? null,
