@@ -15,6 +15,7 @@ export interface RtiDocumentSummary {
   documentType: string;
   authority: string | null;
   subject: string | null;
+  category: string | null;
   referenceNumber: string | null;
   /** ISO date (YYYY-MM-DD) printed on the document, if found. */
   documentDate: string | null;
@@ -33,6 +34,7 @@ Output STRICT JSON only — no markdown, no commentary outside the JSON:
   "documentType": "Application | Acknowledgement | Reply | FAA Order | Second Appeal Order | Other",
   "authority": "public authority / department / office named on the document, or null",
   "subject": "the matter the document concerns, or null",
+  "category": "one of: Roads | Solid Waste Management | Streetlights | Water / Sanitary | Parks / Playgrounds | Storm Water Drain | Revenue / Tax | Health / Sanitation | Town Planning / Building | Other, or null",
   "referenceNumber": "any application / acknowledgement / diary number printed on it, or null",
   "documentDate": "the main date on the document in YYYY-MM-DD, or null",
   "keyDates": [ { "label": "what the date is", "date": "YYYY-MM-DD" } ]
@@ -66,6 +68,7 @@ function fallbackSummary(ocrText: string): RtiDocumentSummary {
     documentType: "Other",
     authority: null,
     subject: s.title && s.title !== "No document available." ? s.title : null,
+    category: null,
     referenceNumber: null,
     documentDate: null,
     keyDates: [],
@@ -107,6 +110,7 @@ export async function summarizeRtiDocument(params: {
       documentType: parsed.documentType || "Other",
       authority: parsed.authority?.trim() || null,
       subject: parsed.subject?.trim() || null,
+      category: parsed.category?.trim() || null,
       referenceNumber: parsed.referenceNumber?.trim() || null,
       documentDate: parsed.documentDate?.trim() || null,
       keyDates,

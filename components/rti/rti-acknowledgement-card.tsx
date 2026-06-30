@@ -21,7 +21,6 @@ import {
 import { FilePreview } from "./file-preview";
 import { MetadataSection } from "./metadata-section";
 import { VerificationSection } from "./verification-section";
-import { OcrPreview } from "./ocr-preview";
 import { ActionToolbar } from "./action-toolbar";
 import { AckHistoryTimeline } from "./ack-history-timeline";
 import { ArchiveAccordion } from "./archive-accordion";
@@ -279,10 +278,6 @@ export function RtiAcknowledgementCard({
               <VerificationSection
                 rti={rti}
                 isPending={isPending}
-              />
-              <OcrPreview
-                ocrText={rti.ack_ocr_text}
-                isLoading={isPending}
               />
               <ActionToolbar
                 canEdit={canEditAck}

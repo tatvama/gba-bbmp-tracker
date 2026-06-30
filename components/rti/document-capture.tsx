@@ -48,19 +48,18 @@ export function DocumentCapture({
   const router = useRouter();
   const idRef = React.useRef(0);
 
-  // Reply / FAA Order / etc. stay locked until both the Application and the
-  // Acknowledgement have been uploaded (they establish the case + filing clock).
-  const hasApplication = existingTypes.includes("Application");
+  // Reply / FAA Order / etc. stay locked until the Acknowledgement has been uploaded
+  // (which establishes the case + filing clock).
   const hasAcknowledgement = existingTypes.includes("Acknowledgement");
-  const unlocked = hasApplication && hasAcknowledgement;
-  const initialType = !hasApplication ? "Application" : !hasAcknowledgement ? "Acknowledgement" : "Application";
+  const unlocked = hasAcknowledgement;
+  const initialType = "Acknowledgement";
 
   const [docType, setDocType] = React.useState(initialType);
 
   // Never leave a now-locked type selected.
   React.useEffect(() => {
-    if (!unlocked && docType !== "Application" && docType !== "Acknowledgement") {
-      setDocType("Application");
+    if (!unlocked && docType !== "Acknowledgement") {
+      setDocType("Acknowledgement");
     }
   }, [unlocked, docType]);
   const [title, setTitle] = React.useState("");
@@ -243,8 +242,8 @@ export function DocumentCapture({
         <div className="space-y-1.5">
           <Label>Document type</Label>
           <select className={selectCls} value={docType} onChange={(e) => setDocType(e.target.value)}>
-            {RTI_DOCUMENT_TYPES.map((t) => {
-              const gated = t !== "Application" && t !== "Acknowledgement";
+            {RTI_DOCUMENT_TYPES.filter((t) => t !== "Application").map((t) => {
+              const gated = t !== "Acknowledgement";
               return (
                 <option key={t} value={t} disabled={gated && !unlocked}>
                   {t}
@@ -254,7 +253,7 @@ export function DocumentCapture({
           </select>
           {!unlocked && (
             <p className="text-[11px] text-muted-foreground">
-              Upload the Application and Acknowledgement first — Reply, FAA Order and others unlock once both are present.
+              Upload the Acknowledgement first — Reply, FAA Order and others unlock once it is present.
             </p>
           )}
         </div>

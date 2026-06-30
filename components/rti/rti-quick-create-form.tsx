@@ -59,115 +59,38 @@ export function RtiQuickCreateForm() {
             </div>
           </div>
 
-          {/* SECTION 1: BASIC INFORMATION */}
+          {/* SECTION 1: REQUEST DETAILS */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
-              1. Basic Information
+              1. Request Details
             </h3>
 
-            {/* Subject / Title */}
+            {/* Priority */}
             <div className="space-y-1.5">
               <Label
-                htmlFor="subject"
+                htmlFor="priority"
                 className="flex items-center gap-1.5 text-xs font-semibold text-slate-750 dark:text-slate-300"
               >
-                <FileText className="h-3.5 w-3.5 text-slate-405" />
-                Subject / Title <span className="text-rose-500 font-bold">*</span>
+                <AlertTriangle className="h-3.5 w-3.5 text-slate-405" />
+                Priority
               </Label>
-              <Input
-                id="subject"
-                name="subject"
-                required
-                minLength={3}
-                placeholder="e.g. Road work bills for Jayanagar 4th Block"
-                className="h-11 px-3.5 rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-primary placeholder:text-slate-400 dark:placeholder:text-slate-600"
-              />
-              {state?.fieldErrors?.subject && (
-                <p className="text-xs font-medium text-rose-600 dark:text-rose-400 mt-1">
-                  {state.fieldErrors.subject}
-                </p>
-              )}
-            </div>
-
-            {/* Public Authority */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="publicAuthority"
-                className="flex items-center gap-1.5 text-xs font-semibold text-slate-750 dark:text-slate-300"
+              <select
+                id="priority"
+                name="priority"
+                className={selectCls}
+                defaultValue="Medium"
               >
-                <Building2 className="h-3.5 w-3.5 text-slate-405" />
-                Public Authority{" "}
-                <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500">
-                  (Optional)
-                </span>
-              </Label>
-              <Input
-                id="publicAuthority"
-                name="publicAuthority"
-                placeholder="e.g. BBMP South Zone — PIO, Engineering"
-                className="h-11 px-3.5 rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-primary placeholder:text-slate-400 dark:placeholder:text-slate-600"
-              />
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* SECTION 2: REQUEST DETAILS */}
-          <div className="space-y-4 pt-2">
-            <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
-              2. Request Details
-            </h3>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Category */}
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="category"
-                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-750 dark:text-slate-300"
-                >
-                  <Folder className="h-3.5 w-3.5 text-slate-405" />
-                  Category{" "}
-                  <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500">
-                    (Optional)
-                  </span>
-                </Label>
-                <select
-                  id="category"
-                  name="category"
-                  className={selectCls}
-                  defaultValue=""
-                >
-                  <option value="">— Select —</option>
-                  {RTI_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Priority */}
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="priority"
-                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-750 dark:text-slate-300"
-                >
-                  <AlertTriangle className="h-3.5 w-3.5 text-slate-405" />
-                  Priority
-                </Label>
-                <select
-                  id="priority"
-                  name="priority"
-                  className={selectCls}
-                  defaultValue="Medium"
-                >
-                  {PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+          {/* Hidden fields for required data */}
+          <input type="hidden" name="subject" value="Pending Acknowledgement Upload" />
 
           {/* SECTION 3: NEXT STEP INFO CARD */}
           <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 dark:border-slate-800/80 dark:bg-slate-950/20 space-y-2.5">

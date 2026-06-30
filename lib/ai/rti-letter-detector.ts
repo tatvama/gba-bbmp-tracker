@@ -135,6 +135,37 @@ function normalizeRanges(raw: Partial<DetectedLetter>[], pageCount: number): Det
   return out;
 }
 
+/**
+ * Recover complete letter objects from a (possibly truncated) JSON response —
+ * walks the `letters` array and parses each balanced {...} block, discarding an
+ * incomplete trailing object. Lets a response cut off by max_tokens still yield
+ * every letter that did come through, instead of falling back to a single one.
+ */
+function salvageLetters(text: string): Partial<DetectedLetter>[] {
+  const key = text.indexOf("letters");
+  const start = key >= 0 ? text.indexOf("[", key) : text.indexOf("[");
+  if (start < 0) return [];
+  const out: Partial<DetectedLetter>[] = [];
+  let depth = 0, buf = "", inStr = false, esc = false;
+  for (let i = start + 1; i < text.length; i++) {
+    const ch = text[i] as string;
+    if (esc) { buf += ch; esc = false; continue; }
+    if (ch === "\\") { buf += ch; esc = true; continue; }
+    if (ch === '"') inStr = !inStr;
+    if (!inStr && ch === "]" && depth === 0) break;
+    if (!inStr && ch === "{") { if (depth === 0) buf = ""; depth++; }
+    if (depth > 0) buf += ch;
+    if (!inStr && ch === "}") {
+      depth--;
+      if (depth === 0) {
+        try { out.push(JSON.parse(buf)); } catch { /* skip malformed */ }
+        buf = "";
+      }
+    }
+  }
+  return out;
+}
+
 export async function detectRtiLetters(params: {
   pageImages: { buffer: Buffer; mimeType: string }[];
   ocrText: string;
@@ -165,26 +196,32 @@ export async function detectRtiLetters(params: {
     prompt: buildPrompt(params.ocrText, params.pageCount),
     images,
     temperature: 0,
-    maxTokens: 3000,
+    maxTokens: 8000,
   });
   if (!res.ok || !res.text) {
     console.error("[detectRtiLetters] vision call failed:", res.error);
     return fallback();
   }
 
+  const cleaned = res.text
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  let rawLetters: Partial<DetectedLetter>[] = [];
   try {
-    const cleaned = res.text
-      .replace(/^```(?:json)?/i, "")
-      .replace(/```$/i, "")
-      .trim();
     const parsed = JSON.parse(cleaned) as { letters?: Partial<DetectedLetter>[] };
-    const letters = normalizeRanges(
-      Array.isArray(parsed.letters) ? parsed.letters : [],
-      params.pageCount,
-    );
-    return letters.length ? letters : fallback();
-  } catch (e) {
-    console.error("[detectRtiLetters] parse failed", e, "raw:", res.text?.slice(0, 500));
-    return fallback();
+    rawLetters = Array.isArray(parsed.letters) ? parsed.letters : [];
+  } catch {
+    // Response likely truncated (max_tokens) — salvage the complete letters.
+    rawLetters = salvageLetters(cleaned);
+    if (rawLetters.length) {
+      console.warn(`[detectRtiLetters] recovered ${rawLetters.length} letters from truncated JSON`);
+    } else {
+      console.error("[detectRtiLetters] parse failed and nothing salvageable; raw head:", cleaned.slice(0, 300));
+    }
   }
+
+  const letters = normalizeRanges(rawLetters, params.pageCount);
+  return letters.length ? letters : fallback();
 }

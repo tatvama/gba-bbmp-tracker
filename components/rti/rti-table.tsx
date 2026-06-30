@@ -296,8 +296,8 @@ export function RtiTable({
         cell: ({ row }) => (
           <div className="flex flex-col items-start gap-1">
             <RtiStatusBadge status={row.original.status} />
-            <span className="text-[10px] font-semibold text-slate-455 dark:text-slate-500 uppercase tracking-wider pl-0.5">
-              {getWorkflowStage(row.original.status)}
+            <span className="text-[10px] font-bold text-slate-455 dark:text-slate-500 uppercase tracking-wider pl-0.5">
+              {row.original.status === "Closed" ? "Case Closed" : `Next: ${getWorkflowStage(row.original.status)}`}
             </span>
           </div>
         ),
@@ -523,9 +523,6 @@ export function RtiTable({
             aria-label="Refresh data"
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
-          </Button>
-          <Button asChild size="sm" className="h-9 text-xs font-semibold rounded-lg">
-            <Link href="/rti/new">New RTI</Link>
           </Button>
         </div>
       </div>
