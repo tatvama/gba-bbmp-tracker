@@ -54,7 +54,18 @@ export function RtiBulkImport() {
       }
       setStoragePath(res.storagePath || "");
       setPageCount(res.pageCount || 0);
-      setLetters((res.letters || []).map((l) => ({ ...l, uid: uidRef.current++ })));
+      setLetters(
+        (res.letters || []).map((l) => ({
+          ...l,
+          uid: uidRef.current++,
+          // Many letters are addressed to a designation ("Executive Engineer …")
+          // with no personal name. Show the detected PIO in the editable field:
+          // prefer a real name, else fall back to the designation so it isn't
+          // left blank. If folded in, don't also keep it as a separate subtext.
+          pioName: l.pioName || l.pioDesignation || "",
+          pioDesignation: l.pioName ? l.pioDesignation : null,
+        })),
+      );
       setPhase("review");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
@@ -205,12 +216,12 @@ export function RtiBulkImport() {
                   </div>
                   <div>
                     <Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                      PIO
+                      PIO (name or office)
                     </Label>
                     <Input
                       value={l.pioName ?? ""}
                       onChange={(e) => updatePio(l.uid, e.target.value)}
-                      placeholder="Public Information Officer"
+                      placeholder="e.g. Executive Engineer, Hebbal Division"
                       className="mt-1 h-10"
                     />
                     {l.pioDesignation && (
