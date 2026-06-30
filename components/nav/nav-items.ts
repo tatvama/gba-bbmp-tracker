@@ -52,7 +52,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/complaints/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "complaints" },
   { href: "/complaints", label: "Complaints", icon: ClipboardList, group: "complaints" },
   { href: "/complaints/import", label: "Upload (ZIP or letter)", icon: Upload, group: "complaints" },
-  { href: "/complaints/new", label: "New Complaint (manual)", icon: FilePlus2, group: "complaints" },
   { href: "/complaints/duplicate-photos", label: "Duplicate Photos", icon: Images, group: "complaints" },
   { href: "/complaints/contractors", label: "Contractor Intelligence", icon: Building2, group: "complaints" },
   { href: "/complaints/oversight", label: "Forensic Oversight", icon: Gauge, group: "complaints" },
