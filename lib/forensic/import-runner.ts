@@ -1,15 +1,15 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadFromR2 } from "@/lib/storage/r2-upload";
-import { readZipEntries, groupByTopFolder } from "@/lib/forensic/zip";
-import { parseJobFolder, classifyFile, type RawFile } from "@/lib/forensic/parse-skill-output";
+import { readZipEntries } from "@/lib/forensic/zip";
+import { groupEntriesByJobCode, classifyRelPath, parseJob, type RawEntry } from "@/lib/forensic/parse-skill-output";
 import { extractDocxText } from "@/lib/forensic/docx-text";
 import { deriveDatasetFromLetter } from "@/lib/ai/forensic-letter-extract";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import type { ForensicFileRole, ForensicJobResult } from "@/lib/forensic/skill-output";
 
-const TEXTUAL: Set<ForensicFileRole> = new Set(["min_json", "rich_json", "text", "info", "evidence_csv", "log"]);
+const TEXTUAL: Set<ForensicFileRole> = new Set(["rich_json", "min_json", "text", "info"]);
 const LETTER_PDF_OCR_PAGE_CAP = 8;
 
 function decode(bytes: Uint8Array): string {
@@ -20,16 +20,11 @@ function decode(bytes: Uint8Array): string {
   }
 }
 
-function baseName(p: string): string {
-  return p.split("/").pop() || p;
-}
-
 /**
  * Background inventory + parse of an uploaded forensic ZIP (runs in Next `after()`).
- * Downloads the staged ZIP, groups by top-level folder (= job code), reads the
- * textual files, extracts the letter text (DOCX via mammoth, else OCR the letter
- * PDF), parses each folder, and AI-derives a dataset when no JSON is present.
- * Writes the per-job results to forensic_import_batches for the review screen.
+ * The export is batch-structured (job folders + a shared _AUDIT_OUTPUT), so we key
+ * every entry off its job code, read the textual files (JSON/OCR) + the drafted
+ * letter text, parse each job, and AI-derive a dataset when no JSON is present.
  */
 export async function processForensicBatch(batchId: string, storagePath: string): Promise<void> {
   const admin = createAdminClient();
@@ -37,37 +32,36 @@ export async function processForensicBatch(batchId: string, storagePath: string)
     const zip = await downloadFromR2(storagePath);
     if (!zip) throw new Error("Could not download the staged ZIP.");
 
-    const { groups, rootFiles } = groupByTopFolder(readZipEntries(zip));
+    const zipEntries = readZipEntries(zip); // [{ path (full), bytes }]
+    const bytesByPath = new Map(zipEntries.map((e) => [e.path, e.bytes] as const));
+    const raw: RawEntry[] = zipEntries.map((e) => ({ relPath: e.path, size: e.bytes.byteLength }));
+    const grouped = groupEntriesByJobCode(raw);
 
-    // Which job codes are already imported (for the "already imported" chip)?
-    const folderNames = groups.map((g) => g.folder);
+    // Which job codes are already imported?
+    const codes = [...grouped.keys()];
     const existing = new Set<string>();
-    if (folderNames.length) {
-      const { data } = await admin.from("job_cases").select("job_number").in("job_number", folderNames);
+    if (codes.length) {
+      const { data } = await admin.from("job_cases").select("job_number").in("job_number", codes);
       for (const r of data ?? []) existing.add(r.job_number as string);
     }
 
     const jobs: ForensicJobResult[] = [];
-    for (const g of groups) {
-      const raw: RawFile[] = [];
-      let letterDocx: { rel: string; bytes: Uint8Array } | null = null;
-      let letterPdf: { rel: string; bytes: Uint8Array } | null = null;
-
-      for (const e of g.entries) {
-        const role = classifyFile(baseName(e.path));
-        let text: string | undefined;
-        if (TEXTUAL.has(role)) text = decode(e.bytes);
-        else if (role === "letter_docx" && !letterDocx) letterDocx = { rel: e.path, bytes: e.bytes };
-        else if (role === "letter_pdf" && !letterPdf) letterPdf = { rel: e.path, bytes: e.bytes };
-        raw.push({ relPath: e.path, size: e.bytes.byteLength, text });
+    for (const [code, es] of grouped) {
+      let letterDocxRel: string | null = null;
+      let letterPdfRel: string | null = null;
+      for (const e of es) {
+        const role = classifyRelPath(e.relPath);
+        if (TEXTUAL.has(role)) e.text = decode(bytesByPath.get(e.relPath)!);
+        else if (role === "letter_docx" && !letterDocxRel) letterDocxRel = e.relPath;
+        else if (role === "letter_pdf" && !letterPdfRel) letterPdfRel = e.relPath;
       }
 
-      // Letter text: prefer DOCX (lossless), else OCR the letter PDF.
+      // Letter text: DOCX (lossless) preferred, else OCR the letter PDF.
       let letterText = "";
-      if (letterDocx) letterText = await extractDocxText(Buffer.from(letterDocx.bytes));
-      if (!letterText && letterPdf) {
+      if (letterDocxRel) letterText = await extractDocxText(Buffer.from(bytesByPath.get(letterDocxRel)!));
+      if (!letterText && letterPdfRel) {
         try {
-          const pages = await pdfRenderer.renderPages(Buffer.from(letterPdf.bytes));
+          const pages = await pdfRenderer.renderPages(Buffer.from(bytesByPath.get(letterPdfRel)!));
           const parts: string[] = [];
           for (const p of pages.slice(0, LETTER_PDF_OCR_PAGE_CAP)) {
             const r = await runOcr({ buffer: p.buffer, mimeType: p.mimeType, language: "eng+kan" });
@@ -75,48 +69,37 @@ export async function processForensicBatch(batchId: string, storagePath: string)
           }
           letterText = parts.join("\n").trim();
         } catch (e) {
-          console.warn("[forensic] letter PDF OCR failed", g.folder, e);
+          console.warn("[forensic] letter PDF OCR failed", code, e);
         }
       }
-      // Feed the letter text back into the RawFile the parser will read it from.
-      const letterRel = letterDocx?.rel ?? letterPdf?.rel;
+      const letterRel = letterDocxRel ?? letterPdfRel;
       if (letterRel) {
-        const f = raw.find((x) => x.relPath === letterRel);
+        const f = es.find((x) => x.relPath === letterRel);
         if (f) f.text = letterText;
       }
 
-      const result = parseJobFolder(g.folder, raw);
+      const result = parseJob(code, es);
       result.alreadyImported = existing.has(result.jobCode);
       if (result.alreadyImported) {
         result.warnings.push("A job case with this code already exists — committing will merge/refresh it.");
       }
-
-      // AI fallback when there is no JSON but we have letter / extracted text.
       if (result.source === "ai-from-letter" && !result.dataset) {
         const ds = await deriveDatasetFromLetter(result.jobCode, result.letterText, result.extractedText);
         if (ds) {
           result.dataset = ds;
-          result.riskColour = ds.overall_risk ?? null;
         } else {
           result.warnings.push(
             "No forensic JSON, and AI could not read the letter (or AI is not configured) — create the case and add details manually.",
           );
         }
       }
-
       jobs.push(result);
     }
+    jobs.sort((a, b) => a.jobCode.localeCompare(b.jobCode));
 
     await admin
       .from("forensic_import_batches")
-      .update({
-        status: "Ready",
-        jobs,
-        folder_count: groups.length,
-        error: rootFiles.length
-          ? `${rootFiles.length} file(s) at the ZIP root were ignored — expected one folder per job code.`
-          : null,
-      })
+      .update({ status: "Ready", jobs, folder_count: jobs.length, error: jobs.length ? null : "No job-code folders found in the ZIP." })
       .eq("id", batchId);
   } catch (e) {
     console.error("[processForensicBatch]", e);

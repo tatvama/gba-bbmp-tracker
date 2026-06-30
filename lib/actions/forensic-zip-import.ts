@@ -8,8 +8,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadFromR2 } from "@/lib/storage/r2-upload";
 import { uploadBuffer, buildPath } from "@/lib/storage/supabase-upload";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
-import { readZipEntries, groupByTopFolder } from "@/lib/forensic/zip";
-import { classifyFile } from "@/lib/forensic/parse-skill-output";
+import { readZipEntries } from "@/lib/forensic/zip";
+import { classifyRelPath } from "@/lib/forensic/parse-skill-output";
 import { extractJobCode, mapPortalFileToDocType, isBlankTemplate } from "@/lib/ifms/downloader";
 import {
   datasetToAuditReport,
@@ -159,12 +159,13 @@ export async function commitForensicImportAction(params: {
   const zip = await downloadFromR2(batch.storage_path as string);
   if (!zip) return { error: "Could not re-read the staged ZIP — please re-upload." };
 
-  // Re-unzip and index folders by job code (don't trust client file bytes).
-  const { groups } = groupByTopFolder(readZipEntries(zip));
-  const byCode = new Map<string, { path: string; bytes: Uint8Array }[]>();
-  for (const g of groups) {
-    const code = extractJobCode(g.folder) ?? g.folder.trim();
-    byCode.set(code, g.entries.map((e) => ({ path: e.path, bytes: e.bytes })));
+  // Re-unzip and index every entry by the job code in its path (batch-agnostic;
+  // a job's source docs + its shared _AUDIT_OUTPUT files all carry its code).
+  const byCode = new Map<string, { relPath: string; bytes: Uint8Array }[]>();
+  for (const e of readZipEntries(zip)) {
+    const code = extractJobCode(e.path);
+    if (!code) continue;
+    (byCode.get(code) ?? byCode.set(code, []).get(code)!).push({ relPath: e.path, bytes: e.bytes });
   }
 
   const selected = params.jobs.filter((j) => !j.skip && j.validCode);
@@ -178,7 +179,7 @@ export async function commitForensicImportAction(params: {
     const code = job.jobCode;
     const entries = byCode.get(code);
     if (!entries) {
-      perJob.push({ jobCode: code, error: "Folder not found in the ZIP." });
+      perJob.push({ jobCode: code, error: "No files found in the ZIP for this job code." });
       continue;
     }
     try {
@@ -218,9 +219,10 @@ export async function commitForensicImportAction(params: {
       let letterPdfPath: { name: string; path: string; mime: string; size: number } | null = null;
 
       for (const e of entries.slice(0, MAX_FILES_PER_JOB)) {
-        const name = baseName(e.path);
+        const name = baseName(e.relPath);
+        const role = classifyRelPath(e.relPath);
+        if (role === "other") continue; // skip WO-*-NA.jpg placeholders, ocr cache, batch logs, index json
         if (have.has(name)) continue;
-        const role = classifyFile(name);
         const mime = mimeFor(name);
         const body = Buffer.from(e.bytes);
         const path = buildPath(jobCaseId, name, Date.now(), Math.random().toString(36).slice(2, 8));

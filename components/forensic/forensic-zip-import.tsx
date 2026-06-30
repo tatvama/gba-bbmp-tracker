@@ -321,11 +321,12 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
                           <span className="font-semibold text-slate-700 dark:text-slate-300">Work:</span> {summary.work}
                         </p>
                       )}
-                      {summary.contractor?.name && (
+                      {summary.contractor && (
                         <p>
                           <span className="font-semibold text-slate-700 dark:text-slate-300">Contractor:</span>{" "}
-                          {summary.contractor.name}
-                          {summary.contractor.class ? ` (${summary.contractor.class})` : ""}
+                          {typeof summary.contractor === "string"
+                            ? summary.contractor
+                            : [summary.contractor.name, summary.contractor.class ? `(${summary.contractor.class})` : ""].filter(Boolean).join(" ")}
                         </p>
                       )}
                       {summary.treasury_loss_total && (

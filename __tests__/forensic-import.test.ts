@@ -1,213 +1,208 @@
 import { describe, it, expect } from "vitest";
 import {
-  classifyFile,
-  computeMissing,
+  classifyRelPath,
+  parseRiskColour,
   mapRiskColourToBand,
+  computeMissing,
   normalizeDataset,
-  parseJobFolder,
+  groupEntriesByJobCode,
+  parseJob,
+  assembleForensicJobs,
   fileExt,
-  type RawFile,
+  type RawEntry,
 } from "@/lib/forensic/parse-skill-output";
 import {
   datasetToAuditReport,
-  datasetToRunningBillRows,
-  datasetToJobCasePatch,
-  datasetToTimelineRows,
   auditRowFromReport,
+  datasetToRunningBillRows,
+  datasetToTimelineRows,
+  datasetToJobCasePatch,
+  contractorName,
 } from "@/lib/forensic/json-to-audit";
 import type { ForensicDataset, ForensicFileRole } from "@/lib/forensic/skill-output";
 
-describe("classifyFile", () => {
+const B = "batch_W209";
+const A = `${B}/_AUDIT_OUTPUT`;
+const CODE = "209-26-000004";
+
+describe("classifyRelPath (batch layout)", () => {
   const cases: [string, ForensicFileRole][] = [
-    ["047-25-000003.min.json", "min_json"],
-    ["047-25-000003.json", "rich_json"],
-    ["047-25-000003.txt", "text"],
-    ["info.txt", "info"],
-    ["047-25-000003.log", "log"],
-    ["evidence_index.csv", "evidence_csv"],
-    ["Job_047-25-000003_complaint_KN.docx", "letter_docx"],
-    ["Job_047-25-000003_complaint_KN.pdf", "letter_pdf"],
-    ["WO-1-Estimate.pdf", "portal_pdf"],
-    ["WB-Bill-P-01.pdf", "portal_pdf"],
-    ["random-note.txt", "text"],
-    ["unknown.xyz", "other"],
+    [`${A}/data/${CODE}.json`, "rich_json"],
+    [`${A}/work/${CODE}.min.json`, "min_json"],
+    [`${A}/work/${CODE}.txt`, "text"],
+    [`${A}/work/${CODE}.log`, "log"],
+    [`${A}/work/${CODE}_index.json`, "other"],
+    [`${A}/work/_batch.log`, "other"],
+    [`${A}/work/_work_split.json`, "other"],
+    [`${A}/work/ocrsafe_cache/abc123.txt`, "other"],
+    [`${A}/letters/Job_${CODE}_complaint_KN.docx`, "letter_docx"],
+    [`${A}/letters/Job_${CODE}_complaint_KN.pdf`, "letter_pdf"],
+    [`${B}/${CODE}/info.txt`, "info"],
+    [`${B}/${CODE}/WO-1-Estimate.pdf`, "portal_pdf"],
+    [`${B}/${CODE}/WO-1-NA.jpg`, "other"], // placeholder
+    [`${B}/${CODE}/WB-photo1.jpg`, "portal_pdf"], // real photo
   ];
-  it.each(cases)("classifies %s", (name, role) => {
-    expect(classifyFile(name)).toBe(role);
-  });
-  it("treats a 'complaint' pdf as the letter, not a portal pdf", () => {
-    expect(classifyFile("final complaint.pdf")).toBe("letter_pdf");
+  it.each(cases)("classifies %s", (p, role) => {
+    expect(classifyRelPath(p)).toBe(role);
   });
 });
 
 describe("fileExt", () => {
-  it("lowercases the extension", () => {
+  it("lowercases", () => {
     expect(fileExt("X.DOCX")).toBe("docx");
     expect(fileExt("a.min.json")).toBe("json");
-    expect(fileExt("noext")).toBe("");
+  });
+});
+
+describe("parseRiskColour", () => {
+  it("pulls a colour out of bilingual text", () => {
+    expect(parseRiskColour("ಹೆಚ್ಚು ಅಪಾಯ / Red")).toBe("Red");
+    expect(parseRiskColour("Orange")).toBe("Orange");
+    expect(parseRiskColour("Amber")).toBe("Amber");
+    expect(parseRiskColour("ಹಸಿರು / Green")).toBe("Green");
+    expect(parseRiskColour("")).toBeNull();
   });
 });
 
 describe("mapRiskColourToBand", () => {
-  it("maps colours to bands", () => {
-    expect(mapRiskColourToBand("Purple")).toBe("bill_stop");
+  it("maps colour → band", () => {
     expect(mapRiskColourToBand("Red")).toBe("bill_stop");
+    expect(mapRiskColourToBand("Purple")).toBe("bill_stop");
     expect(mapRiskColourToBand("Orange")).toBe("serious");
     expect(mapRiskColourToBand("Amber")).toBe("procedural");
-    expect(mapRiskColourToBand("Green")).toBe("low");
     expect(mapRiskColourToBand(null)).toBe("low");
   });
 });
 
-describe("computeMissing", () => {
-  it("lists expected-but-absent pieces; ignores optional logs/portal pdfs", () => {
-    const roles = new Set<ForensicFileRole>(["text", "min_json", "letter_docx", "evidence_csv"]);
-    expect(computeMissing(roles)).toEqual([]);
-    const sparse = new Set<ForensicFileRole>(["letter_docx", "log"]);
-    expect(computeMissing(sparse)).toContain("Extracted text");
-    expect(computeMissing(sparse)).toContain("Forensic dataset (JSON)");
-    expect(computeMissing(sparse)).not.toContain("Kannada complaint letter");
-  });
-});
-
-describe("normalizeDataset", () => {
-  it("returns null for non-objects / empty content", () => {
-    expect(normalizeDataset(null)).toBeNull();
-    expect(normalizeDataset("x")).toBeNull();
-    expect(normalizeDataset({})).toBeNull();
-    expect(normalizeDataset([])).toBeNull();
-  });
-  it("keeps recognised forensic content and a valid risk colour", () => {
-    const d = normalizeDataset({ work: "Road asphalting", overall_risk: "Red", bogus: 1 });
-    expect(d?.work).toBe("Road asphalting");
-    expect(d?.overall_risk).toBe("Red");
-  });
-  it("drops an invalid risk colour", () => {
-    const d = normalizeDataset({ summary: "x", overall_risk: "Magenta" });
-    expect(d?.overall_risk).toBeUndefined();
-  });
-});
-
 const SAMPLE: ForensicDataset = {
-  code: "047-25-000003",
-  org: "BBMP",
-  work: "Asphalting of 3rd Main Road",
-  division: "Mahadevapura Division",
-  zone: "Mahadevapura Zone",
-  sub_division: "Hoodi Sub-Division",
-  contractor: { name: "ABC Constructions", class: "Class I" },
-  payment_rows: [
-    { bill: "1", date: "12-04-2025", gross: "10,00,000", deduct: "50,000", net: "9,50,000", cum: "9,50,000" },
-    { bill: "2", date: "2025-06-01", gross: "5,00,000", deduct: "25,000", net: "4,75,000", cum: "14,25,000" },
+  code: CODE,
+  work: "Improvements to Roads and drains at IDBI Layout, ward 209 Gottigere",
+  division: "Bangalore South Division (South-1)",
+  sub_division: "Anjanapura",
+  zone: "South",
+  wards: "209 Gottigere",
+  contractor: "ಒಪ್ಪಂದದ ಪ್ರಕಾರ Sri Uday N (Uday Infrastructures, Proprietorship)",
+  overall_risk: "ಹೆಚ್ಚು ಅಪಾಯ / Red",
+  treasury_loss_total: "ಪ್ರಮಾಣೀಕರಿಸಲಾಗದು",
+  summary: "Job 209-26-000004 — records missing.",
+  misleading_summary: ["portal shows a bill id but the supplied set has no bill"],
+  grounds: [
+    { title: "Missing bill/MB/payment", risk: "Red", observed: "only WO docs", mismatch: "no bill", demand: "produce certified part bill", law: "KTPP s.x" },
+    { title: "Tender doubt", risk: "Orange", reason: "single doc", demand: "tender evaluation" },
+    { title: "Minor procedural", risk: "Amber", demand: "clarify dates" },
   ],
-  chronology: [{ event: "Agreement signed", date: "01-03-2025" }],
-  document_presence: { MB_book: "missing", bill: "present", QC_tests: "blank" },
-  loss_components: [
-    { category: "Excess quantity", amount: 120000, confidence: "high", formula: "Q*R", record: "MB book" },
-    { category: "Royalty not recovered", amount: 30000, confidence: "low", record: "Royalty challan" },
-  ],
-  treasury_loss_total: "Rs 1,50,000",
-  misleading_summary: ["Billing shown within agreement when it exceeds it"],
-  overall_risk: "Red",
-  summary: "Two possible exposures pending records.",
-  caveats: "Based on supplied records.",
+  payment_rows: [{ item: "Estimate sub total", amount: "₹84,73,139.46", source: "Estimate p9" }],
+  chronology: [{ event: "Administrative sanction", date: "26.05.2025" }],
+  documents_demanded: ["certified part bill and final bill (incl. bill id 762643)"],
 };
 
-describe("parseJobFolder", () => {
-  it("parses a complete job folder (source=json, all present)", () => {
-    const files: RawFile[] = [
-      { relPath: "047-25-000003.txt", size: 1000, text: "OCR text here" },
-      { relPath: "047-25-000003.min.json", size: 800, text: JSON.stringify(SAMPLE) },
-      { relPath: "Job_047-25-000003_complaint_KN.docx", size: 9000, text: "ಪತ್ರದ ಪಠ್ಯ" },
-      { relPath: "Job_047-25-000003_complaint_KN.pdf", size: 12000 },
-      { relPath: "evidence_index.csv", size: 200, text: "a,b" },
-      { relPath: "047-25-000003.log", size: 50, text: "log" },
-      { relPath: "WO-1-Estimate.pdf", size: 4000 },
-    ];
-    const r = parseJobFolder("047-25-000003", files);
-    expect(r.validCode).toBe(true);
-    expect(r.jobCode).toBe("047-25-000003");
-    expect(r.source).toBe("json");
-    expect(r.dataset?.work).toContain("Asphalting");
-    expect(r.missing).toEqual([]);
-    expect(r.letterFileRel).toBe("Job_047-25-000003_complaint_KN.docx");
-    expect(r.letterPdfRel).toBe("Job_047-25-000003_complaint_KN.pdf");
-    expect(r.letterText).toContain("ಪತ್ರ");
-    expect(r.riskColour).toBe("Red");
-    expect(r.skip).toBe(false);
-  });
+function entries(): RawEntry[] {
+  return [
+    { relPath: `${B}/${CODE}/info.txt`, size: 900, text: "Job Code: " + CODE },
+    { relPath: `${B}/${CODE}/WO-1-Estimate.pdf`, size: 7880672 },
+    { relPath: `${B}/${CODE}/WO-1-NA.jpg`, size: 2495 },
+    { relPath: `${A}/data/${CODE}.json`, size: 39000, text: JSON.stringify(SAMPLE) },
+    { relPath: `${A}/work/${CODE}.min.json`, size: 1800, text: JSON.stringify({ code: CODE, work: "skeleton" }) },
+    { relPath: `${A}/work/${CODE}.txt`, size: 35000, text: "ocr extracted text" },
+    { relPath: `${A}/letters/Job_${CODE}_complaint_KN.docx`, size: 53766, text: "ಪತ್ರದ ಪಠ್ಯ letter body" },
+    { relPath: `${A}/letters/Job_${CODE}_complaint_KN.pdf`, size: 448508 },
+    { relPath: `${A}/work/${CODE}.log`, size: 1334, text: "log" },
+    { relPath: `${A}/work/_batch.log`, size: 2523, text: "batch log" }, // no code → dropped
+    { relPath: `${A}/work/ocrsafe_cache/abc.txt`, size: 100, text: "cache" }, // no code → dropped
+  ];
+}
 
-  it("falls back to ai-from-letter when no JSON but a letter/text exists", () => {
-    const files: RawFile[] = [
-      { relPath: "099-25-000010.txt", size: 100, text: "some ocr" },
-      { relPath: "Job_099-25-000010_complaint_KN.docx", size: 9000, text: "letter body" },
-    ];
-    const r = parseJobFolder("099-25-000010", files);
-    expect(r.source).toBe("ai-from-letter");
-    expect(r.dataset).toBeNull();
-    expect(r.missing).toContain("Forensic dataset (JSON)");
-    expect(r.missing).toContain("Evidence index");
+describe("normalizeDataset", () => {
+  it("keeps the real rich shape (grounds, string contractor, raw risk)", () => {
+    const d = normalizeDataset(SAMPLE)!;
+    expect(d.grounds).toHaveLength(3);
+    expect(typeof d.contractor).toBe("string");
+    expect(d.overall_risk).toContain("Red");
+    expect(d.division).toContain("Bangalore South");
   });
-
-  it("flags an invalid job-code folder and defaults to skip", () => {
-    const r = parseJobFolder("not-a-code", [{ relPath: "x.txt", size: 1, text: "" }]);
-    expect(r.validCode).toBe(false);
-    expect(r.skip).toBe(true);
-    expect(r.warnings.join(" ")).toMatch(/not a valid job code/i);
-  });
-
-  it("prefers .min.json over .json and warns", () => {
-    const files: RawFile[] = [
-      { relPath: "047-25-000003.min.json", size: 1, text: JSON.stringify({ work: "MIN" }) },
-      { relPath: "047-25-000003.json", size: 1, text: JSON.stringify({ work: "RICH" }) },
-    ];
-    const r = parseJobFolder("047-25-000003", files);
-    expect(r.dataset?.work).toBe("MIN");
-    expect(r.warnings.join(" ")).toMatch(/min\.json/i);
+  it("returns null for empty / non-object", () => {
+    expect(normalizeDataset({})).toBeNull();
+    expect(normalizeDataset(null)).toBeNull();
   });
 });
 
-describe("datasetToAuditReport", () => {
-  it("maps loss_components + misleading_summary into ranked findings", () => {
-    const report = datasetToAuditReport("047-25-000003", SAMPLE);
-    expect(report.jobNumber).toBe("047-25-000003");
-    expect(report.findings.length).toBe(3); // 2 loss + 1 misleading
-    expect(report.rankedFindings[0]!.riskPoints).toBeGreaterThanOrEqual(
-      report.rankedFindings[report.rankedFindings.length - 1]!.riskPoints ?? 0,
-    );
-    expect(report.risk.band).toBe("bill_stop"); // Red
-    expect(report.loss.totalPossibleExposure).toBe(150000); // parsed from "Rs 1,50,000"
-    expect(report.documentMatrix.find((m) => m.docType === "bill")?.present).toBe(true);
-    expect(report.documentMatrix.find((m) => m.docType === "MB_book")?.present).toBe(false);
-    expect(report.forensicSkill?.overallRisk).toBe("Red");
+describe("groupEntriesByJobCode + parseJob", () => {
+  it("groups across batch + shared _AUDIT_OUTPUT by job code; drops codeless noise", () => {
+    const g = groupEntriesByJobCode(entries());
+    expect([...g.keys()]).toEqual([CODE]);
+    expect(g.get(CODE)!.length).toBe(9); // 11 entries minus _batch.log + ocrsafe (no code)
   });
+  it("parses one job: source=json, letter + dataset detected, nothing missing", () => {
+    const jobs = assembleForensicJobs(entries());
+    expect(jobs).toHaveLength(1);
+    const j = jobs[0]!;
+    expect(j.jobCode).toBe(CODE);
+    expect(j.validCode).toBe(true);
+    expect(j.source).toBe("json");
+    expect(j.dataset?.work).toContain("IDBI");
+    expect(j.letterFileRel).toBe(`${A}/letters/Job_${CODE}_complaint_KN.docx`);
+    expect(j.letterPdfRel).toBe(`${A}/letters/Job_${CODE}_complaint_KN.pdf`);
+    expect(j.riskColour).toBe("Red");
+    expect(j.missing).toEqual([]);
+    expect(j.skip).toBe(false);
+  });
+  it("flags ai-from-letter when no JSON but a letter exists", () => {
+    const es: RawEntry[] = [
+      { relPath: `${B}/${CODE}/info.txt`, size: 10, text: "x" },
+      { relPath: `${A}/letters/Job_${CODE}_complaint_KN.docx`, size: 100, text: "letter only" },
+    ];
+    const j = parseJob(CODE, es);
+    expect(j.source).toBe("ai-from-letter");
+    expect(j.dataset).toBeNull();
+    expect(j.missing).toContain("Forensic dataset (JSON)");
+  });
+});
 
-  it("auditRowFromReport extracts the job_audits columns", () => {
-    const row = auditRowFromReport(datasetToAuditReport("047-25-000003", SAMPLE));
+describe("computeMissing", () => {
+  it("ignores optional logs/csv", () => {
+    const roles = new Set<ForensicFileRole>(["rich_json", "letter_docx", "text", "portal_pdf"]);
+    expect(computeMissing(roles)).toEqual([]);
+    expect(computeMissing(new Set<ForensicFileRole>(["letter_docx"]))).toContain("Forensic dataset (JSON)");
+  });
+});
+
+describe("datasetToAuditReport (from grounds)", () => {
+  it("maps grounds → ranked findings + risk band from overall_risk", () => {
+    const r = datasetToAuditReport(CODE, SAMPLE);
+    expect(r.findings).toHaveLength(3);
+    expect(r.findings[0]!.recordToDemand).toBeTruthy();
+    expect(r.risk.band).toBe("bill_stop"); // Red
+    expect(r.counts.redFlags).toBe(3); // none are Low
+    expect(r.forensicSkill?.overallRisk).toContain("Red");
+    expect(r.forensicSkill?.division).toContain("Bangalore South");
+    expect(r.forensicSkill?.documentsDemanded?.length).toBe(1);
+  });
+  it("auditRowFromReport extracts columns", () => {
+    const row = auditRowFromReport(datasetToAuditReport(CODE, SAMPLE));
     expect(row.risk_band).toBe("bill_stop");
-    expect(row.total_exposure).toBe(150000);
     expect(row.finding_count).toBe(3);
-    expect(row.doc_count).toBe(3);
   });
 });
 
-describe("dataset side-table + job_case patch mappers", () => {
-  it("builds running-bill rows with parsed amounts + ISO dates", () => {
-    const rows = datasetToRunningBillRows("047-25-000003", SAMPLE);
-    expect(rows).toHaveLength(2);
-    expect(rows[0]!.this_bill).toBe(950000);
-    expect(rows[0]!.bill_date).toBe("2025-04-12");
-    expect(rows[1]!.total_upto_date).toBe(1425000);
+describe("side-table + job_case mappers", () => {
+  it("running-bill rows parse ₹ amounts", () => {
+    const rows = datasetToRunningBillRows(CODE, SAMPLE);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.this_bill).toBe(8473139.46);
+    expect(rows[0]!.bill_no).toContain("Estimate");
   });
-  it("builds timeline rows from chronology + key dates", () => {
-    const rows = datasetToTimelineRows("047-25-000003", SAMPLE);
-    expect(rows.find((r) => r.event === "Agreement signed")?.event_date).toBe("2025-03-01");
+  it("timeline rows parse dd.mm.yyyy dates", () => {
+    const rows = datasetToTimelineRows(CODE, SAMPLE);
+    expect(rows[0]!.event_date).toBe("2025-05-26");
   });
-  it("derives a job_cases patch (division + aggregated amounts)", () => {
+  it("job_case patch carries division + string contractor", () => {
     const patch = datasetToJobCasePatch(SAMPLE);
-    expect(patch.division).toBe("Mahadevapura Division");
-    expect(patch.contractor).toBe("ABC Constructions");
-    expect(patch.net_amount).toBe(1425000); // last cumulative
-    expect(patch.gross_amount).toBe(1500000); // 10L + 5L
+    expect(patch.division).toBe("Bangalore South Division (South-1)");
+    expect(patch.contractor).toContain("Sri Uday N");
+  });
+  it("contractorName handles string and object", () => {
+    expect(contractorName("Sri Uday N")).toBe("Sri Uday N");
+    expect(contractorName({ name: "ABC" })).toBe("ABC");
+    expect(contractorName(undefined)).toBeNull();
   });
 });
