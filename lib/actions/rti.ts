@@ -1461,7 +1461,7 @@ export async function commitRtiLettersAction(params: {
 
       // 2. Carve this letter's pages out of the staged PDF and store in R2.
       const split = await extractPdfPages(stagingPdf, letter.startPage, letter.endPage);
-      const r2Key = `letters/${newId}/application-${Date.now().toString(36)}.pdf`;
+      const r2Key = `letters/${row.internal_ref}-application.pdf`;
       const splitPath = await uploadToR2({
         key: r2Key,
         body: split.pdf,
@@ -1581,7 +1581,7 @@ export async function uploadRtiDocumentAction(
 
     // 2. Store it in R2.
     const storagePath = await uploadToR2({
-      key: `letters/${rtiId}/${slugifyDocType(docType)}-${Date.now()}.pdf`,
+      key: `letters/${rti.internal_ref}-${slugifyDocType(docType)}-${Date.now().toString(36)}.pdf`,
       body: pdf,
       contentType: "application/pdf",
     });
