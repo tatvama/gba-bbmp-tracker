@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/print-button";
-import { getJobAudit, getJobDossier, listLetterDrafts } from "@/lib/queries";
+import { getJobAudit, getJobDossier, listLetterDrafts, getJobLinkedRtis } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
@@ -28,10 +28,11 @@ export default async function JobDossierPage({ params }: { params: Promise<{ job
     );
   }
 
-  const [audit, complaints, drafts] = await Promise.all([
+  const [audit, complaints, drafts, linkedRtis] = await Promise.all([
     getJobAudit(jobNumber),
     getJobDossier(jobNumber),
     listLetterDrafts(jobNumber),
+    getJobLinkedRtis(jobNumber),
   ]);
   const report = audit?.report ?? null;
   const ranked = report?.rankedFindings ?? [];
@@ -50,6 +51,7 @@ export default async function JobDossierPage({ params }: { params: Promise<{ job
           {latestLetter && (
             <Button asChild size="sm" variant="outline"><a href={`/api/job-audit/${encodeURIComponent(jobNumber)}/letter?draftId=${latestLetter.id}`} download>Download letter (.docx)</a></Button>
           )}
+          <Button asChild size="sm" variant="outline"><a href={`/api/job-dossier/${encodeURIComponent(jobNumber)}`} download>Download dossier (.docx)</a></Button>
           <PrintButton />
         </div>
       </div>
@@ -67,11 +69,33 @@ export default async function JobDossierPage({ params }: { params: Promise<{ job
           <div><span className="text-muted-foreground">Job / work-order no.:</span> <span className="font-mono">{jobNumber}</span></div>
           <div><span className="text-muted-foreground">Contractor:</span> {contractor ?? "—"}</div>
           <div><span className="text-muted-foreground">Division:</span> {division ?? "—"}</div>
-          <div><span className="text-muted-foreground">Linked cases:</span> {complaints.length} · {totalDocs} documents</div>
+          <div><span className="text-muted-foreground">Linked cases:</span> {complaints.length} complaint{complaints.length === 1 ? "" : "s"} · {linkedRtis.length} RTI · {totalDocs} documents</div>
           {report && <div><span className="text-muted-foreground">Possible exposure:</span> {inr(report.loss.totalPossibleExposure)}</div>}
           {report && <div><span className="text-muted-foreground">Red flags:</span> {report.counts.redFlags}</div>}
         </div>
       </section>
+
+      {/* Linked RTI applications (same job number) */}
+      {linkedRtis.length > 0 && (
+        <section className="mb-6 rounded-xl border bg-card p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Linked RTI applications ({linkedRtis.length})
+          </h2>
+          <ol className="space-y-1.5 text-sm">
+            {linkedRtis.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center gap-2 border-b border-border/40 pb-1.5 last:border-0">
+                <Link href={`/rti/${r.id}`} className="font-mono text-xs underline">{r.internalRef ?? r.id.slice(0, 8)}</Link>
+                <span className="min-w-0 flex-1 truncate">{r.subject || "—"}</span>
+                <Badge variant="muted">{r.status}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {r.dateFiled ? `filed ${formatDate(r.dateFiled)}` : "not filed"}
+                  {r.replyDate ? ` · replied ${formatDate(r.replyDate)}` : r.normalDue ? ` · due ${formatDate(r.normalDue)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {/* Findings */}
       {report ? (

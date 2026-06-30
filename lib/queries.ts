@@ -1947,6 +1947,277 @@ export async function listJobNumbers(): Promise<{ jobNumber: string; complaints:
   return [...counts.entries()].map(([jobNumber, complaints]) => ({ jobNumber, complaints })).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
 }
 
+/** Known job codes (union of job_cases + complaints) — typeahead for linking an RTI. */
+export async function listKnownJobCodes(): Promise<string[]> {
+  const supabase = await sb();
+  const [casesRes, compRes] = await Promise.all([
+    supabase.from("job_cases").select("job_number").limit(5000),
+    supabase.from("complaints").select("job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
+  ]);
+  logErr("listKnownJobCodes:cases", casesRes.error);
+  logErr("listKnownJobCodes:complaints", compRes.error);
+  const set = new Set<string>();
+  for (const r of casesRes.data ?? []) {
+    const j = (r as { job_number: string | null }).job_number;
+    if (j) set.add(j);
+  }
+  for (const r of compRes.data ?? []) {
+    const j = (r as { job_number: string | null }).job_number;
+    if (j) set.add(j);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+export interface JobLinkedRti {
+  id: string;
+  internalRef: string | null;
+  subject: string;
+  status: string;
+  dateFiled: string | null;
+  replyDate: string | null;
+  normalDue: string | null;
+}
+
+/** RTI applications linked to a job number (for the unified by-job-code dossier). */
+export async function getJobLinkedRtis(jobNumber: string): Promise<JobLinkedRti[]> {
+  if (!jobNumber) return [];
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("rti_applications")
+    .select("id, internal_ref, subject, status, date_filed, reply_date, normal_due")
+    .eq("job_number", jobNumber)
+    .order("updated_at", { ascending: false });
+  logErr("getJobLinkedRtis", error);
+  return (data ?? []).map((r) => {
+    const x = r as Record<string, unknown>;
+    return {
+      id: x.id as string,
+      internalRef: (x.internal_ref as string) ?? null,
+      subject: (x.subject as string) ?? "",
+      status: (x.status as string) ?? "",
+      dateFiled: (x.date_filed as string) ?? null,
+      replyDate: (x.reply_date as string) ?? null,
+      normalDue: (x.normal_due as string) ?? null,
+    };
+  });
+}
+
+// ── Contractor & division systemic intelligence (Advanced F) ─────────────────
+
+interface LatestAudit {
+  band: string | null;
+  exposure: number;
+  redFlags: number;
+}
+
+async function loadJobCasesWithAudit(): Promise<{
+  cases: Record<string, unknown>[];
+  latestAudit: Map<string, LatestAudit>;
+}> {
+  const supabase = await sb();
+  const [casesRes, auditRes] = await Promise.all([
+    supabase
+      .from("job_cases")
+      .select("job_number, contractor, division, net_amount, gross_amount, year, status, complaint_id")
+      .limit(5000),
+    supabase
+      .from("job_audits")
+      .select("job_number, risk_band, total_exposure, red_flag_count, created_at")
+      .order("created_at", { ascending: false })
+      .limit(8000),
+  ]);
+  logErr("loadJobCasesWithAudit:cases", casesRes.error);
+  logErr("loadJobCasesWithAudit:audits", auditRes.error);
+  const latestAudit = new Map<string, LatestAudit>();
+  for (const a of auditRes.data ?? []) {
+    const jn = (a as { job_number: string }).job_number;
+    if (!latestAudit.has(jn)) {
+      latestAudit.set(jn, {
+        band: (a as { risk_band: string | null }).risk_band ?? null,
+        exposure: Number((a as { total_exposure: number | null }).total_exposure ?? 0) || 0,
+        redFlags: Number((a as { red_flag_count: number | null }).red_flag_count ?? 0) || 0,
+      });
+    }
+  }
+  return { cases: (casesRes.data ?? []) as Record<string, unknown>[], latestAudit };
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export interface ContractorSummary {
+  contractor: string;
+  jobCount: number;
+  divisions: string[];
+  totalNet: number;
+  totalExposure: number;
+  redFlags: number;
+  highRiskJobs: number;
+  blacklistCandidate: boolean;
+  jobNumbers: string[];
+}
+
+export async function getContractorIntelligence(): Promise<ContractorSummary[]> {
+  const { cases, latestAudit } = await loadJobCasesWithAudit();
+  const map = new Map<string, ContractorSummary>();
+  for (const c of cases) {
+    const name = ((c.contractor as string) ?? "").trim();
+    if (!name) continue;
+    const jn = c.job_number as string;
+    const s =
+      map.get(name) ??
+      { contractor: name, jobCount: 0, divisions: [], totalNet: 0, totalExposure: 0, redFlags: 0, highRiskJobs: 0, blacklistCandidate: false, jobNumbers: [] };
+    s.jobCount += 1;
+    s.jobNumbers.push(jn);
+    const div = (c.division as string) ?? "";
+    if (div && !s.divisions.includes(div)) s.divisions.push(div);
+    if (typeof c.net_amount === "number") s.totalNet += c.net_amount as number;
+    const a = latestAudit.get(jn);
+    if (a) {
+      s.totalExposure += a.exposure;
+      s.redFlags += a.redFlags;
+      if (a.band === "bill_stop" || a.band === "serious") s.highRiskJobs += 1;
+    }
+    map.set(name, s);
+  }
+  const list = [...map.values()];
+  for (const s of list) {
+    s.totalNet = round2(s.totalNet);
+    s.totalExposure = round2(s.totalExposure);
+    s.blacklistCandidate = s.jobCount >= 3 && s.highRiskJobs >= 2;
+  }
+  return list.sort((a, b) => b.totalExposure - a.totalExposure || b.jobCount - a.jobCount);
+}
+
+export interface DivisionSummary {
+  division: string;
+  jobCount: number;
+  contractors: number;
+  totalExposure: number;
+  redFlags: number;
+  highRiskJobs: number;
+}
+
+export async function getDivisionIntelligence(): Promise<DivisionSummary[]> {
+  const { cases, latestAudit } = await loadJobCasesWithAudit();
+  const map = new Map<string, { jobs: number; contractors: Set<string>; exposure: number; redFlags: number; high: number }>();
+  for (const c of cases) {
+    const div = ((c.division as string) ?? "").trim();
+    if (!div) continue;
+    const jn = c.job_number as string;
+    const m = map.get(div) ?? { jobs: 0, contractors: new Set<string>(), exposure: 0, redFlags: 0, high: 0 };
+    m.jobs += 1;
+    if (c.contractor) m.contractors.add((c.contractor as string).trim());
+    const a = latestAudit.get(jn);
+    if (a) {
+      m.exposure += a.exposure;
+      m.redFlags += a.redFlags;
+      if (a.band === "bill_stop" || a.band === "serious") m.high += 1;
+    }
+    map.set(div, m);
+  }
+  return [...map.entries()]
+    .map(([division, m]) => ({ division, jobCount: m.jobs, contractors: m.contractors.size, totalExposure: round2(m.exposure), redFlags: m.redFlags, highRiskJobs: m.high }))
+    .sort((a, b) => b.totalExposure - a.totalExposure || b.jobCount - a.jobCount);
+}
+
+/** Jobs shaped for the KTPP work-split detector (lib/forensic/work-split). */
+export async function getWorkSplitJobs(): Promise<
+  { jobNumber: string; contractor: string | null; division: string | null; year: string | null; amount: number | null }[]
+> {
+  const { cases } = await loadJobCasesWithAudit();
+  return cases.map((c) => ({
+    jobNumber: c.job_number as string,
+    contractor: (c.contractor as string) ?? null,
+    division: (c.division as string) ?? null,
+    year: (c.year as string) ?? null,
+    amount: typeof c.net_amount === "number" ? (c.net_amount as number) : typeof c.gross_amount === "number" ? (c.gross_amount as number) : null,
+  }));
+}
+
+export interface ContractorJobRow {
+  jobNumber: string;
+  division: string | null;
+  net: number | null;
+  band: string | null;
+  exposure: number;
+  complaintId: string | null;
+}
+
+export async function getContractorDossier(name: string): Promise<{ summary: ContractorSummary | null; jobs: ContractorJobRow[] }> {
+  const { cases, latestAudit } = await loadJobCasesWithAudit();
+  const mine = cases.filter((c) => ((c.contractor as string) ?? "").trim() === name.trim());
+  const jobs: ContractorJobRow[] = mine.map((c) => {
+    const a = latestAudit.get(c.job_number as string);
+    return {
+      jobNumber: c.job_number as string,
+      division: (c.division as string) ?? null,
+      net: typeof c.net_amount === "number" ? (c.net_amount as number) : null,
+      band: a?.band ?? null,
+      exposure: a?.exposure ?? 0,
+      complaintId: (c.complaint_id as string) ?? null,
+    };
+  });
+  const all = await getContractorIntelligence();
+  const summary = all.find((s) => s.contractor === name.trim()) ?? null;
+  return { summary, jobs };
+}
+
+export interface OversightStats {
+  totalExposure: number;
+  jobsAudited: number;
+  redFlags: number;
+  bands: Record<string, number>;
+}
+
+/** Platform-wide forensic oversight totals (latest audit per job). */
+export async function getOversightStats(): Promise<OversightStats> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("job_audits")
+    .select("job_number, risk_band, total_exposure, red_flag_count, created_at")
+    .order("created_at", { ascending: false })
+    .limit(8000);
+  logErr("getOversightStats", error);
+  const seen = new Set<string>();
+  const bands: Record<string, number> = {};
+  let totalExposure = 0;
+  let redFlags = 0;
+  for (const a of data ?? []) {
+    const jn = (a as { job_number: string }).job_number;
+    if (seen.has(jn)) continue;
+    seen.add(jn);
+    const band = ((a as { risk_band: string | null }).risk_band ?? "unbanded") as string;
+    bands[band] = (bands[band] ?? 0) + 1;
+    totalExposure += Number((a as { total_exposure: number | null }).total_exposure ?? 0) || 0;
+    redFlags += Number((a as { red_flag_count: number | null }).red_flag_count ?? 0) || 0;
+  }
+  return { totalExposure: round2(totalExposure), jobsAudited: seen.size, redFlags, bands };
+}
+
+/** Open complaints past their follow-up date + RTIs past their normal due date. */
+export async function getOverdueCounts(): Promise<{ complaintsOverdue: number; rtiDue: number }> {
+  const supabase = await sb();
+  const today = new Date().toISOString().slice(0, 10);
+  const [compRes, rtiRes] = await Promise.all([
+    supabase
+      .from("complaints")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .not("status", "in", '("Resolved","Closed")')
+      .not("next_follow_up_date", "is", null)
+      .lt("next_follow_up_date", today),
+    supabase
+      .from("rti_applications")
+      .select("id", { count: "exact", head: true })
+      .not("normal_due", "is", null)
+      .lt("normal_due", today)
+      .not("status", "in", '("Reply Received","Closed","Disposed")'),
+  ]);
+  logErr("getOverdueCounts:complaints", compRes.error);
+  logErr("getOverdueCounts:rti", rtiRes.error);
+  return { complaintsOverdue: compRes.count ?? 0, rtiDue: rtiRes.count ?? 0 };
+}
+
 export interface JobNumberWithAudit {
   jobNumber: string;
   complaints: number;

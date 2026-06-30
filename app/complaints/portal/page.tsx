@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, FileText } from "lucide-react";
+import { Building2, FileText, FolderArchive, ArrowRight } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +80,22 @@ export default async function PortalImportPage() {
       />
 
       <PortalDownload />
+
+      <Link
+        href="/complaints/import"
+        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm transition-colors hover:border-primary/50 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/50"
+      >
+        <FolderArchive className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+        <span className="min-w-0">
+          <span className="block font-semibold text-slate-800 dark:text-slate-200">
+            Already ran the forensic-audit skill offline?
+          </span>
+          <span className="block text-xs text-muted-foreground">
+            Upload its ZIP (one folder per job code) to create complaints with the drafted letter + findings attached.
+          </span>
+        </span>
+        <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
+      </Link>
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Job cases ({cases.length})</h2>

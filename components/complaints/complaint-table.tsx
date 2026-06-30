@@ -27,28 +27,51 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
   const [type, setType] = React.useState("all");
   const [priority, setPriority] = React.useState("all");
   const [flag, setFlag] = React.useState("all"); // overdue | reply | action | noreply
+  const [division, setDivision] = React.useState("all");
+  const [subDivision, setSubDivision] = React.useState("all");
+  const [ward, setWard] = React.useState("all");
+
+  // Track-by options derived from the loaded rows (division/sub-division/ward are
+  // joined in COMPLAINT_SELECT) — no extra fetch needed.
+  const divisionOpts = React.useMemo(
+    () => [...new Set(data.map((c) => c.division?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
+    [data],
+  );
+  const subDivisionOpts = React.useMemo(
+    () => [...new Set(data.map((c) => c.eng_subdivision?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
+    [data],
+  );
+  const wardOpts = React.useMemo(
+    () => [...new Set(data.map((c) => (c.ward ? String(c.ward.new_no) : null)).filter(Boolean) as string[])].sort((a, b) => Number(a) - Number(b)),
+    [data],
+  );
 
   const filtered = React.useMemo(
     () => data.filter((c) => {
       if (status !== "all" && c.status !== status) return false;
       if (type !== "all" && c.type !== type) return false;
       if (priority !== "all" && c.priority !== priority) return false;
+      if (division !== "all" && c.division?.name !== division) return false;
+      if (subDivision !== "all" && c.eng_subdivision?.name !== subDivision) return false;
+      if (ward !== "all" && String(c.ward?.new_no ?? "") !== ward) return false;
       if (flag === "overdue" && !(c.next_follow_up_date && c.next_follow_up_date < today)) return false;
       if (flag === "reply" && !c.latest_reply_date) return false;
       if (flag === "action" && !c.latest_action_taken_date) return false;
       if (flag === "noreply" && c.latest_reply_date) return false;
       return true;
     }),
-    [data, status, type, priority, flag],
+    [data, status, type, priority, flag, division, subDivision, ward],
   );
 
-  const hasFilters = globalFilter !== "" || status !== "all" || type !== "all" || priority !== "all" || flag !== "all";
-  const reset = () => { setGlobalFilter(""); setStatus("all"); setType("all"); setPriority("all"); setFlag("all"); };
+  const hasFilters = globalFilter !== "" || status !== "all" || type !== "all" || priority !== "all" || flag !== "all" || division !== "all" || subDivision !== "all" || ward !== "all";
+  const reset = () => { setGlobalFilter(""); setStatus("all"); setType("all"); setPriority("all"); setFlag("all"); setDivision("all"); setSubDivision("all"); setWard("all"); };
 
   const columns = React.useMemo<ColumnDef<ComplaintWithRelations>[]>(() => [
     { accessorKey: "internal_case_number", header: ({ column }) => <Sort column={column} label="Case no." />, cell: ({ row }) => <span className="whitespace-nowrap font-mono text-xs font-semibold">{orDash(row.original.internal_case_number)}</span>, size: 160 },
     { accessorKey: "title", header: ({ column }) => <Sort column={column} label="Title" />, cell: ({ row }) => <span className="font-medium">{row.original.title}</span> },
     { id: "ward", header: "Ward", cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.ward ? row.original.ward.new_no : "—"}</span>, size: 60 },
+    { id: "division", header: "Division", cell: ({ row }) => <span className="text-sm text-muted-foreground">{orDash(row.original.division?.name)}</span> },
+    { id: "subdivision", header: "Sub-division", cell: ({ row }) => <span className="text-sm text-muted-foreground">{orDash(row.original.eng_subdivision?.name)}</span> },
     { id: "engineer", header: "Engineer", cell: ({ row }) => <span className="text-sm text-muted-foreground">{orDash(row.original.assigned_engineer?.full_name)}</span> },
     { accessorKey: "date_submitted", header: ({ column }) => <Sort column={column} label="Given" />, cell: ({ row }) => <span className="whitespace-nowrap text-xs">{formatDate(row.original.date_submitted)}</span>, size: 100 },
     { id: "reply", header: "Reply", cell: ({ row }) => <span className="whitespace-nowrap text-xs">{formatDate(row.original.latest_reply_date)}</span>, size: 100 },
@@ -74,7 +97,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
   function doExport(format: "csv" | "xlsx") {
     exportRows(filtered.map((c) => ({
       case_no: c.internal_case_number ?? "", external_no: c.complaint_number ?? "", title: c.title, type: c.type,
-      ward: c.ward ? `${c.ward.new_no} ${c.ward.new_name}` : "", engineer: c.assigned_engineer?.full_name ?? "",
+      ward: c.ward ? `${c.ward.new_no} ${c.ward.new_name}` : "", division: c.division?.name ?? "", sub_division: c.eng_subdivision?.name ?? "", engineer: c.assigned_engineer?.full_name ?? "",
       given: c.date_submitted ?? "", latest_reply: c.latest_reply_date ?? "", latest_action: c.latest_action_taken_date ?? "",
       status: c.status, priority: c.priority ?? "", next_follow_up: c.next_follow_up_date ?? "",
     })), "complaint-tracker", format);
@@ -90,6 +113,15 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
         <select className={selectCls} value={flag} onChange={(e) => setFlag(e.target.value)}>
           <option value="all">All</option><option value="overdue">Overdue follow-up</option><option value="reply">Reply received</option><option value="action">Action taken</option><option value="noreply">No reply</option>
         </select>
+        {divisionOpts.length > 0 && (
+          <select className={selectCls} value={division} onChange={(e) => setDivision(e.target.value)}><option value="all">Any division</option>{divisionOpts.map((d) => <option key={d} value={d}>{d}</option>)}</select>
+        )}
+        {subDivisionOpts.length > 0 && (
+          <select className={selectCls} value={subDivision} onChange={(e) => setSubDivision(e.target.value)}><option value="all">Any sub-division</option>{subDivisionOpts.map((s) => <option key={s} value={s}>{s}</option>)}</select>
+        )}
+        {wardOpts.length > 0 && (
+          <select className={selectCls} value={ward} onChange={(e) => setWard(e.target.value)}><option value="all">Any ward</option>{wardOpts.map((w) => <option key={w} value={w}>Ward {w}</option>)}</select>
+        )}
         {hasFilters && <Button variant="ghost" size="sm" onClick={reset}><X className="h-4 w-4" /> Reset</Button>}
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" onClick={() => doExport("csv")}><Download className="h-4 w-4" /> CSV</Button>

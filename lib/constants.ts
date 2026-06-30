@@ -483,6 +483,7 @@ export const COMPLAINT_DRAFT_KINDS = {
   lokayukta_complaint: "Lokayukta complaint",
   chief_secretary_letter: "Chief Secretary / UDD letter",
   records_preservation: "Records-preservation request",
+  counter_reply: "Counter-reply to department reply",
 } as const;
 export type ComplaintDraftKind = keyof typeof COMPLAINT_DRAFT_KINDS;
 
@@ -492,6 +493,7 @@ export const ESCALATION_DRAFT_KINDS: ComplaintDraftKind[] = [
   "lokayukta_complaint",
   "chief_secretary_letter",
   "records_preservation",
+  "counter_reply",
 ];
 
 export const DEFAULT_COMPLAINT_SETTINGS: ComplaintSettings = {
