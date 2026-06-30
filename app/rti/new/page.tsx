@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { RtiNewModes } from "@/components/rti/rti-new-modes";
+import { RtiBulkImport } from "@/components/rti/rti-bulk-import";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
 import { Scale, Calendar } from "lucide-react";
@@ -95,7 +95,7 @@ export default async function NewRtiPage() {
       {/* Grid layout (Form + Side Info Panel) */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <RtiNewModes />
+          <RtiBulkImport />
         </div>
         <div className="lg:col-span-1">
           {/* 9. SIDE INFORMATION PANEL (Desktop/Tablet) */}
@@ -115,14 +115,6 @@ export default async function NewRtiPage() {
                     <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
                   </div>
                   <span className="font-bold text-primary">Draft (Form Saved)</span>
-                </div>
-
-                {/* Step: Application Uploaded */}
-                <div className="relative flex items-center gap-3">
-                  <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
-                    <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                  </div>
-                  <span>Application Uploaded</span>
                 </div>
 
                 {/* Step: Acknowledgement Uploaded */}
