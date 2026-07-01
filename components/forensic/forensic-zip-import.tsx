@@ -33,7 +33,6 @@ const CHECKLIST: { label: string; roles: ForensicFileRole[] }[] = [
   { label: "Forensic JSON", roles: ["min_json", "rich_json"] },
   { label: "Kannada letter (DOCX)", roles: ["letter_docx"] },
   { label: "Letter PDF", roles: ["letter_pdf"] },
-  { label: "Evidence index", roles: ["evidence_csv"] },
   { label: "Logs", roles: ["log"] },
   { label: "Portal source PDFs", roles: ["portal_pdf"] },
 ];
@@ -321,11 +320,12 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
                           <span className="font-semibold text-slate-700 dark:text-slate-300">Work:</span> {summary.work}
                         </p>
                       )}
-                      {summary.contractor?.name && (
+                      {summary.contractor && (
                         <p>
                           <span className="font-semibold text-slate-700 dark:text-slate-300">Contractor:</span>{" "}
-                          {summary.contractor.name}
-                          {summary.contractor.class ? ` (${summary.contractor.class})` : ""}
+                          {typeof summary.contractor === "string"
+                            ? summary.contractor
+                            : [summary.contractor.name, summary.contractor.class ? `(${summary.contractor.class})` : ""].filter(Boolean).join(" ")}
                         </p>
                       )}
                       {summary.treasury_loss_total && (

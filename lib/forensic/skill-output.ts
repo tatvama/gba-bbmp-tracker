@@ -1,65 +1,68 @@
 /**
  * Shared types for the "forensic ZIP" import (bbmp-bwssb-forensic-audit skill output).
  *
- * The user runs the external skill, which downloads BBMP IFMS documents, OCRs them,
- * runs a forensic audit, and drafts a Kannada complaint letter — producing, PER JOB
- * CODE, an extracted-text file, a minimum-dataset JSON, the letter (DOCX + PDF) and
- * logs. The user ZIPs that output so each top-level folder is named exactly a job
- * code (ddd-yy-nnnnnn) and uploads it here.
+ * REAL export layout (one batch per ZIP, possibly several batches):
+ *   batch_<W..>/
+ *     <ddd-yy-nnnnnn>/                 ← job-code folder: SOURCE docs (WO-*, info.txt)
+ *     _AUDIT_OUTPUT/
+ *       data/<code>.json               ← rich forensic dataset (the authoritative one)
+ *       work/<code>.min.json           ← skeleton (fallback only)
+ *       work/<code>.txt                ← extracted/OCR text
+ *       letters/Job_<code>_complaint_KN.docx + .pdf   ← drafted letter
+ *       work/{_batch*.json,_work_split.json,ocrsafe_cache/} ← batch noise (ignored)
  *
- * NOTE: deliberately NO `import "server-only"` — this is a plain types/contract module
- * imported by both server actions and client components (mirrors lib/rti/letter-import.ts).
+ * So a job's files are spread across the job folder AND the shared _AUDIT_OUTPUT.
+ * We therefore key everything off the job code found in each entry's path.
+ *
+ * NOTE: no `import "server-only"` — imported by client components too (types only).
  */
 
-/** Where a job's parsed dataset came from. */
 export type ForensicSource = "json" | "ai-from-letter" | "none";
 
-/** What a file inside a job-code folder is. */
 export type ForensicFileRole =
-  | "min_json"      // <code>.min.json — the guaranteed minimum dataset
-  | "rich_json"     // <code>.json     — analyst-curated rich dataset
-  | "text"          // <code>.txt      — combined extracted/OCR text
-  | "letter_docx"   // Job_<code>_complaint_*.docx — the drafted complaint letter
+  | "rich_json"     // _AUDIT_OUTPUT/data/<code>.json — authoritative dataset
+  | "min_json"      // _AUDIT_OUTPUT/work/<code>.min.json — skeleton fallback
+  | "text"          // <code>.txt — combined extracted/OCR text
+  | "letter_docx"   // Job_<code>_complaint_*.docx
   | "letter_pdf"    // Job_<code>_complaint_*.pdf
-  | "evidence_csv"  // evidence/annexure index
-  | "log"           // <code>.log / batch logs
-  | "portal_pdf"    // original IFMS source PDF (WO-*, WB-*, BA-*, Pmc-*)
+  | "evidence_csv"
+  | "log"
+  | "portal_pdf"    // a source document (WO-*, WB-*, …) or site photo
   | "info"          // info.txt
-  | "other";
+  | "other";        // placeholders (WO-*-NA.jpg), batch logs, ocr cache — ignored
 
 export interface DetectedFile {
-  /** Path within the job-code folder (no leading folder, forward slashes). */
-  relPath: string;
-  fileName: string;
+  relPath: string;   // full path within the ZIP
+  fileName: string;  // basename
   ext: string;
   size: number;
   role: ForensicFileRole;
-  /** Canonical document type (for portal_pdf, via mapPortalFileToDocType). */
-  docType: string;
+  docType: string;   // for portal_pdf, via mapPortalFileToDocType
   isBlankTemplate: boolean;
 }
 
-// ── Minimum-dataset shape (matches assets/minimum_dataset.schema.json) ─────────
-// Everything optional: the importer must tolerate partial/missing data.
+export type ForensicRiskColour = "Green" | "Amber" | "Orange" | "Red" | "Purple";
 
-export interface ForensicContractor {
-  name?: string;
-  class?: string;
-  gstin?: string;
-  pan?: string;
+/** A forensic ground (finding) from the rich data/<code>.json. */
+export interface ForensicGround {
+  title?: string;
+  doc_ref?: string;
+  observed?: string;
+  mismatch?: string;
+  reason?: string;
+  example?: string;
+  law?: string;
+  demand?: string;
+  officer?: string;
+  evidence?: string;
+  risk?: string; // Red | Orange | Amber | Green (sometimes free text)
 }
-export interface ForensicSanction {
-  number?: string;
-  date?: string;
-  amount?: string;
-}
-export interface ForensicAgreement {
-  number?: string;
-  date?: string;
-  value?: string;
-  percent_above_sr?: string;
-}
+
+/** Payment/amount row — real shape {item,amount,source}; legacy keys tolerated. */
 export interface ForensicPaymentRow {
+  item?: string;
+  amount?: string;
+  source?: string;
   bill?: string;
   date?: string;
   gross?: string;
@@ -67,21 +70,12 @@ export interface ForensicPaymentRow {
   net?: string;
   cum?: string;
 }
-export interface ForensicQuantityRow {
-  item?: string;
-  desc?: string;
-  sr?: string;
-  orig?: string;
-  mod?: string;
-  billed?: string;
-  rate?: string;
-  amount?: string;
-  pct?: string;
-}
+
 export interface ForensicChronologyRow {
   event?: string;
   date?: string;
 }
+
 export interface ForensicLossComponent {
   category?: string;
   formula?: string;
@@ -91,8 +85,7 @@ export interface ForensicLossComponent {
   record?: string;
 }
 
-export type ForensicRiskColour = "Green" | "Amber" | "Orange" | "Red" | "Purple";
-
+/** The forensic dataset (rich data/<code>.json; tolerant of the skeleton min.json). */
 export interface ForensicDataset {
   code?: string;
   org?: string;
@@ -101,58 +94,56 @@ export interface ForensicDataset {
   zone?: string;
   division?: string;
   sub_division?: string;
-  sr_year?: string;
-  contractor?: ForensicContractor;
-  estimate_cost?: string;
-  administrative_sanction?: ForensicSanction;
-  technical_sanction?: ForensicSanction;
-  agreement?: ForensicAgreement;
-  work_order?: { number?: string; date?: string };
-  cbr?: string;
-  rtgs?: string;
-  bill_ids?: string;
+  place?: string;
+  letter_date?: string;
+  /** Real export uses a string; legacy schema used an object. */
+  contractor?: string | { name?: string; class?: string; gstin?: string; pan?: string };
+  identity_rows?: { label?: string; value?: string }[];
   payment_rows?: ForensicPaymentRow[];
-  quantity_rows?: ForensicQuantityRow[];
+  quantity_rows?: Record<string, unknown>[];
   chronology?: ForensicChronologyRow[];
-  document_presence?: Record<string, string>;
-  blank_form_files?: string[];
-  loss_components?: ForensicLossComponent[];
-  loss_line?: string;
+  grounds?: ForensicGround[];
+  documents_demanded?: (string | { label?: string; demand?: string })[];
   treasury_loss_total?: string;
+  /** Raw risk text (e.g. "ಹೆಚ್ಚು ಅಪಾಯ / Red"); parse the colour with parseRiskColour. */
+  overall_risk?: string;
+  loss_line?: string;
   misleading_summary?: string | string[];
-  overall_risk?: ForensicRiskColour;
   summary?: string;
   caveats?: string;
+  /** Legacy minimum-dataset fields (still accepted). */
+  loss_components?: ForensicLossComponent[];
+  document_presence?: Record<string, unknown>;
+  bill_ids?: string;
 }
 
 /** Per-job result after analyze; reviewed by the user, then committed. */
 export interface ForensicJobResult {
-  jobCode: string;          // folder name (raw)
-  validCode: boolean;       // matches ^\d{3}-\d{2}-\d{6}$
-  files: DetectedFile[];
-  missing: string[];        // human labels of expected-but-absent pieces
+  jobCode: string;
+  validCode: boolean;
+  files: DetectedFile[];     // all entries belonging to this job code (full relPaths)
+  missing: string[];
   warnings: string[];
   source: ForensicSource;
   dataset: ForensicDataset | null;
-  letterText: string;       // text of the drafted letter (DOCX/PDF/derived), capped
-  extractedText: string;    // OCR/extracted text (<code>.txt), capped
-  letterFileRel: string | null; // relPath of the letter DOCX (canonical print artifact)
+  letterText: string;
+  extractedText: string;
+  letterFileRel: string | null;
   letterPdfRel: string | null;
   riskColour: ForensicRiskColour | null;
-  skip: boolean;            // user toggle in review (default true if !validCode)
-  alreadyImported?: boolean; // job_number already exists in job_cases
+  skip: boolean;
+  alreadyImported?: boolean;
 }
 
 export type ForensicImportStatus = "Processing" | "Ready" | "Committed" | "Failed";
 
-/** Envelope returned by the analyze/poll actions and consumed by the import UI. */
 export interface ForensicImportBatch {
   success?: boolean;
   error?: string;
   batchId?: string;
   status?: ForensicImportStatus;
   storagePath?: string;
-  folderCount?: number;
+  folderCount?: number; // number of job codes found
   jobs?: ForensicJobResult[];
   createdCaseIds?: string[];
   createdComplaintIds?: string[];
