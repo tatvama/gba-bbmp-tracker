@@ -39,20 +39,21 @@ export default async function DuplicatePhotosPage() {
   const divIds = Array.from(
     new Set(clusters.flatMap((c) => c.divisions.map((d) => d.divisionId).filter(Boolean) as string[])),
   );
-  const officerEntries = await Promise.all(
-    divIds.map(async (id) => [id, await getDivisionResponsibleOfficers(id)] as const),
-  );
-  const officersByDiv = new Map<string, ResponsibleOfficer[]>(officerEntries);
-
+  // Officer lookups and thumbnail signing are independent of each other ->
+  // run both groups concurrently instead of one after the other.
   const thumbs = new Map<string, string>();
-  await Promise.all(
-    clusters.flatMap((c) =>
-      c.entries.map(async (e) => {
-        const url = await getSignedUrl(e.bucket, e.thumbPath ?? e.storagePath, 3600);
-        if (url) thumbs.set(e.documentId, url);
-      }),
+  const [officerEntries] = await Promise.all([
+    Promise.all(divIds.map(async (id) => [id, await getDivisionResponsibleOfficers(id)] as const)),
+    Promise.all(
+      clusters.flatMap((c) =>
+        c.entries.map(async (e) => {
+          const url = await getSignedUrl(e.bucket, e.thumbPath ?? e.storagePath, 3600);
+          if (url) thumbs.set(e.documentId, url);
+        }),
+      ),
     ),
-  );
+  ]);
+  const officersByDiv = new Map<string, ResponsibleOfficer[]>(officerEntries);
 
   const sameDiv = clusters.filter((c) => c.sameDivisionReuse);
   const crossDiv = clusters.filter((c) => !c.sameDivisionReuse);

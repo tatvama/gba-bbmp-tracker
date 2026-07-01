@@ -31,7 +31,8 @@ export function CommandPalette() {
     if (open) {
       setQ("");
       setCursor(0);
-      setTimeout(() => inputRef.current?.focus(), 30);
+      const t = setTimeout(() => inputRef.current?.focus(), 30);
+      return () => clearTimeout(t);
     }
   }, [open]);
 
