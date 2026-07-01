@@ -1,5 +1,6 @@
 import "server-only";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Readable } from "node:stream";
 
 /**
@@ -23,6 +24,15 @@ function getClient(): S3Client {
     region: "auto",
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
+    // AWS SDK v3 (>= ~3.729) defaults to adding a flexible CRC32 checksum to
+    // every PutObject. For streamed/large bodies this forces `aws-chunked`
+    // content-encoding + a streaming checksum trailer, which Cloudflare R2
+    // rejects/mishandles — the upload then fails (silently, per-file, in the
+    // forensic import). R2 is S3-compatible but does NOT support the new
+    // default checksum flow, so restore the pre-2025 behaviour: only send a
+    // checksum when the specific operation actually requires one.
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
 }
 
@@ -36,6 +46,18 @@ export function getR2PublicUrl(key: string): string {
   const base = (process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
   if (!base) throw new Error("R2_PUBLIC_URL is not configured");
   return `${base}/${key}`;
+}
+
+/**
+ * Short-lived presigned GET URL for an R2 object key. Unlike getR2PublicUrl this
+ * works even when the bucket has NO public access enabled (it signs a request to
+ * the authenticated S3 endpoint), and keeps complaint documents private — the
+ * link expires. This is what the in-app viewer/download uses.
+ */
+export async function getR2SignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+  const bucket = process.env.R2_BUCKET_NAME;
+  if (!bucket) throw new Error("R2_BUCKET_NAME is not configured");
+  return getSignedUrl(getClient(), new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: expiresInSeconds });
 }
 
 /** Extract the R2 object key from a public URL. */
@@ -100,9 +122,22 @@ export async function downloadFromR2(url: string): Promise<Buffer | null> {
   }
 }
 
-/** Convenience for read-side call sites that only have a bare object key. */
+/**
+ * Download an R2 object by its bare key using the authenticated S3 API (not the
+ * public URL), so server-side reads (OCR, vision screening, photo-dedupe) work
+ * regardless of whether the bucket has public access enabled.
+ */
 export async function downloadFromR2ByKey(key: string): Promise<Buffer | null> {
-  return downloadFromR2(getR2PublicUrl(key));
+  try {
+    const bucket = process.env.R2_BUCKET_NAME;
+    if (!bucket) return null;
+    const res = await getClient().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    const bytes = await res.Body?.transformToByteArray();
+    return bytes ? Buffer.from(bytes) : null;
+  } catch (e) {
+    console.warn("[r2] downloadFromR2ByKey failed", key, e);
+    return null;
+  }
 }
 
 /**
