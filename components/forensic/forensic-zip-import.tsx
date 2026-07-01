@@ -170,11 +170,31 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
         return;
       }
       const failed = (res.perJob || []).filter((p) => p.error);
-      stopPoll();
-      setImportParam(null);
       if (failed.length) {
         setError(`${failed.length} job(s) failed: ${failed.map((f) => `${f.jobCode} (${f.error})`).join("; ")}`);
         setPhase("review");
+        return;
+      }
+      const filesFailed = (res.perJob || []).flatMap((p) =>
+        (p.filesFailed || []).map((f) => `${p.jobCode}/${f.fileName}`),
+      );
+      stopPoll();
+      setImportParam(null);
+      if (filesFailed.length) {
+        // The temp extraction dir is already deleted after this commit attempt
+        // (success or partial failure) — retrying needs a fresh ZIP upload, not
+        // a re-click on this now-stale review screen. Already-uploaded files are
+        // skipped on re-import (deduped by file name against job_documents).
+        const shown = filesFailed.slice(0, 5).join(", ");
+        const more = filesFailed.length > 5 ? ` and ${filesFailed.length - 5} more` : "";
+        setError(
+          `Complaint${res.perJob && res.perJob.length === 1 ? "" : "s"} created, but ${filesFailed.length} file(s) failed to upload to storage: ${shown}${more}. Re-upload the same ZIP to retry just the missing files.`,
+        );
+        setFile(null);
+        setJobs([]);
+        setBatchId("");
+        setBatchError(null);
+        setPhase("idle");
         return;
       }
       router.push("/complaints");

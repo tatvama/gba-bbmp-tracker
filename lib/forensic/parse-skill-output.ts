@@ -224,3 +224,31 @@ export function assembleForensicJobs(entries: RawEntry[]): ForensicJobResult[] {
     .map(([code, es]) => parseJob(code, es))
     .sort((a, b) => a.jobCode.localeCompare(b.jobCode));
 }
+
+/**
+ * The R2 sub-path for one entry, preserving the forensic-audit-skill's own
+ * layout (no invented Bills/Photos/Documents taxonomy):
+ *  - _AUDIT_OUTPUT-rooted files (shared across all jobs) → everything AFTER
+ *    "_AUDIT_OUTPUT/" (e.g. "data/<code>.json", "letters/Job_<code>_....docx",
+ *    "work/<code>.txt") — exactly the data/letters/work grouping the skill
+ *    already uses.
+ *  - the job's OWN source folder (<batch>/<job-code>/*, flat today) →
+ *    everything after the <job-code> path segment (falls back to the
+ *    basename if the code segment isn't found, or if a future export nests
+ *    subfolders under it — still correct either way).
+ */
+export function forensicR2SubPath(relPath: string, jobCode: string): string {
+  const norm = relPath.replace(/\\/g, "/");
+  const marker = "_AUDIT_OUTPUT/";
+  const idx = norm.indexOf(marker);
+  if (idx !== -1) {
+    const sub = norm.slice(idx + marker.length);
+    if (sub) return sub;
+  }
+  const segs = norm.split("/");
+  const codeIdx = segs.indexOf(jobCode);
+  if (codeIdx !== -1 && codeIdx < segs.length - 1) {
+    return segs.slice(codeIdx + 1).join("/");
+  }
+  return segs.pop() || norm; // fallback: basename
+}

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Loader2, ShieldAlert, ShieldCheck, AlertTriangle, Check, X, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { runBillForensics, type ForensicsActionResult } from "@/lib/actions/forensics";
@@ -44,7 +45,7 @@ export function BillForensicsPanel({ complaintId, aiConfigured }: { complaintId:
       )}
 
       {f && res?.ok && (
-        <>
+        <div className="space-y-4 animate-fade-in">
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle>Forensic audit ({res.documentCount} documents)</CardTitle>
@@ -57,13 +58,13 @@ export function BillForensicsPanel({ complaintId, aiConfigured }: { complaintId:
             <CardContent className="space-y-4">
               {f.summary && <p className="text-sm text-muted-foreground">{f.summary}</p>}
               {f.needsManualReview && (
-                <p className="rounded-md border border-amber/40 bg-amber/5 p-2 text-xs text-amber-dark">
+                <p className="rounded-md border border-amber/40 bg-amber/5 p-2 text-xs text-amber-dark animate-pulse-subtle">
                   Low confidence / OCR unclear — verify against the originals before acting.
                 </p>
               )}
 
               {f.crossChecks.length > 0 && (
-                <div>
+                <div className="animate-fade-in">
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cross-document checks</h3>
                   <ul className="space-y-1 text-sm">
                     {f.crossChecks.map((cc, i) => (
@@ -81,22 +82,31 @@ export function BillForensicsPanel({ complaintId, aiConfigured }: { complaintId:
               {f.findings.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Findings</h3>
-                  {f.findings.map((x, i) => (
-                    <div key={i} className="rounded-md border p-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={sev(x.severity)}>{x.severity}</Badge>
-                        <span className="text-sm font-semibold">{x.title}</span>
-                        <span className="text-xs text-muted-foreground">· {x.category}</span>
+                  {f.findings.map((x, i) => {
+                    const staggerClass = `stagger-${(i % 4) + 1}`;
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          "rounded-md border p-3 bg-card transition-all duration-300 ease-in-out hover:shadow-sm hover:border-slate-350 dark:hover:border-slate-750 animate-fade-in",
+                          staggerClass
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={sev(x.severity)}>{x.severity}</Badge>
+                          <span className="text-sm font-semibold">{x.title}</span>
+                          <span className="text-xs text-muted-foreground">· {x.category}</span>
+                        </div>
+                        <p className="mt-1 text-sm">{x.detail}</p>
+                        {x.evidence && <p className="mt-1 text-xs italic text-muted-foreground">“{x.evidence}”</p>}
                       </div>
-                      <p className="mt-1 text-sm">{x.detail}</p>
-                      {x.evidence && <p className="mt-1 text-xs italic text-muted-foreground">“{x.evidence}”</p>}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </div>
   );

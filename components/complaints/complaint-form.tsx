@@ -641,7 +641,7 @@ export function ComplaintForm({
         <Field label="Landmark" error={fe.landmark}>
           <Input name="landmark" defaultValue={initial?.landmark ?? ""} />
         </Field>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <Field label="Latitude" error={fe.latitude}>
             <Input name="latitude" defaultValue={initial?.latitude ?? ""} placeholder="12.97" />
           </Field>

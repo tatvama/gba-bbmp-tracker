@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Download, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ArrowUpDown, Download, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import type { WardWithRelations } from "@/lib/types";
 import {
   Table,
@@ -31,11 +31,70 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { Card, CardContent } from "@/components/ui/card";
 import { CorpPill, DerivedBadge, VerificationBadge } from "@/components/badges";
 import { formatNumber } from "@/lib/format";
 import { exportRows } from "@/lib/export";
 
 const STORAGE_KEY = "ward-table-filters";
+
+function WardCard({ w, router }: { w: WardWithRelations; router: any }) {
+  const o = w.old_wards ?? [];
+  return (
+    <Card
+      onClick={() => router.push(`/wards/${w.new_no}`)}
+      className="border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden hover:border-blue-200 dark:bg-slate-900/40 dark:border-slate-800 transition-all duration-205 group cursor-pointer active:bg-slate-50/50 dark:active:bg-slate-850"
+    >
+      <CardContent className="p-3.5 space-y-3">
+        {/* Header: Ward Number & Status */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border dark:border-slate-750 font-mono">
+            Ward {w.new_no}
+          </span>
+          <VerificationBadge status={w.verification_status} />
+        </div>
+
+        {/* Ward Name */}
+        <div>
+          <h3 className="font-bold text-sm text-slate-850 dark:text-slate-200 truncate group-hover:text-blue-650">
+            {w.new_name}
+          </h3>
+          {o.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-400 font-medium">
+              <span>Old Wards: {o.join(", ")}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Corporation details & Derived Badge */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-105 dark:border-slate-850/60 mt-1">
+          {w.derived_corporation ? (
+            <>
+              <CorpPill code={w.derived_corporation.code} name={w.derived_corporation.name} derived />
+              <DerivedBadge />
+            </>
+          ) : (
+            <span className="text-[10px] italic text-slate-450">not resolved</span>
+          )}
+        </div>
+
+        {/* Footer Action */}
+        <div className="flex items-center justify-between pt-2 border-t border-slate-105 dark:border-slate-850/60 text-[11px] text-slate-500">
+          <span className="font-medium">Properties: {formatNumber(w.property_count)}</span>
+          <span className="text-blue-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+            View Details →
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function WardTable({ data }: { data: WardWithRelations[] }) {
   const router = useRouter();
@@ -45,6 +104,9 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [zone, setZone] = React.useState<string>("all");
   const [corp, setCorp] = React.useState<string>("all");
+  const [ac, setAc] = React.useState<string>("all");
+  const [verification, setVerification] = React.useState<string>("all");
+  const [showMobileFilters, setShowMobileFilters] = React.useState(false);
 
   React.useEffect(() => {
     try {
@@ -54,6 +116,8 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
         setGlobalFilter(s.globalFilter ?? "");
         setZone(s.zone ?? "all");
         setCorp(s.corp ?? "all");
+        setAc(s.ac ?? "all");
+        setVerification(s.verification ?? "all");
       }
     } catch {
       /* ignore */
@@ -64,12 +128,12 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ globalFilter, zone, corp }),
+        JSON.stringify({ globalFilter, zone, corp, ac, verification }),
       );
     } catch {
       /* ignore */
     }
-  }, [globalFilter, zone, corp]);
+  }, [globalFilter, zone, corp, ac, verification]);
 
   const zones = React.useMemo(
     () =>
@@ -87,24 +151,38 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
       ),
     [data],
   );
+  const assemblyConstituencies = React.useMemo(
+    () =>
+      Array.from(new Set(data.map((w) => w.assembly_constituency).filter(Boolean))).sort() as string[],
+    [data],
+  );
+  const verificationStatuses = React.useMemo(
+    () =>
+      Array.from(new Set(data.map((w) => w.verification_status).filter(Boolean))).sort() as string[],
+    [data],
+  );
 
   const filtered = React.useMemo(
     () =>
       data.filter(
         (w) =>
           (zone === "all" || w.zone === zone) &&
-          (corp === "all" || w.derived_corporation?.code === corp),
+          (corp === "all" || w.derived_corporation?.code === corp) &&
+          (ac === "all" || w.assembly_constituency === ac) &&
+          (verification === "all" || w.verification_status === verification),
       ),
-    [data, zone, corp],
+    [data, zone, corp, ac, verification],
   );
 
   const hasFilters =
-    globalFilter !== "" || zone !== "all" || corp !== "all";
+    globalFilter !== "" || zone !== "all" || corp !== "all" || ac !== "all" || verification !== "all";
 
   function resetFilters() {
     setGlobalFilter("");
     setZone("all");
     setCorp("all");
+    setAc("all");
+    setVerification("all");
   }
 
   const columns = React.useMemo<ColumnDef<WardWithRelations>[]>(
@@ -198,8 +276,20 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
           <VerificationBadge status={row.original.verification_status} />
         ),
       },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => (
+          <Button
+            onClick={() => router.push(`/wards/${row.original.new_no}`)}
+            className="h-7 px-4 text-xs font-bold rounded-lg bg-[#e27226] hover:bg-[#c95d18] text-white border-0 cursor-pointer transition-colors shadow-xs"
+          >
+            View
+          </Button>
+        ),
+      },
     ],
-    [],
+    [router],
   );
 
   const table = useReactTable({
@@ -239,8 +329,96 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
 
   return (
     <div>
-      {/* Filter toolbar */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      {/* Mobile Filter & Toolbar Header */}
+      <div className="flex flex-col gap-2 md:hidden mb-4">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search wards, AC, zone…"
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="flex-1 h-11 text-sm bg-white dark:bg-slate-950/40 border-slate-200 dark:border-slate-800"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className="h-11 px-3 text-xs font-semibold gap-1.5 rounded-lg border-slate-200 dark:border-slate-800"
+          >
+            Filters {hasFilters && <span className="h-2 w-2 rounded-full bg-blue-650 shrink-0" />}
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 px-3 text-xs font-semibold gap-1.5 rounded-lg border-slate-205 dark:border-slate-800"
+              >
+                <Download className="h-4 w-4" /> Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="dark:bg-slate-900 dark:border-slate-800">
+              <DropdownMenuItem onClick={() => doExport("csv")} className="cursor-pointer text-xs font-medium">CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => doExport("xlsx")} className="cursor-pointer text-xs font-medium">Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {showMobileFilters && (
+          <div className="p-3.5 border border-slate-205 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40 grid grid-cols-1 gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Zone</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={zone} onChange={(e) => setZone(e.target.value)}>
+                <option value="all">All Zones</option>
+                {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Corporation</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={corp} onChange={(e) => setCorp(e.target.value)}>
+                <option value="all">All Corporations</option>
+                {corps.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Assembly Constituency</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={ac} onChange={(e) => setAc(e.target.value)}>
+                <option value="all">All constituencies</option>
+                {assemblyConstituencies.map((val) => <option key={val} value={val}>{val}</option>)}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Verification Status</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={verification} onChange={(e) => setVerification(e.target.value)}>
+                <option value="all">All statuses</option>
+                {verificationStatuses.map((val) => <option key={val} value={val}>{val}</option>)}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-200 dark:border-slate-850">
+              <span className="text-[10.5px] text-slate-500 font-semibold">
+                {table.getFilteredRowModel().rows.length} Wards Match
+              </span>
+              <div className="flex gap-2">
+                {hasFilters && (
+                  <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-xs font-bold text-slate-500 hover:text-slate-750">
+                    Reset
+                  </Button>
+                )}
+                <Button type="button" size="sm" onClick={() => setShowMobileFilters(false)} className="h-8 text-xs font-bold px-3">
+                  Apply
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Filter Toolbar (Unchanged) */}
+      <div className="hidden md:flex mb-3 flex-row flex-wrap items-center gap-2">
         <Input
           placeholder="Search wards, AC, zone…"
           value={globalFilter}
@@ -303,8 +481,9 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
         </div>
       </div>
 
-      {/* Table */}
-      <Table>
+      {/* Desktop Table View (Unchanged) */}
+      <div className="hidden md:block">
+        <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
@@ -340,10 +519,6 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer"
-                  onClick={() =>
-                    router.push(`/wards/${row.original.new_no}`)
-                  }
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-2.5">
@@ -358,16 +533,30 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
             )}
           </TableBody>
         </Table>
+      </div>
 
-      {/* Pagination */}
-      <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+      {/* Mobile Card Listing Grid */}
+      <div className="block md:hidden space-y-3">
+        {table.getRowModel().rows.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 border border-dashed rounded-xl bg-slate-50/20 dark:bg-slate-900/10">
+            No wards match your active search filters.
+          </div>
+        ) : (
+          table.getRowModel().rows.map((row) => (
+            <WardCard key={row.original.new_no} w={row.original} router={router} />
+          ))
+        )}
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="mt-4 flex items-center justify-between text-xs md:text-sm text-slate-500">
         <span>
-          <span className="font-semibold text-foreground">
+          <span className="font-bold text-slate-800 dark:text-slate-200">
             {table.getFilteredRowModel().rows.length}
           </span>{" "}
           ward{table.getFilteredRowModel().rows.length === 1 ? "" : "s"}
           {hasFilters && (
-            <span className="ml-1 text-xs">
+            <span className="ml-1 text-xs text-slate-400">
               (filtered from {data.length})
             </span>
           )}
@@ -382,6 +571,7 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
             size="icon"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
+            className="h-9 w-9 rounded-lg"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -390,6 +580,7 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
             size="icon"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
+            className="h-9 w-9 rounded-lg"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

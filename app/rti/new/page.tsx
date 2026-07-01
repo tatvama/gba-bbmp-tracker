@@ -1,3 +1,4 @@
+import { NewRtiIntro, NewRtiStepper } from "@/components/rti/new-rti-helpers";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -24,80 +25,19 @@ export default async function NewRtiPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-4 md:space-y-6 px-3 md:px-4 lg:px-6">
       {/* Page Header */}
-      <div className="border-b border-slate-200/60 dark:border-slate-800/80 pb-4">
-        <h1 className="text-2.5xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">
-          New RTI Application
-        </h1>
-        <p className="text-xs text-slate-500 dark:text-slate-405 leading-relaxed mt-1.5 max-w-3xl">
-          Create a new RTI record to begin tracking the complete RTI lifecycle.
-          After saving, you will upload the RTI Application and Filing Acknowledgement.
-          The statutory reply countdown begins once the acknowledgement is confirmed.
-        </p>
-      </div>
+      <NewRtiIntro />
 
       {/* 1. PROGRESS STEPPER */}
-      <div className="no-print border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl p-4 shadow-3xs">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-2">
-          {/* Step 1 */}
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-xs">
-              1
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-850 dark:text-slate-200">Basic Information</span>
-              <span className="text-[10px] text-primary font-semibold">Active</span>
-            </div>
-          </div>
-
-          <span className="hidden sm:inline text-slate-300 dark:text-slate-700">→</span>
-
-          {/* Step 2 */}
-          <div className="flex items-center gap-2.5 opacity-60">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
-              2
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400">Upload Documents</span>
-              <span className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold">Pending</span>
-            </div>
-          </div>
-
-          <span className="hidden sm:inline text-slate-300 dark:text-slate-700">→</span>
-
-          {/* Step 3 */}
-          <div className="flex items-center gap-2.5 opacity-60">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
-              3
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400">Verification</span>
-              <span className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold">Pending</span>
-            </div>
-          </div>
-
-          <span className="hidden sm:inline text-slate-300 dark:text-slate-700">→</span>
-
-          {/* Step 4 */}
-          <div className="flex items-center gap-2.5 opacity-60">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
-              4
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400">RTI Tracking</span>
-              <span className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold">Pending</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <NewRtiStepper />
 
       {/* Grid layout (Form + Side Info Panel) */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <RtiBulkImport />
         </div>
-        <div className="lg:col-span-1">
+        <div className="hidden lg:block lg:col-span-1">
           {/* 9. SIDE INFORMATION PANEL (Desktop/Tablet) */}
           <Card className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs rounded-xl overflow-hidden h-fit">
             <CardContent className="p-5 space-y-4">

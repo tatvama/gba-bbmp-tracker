@@ -91,32 +91,32 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       count("contacts", (q) => q.eq("verification_status", "PENDING")),
     ]);
 
-  // GBA wards = sum of corporation ward_count (369)
-  const { data: corps } = await supabase.from("corporations").select("ward_count");
+  // The five reads below are independent of each other (none depends on
+  // another's result) -> fetched in parallel instead of one-by-one.
+  const [{ data: corps }, { data: oldRows }, missingContactInfo, { data: subWithContact }, { data: wardSubs }] =
+    await Promise.all([
+      // GBA wards = sum of corporation ward_count (369)
+      supabase.from("corporations").select("ward_count"),
+      // Old-198 represented = distinct old_wards entries across all wards
+      supabase.from("wards").select("old_wards"),
+      count("contacts", (q) => q.or("phone.is.null,email.is.null,office_address.is.null")),
+      // wards whose eng sub-division has no contact
+      supabase.from("contacts").select("eng_subdivision_id").not("eng_subdivision_id", "is", null),
+      supabase.from("wards").select("eng_subdivision_id"),
+    ]);
+
   const gbaWards = (corps ?? []).reduce(
     (s: number, c: { ward_count: number }) => s + (c.ward_count ?? 0),
     0,
   );
 
-  // Old-198 represented = distinct old_wards entries across all wards
-  const { data: oldRows } = await supabase.from("wards").select("old_wards");
   const oldSet = new Set<string>();
   for (const r of (oldRows ?? []) as { old_wards: string[] }[])
     for (const o of r.old_wards ?? []) oldSet.add(o);
 
-  const missingContactInfo = await count("contacts", (q) =>
-    q.or("phone.is.null,email.is.null,office_address.is.null"),
-  );
-
-  // wards whose eng sub-division has no contact
-  const { data: subWithContact } = await supabase
-    .from("contacts")
-    .select("eng_subdivision_id")
-    .not("eng_subdivision_id", "is", null);
   const subsCovered = new Set(
     (subWithContact ?? []).map((r: { eng_subdivision_id: string }) => r.eng_subdivision_id),
   );
-  const { data: wardSubs } = await supabase.from("wards").select("eng_subdivision_id");
   const wardsWithoutContact = (wardSubs ?? []).filter(
     (w: { eng_subdivision_id: string | null }) =>
       !w.eng_subdivision_id || !subsCovered.has(w.eng_subdivision_id),
@@ -967,6 +967,57 @@ export async function getComplaint(id: string): Promise<ComplaintWithRelations |
   return mapGbaComplaint(data as unknown as ComplaintWithRelations);
 }
 
+/**
+ * Latest letter draft attached to a complaint (the forensic-ZIP-imported
+ * complaint letter). Used to render the drafted letter inline in the Submit
+ * step of the case workflow, so the user reads what the skill already produced
+ * instead of regenerating it. Returns null when no letter is stored.
+ */
+export async function getComplaintLetterDraft(
+  complaintId: string,
+): Promise<{ id: string; content: string | null; file_name: string | null; variant: string | null; language: string | null } | null> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("letter_drafts")
+    .select("id, content, file_name, variant, language")
+    .eq("complaint_id", complaintId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  logErr("getComplaintLetterDraft", error);
+  return (data as { id: string; content: string | null; file_name: string | null; variant: string | null; language: string | null } | null) ?? null;
+}
+
+/** A job-case evidence document (the source PDFs/JSON imported from the ZIP). */
+export interface JobEvidenceDoc {
+  id: string;
+  title: string | null;
+  original_file_name: string | null;
+  document_type: string | null;
+  mime_type: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  file_size: number | null;
+  ocr_status: string | null;
+}
+
+/**
+ * The job case's evidence documents (source WO-*.pdf, forensic JSON, letter,
+ * etc.) for a complaint's job number. These live in `job_documents`, separate
+ * from the complaint's own `complaint_documents`, so the complaint page can
+ * surface the full imported evidence set for viewing.
+ */
+export async function getJobDocumentsByNumber(jobNumber: string): Promise<JobEvidenceDoc[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("job_documents")
+    .select("id, title, original_file_name, document_type, mime_type, storage_bucket, storage_path, file_size, ocr_status")
+    .eq("job_number", jobNumber)
+    .order("original_file_name", { ascending: true });
+  logErr("getJobDocumentsByNumber", error);
+  return (data as JobEvidenceDoc[]) ?? [];
+}
+
 export async function listComplaintDocuments(complaintId: string): Promise<ComplaintDocument[]> {
   const supabase = await sb();
   const { data, error } = await supabase
@@ -1156,12 +1207,16 @@ export async function complaintDashboardStats(): Promise<ComplaintDashboardStats
 
 export async function rtiDashboardStats(): Promise<RtiDashboardStats> {
   const supabase = await sb();
-  const rules = await getDeadlineRules();
-  const { data, error } = await supabase
-    .from("rti_applications")
-    .select(
-      "status, priority, is_life_liberty, satisfaction_status, normal_due, life_liberty_due, first_appeal_due, second_appeal_due",
-    );
+  // getDeadlineRules() is only used later (post-processing rows) -> independent
+  // of the rti_applications read, so fetch both in parallel.
+  const [rules, { data, error }] = await Promise.all([
+    getDeadlineRules(),
+    supabase
+      .from("rti_applications")
+      .select(
+        "status, priority, is_life_liberty, satisfaction_status, normal_due, life_liberty_due, first_appeal_due, second_appeal_due",
+      ),
+  ]);
   logErr("rtiDashboardStats", error);
   const rows = (data as RtiApplication[]) ?? [];
   const now = new Date();

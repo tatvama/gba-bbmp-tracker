@@ -1,8 +1,9 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadBuffer } from "@/lib/storage/supabase-upload";
+import { downloadFromR2ByKey } from "@/lib/storage/r2-upload";
 import { hammingHex } from "@/lib/ocr/image-fingerprint";
-import { DEFAULT_PHOTO_DEDUPE_RULES } from "@/lib/constants";
+import { DEFAULT_PHOTO_DEDUPE_RULES, R2_STORAGE_SENTINEL } from "@/lib/constants";
 import { compareTwoPhotos } from "@/lib/ai/photo-vision";
 
 /**
@@ -179,9 +180,12 @@ export interface VisualScanResult {
   error?: string;
 }
 
-function bucketPath(row: PhotoRow): { bucket: string; path: string } | null {
-  if (!row.bucket || !row.path) return null;
-  return { bucket: row.bucket, path: row.path };
+/** Download a photo's bytes — R2 by bare key (forensic imports) or Supabase Storage by bucket+path. */
+async function downloadPhoto(row: PhotoRow): Promise<Buffer | null> {
+  if (!row.path) return null;
+  if (row.bucket === R2_STORAGE_SENTINEL) return downloadFromR2ByKey(row.path);
+  if (!row.bucket) return null;
+  return downloadBuffer(row.bucket, row.path);
 }
 
 function mimeFromName(name: string | null): string {
@@ -233,10 +237,8 @@ export async function scanDivisionVisualDuplicates(division: string): Promise<Vi
     let sharedDetails = (existing?.shared_details as string) ?? "";
 
     if (!verdict) {
-      const pa = bucketPath(docA);
-      const pb = bucketPath(docB);
-      if (!pa || !pb) continue;
-      const [ba, bb] = await Promise.all([downloadBuffer(pa.bucket, pa.path), downloadBuffer(pb.bucket, pb.path)]);
+      if (!docA.path || !docB.path) continue;
+      const [ba, bb] = await Promise.all([downloadPhoto(docA), downloadPhoto(docB)]);
       if (!ba || !bb) continue;
       const cmp = await compareTwoPhotos(
         { buffer: ba, mime: mimeFromName(docA.fileName) },
