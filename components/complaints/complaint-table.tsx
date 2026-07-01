@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   type ColumnDef, type SortingState, flexRender, getCoreRowModel,
   getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable,
@@ -332,13 +332,16 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
 
 export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "updated_at", desc: true }]);
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [showMobileFilters, setShowMobileFilters] = React.useState(false);
-  const [status, setStatus] = React.useState("all");
+  // Initial status/flag come from the URL so dashboard cards can deep-link to a
+  // pre-filtered worklist (e.g. /complaints?flag=overdue, ?status=Escalated).
+  const [status, setStatus] = React.useState(() => searchParams.get("status") ?? "all");
   const [type, setType] = React.useState("all");
   const [priority, setPriority] = React.useState("all");
-  const [flag, setFlag] = React.useState("all"); // overdue | reply | action | noreply
+  const [flag, setFlag] = React.useState(() => searchParams.get("flag") ?? "all"); // overdue | reply | action | noreply | today | open
   const [division, setDivision] = React.useState("all");
   const [subDivision, setSubDivision] = React.useState("all");
   const [ward, setWard] = React.useState("all");
@@ -368,6 +371,8 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
       if (flag === "reply" && !c.latest_reply_date) return false;
       if (flag === "action" && !c.latest_action_taken_date) return false;
       if (flag === "noreply" && c.latest_reply_date) return false;
+      if (flag === "today" && c.next_follow_up_date !== today) return false;
+      if (flag === "open" && (c.status === "Resolved" || c.status === "Closed")) return false;
       return true;
     }),
     [data, status, type, priority, flag, division, subDivision, ward],
@@ -569,6 +574,8 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
           </select>
           <select className={selectCls} value={flag} onChange={(e) => setFlag(e.target.value)} aria-label="Quick flag filter">
             <option value="all">All</option>
+            <option value="open">Open (not resolved)</option>
+            <option value="today">Follow-up due today</option>
             <option value="overdue">Overdue follow-up</option>
             <option value="reply">Reply received</option>
             <option value="action">Action taken</option>
@@ -696,6 +703,8 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
               <span className="text-[11px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Quick Flag</span>
               <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={flag} onChange={(e) => setFlag(e.target.value)}>
                 <option value="all">All Flags</option>
+                <option value="open">Open (not resolved)</option>
+                <option value="today">Follow-up due today</option>
                 <option value="overdue">Overdue follow-up</option>
                 <option value="reply">Reply received</option>
                 <option value="action">Action taken</option>
