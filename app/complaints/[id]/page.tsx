@@ -10,6 +10,7 @@ import {
   getComplaint, listComplaintDocuments, listComplaintTimeline, listComplaintReplies,
   listComplaintActions, listComplaintCommunications, listComplaintReminders,
   listComplaintEscalations, listComplaintAiDrafts, listAuditLogs, getComplaintFormOptions,
+  getComplaintLetterDraft, getJobDocumentsByNumber,
 } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { isAiConfigured } from "@/lib/ai/provider";
@@ -23,7 +24,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
   const complaint = await getComplaint(id);
   if (!complaint) notFound();
 
-  const [documents, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, options, user] =
+  const [documents, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, options, letterDraft, user] =
     await Promise.all([
       listComplaintDocuments(id),
       listComplaintTimeline(id),
@@ -35,8 +36,22 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
       listComplaintAiDrafts(id),
       listAuditLogs({ entityType: "complaint", entityId: id }, 100),
       getComplaintFormOptions(),
+      getComplaintLetterDraft(id),
       getSessionUser(),
     ]);
+
+  // The job case's imported evidence (source PDFs/JSON) lives in job_documents,
+  // keyed by job number — surfaced on the complaint so every imported file is viewable here.
+  const jobDocuments = complaint.job_number ? await getJobDocumentsByNumber(complaint.job_number) : [];
+
+  // The complaint letter the forensic ZIP already drafted (shown in the Submit
+  // step for view/download/read — never regenerated).
+  const letter = {
+    text: letterDraft?.content ?? null,
+    fileName: letterDraft?.file_name ?? null,
+    pdfDocId: documents.find((d) => d.document_type === "Generated complaint letter (PDF)")?.id ?? null,
+    docxDocId: documents.find((d) => d.document_type === "Generated complaint letter")?.id ?? null,
+  };
 
   const flags = {
     canEdit: hasRole(user, COMPLAINT_WRITE_ROLES),
@@ -78,7 +93,24 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge variant="muted">{complaint.status}</Badge>
           {complaint.priority && <Badge variant="outline">{complaint.priority} priority</Badge>}
-          {complaint.next_follow_up_date && <Badge variant="warning">Next follow-up {formatDate(complaint.next_follow_up_date)}</Badge>}
+          {(() => {
+            const today = new Date().toISOString().slice(0, 10);
+            const dd = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
+            const badges: React.ReactNode[] = [];
+            if (complaint.date_submitted) {
+              const ago = dd(today, complaint.date_submitted);
+              badges.push(<Badge key="filed" variant="outline">Filed {ago <= 0 ? "today" : `${ago}d ago`}</Badge>);
+            }
+            if (complaint.next_follow_up_date) {
+              const left = dd(complaint.next_follow_up_date, today);
+              badges.push(
+                left < 0
+                  ? <Badge key="fu" variant="destructive">Overdue {Math.abs(left)}d · follow-up was {formatDate(complaint.next_follow_up_date)}</Badge>
+                  : <Badge key="fu" variant="warning">Follow-up {left === 0 ? "today" : `in ${left}d`} ({formatDate(complaint.next_follow_up_date)})</Badge>,
+              );
+            }
+            return badges;
+          })()}
         </div>
       </div>
 
@@ -89,12 +121,14 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           jobNumber={complaint.job_number ?? null}
           caseNumber={complaint.internal_case_number ?? null}
           aiConfigured={flags.aiConfigured}
+          letter={letter}
         />
       )}
 
       <ComplaintTabs
         complaint={complaint}
         documents={documents}
+        jobDocuments={jobDocuments}
         timeline={timeline}
         replies={replies}
         actions={actions}

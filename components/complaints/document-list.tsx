@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, RefreshCw, Sparkles, ClipboardCheck, Loader2, FileText, CheckCircle2, ScanEye, MapPin } from "lucide-react";
+import { Eye, RefreshCw, Sparkles, ClipboardCheck, FileText, CheckCircle2, ScanEye, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/empty-state";
 import { DocumentReview } from "@/components/complaints/document-review";
-import { getDocumentViewUrl, setDocumentVerification } from "@/lib/actions/complaints";
+import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
+import { setDocumentVerification } from "@/lib/actions/complaints";
 import { formatDate } from "@/lib/format";
 import type { ComplaintDocument } from "@/lib/types";
 
@@ -42,13 +43,16 @@ export function DocumentList({
   const router = useRouter();
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [reviewDoc, setReviewDoc] = React.useState<ComplaintDocument | null>(null);
+  const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
 
-  async function view(id: string) {
-    setBusyId(id);
-    const r = await getDocumentViewUrl(id);
-    setBusyId(null);
-    if (r.url) window.open(r.url, "_blank", "noopener");
-    else alert(r.error ?? "Could not open document.");
+  function view(d: ComplaintDocument) {
+    setViewTarget({
+      documentId: d.id,
+      title: d.title || d.original_file_name,
+      mimeType: d.mime_type,
+      fileName: d.original_file_name,
+      fallbackText: d.ocr_clean_text || d.ocr_raw_text,
+    });
   }
 
   async function post(url: string, id: string) {
@@ -119,8 +123,8 @@ export function DocumentList({
               {d.ai_summary && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{d.ai_summary}</p>}
 
               <div className="mt-3 flex flex-wrap gap-1.5">
-                <Button size="sm" variant="outline" onClick={() => view(d.id)} disabled={busy}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />} View
+                <Button size="sm" variant="outline" onClick={() => view(d)}>
+                  <Eye className="h-4 w-4" /> View
                 </Button>
                 {canVerify && (
                   <>
@@ -157,6 +161,8 @@ export function DocumentList({
           {reviewDoc && <DocumentReview doc={reviewDoc} onDone={() => setReviewDoc(null)} />}
         </DialogContent>
       </Dialog>
+
+      <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
     </>
   );
 }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError, type SessionUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSignedUrl, uploadBuffer, buildPath, validateUpload } from "@/lib/storage/supabase-upload";
-import { getR2PublicUrl } from "@/lib/storage/r2-upload";
+import { getR2SignedUrl } from "@/lib/storage/r2-upload";
 import { buildMergedPdf } from "@/lib/pdf/merge";
 import { processDocumentOcr } from "@/lib/ocr/process-document";
 import { writeAudit, diffFields } from "@/lib/audit";
@@ -18,19 +18,14 @@ import {
 import {
   COMPLAINT_WRITE_ROLES,
   COMPLAINT_VERIFY_ROLES,
-  ESCALATION_DRAFT_KINDS,
   STORAGE_BUCKETS,
   R2_STORAGE_SENTINEL,
   type UserRole,
 } from "@/lib/constants";
-import { sanitizeDraft } from "@/lib/letters/safe-language";
 import { getComplaintSettings } from "@/lib/settings";
 import { addDays } from "@/lib/rti-deadlines";
-import { generateText } from "@/lib/ai/provider";
-import {
-  buildComplaintDraftPrompt,
-  type ComplaintDraftKind,
-} from "@/lib/ai/complaint-document-analyzer";
+import { runComplaintDraft } from "@/lib/ai/complaint-draft";
+import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 
@@ -311,6 +306,78 @@ export async function setComplaintStatus(id: string, status: string): Promise<Ac
   revalidatePath(`/complaints/${id}`);
   revalidatePath("/complaints");
   return { success: true, id };
+}
+
+/**
+ * File (submit) a complaint: record HOW/WHEN it was submitted to the officer and
+ * seed the follow-up. This is the "Submit" step of the case workflow — the drafted
+ * letter (from the forensic ZIP) is submitted by hand/RPAD/portal, and the user
+ * records those particulars here rather than a bare one-click status flip.
+ */
+export async function fileComplaint(input: {
+  complaintId: string;
+  submittedDate?: string | null;
+  channel?: string | null;
+  filedTo?: string | null;
+  referenceNo?: string | null;
+  followUpDays?: number | null;
+}): Promise<ActionState> {
+  const a = await authed(COMPLAINT_WRITE_ROLES);
+  if ("error" in a) return { error: a.error };
+  const { user, admin } = a;
+
+  const submitted = (input.submittedDate || "").trim() || todayISO();
+  const settings = await getComplaintSettings();
+  const days = Number.isFinite(input.followUpDays as number) && (input.followUpDays as number) > 0
+    ? Math.floor(input.followUpDays as number)
+    : settings.followUpDaysAfterFiling;
+  const followUp = addDays(submitted, days);
+
+  const update: Record<string, unknown> = {
+    status: "Filed",
+    date_submitted: submitted,
+    next_follow_up_date: followUp,
+    next_action_date: followUp,
+    updated_by: user.id,
+  };
+  if (input.channel?.trim()) update.complaint_mode = input.channel.trim();
+  if (input.filedTo?.trim()) update.complaint_filed_to = input.filedTo.trim();
+  if (input.referenceNo?.trim()) update.complaint_number = input.referenceNo.trim();
+
+  const { error } = await admin.from("complaints").update(update).eq("id", input.complaintId);
+  if (error) return { error: error.message };
+
+  const parts = [
+    input.channel?.trim() ? `via ${input.channel.trim()}` : null,
+    input.filedTo?.trim() ? `to ${input.filedTo.trim()}` : null,
+    input.referenceNo?.trim() ? `ref ${input.referenceNo.trim()}` : null,
+  ].filter(Boolean);
+  await addTimeline(admin, {
+    complaintId: input.complaintId,
+    eventType: "Filed",
+    title: "Complaint letter submitted",
+    summary: parts.length ? `Submitted ${parts.join(", ")}.` : `Submitted on ${submitted}.`,
+    eventDate: `${submitted}T00:00:00.000Z`,
+    createdBy: user.id,
+  });
+  if (followUp) {
+    await addReminder(admin, {
+      complaintId: input.complaintId,
+      title: "Follow up — no reply yet since filing",
+      dueDate: followUp,
+      reminderType: "Follow-up with engineer",
+      createdBy: user.id,
+    });
+  }
+  await writeAudit(admin, {
+    entityType: "complaint",
+    entityId: input.complaintId,
+    changedBy: user.id,
+    changes: [{ field: "status", oldValue: "Draft", newValue: "Filed" }],
+  });
+  revalidatePath(`/complaints/${input.complaintId}`);
+  revalidatePath("/complaints");
+  return { success: true, id: input.complaintId };
 }
 
 // ── Replies ─────────────────────────────────────────────────────────────────
@@ -654,69 +721,6 @@ export async function uploadComplaintScanAction(
 
 // ── AI drafts ───────────────────────────────────────────────────────────────
 
-function complaintContext(c: Record<string, any>): string {
-  return [
-    `Case: ${c.internal_case_number ?? "—"} | ${c.title}`,
-    `Type: ${c.type}${c.complaint_subtype ? ` / ${c.complaint_subtype}` : ""} | Status: ${c.status} | Priority: ${c.priority ?? "—"}`,
-    c.complaint_number ? `External complaint no: ${c.complaint_number}` : "",
-    c.date_submitted ? `Complaint given on: ${c.date_submitted}` : "",
-    c.location ? `Location: ${c.location}${c.landmark ? `, ${c.landmark}` : ""}` : "",
-    c.responsible_department ? `Department: ${c.responsible_department}` : "",
-    c.description ? `Description: ${c.description}` : "",
-    c.requested_action ? `Requested action: ${c.requested_action}` : "",
-    c.latest_reply_summary ? `Latest reply (${c.latest_reply_date ?? "?"}): ${c.latest_reply_summary}` : "No reply received yet.",
-    c.latest_action_taken_summary ? `Latest action taken (${c.latest_action_taken_date ?? "?"}): ${c.latest_action_taken_summary}` : "No action taken recorded yet.",
-    c.assigned_engineer?.full_name ? `Assigned engineer: ${c.assigned_engineer.full_name} (${c.assigned_engineer.designation ?? ""})` : "",
-    c.ward?.new_name ? `Ward: ${c.ward.new_no} ${c.ward.new_name}` : "",
-  ].filter(Boolean).join("\n");
-}
-
-/** Build a dated case-history block (chronology + replies + actions + escalations +
- *  linked job-audit findings) so escalation drafts argue from the real timeline. */
-async function buildCaseHistory(admin: SupabaseClient, complaintId: string, jobNumber: string | null): Promise<string> {
-  const [timeline, replies, actions, escalations] = await Promise.all([
-    admin.from("complaint_timeline").select("event_date,event_type,title,summary").eq("complaint_id", complaintId).order("event_date", { ascending: true }).limit(40),
-    admin.from("complaint_replies").select("reply_date,replied_by_name,reply_summary,issues_remaining,is_satisfactory").eq("complaint_id", complaintId).order("reply_date", { ascending: true }).limit(20),
-    admin.from("complaint_action_taken").select("action_taken_date,action_summary,pending_work").eq("complaint_id", complaintId).order("action_taken_date", { ascending: true }).limit(20),
-    admin.from("escalation_logs").select("escalated_on,to_level,reason,response_received").eq("entity_id", complaintId).eq("entity_type", "complaint").order("escalated_on", { ascending: true }).limit(20),
-  ]);
-
-  const lines: string[] = [];
-  const tl = timeline.data ?? [];
-  if (tl.length) {
-    lines.push("Chronology:");
-    for (const e of tl) lines.push(`  - ${e.event_date ?? "?"} [${e.event_type}] ${e.title}${e.summary ? `: ${e.summary}` : ""}`);
-  }
-  for (const r of replies.data ?? []) {
-    lines.push(`Reply (${r.reply_date ?? "?"}${r.replied_by_name ? `, ${r.replied_by_name}` : ""}): ${r.reply_summary ?? ""}${r.issues_remaining ? ` | Unresolved: ${r.issues_remaining}` : ""}${r.is_satisfactory === false ? " | marked NOT satisfactory" : ""}`);
-  }
-  for (const ac of actions.data ?? []) {
-    lines.push(`Action taken (${ac.action_taken_date ?? "?"}): ${ac.action_summary ?? ""}${ac.pending_work ? ` | Still pending: ${ac.pending_work}` : ""}`);
-  }
-  for (const es of escalations.data ?? []) {
-    lines.push(`Escalation (${es.escalated_on ?? "?"}) to ${es.to_level ?? "?"}: ${es.reason ?? ""}${es.response_received ? "" : " | no response recorded"}`);
-  }
-
-  // Linked forensic job-audit findings (top, by risk) — gives concrete grounds.
-  if (jobNumber) {
-    const { data: audit } = await admin
-      .from("job_audits")
-      .select("report, risk_band, risk_score, total_exposure")
-      .eq("job_number", jobNumber)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const report = (audit?.report ?? null) as { rankedFindings?: { title?: string; detail?: string; recordToDemand?: string }[] } | null;
-    const findings = report?.rankedFindings ?? [];
-    if (findings.length) {
-      lines.push(`\nForensic job audit (job ${jobNumber}, risk ${audit?.risk_band ?? "?"} ${audit?.risk_score ?? ""}${audit?.total_exposure ? `, possible exposure ₹${audit.total_exposure}` : ""}). Top documented suspicions (records to demand):`);
-      for (const f of findings.slice(0, 12)) lines.push(`  - ${f.title ?? ""}${f.recordToDemand ? ` → demand: ${f.recordToDemand}` : ""}`);
-    }
-  }
-
-  return lines.length ? lines.join("\n") : "No case history recorded yet.";
-}
-
 export async function generateComplaintDraft(input: {
   complaintId: string;
   kind: ComplaintDraftKind;
@@ -725,38 +729,8 @@ export async function generateComplaintDraft(input: {
 }): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
-  const { admin } = a;
-  const { data: c } = await admin
-    .from("complaints")
-    .select("*, ward:wards!ward_id(new_no,new_name), assigned_engineer:contacts!assigned_engineer_id(full_name,designation)")
-    .eq("id", input.complaintId)
-    .single();
-  if (!c) return { ok: false, error: "Complaint not found." };
-
-  // Escalation drafts argue from the full chronology + the forensic audit findings.
-  const isEscalation = ESCALATION_DRAFT_KINDS.includes(input.kind);
-  let context = complaintContext(c as Record<string, any>);
-  if (isEscalation) {
-    const history = await buildCaseHistory(admin, input.complaintId, (c as { job_number?: string | null }).job_number ?? null);
-    context = `${context}\n\n=== CASE HISTORY ===\n${history}`;
-  }
-
-  const { system, prompt } = buildComplaintDraftPrompt({
-    kind: input.kind,
-    complaintContext: context,
-    tone: input.tone,
-    language: input.language,
-  });
-  const r = await generateText({ system, prompt });
-  if (!r.ok || !r.text) return { ok: r.ok, text: r.text, error: r.error };
-
-  // Escalation forums get the hard safe-language gate: rewrite accusatory wording
-  // into documented-suspicion phrasing, then flag anything still prohibited.
-  if (isEscalation) {
-    const { text, lint } = sanitizeDraft(r.text);
-    return { ok: true, text, lintWarning: lint.ok ? undefined : lint.errors.map((e) => e.reason).join("; ") };
-  }
-  return { ok: true, text: r.text };
+  // Shared generation core (also used by the background-job runner in jobs.ts).
+  return runComplaintDraft(a.admin, input);
 }
 
 /** Short-lived signed URL for viewing a private document (original or processed). */
@@ -781,14 +755,46 @@ export async function getDocumentViewUrl(
   const bucket = which === "processed" ? "complaint-processed-images" : doc.storage_bucket;
   const path = which === "processed" ? doc.processed_storage_path : doc.storage_path;
   if (!path) return { error: "File not available." };
-  // R2-backed rows (forensic-ZIP-imported letters) store a bare object key —
-  // build the public URL directly, no signing needed. The `processed` path is
-  // always a Supabase-backed AI-derived image, never R2, so it always falls
-  // through to the unchanged getSignedUrl call below.
+  // R2-backed rows (forensic-ZIP-imported letters/docs) store a bare object key.
+  // Use a short-lived PRESIGNED URL, not the public URL: it works even when the
+  // bucket has no public access enabled and keeps complaint PII private. The
+  // `processed` path is always a Supabase-backed AI-derived image, never R2, so
+  // it falls through to the unchanged Supabase getSignedUrl call below.
   if (which === "original" && bucket === R2_STORAGE_SENTINEL) {
-    return { url: getR2PublicUrl(path) };
+    try {
+      return { url: await getR2SignedUrl(path, 3600) };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Could not create R2 signed URL." };
+    }
   }
   const url = await getSignedUrl(bucket, path, 3600);
+  return url ? { url } : { error: "Could not create signed URL." };
+}
+
+/** View URL for a job-case evidence document (job_documents), R2 or Supabase. */
+export async function getJobDocumentViewUrl(documentId: string): Promise<{ url?: string; error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "Sign in to view documents." };
+  let admin: SupabaseClient;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: "Storage not configured." };
+  }
+  const { data: doc } = await admin
+    .from("job_documents")
+    .select("storage_bucket, storage_path")
+    .eq("id", documentId)
+    .single();
+  if (!doc?.storage_path) return { error: "File not available." };
+  if (doc.storage_bucket === R2_STORAGE_SENTINEL) {
+    try {
+      return { url: await getR2SignedUrl(doc.storage_path as string, 3600) };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Could not create R2 signed URL." };
+    }
+  }
+  const url = await getSignedUrl(doc.storage_bucket as string, doc.storage_path as string, 3600);
   return url ? { url } : { error: "Could not create signed URL." };
 }
 

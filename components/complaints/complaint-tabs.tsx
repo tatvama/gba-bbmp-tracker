@@ -11,6 +11,9 @@ import { DetailRow } from "@/components/detail-row";
 import { EmptyState } from "@/components/empty-state";
 import { DocumentUpload } from "@/components/complaints/document-upload";
 import { DocumentList } from "@/components/complaints/document-list";
+import { CaseThread } from "@/components/complaints/case-thread";
+import { JobEvidenceList } from "@/components/complaints/job-evidence-list";
+import type { JobEvidenceDoc } from "@/lib/queries";
 import { ReplyForm, ActionForm, CommunicationForm, EscalationForm } from "@/components/complaints/complaint-forms";
 import { ComplaintAiDrafts } from "@/components/complaints/complaint-ai-drafts";
 import { completeComplaintReminder } from "@/lib/actions/complaints";
@@ -23,10 +26,11 @@ import type {
 type Officer = { id: string; full_name: string; designation: string };
 
 export function ComplaintTabs({
-  complaint, documents, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, officers, flags,
+  complaint, documents, jobDocuments, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, officers, flags,
 }: {
   complaint: ComplaintWithRelations;
   documents: ComplaintDocument[];
+  jobDocuments: JobEvidenceDoc[];
   timeline: ComplaintTimelineEntry[];
   replies: ComplaintReply[];
   actions: ComplaintActionTaken[];
@@ -54,7 +58,8 @@ export function ComplaintTabs({
       <div className="overflow-x-auto">
         <TabsList className="mb-4 inline-flex w-max">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="documents">Documents &amp; OCR ({documents.length})</TabsTrigger>
+          <TabsTrigger value="correspondence">Correspondence</TabsTrigger>
+          <TabsTrigger value="documents">Documents &amp; OCR ({documents.length + jobDocuments.length})</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="replies">Replies ({replies.length})</TabsTrigger>
           <TabsTrigger value="actions">Action Taken ({actions.length})</TabsTrigger>
@@ -90,10 +95,17 @@ export function ComplaintTabs({
         {c.description && <Card className="mt-6"><CardContent className="pt-6"><DetailRow label="Description">{c.description}</DetailRow>{c.requested_action && <DetailRow label="Requested action">{c.requested_action}</DetailRow>}</CardContent></Card>}
       </TabsContent>
 
+      <TabsContent value="correspondence">
+        <CaseThread documents={documents} escalations={escalations} aiDrafts={aiDrafts} />
+      </TabsContent>
+
       <TabsContent value="documents">
         <div className="space-y-6">
           {flags.canField && (
             <Card><CardContent className="pt-6"><DocumentUpload complaintId={c.id} aiConfigured={flags.aiConfigured} /></CardContent></Card>
+          )}
+          {jobDocuments.length > 0 && (
+            <Card><CardContent className="pt-6"><JobEvidenceList docs={jobDocuments} /></CardContent></Card>
           )}
           <DocumentList documents={documents} complaintId={c.id} canVerify={flags.canVerify} />
         </div>

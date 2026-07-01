@@ -14,14 +14,7 @@ import {
 export function ComplaintsHeaderActions({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-      {/* Primary Action: Full width on mobile */}
-      {canEdit && (
-        <Button asChild className="h-11 sm:h-9 w-full sm:w-auto font-bold justify-center cursor-pointer order-first sm:order-last">
-          <Link href="/complaints/new">
-            <Plus className="h-4 w-4 mr-1.5" /> New Complaint
-          </Link>
-        </Button>
-      )}
+
 
       {/* Secondary Actions: Slide/flex on desktop, grouped in dropdown on mobile */}
       <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
