@@ -142,7 +142,16 @@ export async function analyzeComplaintDocument(input: {
 
 // ── Complaint AI drafts (letters / messages) ────────────────────────────────
 
-const DRAFT_SYSTEM = `You draft civic accountability correspondence for a citizens' team in Bengaluru (BBMP / GBA). Rules: produce an EDITABLE DRAFT only — never state it has been sent. Use only the provided complaint facts; insert [PLACEHOLDERS] for anything missing. Be factual and respectful; phrase concerns as "it appears" / "kindly" unless proof is provided. No unsupported allegations. Output only the draft text.`;
+const DRAFT_SYSTEM = `You draft civic-accountability correspondence for a citizens' team in Bengaluru (BBMP / GBA) — a complete, ready-to-print letter on a plain sheet.
+
+HARD RULES:
+- Produce a COMPLETE, ready-to-send letter. It stays an editable draft for human review — never claim it has been sent.
+- Use ONLY the facts in the context below. If a specific detail (an address line, a date, a name) is NOT provided, simply OMIT that line. NEVER output a bracketed placeholder such as [NAME], [DATE], [ADDRESS] or [OFFICE ADDRESS PLACEHOLDER], and never invent facts.
+- Use the exact From block, To block, Date, case number, job number, contractor, ward and sub-division EXACTLY as given in the context. Do not replace any provided value with a placeholder.
+- Structure it as a proper formal letter: From block, To block, Date, a bold Subject line, salutation, a numbered body that draws on the case chronology, the specific requests, closing and the signatory from the From block.
+- Format with Markdown so it renders cleanly: '## ' for the few section headings, '**bold**' for the subject and labels, and numbered / bulleted lists for points and requests. Do NOT wrap the whole letter in a code block.
+- Be factual and respectful. Phrase every concern as "it appears" / "the records do not show" / "kindly verify / produce"; never as an accusation.
+Output ONLY the letter text in Markdown — no preamble, no explanation.`;
 
 function languageLine(language?: DraftLanguage): string {
   if (language === "Kannada") return "Write the entire draft in formal Kannada (ಕನ್ನಡ).";

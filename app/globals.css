@@ -435,4 +435,15 @@
   table { page-break-inside: auto; }
   tr    { page-break-inside: avoid; page-break-after: auto; }
   thead { display: table-header-group; }
+
+  /* Letter print-isolation: when printing is triggered from a letter preview,
+     body.printing-letter hides everything except the .print-letter block so
+     the PDF is just the letter on a clean page. */
+  body.printing-letter * { visibility: hidden !important; }
+  body.printing-letter .print-letter,
+  body.printing-letter .print-letter * { visibility: visible !important; }
+  body.printing-letter .print-letter {
+    position: absolute; inset: 0; margin: 0; max-width: none;
+    border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  }
 }
