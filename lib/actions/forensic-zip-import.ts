@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { readFile } from "node:fs/promises";
-import { createReadStream } from "node:fs";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { scanDivisionVisualDuplicates } from "@/lib/forensic/job-photo-dedupe";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,6 +21,7 @@ import {
 } from "@/lib/forensic/json-to-audit";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { convertJobCaseToComplaint } from "@/lib/actions/ifms";
+import { notifyUser } from "@/lib/notifications";
 import type {
   CommitForensicResult,
   ForensicFileRole,
@@ -31,6 +31,8 @@ import type {
 
 const MAX_FILES_PER_JOB = 300;
 const UPLOAD_CONCURRENCY = 6; // bounded parallel R2 uploads per job; I/O-bound, no reason for full sequential
+/** R2 top-level folder for every forensic-ZIP-imported file: complaints/<job-number>/... */
+const R2_FOLDER_PREFIX = "complaints";
 
 function mimeFor(name: string): string {
   const ext = (name.split(".").pop() || "").toLowerCase();
@@ -70,9 +72,16 @@ function baseName(p: string): string {
 
 /**
  * Resolve the structured ward/division/sub-division FKs for a complaint from the
- * skill's text division/sub_division + the job code's ward number, so imported
- * complaints are trackable by Ward / Division / Sub-division. Best-effort: any
- * field that doesn't match a master row is left null (the text stays on job_cases).
+ * job code's ward number, so imported complaints are trackable by Ward / Division
+ * / Sub-division. The ward's own division_id/eng_subdivision_id FK columns are the
+ * PRIMARY source — they're the app's current, authoritative org master and always
+ * agree with the Ward filter shown elsewhere in the UI. The skill's free-text
+ * division/sub_division fields describe the *original tender-era BBMP engineering
+ * division* (e.g. "Bangalore South Division (South-1)") — a different, older
+ * naming scheme that routinely has no match in this app's `divisions` table (it
+ * names today's GBA-era divisions, e.g. "Uttarahalli") — so that text is only a
+ * fallback for wards whose own master row hasn't been assigned a division yet.
+ * Best-effort throughout: anything that doesn't resolve is left null.
  */
 async function resolveOrgIds(
   admin: ReturnType<typeof createAdminClient>,
@@ -83,24 +92,71 @@ async function resolveOrgIds(
   let eng_subdivision_id: string | null = null;
   let ward_id: string | null = null;
 
-  const divName = dataset?.division?.trim();
-  if (divName) {
-    const { data } = await admin.from("divisions").select("id").ilike("name", divName).limit(1);
-    division_id = (data?.[0]?.id as string) ?? null;
-  }
-  const subName = dataset?.sub_division?.trim();
-  if (subName) {
-    let q = admin.from("eng_subdivisions").select("id").ilike("name", subName);
-    if (division_id) q = q.eq("division_id", division_id);
-    const { data } = await q.limit(1);
-    eng_subdivision_id = (data?.[0]?.id as string) ?? null;
-  }
   const wardNo = parseInt(jobCode.split("-")[0] ?? "", 10);
   if (Number.isFinite(wardNo)) {
-    const { data } = await admin.from("wards").select("id").eq("new_no", wardNo).limit(1);
-    ward_id = (data?.[0]?.id as string) ?? null;
+    const { data } = await admin
+      .from("wards")
+      .select("id, division_id, eng_subdivision_id")
+      .eq("new_no", wardNo)
+      .limit(1);
+    const ward = data?.[0];
+    ward_id = (ward?.id as string) ?? null;
+    division_id = (ward?.division_id as string) ?? null;
+    eng_subdivision_id = (ward?.eng_subdivision_id as string) ?? null;
+  }
+
+  if (!division_id) {
+    const divName = dataset?.division?.trim();
+    if (divName) {
+      const { data } = await admin.from("divisions").select("id").ilike("name", divName).limit(1);
+      division_id = (data?.[0]?.id as string) ?? null;
+    }
+  }
+  if (!eng_subdivision_id) {
+    const subName = dataset?.sub_division?.trim();
+    if (subName) {
+      let q = admin.from("eng_subdivisions").select("id").ilike("name", subName);
+      if (division_id) q = q.eq("division_id", division_id);
+      const { data } = await q.limit(1);
+      eng_subdivision_id = (data?.[0]?.id as string) ?? null;
+    }
   }
   return { division_id, eng_subdivision_id, ward_id };
+}
+
+/**
+ * Best-effort default officer for a resolved eng_subdivision: the contact most
+ * specifically named as responsible in these audits — "Executive Engineer" /
+ * "Assistant Executive Engineer" of the subdivision (this is literally who the
+ * skill's own grounds[].officer text names for subdivision-level oversight).
+ * Falls back to any other contact at that subdivision. Returns nulls (never
+ * throws) when no contact is mapped yet — the contacts directory is filled in
+ * over time and most subdivisions have no entry yet.
+ */
+async function resolveAssignedEngineer(
+  admin: ReturnType<typeof createAdminClient>,
+  engSubdivisionId: string | null,
+): Promise<{ assigned_engineer_id: string | null; responsible_department: string | null }> {
+  if (!engSubdivisionId) return { assigned_engineer_id: null, responsible_department: null };
+  const { data } = await admin
+    .from("contacts")
+    .select("id, designation, department")
+    .eq("eng_subdivision_id", engSubdivisionId);
+  const contacts = data ?? [];
+  if (!contacts.length) return { assigned_engineer_id: null, responsible_department: null };
+
+  const rank = (designation: string | null) => {
+    const d = (designation ?? "").toLowerCase();
+    if (d.includes("executive engineer") && !d.includes("assistant")) return 0;
+    if (d.includes("assistant executive engineer")) return 1;
+    if (d.includes("ward engineer")) return 2;
+    return 3;
+  };
+  const best = [...contacts].sort((a, b) => rank(a.designation as string) - rank(b.designation as string))[0]!;
+  return {
+    assigned_engineer_id: (best.id as string) ?? null,
+    responsible_department: (best.department as string) ?? null,
+  };
 }
 
 /** Poll/resume a forensic import batch by id (also used after a page refresh). */
@@ -223,29 +279,49 @@ export async function commitForensicImportAction(params: {
 
       // 2) Upload files → R2 (bounded concurrency; per-file try/catch so one
       // file's failure never aborts the job or the batch).
+      //
+      // Dedup is R2-AWARE, not just name-aware: skip a file only if it already
+      // has an R2-backed row. A file that exists only as a legacy row (e.g. an
+      // earlier import that stored to Supabase Storage, storage_bucket
+      // "job-documents") is re-uploaded to R2 and its row migrated in place —
+      // otherwise switching to R2-only storage would skip every previously
+      // imported file forever and R2 would stay empty.
       const { data: existingDocs } = await admin
         .from("job_documents")
-        .select("original_file_name")
+        .select("id, original_file_name, storage_bucket")
         .eq("job_number", code);
-      const have = new Set((existingDocs ?? []).map((r) => r.original_file_name as string));
+      const r2Have = new Set(
+        (existingDocs ?? [])
+          .filter((r) => r.storage_bucket === R2_STORAGE_SENTINEL)
+          .map((r) => r.original_file_name as string),
+      );
+      const legacyRowIdByName = new Map<string, string>();
+      for (const r of existingDocs ?? []) {
+        const name = r.original_file_name as string;
+        if (r.storage_bucket !== R2_STORAGE_SENTINEL && !legacyRowIdByName.has(name)) {
+          legacyRowIdByName.set(name, r.id as string);
+        }
+      }
 
       const candidates = jobFiles
         .slice(0, MAX_FILES_PER_JOB)
-        .filter((f) => classifyRelPath(f.relPath) !== "other" && !have.has(baseName(f.relPath)));
+        .filter((f) => classifyRelPath(f.relPath) !== "other" && !r2Have.has(baseName(f.relPath)));
       totalFiles += candidates.length;
       totalSkipped += jobFiles.length - candidates.length;
 
-      // Pre-scan letter attachment targets — pure, synchronous, runs BEFORE
-      // the concurrent upload loop so attachment is deterministic regardless
-      // of upload completion order.
+      // Pre-scan letter attachment targets from ALL job files (not just the
+      // upload candidates): the R2 key is deterministic, so the letter must be
+      // attached to the complaint even when it was already uploaded on a prior
+      // run (and thus deduped out of `candidates`) — otherwise a re-imported
+      // complaint would show no letter.
       let letterDocxPath: { name: string; key: string; subPath: string; mime: string; size: number } | null = null;
       let letterPdfPath: { name: string; key: string; subPath: string; mime: string; size: number } | null = null;
-      for (const f of candidates) {
+      for (const f of jobFiles.slice(0, MAX_FILES_PER_JOB)) {
         const role = classifyRelPath(f.relPath);
         if (role !== "letter_docx" && role !== "letter_pdf") continue;
         const name = baseName(f.relPath);
         const subPath = forensicR2SubPath(f.relPath, code);
-        const entry = { name, key: `forensic/${code}/${subPath}`, subPath, mime: mimeFor(name), size: f.size };
+        const entry = { name, key: `${R2_FOLDER_PREFIX}/${code}/${subPath}`, subPath, mime: mimeFor(name), size: f.size };
         if (role === "letter_docx" && !letterDocxPath) letterDocxPath = entry;
         if (role === "letter_pdf" && !letterPdfPath) letterPdfPath = entry;
       }
@@ -255,12 +331,13 @@ export async function commitForensicImportAction(params: {
         const role = classifyRelPath(f.relPath);
         const mime = mimeFor(name);
         const subPath = forensicR2SubPath(f.relPath, code);
-        const key = `forensic/${code}/${subPath}`;
+        const key = `${R2_FOLDER_PREFIX}/${code}/${subPath}`;
         try {
-          await uploadToR2({ key, body: createReadStream(f.absPath), contentType: mime, contentLength: f.size });
+          const bytes = await readFile(f.absPath);
+          await uploadToR2({ key, body: bytes, contentType: mime, contentLength: f.size });
 
-          const fp = mime.startsWith("image/") ? await fingerprintImage(await readFile(f.absPath), mime).catch(() => null) : null;
-          const { error: insErr } = await admin.from("job_documents").insert({
+          const fp = mime.startsWith("image/") ? await fingerprintImage(bytes, mime).catch(() => null) : null;
+          const row = {
             job_case_id: jobCaseId,
             job_number: code,
             document_type: docTypeForRole(role, name),
@@ -283,10 +360,19 @@ export async function commitForensicImportAction(params: {
             exif_gps_lon: fp?.gpsLon ?? null,
             exif_taken_at: fp?.takenAt ?? null,
             created_by: user.id,
-          });
-          if (insErr) throw new Error(insErr.message);
+          };
+          // Migrate a legacy (non-R2) row in place instead of inserting a
+          // duplicate — the old Supabase object is left orphaned (harmless).
+          const legacyId = legacyRowIdByName.get(name);
+          if (legacyId) {
+            const { error: updErr } = await admin.from("job_documents").update(row).eq("id", legacyId);
+            if (updErr) throw new Error(updErr.message);
+          } else {
+            const { error: insErr } = await admin.from("job_documents").insert(row);
+            if (insErr) throw new Error(insErr.message);
+          }
 
-          console.log(`[commitForensicImportAction] file uploaded job=${code} file=${name} key=${key} user=${user.id} ts=${new Date().toISOString()}`);
+          console.log(`[commitForensicImportAction] file uploaded job=${code} file=${name} key=${key} migrated=${legacyId ? "yes" : "no"} user=${user.id} ts=${new Date().toISOString()}`);
           return { ok: true as const, name };
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Upload failed";
@@ -327,13 +413,39 @@ export async function commitForensicImportAction(params: {
       if (!conv.ok || !conv.complaintId) throw new Error(conv.error || "Could not create the complaint.");
       const complaintId = conv.complaintId;
 
-      // 4b) Make the complaint trackable by Ward / Division / Sub-division.
+      // 4b) Make the complaint trackable by Ward / Division / Sub-division, and
+      // default an Assigned Engineer + Responsible Department from the org
+      // directory — never clobbering a value a human already set (e.g. a manual
+      // reassignment surviving a re-import/refresh of the same job).
       try {
         const org = await resolveOrgIds(admin, job.dataset, code);
         const patch: Record<string, unknown> = {};
         if (org.division_id) patch.division_id = org.division_id;
         if (org.eng_subdivision_id) patch.eng_subdivision_id = org.eng_subdivision_id;
         if (org.ward_id) patch.ward_id = org.ward_id;
+
+        const { data: current } = await admin
+          .from("complaints")
+          .select("assigned_engineer_id, responsible_department")
+          .eq("id", complaintId)
+          .single();
+        if (!current?.assigned_engineer_id || !current?.responsible_department) {
+          const officer = await resolveAssignedEngineer(admin, org.eng_subdivision_id);
+          if (!current?.assigned_engineer_id && officer.assigned_engineer_id) {
+            patch.assigned_engineer_id = officer.assigned_engineer_id;
+          }
+          if (!current?.responsible_department && officer.responsible_department) {
+            patch.responsible_department = officer.responsible_department;
+          }
+        }
+        // Fallback so Responsible department is never blank: the executive-
+        // engineering sub-division that owns the work, derived from the skill's
+        // sub_division text (this is who grounds[].officer names for oversight).
+        if (!current?.responsible_department && !patch.responsible_department) {
+          const sub = job.dataset?.sub_division?.trim();
+          if (sub) patch.responsible_department = `Executive Engineer, ${sub} Sub-division (BBMP)`;
+        }
+
         if (Object.keys(patch).length) await admin.from("complaints").update(patch).eq("id", complaintId);
       } catch (e) {
         console.warn("[commitForensicImportAction] org-id mapping", code, e);
@@ -341,22 +453,31 @@ export async function commitForensicImportAction(params: {
 
       // 5) Attach the skill's letter as the printable complaint letter.
       if (job.letterText || letterDocxPath || letterPdfPath) {
-        await admin.from("letter_drafts").insert({
-          job_number: code,
-          complaint_id: complaintId,
-          variant: "bill_stop",
-          language: "Kannada",
-          signatory_key: "raghav_gowda",
-          content: job.letterText || null,
-          risk_score: auditRow?.risk_score ?? null,
-          band: auditRow?.risk_band ?? null,
-          ai_used: job.source === "ai-from-letter",
-          lint_ok: false,
-          file_name: letterDocxPath?.name ?? letterPdfPath?.name ?? null,
-          created_by: user.id,
-        });
+        // Skip letter-draft/doc/timeline inserts that already exist for this
+        // complaint, so re-committing the same complaint doesn't pile up dupes.
+        const { data: existingLd } = await admin
+          .from("letter_drafts").select("id").eq("complaint_id", complaintId).eq("variant", "bill_stop").limit(1);
+        if (!existingLd?.length) {
+          await admin.from("letter_drafts").insert({
+            job_number: code,
+            complaint_id: complaintId,
+            variant: "bill_stop",
+            language: "Kannada",
+            signatory_key: "raghav_gowda",
+            content: job.letterText || null,
+            risk_score: auditRow?.risk_score ?? null,
+            band: auditRow?.risk_band ?? null,
+            ai_used: job.source === "ai-from-letter",
+            lint_ok: false,
+            file_name: letterDocxPath?.name ?? letterPdfPath?.name ?? null,
+            created_by: user.id,
+          });
+        }
+        const { data: existingCd } = await admin
+          .from("complaint_documents").select("original_file_name").eq("complaint_id", complaintId);
+        const haveCd = new Set((existingCd ?? []).map((r) => r.original_file_name as string));
         for (const lf of [letterDocxPath, letterPdfPath]) {
-          if (!lf) continue;
+          if (!lf || haveCd.has(lf.name)) continue;
           await admin.from("complaint_documents").insert({
             complaint_id: complaintId,
             document_type: lf === letterDocxPath ? "Generated complaint letter" : "Generated complaint letter (PDF)",
@@ -411,6 +532,17 @@ export async function commitForensicImportAction(params: {
   // dir afterward — the only recovery is a fresh re-upload; accepted per plan.
   await deleteTempDir(tempDirPath);
   console.log(`[commitForensicImportAction] completed batch=${params.batchId} user=${user.id} summary=${JSON.stringify(summary)} ts=${new Date().toISOString()}`);
+
+  // Drop an alert into the notifications inbox (this is an automated job too).
+  const okJobs = perJob.filter((p) => !p.error).length;
+  const failJobs = perJob.filter((p) => p.error).length;
+  await notifyUser(admin, user.id, {
+    type: failJobs ? "job_failed" : "job_done",
+    title: `Forensic import: ${okJobs} complaint${okJobs === 1 ? "" : "s"} created${failJobs ? `, ${failJobs} failed` : ""}`,
+    body: `${summary.uploaded} file(s) uploaded to storage${summary.failed ? `, ${summary.failed} failed` : ""}.`,
+    link: "/complaints",
+    entityType: "complaint",
+  });
 
   revalidatePath("/complaints");
   revalidatePath("/complaints/import");
