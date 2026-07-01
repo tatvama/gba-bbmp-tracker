@@ -2,14 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { readFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { scanDivisionVisualDuplicates } from "@/lib/forensic/job-photo-dedupe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { downloadFromR2 } from "@/lib/storage/r2-upload";
-import { uploadBuffer, buildPath } from "@/lib/storage/supabase-upload";
-import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
-import { readZipEntries } from "@/lib/forensic/zip";
-import { classifyRelPath } from "@/lib/forensic/parse-skill-output";
+import { uploadToR2 } from "@/lib/storage/r2-upload";
+import { walkTempDir, deleteTempDir, type TempDirFile } from "@/lib/forensic/zip";
+import { mapWithConcurrency } from "@/lib/utils/concurrency";
+import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES, R2_STORAGE_SENTINEL } from "@/lib/constants";
+import { classifyRelPath, forensicR2SubPath } from "@/lib/forensic/parse-skill-output";
 import { extractJobCode, mapPortalFileToDocType, isBlankTemplate } from "@/lib/ifms/downloader";
 import {
   datasetToAuditReport,
@@ -28,6 +30,7 @@ import type {
 } from "@/lib/forensic/skill-output";
 
 const MAX_FILES_PER_JOB = 300;
+const UPLOAD_CONCURRENCY = 6; // bounded parallel R2 uploads per job; I/O-bound, no reason for full sequential
 
 function mimeFor(name: string): string {
   const ext = (name.split(".").pop() || "").toLowerCase();
@@ -112,7 +115,7 @@ export async function getForensicImportBatchAction(batchId: string): Promise<For
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("forensic_import_batches")
-    .select("id, status, storage_path, folder_count, jobs, created_case_ids, created_complaint_ids, error")
+    .select("id, status, extract_dir, folder_count, jobs, created_case_ids, created_complaint_ids, error")
     .eq("id", batchId)
     .single();
   if (error || !data) return { error: "Import not found — it may have expired. Please re-upload." };
@@ -121,7 +124,7 @@ export async function getForensicImportBatchAction(batchId: string): Promise<For
     success: true,
     batchId: data.id as string,
     status: data.status as ForensicImportBatch["status"],
-    storagePath: data.storage_path as string,
+    extractDir: data.extract_dir as string,
     folderCount: (data.folder_count as number) ?? 0,
     jobs: (data.jobs as ForensicJobResult[]) ?? [],
     createdCaseIds: (data.created_case_ids as string[]) ?? [],
@@ -131,16 +134,22 @@ export async function getForensicImportBatchAction(batchId: string): Promise<For
 }
 
 /**
- * Commit a reviewed forensic import. Re-downloads + re-unzips the staged ZIP (does
- * not trust client bytes); for each selected, valid-code job: upserts a job_case,
- * uploads its files to the job-documents bucket (fingerprinting images), maps the
- * skill JSON into job_audits + side tables (NO engine re-run), converts the job
- * case to a Complaint, and attaches the skill's letter as the printable letter.
+ * Commit a reviewed forensic import. Reads from the LOCAL TEMP DIR the route
+ * handler extracted into (never re-fetches anything — we're reading our own
+ * server-side extraction of the original upload, never touched by the client
+ * after that point). For each selected, valid-code job: upserts a job_case,
+ * uploads its files to R2 (preserving the skill's own data/letters/work
+ * sub-path — see forensicR2SubPath), maps the skill JSON into job_audits +
+ * side tables (no engine re-run), converts the job case to a Complaint, and
+ * attaches the skill's letter as the printable letter. Bare R2 object keys
+ * only in storage_path (never a full URL) — see R2_STORAGE_SENTINEL for the
+ * discriminator against legacy Supabase rows.
  */
 export async function commitForensicImportAction(params: {
   batchId: string;
   jobs: ForensicJobResult[];
 }): Promise<CommitForensicResult> {
+  const startedAt = Date.now();
   let user;
   try {
     user = await requireRole(COMPLAINT_WRITE_ROLES);
@@ -151,21 +160,24 @@ export async function commitForensicImportAction(params: {
 
   const { data: batch } = await admin
     .from("forensic_import_batches")
-    .select("id, storage_path")
+    .select("id, extract_dir")
     .eq("id", params.batchId)
     .single();
-  if (!batch?.storage_path) return { error: "Import batch not found — please re-upload." };
+  if (!batch?.extract_dir) return { error: "Import batch not found — please re-upload." };
+  const tempDirPath = batch.extract_dir as string;
 
-  const zip = await downloadFromR2(batch.storage_path as string);
-  if (!zip) return { error: "Could not re-read the staged ZIP — please re-upload." };
+  console.log(`[commitForensicImportAction] started batch=${params.batchId} user=${user.id} ts=${new Date(startedAt).toISOString()}`);
 
-  // Re-unzip and index every entry by the job code in its path (batch-agnostic;
-  // a job's source docs + its shared _AUDIT_OUTPUT files all carry its code).
-  const byCode = new Map<string, { relPath: string; bytes: Uint8Array }[]>();
-  for (const e of readZipEntries(zip)) {
-    const code = extractJobCode(e.path);
+  const files = await walkTempDir(tempDirPath);
+  if (files.length === 0) {
+    return { error: "The extracted files for this import are no longer available (the server may have restarted) — please re-upload the ZIP." };
+  }
+
+  const byCode = new Map<string, TempDirFile[]>();
+  for (const f of files) {
+    const code = extractJobCode(f.relPath);
     if (!code) continue;
-    (byCode.get(code) ?? byCode.set(code, []).get(code)!).push({ relPath: e.path, bytes: e.bytes });
+    (byCode.get(code) ?? byCode.set(code, []).get(code)!).push(f);
   }
 
   const selected = params.jobs.filter((j) => !j.skip && j.validCode);
@@ -174,12 +186,13 @@ export async function commitForensicImportAction(params: {
   const perJob: NonNullable<CommitForensicResult["perJob"]> = [];
   const createdCaseIds: string[] = [];
   const createdComplaintIds: string[] = [];
+  let totalFiles = 0, totalUploaded = 0, totalFailed = 0, totalSkipped = 0;
 
   for (const job of selected) {
     const code = job.jobCode;
-    const entries = byCode.get(code);
-    if (!entries) {
-      perJob.push({ jobCode: code, error: "No files found in the ZIP for this job code." });
+    const jobFiles = byCode.get(code);
+    if (!jobFiles) {
+      perJob.push({ jobCode: code, error: "No files found for this job code in the extracted temp dir." });
       continue;
     }
     try {
@@ -208,53 +221,83 @@ export async function commitForensicImportAction(params: {
       if (jcErr || !jc) throw new Error(jcErr?.message || "Could not create the job case.");
       const jobCaseId = jc.id as string;
 
-      // 2) Upload files → job-documents (skip ones already present; fingerprint images).
+      // 2) Upload files → R2 (bounded concurrency; per-file try/catch so one
+      // file's failure never aborts the job or the batch).
       const { data: existingDocs } = await admin
         .from("job_documents")
         .select("original_file_name")
         .eq("job_number", code);
       const have = new Set((existingDocs ?? []).map((r) => r.original_file_name as string));
 
-      let letterDocxPath: { name: string; path: string; mime: string; size: number } | null = null;
-      let letterPdfPath: { name: string; path: string; mime: string; size: number } | null = null;
+      const candidates = jobFiles
+        .slice(0, MAX_FILES_PER_JOB)
+        .filter((f) => classifyRelPath(f.relPath) !== "other" && !have.has(baseName(f.relPath)));
+      totalFiles += candidates.length;
+      totalSkipped += jobFiles.length - candidates.length;
 
-      for (const e of entries.slice(0, MAX_FILES_PER_JOB)) {
-        const name = baseName(e.relPath);
-        const role = classifyRelPath(e.relPath);
-        if (role === "other") continue; // skip WO-*-NA.jpg placeholders, ocr cache, batch logs, index json
-        if (have.has(name)) continue;
-        const mime = mimeFor(name);
-        const body = Buffer.from(e.bytes);
-        const path = buildPath(jobCaseId, name, Date.now(), Math.random().toString(36).slice(2, 8));
-        await uploadBuffer({ bucket: STORAGE_BUCKETS.jobDocuments, path, body, contentType: mime });
-
-        const fp = mime.startsWith("image/") ? await fingerprintImage(body, mime).catch(() => null) : null;
-        await admin.from("job_documents").insert({
-          job_case_id: jobCaseId,
-          job_number: code,
-          document_type: docTypeForRole(role, name),
-          original_file_name: name,
-          title: name,
-          storage_bucket: STORAGE_BUCKETS.jobDocuments,
-          storage_path: path,
-          mime_type: mime,
-          file_size: body.byteLength,
-          source: "forensic_zip",
-          is_blank_template: isBlankTemplate(name),
-          ocr_status: role === "portal_pdf" ? "Queued" : "Skipped",
-          ocr_language: "eng+kan",
-          ai_extracted_json: role === "min_json" || role === "rich_json" ? (job.dataset ?? null) : null,
-          file_sha256: fp?.sha256 ?? null,
-          phash: fp?.phash ?? null,
-          dhash: fp?.dhash ?? null,
-          exif_gps_lat: fp?.gpsLat ?? null,
-          exif_gps_lon: fp?.gpsLon ?? null,
-          exif_taken_at: fp?.takenAt ?? null,
-          created_by: user.id,
-        });
-        if (role === "letter_docx" && !letterDocxPath) letterDocxPath = { name, path, mime, size: body.byteLength };
-        if (role === "letter_pdf" && !letterPdfPath) letterPdfPath = { name, path, mime, size: body.byteLength };
+      // Pre-scan letter attachment targets — pure, synchronous, runs BEFORE
+      // the concurrent upload loop so attachment is deterministic regardless
+      // of upload completion order.
+      let letterDocxPath: { name: string; key: string; subPath: string; mime: string; size: number } | null = null;
+      let letterPdfPath: { name: string; key: string; subPath: string; mime: string; size: number } | null = null;
+      for (const f of candidates) {
+        const role = classifyRelPath(f.relPath);
+        if (role !== "letter_docx" && role !== "letter_pdf") continue;
+        const name = baseName(f.relPath);
+        const subPath = forensicR2SubPath(f.relPath, code);
+        const entry = { name, key: `forensic/${code}/${subPath}`, subPath, mime: mimeFor(name), size: f.size };
+        if (role === "letter_docx" && !letterDocxPath) letterDocxPath = entry;
+        if (role === "letter_pdf" && !letterPdfPath) letterPdfPath = entry;
       }
+
+      const uploadResults = await mapWithConcurrency(candidates, UPLOAD_CONCURRENCY, async (f) => {
+        const name = baseName(f.relPath);
+        const role = classifyRelPath(f.relPath);
+        const mime = mimeFor(name);
+        const subPath = forensicR2SubPath(f.relPath, code);
+        const key = `forensic/${code}/${subPath}`;
+        try {
+          await uploadToR2({ key, body: createReadStream(f.absPath), contentType: mime, contentLength: f.size });
+
+          const fp = mime.startsWith("image/") ? await fingerprintImage(await readFile(f.absPath), mime).catch(() => null) : null;
+          const { error: insErr } = await admin.from("job_documents").insert({
+            job_case_id: jobCaseId,
+            job_number: code,
+            document_type: docTypeForRole(role, name),
+            original_file_name: name,
+            title: name,
+            storage_bucket: R2_STORAGE_SENTINEL,
+            storage_path: key,
+            relative_path: subPath,
+            mime_type: mime,
+            file_size: f.size,
+            source: "forensic_zip",
+            is_blank_template: isBlankTemplate(name),
+            ocr_status: role === "portal_pdf" ? "Queued" : "Skipped",
+            ocr_language: "eng+kan",
+            ai_extracted_json: role === "min_json" || role === "rich_json" ? (job.dataset ?? null) : null,
+            file_sha256: fp?.sha256 ?? null,
+            phash: fp?.phash ?? null,
+            dhash: fp?.dhash ?? null,
+            exif_gps_lat: fp?.gpsLat ?? null,
+            exif_gps_lon: fp?.gpsLon ?? null,
+            exif_taken_at: fp?.takenAt ?? null,
+            created_by: user.id,
+          });
+          if (insErr) throw new Error(insErr.message);
+
+          console.log(`[commitForensicImportAction] file uploaded job=${code} file=${name} key=${key} user=${user.id} ts=${new Date().toISOString()}`);
+          return { ok: true as const, name };
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Upload failed";
+          console.error(`[commitForensicImportAction] file upload FAILED job=${code} file=${name} user=${user.id} ts=${new Date().toISOString()}`, e);
+          return { ok: false as const, name, error: msg };
+        }
+      });
+
+      const failedFiles = uploadResults.filter((r): r is { ok: false; name: string; error: string } => !r.ok);
+      totalUploaded += uploadResults.length - failedFiles.length;
+      totalFailed += failedFiles.length;
 
       const { count } = await admin
         .from("job_documents")
@@ -319,8 +362,9 @@ export async function commitForensicImportAction(params: {
             document_type: lf === letterDocxPath ? "Generated complaint letter" : "Generated complaint letter (PDF)",
             title: lf.name,
             original_file_name: lf.name,
-            storage_bucket: STORAGE_BUCKETS.jobDocuments,
-            storage_path: lf.path,
+            storage_bucket: R2_STORAGE_SENTINEL,
+            storage_path: lf.key,
+            relative_path: lf.subPath,
             mime_type: lf.mime,
             file_size: lf.size,
             ocr_status: "Skipped",
@@ -338,17 +382,35 @@ export async function commitForensicImportAction(params: {
 
       createdCaseIds.push(jobCaseId);
       createdComplaintIds.push(complaintId);
-      perJob.push({ jobCode: code, jobCaseId, complaintId });
+      perJob.push({
+        jobCode: code,
+        jobCaseId,
+        complaintId,
+        filesTotal: candidates.length,
+        filesUploaded: uploadResults.length - failedFiles.length,
+        filesFailed: failedFiles.map((f) => ({ fileName: f.name, error: f.error })),
+      });
+      console.log(`[commitForensicImportAction] job completed job=${code} caseId=${jobCaseId} complaintId=${complaintId} filesUploaded=${uploadResults.length - failedFiles.length} filesFailed=${failedFiles.length} user=${user.id} ts=${new Date().toISOString()}`);
     } catch (e) {
-      console.error("[commitForensicImportAction]", code, e);
+      console.error(`[commitForensicImportAction] job FAILED job=${code} user=${user.id} ts=${new Date().toISOString()}`, e);
       perJob.push({ jobCode: code, error: e instanceof Error ? e.message : "Failed" });
     }
   }
 
+  const durationMs = Date.now() - startedAt;
+  const summary = { totalFiles, uploaded: totalUploaded, failed: totalFailed, skipped: totalSkipped, durationMs };
+
   await admin
     .from("forensic_import_batches")
-    .update({ status: "Committed", created_case_ids: createdCaseIds, created_complaint_ids: createdComplaintIds })
+    .update({ status: "Committed", created_case_ids: createdCaseIds, created_complaint_ids: createdComplaintIds, commit_summary: summary })
     .eq("id", params.batchId);
+
+  // Delete the temp dir ONLY NOW — after ALL selected jobs have been
+  // processed (success or failure), never per-job (multiple jobs share one
+  // batch dir). A partially-failed commit is NOT retryable from this temp
+  // dir afterward — the only recovery is a fresh re-upload; accepted per plan.
+  await deleteTempDir(tempDirPath);
+  console.log(`[commitForensicImportAction] completed batch=${params.batchId} user=${user.id} summary=${JSON.stringify(summary)} ts=${new Date().toISOString()}`);
 
   revalidatePath("/complaints");
   revalidatePath("/complaints/import");
@@ -370,5 +432,5 @@ export async function commitForensicImportAction(params: {
     });
   }
 
-  return { success: true, perJob, createdComplaintIds };
+  return { success: true, perJob, createdComplaintIds, summary };
 }

@@ -1,20 +1,26 @@
 import { NextResponse, type NextRequest, after } from "next/server";
 import { randomUUID } from "node:crypto";
+import os from "node:os";
+import path from "node:path";
+import { mkdir } from "node:fs/promises";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { uploadToR2 } from "@/lib/storage/r2-upload";
 import { processForensicBatch } from "@/lib/forensic/import-runner";
-import { MAX_ZIP_BYTES } from "@/lib/forensic/zip";
+import { MAX_ZIP_BYTES, extractZipToTempDir, deleteTempDir } from "@/lib/forensic/zip";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
  * Forensic ZIP upload. A ZIP can exceed the 6 MB Server-Action body cap
- * (next.config.mjs), so the upload goes through this Route Handler. It stages the
- * raw ZIP in R2, records a Processing batch, kicks off background inventory/parse
- * via `after()` (survives a client refresh), and returns the batch id to poll.
+ * (next.config.mjs), so the upload goes through this Route Handler. The raw
+ * ZIP is NEVER uploaded anywhere — it's extracted into a local temp directory
+ * on this container's disk (transient; survives across the analyze→commit
+ * requests only as long as this same container instance is alive), a
+ * Processing batch row is recorded pointing at that directory, and background
+ * inventory/parse runs via `after()` (survives a client refresh; polls by
+ * batch id).
  */
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
@@ -47,22 +53,31 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  console.log(`[forensicImport:upload] validated user=${user.id} file=${file.name} size=${file.size} ts=${new Date().toISOString()}`);
 
-  let storagePath: string;
+  const importId = randomUUID();
+  const tempDir = path.join(os.tmpdir(), "gba-forensic-import", importId);
+
   let batchId: string;
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    storagePath = await uploadToR2({
-      key: `forensic/_imports/${randomUUID()}.zip`,
-      body: buffer,
-      contentType: "application/zip",
-    });
+    await mkdir(tempDir, { recursive: true });
+
+    const t0 = Date.now();
+    console.log(`[forensicImport:upload] extraction started user=${user.id} tempDir=${tempDir} ts=${new Date().toISOString()}`);
+    const manifest = await extractZipToTempDir(buffer, tempDir);
+    console.log(`[forensicImport:upload] extraction completed user=${user.id} tempDir=${tempDir} files=${manifest.length} ms=${Date.now() - t0} ts=${new Date().toISOString()}`);
+    if (manifest.length === 0) {
+      await deleteTempDir(tempDir);
+      return NextResponse.json({ error: "ZIP contained no readable files." }, { status: 400 });
+    }
+
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("forensic_import_batches")
       .insert({
         status: "Processing",
-        storage_path: storagePath,
+        extract_dir: tempDir,
         original_file_name: file.name,
         zip_size: file.size,
         created_by: user.id,
@@ -72,13 +87,15 @@ export async function POST(req: NextRequest) {
     if (error || !data) throw new Error(error?.message || "Could not create the import batch.");
     batchId = data.id as string;
   } catch (e) {
+    await deleteTempDir(tempDir); // no batch row exists yet to track cleanup — do it here
+    console.error(`[forensicImport:upload] failed user=${user.id} ts=${new Date().toISOString()}`, e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Upload failed." }, { status: 500 });
   }
 
-  const captured = { batchId, storagePath };
+  const captured = { batchId, tempDir };
   after(async () => {
-    await processForensicBatch(captured.batchId, captured.storagePath);
+    await processForensicBatch(captured.batchId, captured.tempDir);
   });
 
-  return NextResponse.json({ batchId, storagePath });
+  return NextResponse.json({ batchId });
 }

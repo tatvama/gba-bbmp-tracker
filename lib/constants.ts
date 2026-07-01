@@ -457,6 +457,16 @@ export const STORAGE_BUCKETS = {
   jobDocuments: "job-documents",
 } as const;
 
+/**
+ * Sentinel written to job_documents/complaint_documents.storage_bucket for R2-
+ * backed rows (forensic-ZIP import). ALWAYS this literal string, never null —
+ * a real Supabase bucket name is equally truthy, so every existing
+ * `doc.storage_bucket && doc.storage_path` guard elsewhere in the codebase
+ * (e.g. lib/actions/job-audit.ts) keeps working unmodified for R2 rows too.
+ * storage_path for these rows holds a bare R2 object key, never a full URL.
+ */
+export const R2_STORAGE_SENTINEL = "r2" as const;
+
 /** Default complaint module settings (mirrors app_settings 'complaint_settings'). */
 export interface ComplaintSettings {
   caseNumberPrefix: string;

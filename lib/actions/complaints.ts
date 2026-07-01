@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError, type SessionUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSignedUrl, uploadBuffer, buildPath, validateUpload } from "@/lib/storage/supabase-upload";
+import { getR2PublicUrl } from "@/lib/storage/r2-upload";
 import { buildMergedPdf } from "@/lib/pdf/merge";
 import { processDocumentOcr } from "@/lib/ocr/process-document";
 import { writeAudit, diffFields } from "@/lib/audit";
@@ -19,6 +20,7 @@ import {
   COMPLAINT_VERIFY_ROLES,
   ESCALATION_DRAFT_KINDS,
   STORAGE_BUCKETS,
+  R2_STORAGE_SENTINEL,
   type UserRole,
 } from "@/lib/constants";
 import { sanitizeDraft } from "@/lib/letters/safe-language";
@@ -779,6 +781,13 @@ export async function getDocumentViewUrl(
   const bucket = which === "processed" ? "complaint-processed-images" : doc.storage_bucket;
   const path = which === "processed" ? doc.processed_storage_path : doc.storage_path;
   if (!path) return { error: "File not available." };
+  // R2-backed rows (forensic-ZIP-imported letters) store a bare object key —
+  // build the public URL directly, no signing needed. The `processed` path is
+  // always a Supabase-backed AI-derived image, never R2, so it always falls
+  // through to the unchanged getSignedUrl call below.
+  if (which === "original" && bucket === R2_STORAGE_SENTINEL) {
+    return { url: getR2PublicUrl(path) };
+  }
   const url = await getSignedUrl(bucket, path, 3600);
   return url ? { url } : { error: "Could not create signed URL." };
 }

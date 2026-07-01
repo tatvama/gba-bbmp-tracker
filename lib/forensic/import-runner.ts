@@ -1,7 +1,7 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { downloadFromR2 } from "@/lib/storage/r2-upload";
-import { readZipEntries } from "@/lib/forensic/zip";
+import { walkTempDir } from "@/lib/forensic/zip";
 import { groupEntriesByJobCode, classifyRelPath, parseJob, type RawEntry } from "@/lib/forensic/parse-skill-output";
 import { extractDocxText } from "@/lib/forensic/docx-text";
 import { deriveDatasetFromLetter } from "@/lib/ai/forensic-letter-extract";
@@ -12,7 +12,7 @@ import type { ForensicFileRole, ForensicJobResult } from "@/lib/forensic/skill-o
 const TEXTUAL: Set<ForensicFileRole> = new Set(["rich_json", "min_json", "text", "info"]);
 const LETTER_PDF_OCR_PAGE_CAP = 8;
 
-function decode(bytes: Uint8Array): string {
+function decode(bytes: Buffer): string {
   try {
     return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
   } catch {
@@ -21,20 +21,22 @@ function decode(bytes: Uint8Array): string {
 }
 
 /**
- * Background inventory + parse of an uploaded forensic ZIP (runs in Next `after()`).
- * The export is batch-structured (job folders + a shared _AUDIT_OUTPUT), so we key
- * every entry off its job code, read the textual files (JSON/OCR) + the drafted
- * letter text, parse each job, and AI-derive a dataset when no JSON is present.
+ * Background inventory + parse of an extracted forensic ZIP (runs in Next
+ * `after()`). Reads from the local temp dir the route handler already
+ * extracted into — no re-download, no re-unzip (the raw ZIP is never
+ * uploaded anywhere). Does NOT delete tempDirPath: the commit step
+ * (lib/actions/forensic-zip-import.ts) still needs it.
  */
-export async function processForensicBatch(batchId: string, storagePath: string): Promise<void> {
+export async function processForensicBatch(batchId: string, tempDirPath: string): Promise<void> {
   const admin = createAdminClient();
   try {
-    const zip = await downloadFromR2(storagePath);
-    if (!zip) throw new Error("Could not download the staged ZIP.");
-
-    const zipEntries = readZipEntries(zip); // [{ path (full), bytes }]
-    const bytesByPath = new Map(zipEntries.map((e) => [e.path, e.bytes] as const));
-    const raw: RawEntry[] = zipEntries.map((e) => ({ relPath: e.path, size: e.bytes.byteLength }));
+    console.log(`[processForensicBatch] started batch=${batchId} tempDir=${tempDirPath} ts=${new Date().toISOString()}`);
+    const files = await walkTempDir(tempDirPath);
+    if (files.length === 0) {
+      throw new Error("Extracted files are no longer available (the server may have restarted) — please re-upload the ZIP.");
+    }
+    const absByRel = new Map(files.map((f) => [f.relPath, f.absPath] as const));
+    const raw: RawEntry[] = files.map((f) => ({ relPath: f.relPath, size: f.size }));
     const grouped = groupEntriesByJobCode(raw);
 
     // Which job codes are already imported?
@@ -51,17 +53,17 @@ export async function processForensicBatch(batchId: string, storagePath: string)
       let letterPdfRel: string | null = null;
       for (const e of es) {
         const role = classifyRelPath(e.relPath);
-        if (TEXTUAL.has(role)) e.text = decode(bytesByPath.get(e.relPath)!);
+        if (TEXTUAL.has(role)) e.text = decode(await readFile(absByRel.get(e.relPath)!));
         else if (role === "letter_docx" && !letterDocxRel) letterDocxRel = e.relPath;
         else if (role === "letter_pdf" && !letterPdfRel) letterPdfRel = e.relPath;
       }
 
       // Letter text: DOCX (lossless) preferred, else OCR the letter PDF.
       let letterText = "";
-      if (letterDocxRel) letterText = await extractDocxText(Buffer.from(bytesByPath.get(letterDocxRel)!));
+      if (letterDocxRel) letterText = await extractDocxText(await readFile(absByRel.get(letterDocxRel)!));
       if (!letterText && letterPdfRel) {
         try {
-          const pages = await pdfRenderer.renderPages(Buffer.from(bytesByPath.get(letterPdfRel)!));
+          const pages = await pdfRenderer.renderPages(await readFile(absByRel.get(letterPdfRel)!));
           const parts: string[] = [];
           for (const p of pages.slice(0, LETTER_PDF_OCR_PAGE_CAP)) {
             const r = await runOcr({ buffer: p.buffer, mimeType: p.mimeType, language: "eng+kan" });
@@ -101,6 +103,7 @@ export async function processForensicBatch(batchId: string, storagePath: string)
       .from("forensic_import_batches")
       .update({ status: "Ready", jobs, folder_count: jobs.length, error: jobs.length ? null : "No job-code folders found in the ZIP." })
       .eq("id", batchId);
+    console.log(`[processForensicBatch] ready batch=${batchId} jobs=${jobs.length} ts=${new Date().toISOString()}`);
   } catch (e) {
     console.error("[processForensicBatch]", e);
     await admin
