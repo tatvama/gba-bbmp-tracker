@@ -2,7 +2,7 @@
 
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
+import { COMPLAINT_VERIFY_ROLES, R2_STORAGE_SENTINEL } from "@/lib/constants";
 import { loadSrRatesCached } from "@/lib/sr-rates";
 import { runJobAudit, type JobAuditInput, type JobAuditReport, type DocumentMatrixRow, type AuditCoverage } from "@/lib/forensics/job-audit";
 import { scoreFinding, gradeEvidence, scoreJobRisk } from "@/lib/forensics/risk-score";
@@ -11,6 +11,7 @@ import { extractMbBill, extractTimelineDates, extractEligibility, extractInsuran
 import { analyzeDocFormIntegrity } from "@/lib/ai/form-integrity";
 import { crossDocFieldMismatch } from "@/lib/forensics/pattern-detector";
 import { downloadBuffer } from "@/lib/storage/supabase-upload";
+import { downloadFromR2ByKey } from "@/lib/storage/r2-upload";
 import { isAiConfigured } from "@/lib/ai/provider";
 import type { BillFinding, StructuredBill, ScheduleBItem, RunningBill, JobTimelineDates, EligibilityRequirement, InsurancePolicy } from "@/lib/forensics/types";
 
@@ -101,7 +102,9 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     // "requires original / metadata / expert verification".
     const mime = (d.mime_type as string) ?? "";
     if (aiOn && formScreened < FORM_CAP && (isBill(type) || isMb(type)) && /^image\//.test(mime) && d.storage_bucket && d.storage_path) {
-      const buf = await downloadBuffer(d.storage_bucket as string, d.storage_path as string);
+      const buf = d.storage_bucket === R2_STORAGE_SENTINEL
+        ? await downloadFromR2ByKey(d.storage_path as string)
+        : await downloadBuffer(d.storage_bucket as string, d.storage_path as string);
       if (buf) {
         formScreened++;
         const fi = await analyzeDocFormIntegrity(buf, mime);

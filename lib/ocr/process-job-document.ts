@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadBuffer } from "@/lib/storage/supabase-upload";
+import { downloadFromR2ByKey } from "@/lib/storage/r2-upload";
+import { R2_STORAGE_SENTINEL } from "@/lib/constants";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { analyzeComplaintDocument } from "@/lib/ai/complaint-document-analyzer";
@@ -71,7 +73,11 @@ export async function processJobDocumentOcr(
 
   await admin.from("job_documents").update({ ocr_status: "Processing" }).eq("id", jobDocId);
 
-  const buffer = opts?.buffer ?? (await downloadBuffer(doc.storage_bucket, doc.storage_path));
+  const buffer =
+    opts?.buffer ??
+    (doc.storage_bucket === R2_STORAGE_SENTINEL
+      ? await downloadFromR2ByKey(doc.storage_path)
+      : await downloadBuffer(doc.storage_bucket, doc.storage_path));
   if (!buffer) {
     await admin.from("job_documents").update({ ocr_status: "Failed" }).eq("id", jobDocId);
     return { ok: false, status: "Failed", error: "Could not download original file" };

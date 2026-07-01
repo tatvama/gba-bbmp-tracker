@@ -142,16 +142,39 @@ export interface ForensicImportBatch {
   error?: string;
   batchId?: string;
   status?: ForensicImportStatus;
-  storagePath?: string;
+  /** Local temp-directory path the ZIP was extracted into (not object storage). */
+  extractDir?: string;
   folderCount?: number; // number of job codes found
   jobs?: ForensicJobResult[];
   createdCaseIds?: string[];
   createdComplaintIds?: string[];
 }
 
+export interface CommitForensicFileFailure {
+  fileName: string;
+  error: string;
+}
+
+export interface CommitForensicSummary {
+  totalFiles: number;
+  uploaded: number;
+  failed: number;
+  skipped: number;
+  durationMs: number;
+}
+
 export interface CommitForensicResult {
   success?: boolean;
   error?: string;
-  perJob?: { jobCode: string; jobCaseId?: string; complaintId?: string; error?: string }[];
+  perJob?: {
+    jobCode: string;
+    jobCaseId?: string;
+    complaintId?: string;
+    error?: string;
+    filesTotal?: number;
+    filesUploaded?: number;
+    filesFailed?: CommitForensicFileFailure[];
+  }[];
   createdComplaintIds?: string[];
+  summary?: CommitForensicSummary;
 }

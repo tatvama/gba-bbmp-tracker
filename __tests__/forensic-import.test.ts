@@ -9,6 +9,7 @@ import {
   parseJob,
   assembleForensicJobs,
   fileExt,
+  forensicR2SubPath,
   type RawEntry,
 } from "@/lib/forensic/parse-skill-output";
 import {
@@ -44,6 +45,23 @@ describe("classifyRelPath (batch layout)", () => {
   ];
   it.each(cases)("classifies %s", (p, role) => {
     expect(classifyRelPath(p)).toBe(role);
+  });
+});
+
+describe("forensicR2SubPath", () => {
+  it("preserves the shared _AUDIT_OUTPUT grouping (data/letters/work)", () => {
+    expect(forensicR2SubPath(`${A}/data/${CODE}.json`, CODE)).toBe(`data/${CODE}.json`);
+    expect(forensicR2SubPath(`${A}/letters/Job_${CODE}_complaint_KN.docx`, CODE)).toBe(
+      `letters/Job_${CODE}_complaint_KN.docx`,
+    );
+    expect(forensicR2SubPath(`${A}/work/${CODE}.txt`, CODE)).toBe(`work/${CODE}.txt`);
+  });
+  it("keeps a job's own source folder flat (everything after the job-code segment)", () => {
+    expect(forensicR2SubPath(`${B}/${CODE}/info.txt`, CODE)).toBe("info.txt");
+    expect(forensicR2SubPath(`${B}/${CODE}/WO-1-Estimate.pdf`, CODE)).toBe("WO-1-Estimate.pdf");
+  });
+  it("falls back to the basename when the job-code segment isn't found", () => {
+    expect(forensicR2SubPath("some/other/path/file.pdf", CODE)).toBe("file.pdf");
   });
 });
 

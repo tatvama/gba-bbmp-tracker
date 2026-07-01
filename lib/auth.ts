@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 import type { UserRole } from "@/lib/constants";
@@ -12,8 +13,13 @@ export interface SessionUser {
 /**
  * Returns the signed-in user with their profile + role, or null.
  * Role falls back to VIEWER if no profile row exists yet.
+ *
+ * Wrapped in React's `cache()` so repeated calls within the same request
+ * (e.g. the root layout + a page + several nested components all checking
+ * the session) share one `auth.getUser()` + profile round trip instead of
+ * repeating it per call. Same inputs (none) -> same output within a request.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -32,7 +38,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     profile: (profile as Profile) ?? null,
     role: (profile as Profile | null)?.role ?? "VIEWER",
   };
-}
+});
 
 export function hasRole(user: SessionUser | null, allowed: UserRole[]): boolean {
   return !!user && allowed.includes(user.role);

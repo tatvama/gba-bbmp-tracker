@@ -47,11 +47,11 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Button asChild variant="ghost" size="sm" className="no-print -ml-2">
           <Link href="/complaints"><ArrowLeft className="h-4 w-4" /> Complaints</Link>
         </Button>
-        <div className="no-print flex gap-2">
+        <div className="no-print flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/print`}>Case file</Link></Button>
           {flags.canVerify && (
             <>

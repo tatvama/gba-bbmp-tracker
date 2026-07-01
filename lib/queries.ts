@@ -91,32 +91,32 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       count("contacts", (q) => q.eq("verification_status", "PENDING")),
     ]);
 
-  // GBA wards = sum of corporation ward_count (369)
-  const { data: corps } = await supabase.from("corporations").select("ward_count");
+  // The five reads below are independent of each other (none depends on
+  // another's result) -> fetched in parallel instead of one-by-one.
+  const [{ data: corps }, { data: oldRows }, missingContactInfo, { data: subWithContact }, { data: wardSubs }] =
+    await Promise.all([
+      // GBA wards = sum of corporation ward_count (369)
+      supabase.from("corporations").select("ward_count"),
+      // Old-198 represented = distinct old_wards entries across all wards
+      supabase.from("wards").select("old_wards"),
+      count("contacts", (q) => q.or("phone.is.null,email.is.null,office_address.is.null")),
+      // wards whose eng sub-division has no contact
+      supabase.from("contacts").select("eng_subdivision_id").not("eng_subdivision_id", "is", null),
+      supabase.from("wards").select("eng_subdivision_id"),
+    ]);
+
   const gbaWards = (corps ?? []).reduce(
     (s: number, c: { ward_count: number }) => s + (c.ward_count ?? 0),
     0,
   );
 
-  // Old-198 represented = distinct old_wards entries across all wards
-  const { data: oldRows } = await supabase.from("wards").select("old_wards");
   const oldSet = new Set<string>();
   for (const r of (oldRows ?? []) as { old_wards: string[] }[])
     for (const o of r.old_wards ?? []) oldSet.add(o);
 
-  const missingContactInfo = await count("contacts", (q) =>
-    q.or("phone.is.null,email.is.null,office_address.is.null"),
-  );
-
-  // wards whose eng sub-division has no contact
-  const { data: subWithContact } = await supabase
-    .from("contacts")
-    .select("eng_subdivision_id")
-    .not("eng_subdivision_id", "is", null);
   const subsCovered = new Set(
     (subWithContact ?? []).map((r: { eng_subdivision_id: string }) => r.eng_subdivision_id),
   );
-  const { data: wardSubs } = await supabase.from("wards").select("eng_subdivision_id");
   const wardsWithoutContact = (wardSubs ?? []).filter(
     (w: { eng_subdivision_id: string | null }) =>
       !w.eng_subdivision_id || !subsCovered.has(w.eng_subdivision_id),
@@ -1156,12 +1156,16 @@ export async function complaintDashboardStats(): Promise<ComplaintDashboardStats
 
 export async function rtiDashboardStats(): Promise<RtiDashboardStats> {
   const supabase = await sb();
-  const rules = await getDeadlineRules();
-  const { data, error } = await supabase
-    .from("rti_applications")
-    .select(
-      "status, priority, is_life_liberty, satisfaction_status, normal_due, life_liberty_due, first_appeal_due, second_appeal_due",
-    );
+  // getDeadlineRules() is only used later (post-processing rows) -> independent
+  // of the rti_applications read, so fetch both in parallel.
+  const [rules, { data, error }] = await Promise.all([
+    getDeadlineRules(),
+    supabase
+      .from("rti_applications")
+      .select(
+        "status, priority, is_life_liberty, satisfaction_status, normal_due, life_liberty_due, first_appeal_due, second_appeal_due",
+      ),
+  ]);
   logErr("rtiDashboardStats", error);
   const rows = (data as RtiApplication[]) ?? [];
   const now = new Date();
