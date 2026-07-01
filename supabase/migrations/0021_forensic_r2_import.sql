@@ -22,7 +22,19 @@
 --   Idempotent (ADD COLUMN IF NOT EXISTS). Run with: npm run db:migrate
 -- -----------------------------------------------------------------------------
 
-alter table public.forensic_import_batches rename column storage_path to extract_dir;
+-- Idempotent rename: only when the old column still exists and the new one
+-- doesn't (the migrate script re-runs every file, so a bare RENAME would fail
+-- on the second run).
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'forensic_import_batches' and column_name = 'storage_path')
+     and not exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'forensic_import_batches' and column_name = 'extract_dir')
+  then
+    alter table public.forensic_import_batches rename column storage_path to extract_dir;
+  end if;
+end $$;
 
 comment on column public.forensic_import_batches.extract_dir is
   'Local filesystem path (this container instance only — not object storage) that the uploaded ZIP was extracted into at analyze-time. Read by commitForensicImportAction; deleted (best-effort) once all selected jobs have been processed, success or failure. If the container restarts between analyze and commit this path is gone — commit fails with a clear "please re-upload" error rather than crashing.';
