@@ -100,7 +100,7 @@ export default async function RtiDetailPage({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-4 flex items-center justify-between animate-blur-reveal">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 animate-blur-reveal">
         <Button asChild variant="ghost" size="sm" className="no-print -ml-2">
           <Link href="/rti/all"><ArrowLeft className="h-4 w-4" /> All RTIs</Link>
         </Button>
