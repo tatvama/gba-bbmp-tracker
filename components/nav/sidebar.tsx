@@ -49,7 +49,7 @@ export function Sidebar({ className }: { className?: string }) {
             "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150",
             active
               ? "bg-primary/[0.08] dark:bg-primary/[0.12] font-bold text-primary"
-              : "font-medium text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground/80",
+              : "font-medium text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground/80 hover:translate-x-0.5",
           )}
         >
           <Icon

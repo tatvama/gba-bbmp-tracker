@@ -7,6 +7,7 @@ import { Eye, RefreshCw, Sparkles, ClipboardCheck, Loader2, FileText, CheckCircl
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/empty-state";
 import { DocumentReview } from "@/components/complaints/document-review";
@@ -74,10 +75,17 @@ export function DocumentList({
   return (
     <>
       <ul className="space-y-3">
-        {documents.map((d) => {
+        {documents.map((d, idx) => {
           const busy = busyId === d.id;
+          const staggerClass = `stagger-${(idx % 4) + 1}`;
           return (
-            <li key={d.id} className="rounded-lg border p-3">
+            <li
+              key={d.id}
+              className={cn(
+                "rounded-lg border p-3 bg-card transition-all duration-300 ease-in-out hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-700 animate-fade-in",
+                staggerClass
+              )}
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium">{d.title || d.original_file_name || "Document"}</p>

@@ -24,7 +24,7 @@ import { RTI_WRITE_ROLES, VERIFY_ROLES, type DeadlineRules } from "@/lib/constan
 import { deadlineStatus, DEADLINE_BUCKET_LABEL } from "@/lib/rti-deadlines";
 import { formatDate, formatDateTime, orDash } from "@/lib/format";
 import { RtiDocumentsPanel } from "@/components/rti/rti-documents-panel";
-import { CloseCaseButton } from "@/components/rti/close-case-button";
+import { RtiHeaderActions } from "@/components/rti/rti-header-actions";
 import { FilingDateEditor } from "@/components/rti/filing-date-editor";
 import { HistoryTimeline } from "@/components/rti/history-timeline";
 import { buildRtiHistory } from "@/lib/rti-history";
@@ -99,22 +99,18 @@ export default async function RtiDetailPage({
   };
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-4 flex items-center justify-between animate-blur-reveal">
-        <Button asChild variant="ghost" size="sm" className="no-print -ml-2">
-          <Link href="/rti/all"><ArrowLeft className="h-4 w-4" /> All RTIs</Link>
+    <div className="mx-auto max-w-5xl px-3 md:px-4 lg:px-6">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between animate-blur-reveal">
+        <Button asChild variant="ghost" size="sm" className="no-print -ml-2 self-start hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <Link href="/rti/all" className="flex items-center gap-1.5"><ArrowLeft className="h-4 w-4" /> All RTIs</Link>
         </Button>
-        <div className="no-print flex flex-wrap gap-2">
+        <div className="no-print w-full sm:w-auto">
           {canEdit && (
-            <>
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/rti/${id}/analyze`}><FileSearch className="h-4 w-4" /> Analyze reply</Link>
-              </Button>
-              <CloseCaseButton rtiId={id} status={rti.status} canClose={canCloseCase} />
-              <Button asChild size="sm">
-                <Link href={`/rti/${id}/edit`}><Pencil className="h-4 w-4" /> Edit</Link>
-              </Button>
-            </>
+            <RtiHeaderActions
+              rtiId={id}
+              status={rti.status}
+              canClose={canCloseCase}
+            />
           )}
         </div>
       </div>

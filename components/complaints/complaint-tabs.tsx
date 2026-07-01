@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DetailRow } from "@/components/detail-row";
@@ -100,18 +101,22 @@ export function ComplaintTabs({
 
       <TabsContent value="timeline">
         {timeline.length === 0 ? <EmptyState title="No timeline yet" /> : (
-          <ol className="relative space-y-4 border-l pl-5">
-            {timeline.map((t) => (
-              <li key={t.id} className="relative">
-                <span className="absolute -left-[1.42rem] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{t.event_type}</Badge>
-                  <span className="font-medium">{t.title}</span>
-                  <span className="text-xs text-muted-foreground">{formatDateTime(t.event_date)}</span>
-                </div>
-                {t.summary && <p className="mt-0.5 text-sm text-muted-foreground">{t.summary}</p>}
-              </li>
-            ))}
+          <ol className="relative space-y-4 pl-6">
+            <div className="absolute left-[7px] top-1.5 bottom-1.5 w-0.5 bg-slate-100 dark:bg-slate-800 timeline-connector" />
+            {timeline.map((t, idx) => {
+              const staggerClass = `stagger-${(idx % 4) + 1}`;
+              return (
+                <li key={t.id} className={cn("relative timeline-event", staggerClass)}>
+                  <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full border border-background bg-primary timeline-node" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{t.event_type}</Badge>
+                    <span className="font-medium">{t.title}</span>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(t.event_date)}</span>
+                  </div>
+                  {t.summary && <p className="mt-0.5 text-sm text-muted-foreground">{t.summary}</p>}
+                </li>
+              );
+            })}
           </ol>
         )}
       </TabsContent>

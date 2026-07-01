@@ -28,8 +28,8 @@ export function TopNav({ email, role }: UserMenuProps) {
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <Button
             variant="ghost"
-            size="icon-sm"
-            className="lg:hidden"
+            size="icon"
+            className="lg:hidden h-11 w-11 sm:h-9 sm:w-9 cursor-pointer"
             aria-label="Open navigation"
             onClick={() => setMobileOpen(true)}
           >
@@ -79,10 +79,10 @@ export function TopNav({ email, role }: UserMenuProps) {
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:block">
         <button
           onClick={openPalette}
-          className="h-9 w-[320px] flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-450 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/35 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-slate-900/60 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-800"
+          className="h-9 w-[320px] flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-55 px-3 text-xs text-slate-450 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/35 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-slate-900/60 dark:hover:text-slate-305 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-800"
           aria-label="Open command palette"
         >
-          <Search className="h-3.5 w-3.5 shrink-0 opacity-80 text-slate-400" />
+          <Search className="h-3.5 w-3.5 shrink-0 opacity-80 text-slate-405" />
           <span className="flex-1 text-left font-medium">Search wards, contacts…</span>
           <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 select-none rounded border border-slate-200 bg-white px-1.5 font-mono text-[10px] font-medium text-slate-450 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 shadow-2xs">
             ⌘K
@@ -91,21 +91,17 @@ export function TopNav({ email, role }: UserMenuProps) {
       </div>
 
       {/* Mobile: icon-only search */}
-      <button
-        onClick={() => {
-          if (typeof document !== "undefined" && (document as any).startViewTransition) {
-            (document as any).startViewTransition(() => {
-              router.push("/search");
-            });
-          } else {
-            router.push("/search");
-          }
-        }}
-        className="flex items-center sm:hidden"
+      <Button
+        asChild
+        variant="ghost"
+        size="icon"
+        className="flex sm:hidden h-11 w-11 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
         aria-label="Search"
       >
-        <Search className="h-4 w-4 text-muted-foreground" />
-      </button>
+        <Link href="/search">
+          <Search className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      </Button>
 
       <div className="flex items-center gap-1">
         <ModeToggle />

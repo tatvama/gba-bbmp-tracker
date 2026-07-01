@@ -23,8 +23,8 @@ export default async function AllRtisPage() {
     <div>
       <PageHeader title="All RTIs" description="Every RTI application with status, priority, and live deadline countdowns.">
         {canEdit && (
-          <Button asChild size="sm">
-            <Link href="/rti/new"><Plus className="h-4 w-4" /> New RTI</Link>
+          <Button asChild size="sm" className="w-full sm:w-auto h-11 sm:h-9 justify-center hover:scale-[1.01] active:scale-[0.99] transition-all font-semibold cursor-pointer">
+            <Link href="/rti/new" className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> New RTI</Link>
           </Button>
         )}
       </PageHeader>

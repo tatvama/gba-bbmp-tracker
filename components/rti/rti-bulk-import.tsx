@@ -11,7 +11,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Layers,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +40,7 @@ export function RtiBulkImport() {
   const [storagePath, setStoragePath] = React.useState("");
   const [pageCount, setPageCount] = React.useState(0);
   const [letters, setLetters] = React.useState<EditableLetter[]>([]);
+  const [showWarningDetails, setShowWarningDetails] = React.useState(false);
   const uidRef = React.useRef(0);
   const pollRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeRef = React.useRef(true);
@@ -281,12 +285,12 @@ export function RtiBulkImport() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-rose-500 hover:text-rose-600"
+                    className="h-11 w-11 sm:h-7 sm:w-auto sm:px-2 text-rose-500 hover:text-rose-600 flex items-center justify-center cursor-pointer"
                     onClick={() => removeLetter(l.uid)}
                     disabled={letters.length <= 1}
                     title={letters.length <= 1 ? "At least one letter is required" : "Remove this letter"}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                   </Button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -298,7 +302,7 @@ export function RtiBulkImport() {
                       value={l.subject ?? ""}
                       onChange={(e) => updateSubject(l.uid, e.target.value)}
                       placeholder="Subject of this RTI letter"
-                      className="mt-1 h-10"
+                      className="mt-1 h-11 sm:h-10 text-sm"
                     />
                   </div>
                   <div>
@@ -309,7 +313,7 @@ export function RtiBulkImport() {
                       value={l.pioName ?? ""}
                       onChange={(e) => updatePio(l.uid, e.target.value)}
                       placeholder="e.g. Executive Engineer, Hebbal Division"
-                      className="mt-1 h-10"
+                      className="mt-1 h-11 sm:h-10 text-sm"
                     />
                     {l.pioDesignation && (
                       <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500 truncate">
@@ -327,11 +331,11 @@ export function RtiBulkImport() {
             ))}
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-150 dark:border-slate-800/85 pt-4">
-            <Button type="button" variant="outline" onClick={reset} className="h-10">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-t border-slate-150 dark:border-slate-800/85 pt-4">
+            <Button type="button" variant="outline" onClick={reset} className="h-11 sm:h-10 w-full sm:w-auto justify-center cursor-pointer font-medium">
               Start over
             </Button>
-            <Button type="button" onClick={commit} className="h-10 font-bold">
+            <Button type="button" onClick={commit} className="h-11 sm:h-10 w-full sm:w-auto justify-center font-bold cursor-pointer">
               <CheckCircle2 className="h-4 w-4 mr-1.5" />
               Create {letters.length} {letters.length === 1 ? "case" : "cases"}
             </Button>
@@ -344,31 +348,56 @@ export function RtiBulkImport() {
   // ── Idle / pick file ──────────────────────────────────────────────────────────
   return (
     <Card className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm rounded-xl overflow-hidden">
-      <CardContent className="p-6 space-y-5">
+      <CardContent className="p-4 md:p-6 space-y-4 md:space-y-5">
         {error && (
           <p className="rounded-lg border border-rose-250/30 bg-rose-50/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
             {error}
           </p>
         )}
 
-        <div className="flex items-start gap-2.5 rounded-lg border border-amber-100 bg-amber-50/30 p-3.5 dark:border-slate-800 dark:bg-slate-950/30">
-          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            Upload a single office-copy PDF that contains several RTI letters. The system reads it,
-            detects each separate letter, and (after your review) creates one RTI case per letter —
-            each with its own reference number, subject, and split application PDF.
-          </p>
+        {/* Dynamic Warning Alert: Collapsed by default on mobile, expandable notice */}
+        <div className="rounded-lg border border-amber-100 bg-amber-50/30 p-3.5 dark:border-slate-800/80 dark:bg-slate-950/30">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 leading-none">
+              <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              Multiple RTIs in one PDF?
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowWarningDetails(!showWarningDetails)}
+              className="text-xs text-primary font-bold hover:underline cursor-pointer h-8 px-2.5 flex items-center justify-center border rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-850"
+            >
+              {showWarningDetails ? "Hide Details" : "Show Details"}
+            </button>
+          </div>
+          
+          <AnimatePresence initial={false}>
+            {showWarningDetails && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+                className="overflow-hidden text-xs text-slate-650 dark:text-slate-400 leading-relaxed mt-2"
+              >
+                Upload a single office-copy PDF that contains several RTI letters. The system reads it,
+                detects each separate letter, and (after your review) creates one RTI case per letter —
+                each with its own reference number, subject, and split application PDF.
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
+        {/* Compact Upload Zone: reduced height on mobile by ~40% (py-6 instead of py-10) */}
         <label
           htmlFor="bulk-rti-file"
-          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-250 bg-slate-50/40 px-4 py-10 text-center transition-colors hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50"
+          className="flex cursor-pointer flex-col items-center justify-center gap-1.5 md:gap-2 rounded-xl border-2 border-dashed border-slate-250 bg-slate-50/40 px-4 py-6 md:py-10 text-center transition-all duration-150 hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50 active:scale-[0.995]"
         >
-          <UploadCloud className="h-8 w-8 text-slate-400" />
+          <UploadCloud className="h-8 w-8 text-slate-400 shrink-0" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             Choose a PDF (or images)
           </span>
-          <span className="text-xs text-slate-400">PDF, JPEG, PNG or WebP</span>
+          <span className="text-xs text-slate-400 leading-none">PDF, JPEG, PNG or WebP</span>
           <input
             id="bulk-rti-file"
             type="file"
@@ -387,8 +416,8 @@ export function RtiBulkImport() {
                 className="flex items-center gap-2 rounded-lg border border-slate-150 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
               >
                 <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span className="truncate">{f.name}</span>
-                <span className="ml-auto shrink-0 text-slate-400">
+                <span className="truncate flex-1">{f.name}</span>
+                <span className="ml-auto shrink-0 text-slate-400 font-semibold">
                   {(f.size / 1_048_576).toFixed(1)} MB
                 </span>
               </li>
@@ -396,12 +425,13 @@ export function RtiBulkImport() {
           </ul>
         )}
 
+        {/* Primary Action Button: full width on mobile, inline on desktop */}
         <div className="flex justify-end border-t border-slate-150 dark:border-slate-800/85 pt-4">
           <Button
             type="button"
             onClick={analyze}
             disabled={files.length === 0}
-            className="h-10 font-bold"
+            className="h-11 md:h-10 w-full md:w-auto justify-center font-bold cursor-pointer"
           >
             <Sparkles className="h-4 w-4 mr-1.5" />
             Detect letters

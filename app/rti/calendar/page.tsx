@@ -10,7 +10,7 @@ export default async function RtiCalendarPage() {
   const [rtis, rules] = await Promise.all([listRtis(), getDeadlineRules()]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl px-3 md:px-4 lg:px-6">
       <PageHeader
         title="RTI deadline calendar"
         description="Every open RTI's next statutory deadline — reply, first appeal, or second appeal — soonest first."

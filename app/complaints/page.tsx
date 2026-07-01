@@ -1,7 +1,5 @@
-import Link from "next/link";
-import { Plus, LayoutDashboard, Smartphone, Upload } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
+import { ComplaintsHeaderActions } from "@/components/complaints/complaints-header-actions";
 import { ComplaintTable } from "@/components/complaints/complaint-table";
 import { listComplaints } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
@@ -20,10 +18,7 @@ export default async function ComplaintsPage() {
         title="Complaint tracker"
         description="Every civic complaint with internal case number, replies, action taken, documents (OCR/AI), and follow-up reminders."
       >
-        <Button asChild size="sm" variant="outline"><Link href="/complaints/dashboard"><LayoutDashboard className="h-4 w-4" /> Dashboard</Link></Button>
-        <Button asChild size="sm" variant="outline"><Link href="/complaints/mobile/upload"><Smartphone className="h-4 w-4" /> Mobile</Link></Button>
-        {canEdit && <Button asChild size="sm" variant="outline"><Link href="/complaints/import"><Upload className="h-4 w-4" /> Upload</Link></Button>}
-        {canEdit && <Button asChild size="sm"><Link href="/complaints/new"><Plus className="h-4 w-4" /> New</Link></Button>}
+        <ComplaintsHeaderActions canEdit={canEdit} />
       </PageHeader>
       <ComplaintTable data={complaints} />
     </div>

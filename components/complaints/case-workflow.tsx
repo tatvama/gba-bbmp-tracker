@@ -163,7 +163,7 @@ export function CaseWorkflow({
 
 function StepPanel({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 animate-fade-in">
       <div>
         <h3 className="text-sm font-semibold">{title}</h3>
         <p className="text-xs text-muted-foreground">{hint}</p>

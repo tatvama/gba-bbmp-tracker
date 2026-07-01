@@ -27,7 +27,7 @@ function fmtDate(d: string | null): string {
   if (!d) return "—";
   const parsed = new Date(d);
   if (Number.isNaN(parsed.getTime())) return d;
-  return parsed.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  return parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function statusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {

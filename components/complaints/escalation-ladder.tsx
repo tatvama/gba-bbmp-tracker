@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Loader2, Gavel, Search, FileText, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { generateComplaintDraft } from "@/lib/actions/complaints";
 import { analyzeReplyGapAction, type ReplyGapResult } from "@/lib/actions/lifecycle";
 
@@ -119,31 +120,36 @@ export function EscalationLadder({ complaintId }: { complaintId: string }) {
         </h2>
         {error && <p className="mb-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <div className="grid gap-2 sm:grid-cols-2">
-          {LADDER.map((rung) => (
-            <button
-              key={rung.kind}
-              type="button"
-              onClick={() => draftRung(rung.kind)}
-              disabled={draftBusy !== null}
-              className={`flex items-start gap-2 rounded-lg border p-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
-                draftKind === rung.kind ? "border-primary" : "border-slate-200 dark:border-slate-800"
-              }`}
-            >
-              {draftBusy === rung.kind ? (
-                <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-primary" />
-              ) : (
-                <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              )}
-              <span>
-                <span className="block text-sm font-semibold">{rung.label}</span>
-                <span className="block text-[11px] text-muted-foreground">{rung.hint}</span>
-              </span>
-            </button>
-          ))}
+          {LADDER.map((rung, idx) => {
+            const staggerClass = `stagger-${(idx % 4) + 1}`;
+            return (
+              <button
+                key={rung.kind}
+                type="button"
+                onClick={() => draftRung(rung.kind)}
+                disabled={draftBusy !== null}
+                className={cn(
+                  "flex items-start gap-2 rounded-lg border p-3 text-left transition-all duration-300 ease-in-out hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 animate-fade-in",
+                  staggerClass,
+                  draftKind === rung.kind ? "border-primary bg-primary/[0.02]" : "border-slate-200 dark:border-slate-800"
+                )}
+              >
+                {draftBusy === rung.kind ? (
+                  <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-primary" />
+                ) : (
+                  <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                )}
+                <span>
+                  <span className="block text-sm font-semibold">{rung.label}</span>
+                  <span className="block text-[11px] text-muted-foreground">{rung.hint}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {draft && (
-          <div className="mt-4">
+          <div className="mt-4 animate-fade-in">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground">Draft — review & edit before filing</span>
               <Button type="button" size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(draft)}>
@@ -154,7 +160,7 @@ export function EscalationLadder({ complaintId }: { complaintId: string }) {
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="h-72 w-full rounded-lg border border-input bg-background p-3 font-sans text-xs leading-relaxed"
+              className="h-72 w-full rounded-lg border border-input bg-background p-3 font-sans text-xs leading-relaxed transition-all duration-200 focus:border-primary focus:ring-1 focus:ring-primary"
             />
           </div>
         )}

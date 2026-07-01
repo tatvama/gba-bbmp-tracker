@@ -33,7 +33,16 @@ import {
   Droplet,
   Briefcase,
   ArrowRight,
+  SlidersHorizontal,
+  ChevronDown,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
@@ -214,6 +223,7 @@ export function RtiTable({
   const [category, setCategory] = React.useState("all");
   const [priority, setPriority] = React.useState("all");
   const [deadline, setDeadline] = React.useState("all");
+  const [showMobileFilters, setShowMobileFilters] = React.useState(false);
 
   const filtered = React.useMemo(
     () =>
@@ -357,9 +367,9 @@ export function RtiTable({
           return (
             <div className="flex justify-end pr-2">
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
-                className="h-8 px-3 text-xs font-semibold rounded-lg border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-905 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-150 shadow-3xs"
+                className="h-8 px-3 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground transition-all duration-150 shadow-xs"
                 onClick={handleViewDetails}
               >
                 View
@@ -418,11 +428,10 @@ export function RtiTable({
   const totalRows = filtered.length;
   const fromRow = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
   const toRow = Math.min((pageIndex + 1) * pageSize, totalRows);
-
   return (
-    <div className="space-y-6">
-      {/* Redesigned Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print bg-slate-55 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+    <div className="space-y-4 md:space-y-6">
+      {/* ── DESKTOP TOOLBAR (md and up) ── */}
+      <div className="hidden md:flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print bg-slate-55 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-405 shrink-0" />
@@ -489,7 +498,7 @@ export function RtiTable({
               variant="ghost"
               size="sm"
               onClick={reset}
-              className="h-9 px-2.5 text-xs text-slate-500 hover:text-foreground"
+              className="h-9 px-2.5 text-xs text-slate-500 hover:text-foreground cursor-pointer"
             >
               <X className="h-4 w-4 mr-1.5" /> Reset
             </Button>
@@ -503,7 +512,7 @@ export function RtiTable({
             variant="outline"
             size="sm"
             onClick={() => doExport("csv")}
-            className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg"
+            className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
           >
             <Download className="h-4 w-4 mr-1.5" /> CSV
           </Button>
@@ -511,7 +520,7 @@ export function RtiTable({
             variant="outline"
             size="sm"
             onClick={() => doExport("xlsx")}
-            className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg"
+            className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
           >
             <Download className="h-4 w-4 mr-1.5" /> XLSX
           </Button>
@@ -519,12 +528,166 @@ export function RtiTable({
             variant="outline"
             size="sm"
             onClick={() => router.refresh()}
-            className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg"
+            className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
             aria-label="Refresh data"
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
           </Button>
         </div>
+      </div>
+
+      {/* ── MOBILE TOOLBAR (md hidden) ── */}
+      <div className="flex md:hidden flex-col gap-2.5 no-print bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-3xs">
+        {/* Full-width Search Bar */}
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400 shrink-0 pointer-events-none" />
+          <Input
+            placeholder="Search ref, subject, authority…"
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="h-11 w-full text-sm pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+            aria-label="Search cases"
+          />
+        </div>
+
+        {/* Toolbar buttons row */}
+        <div className="flex items-center gap-2 w-full">
+          {/* Filters toggle */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className={cn(
+              "h-11 flex-1 text-xs font-bold rounded-lg border flex items-center justify-center gap-2 cursor-pointer transition-all bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800",
+              showMobileFilters && "bg-slate-100 border-slate-300 dark:bg-slate-850 dark:border-slate-700"
+            )}
+            aria-label="Toggle advanced filters"
+          >
+            <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+            <span>Filters</span>
+            {hasFilters && (
+              <span className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
+            )}
+          </Button>
+
+          {/* Export Select Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-11 flex-1 text-xs font-bold rounded-lg border flex items-center justify-center gap-2 cursor-pointer bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                aria-label="Export cases"
+              >
+                <Download className="h-4 w-4 text-slate-500" />
+                <span>Export</span>
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
+              <DropdownMenuItem onClick={() => doExport("csv")} className="cursor-pointer text-xs font-semibold">
+                Export to CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => doExport("xlsx")} className="cursor-pointer text-xs font-semibold">
+                Export to Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Refresh button */}
+          <Button
+            variant="outline"
+            onClick={() => router.refresh()}
+            className="h-11 w-11 shrink-0 rounded-lg border flex items-center justify-center cursor-pointer bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+            aria-label="Refresh data"
+          >
+            <RefreshCw className="h-4 w-4 text-slate-500" />
+          </Button>
+        </div>
+
+        {/* Collapsible advanced filters accordion grid */}
+        <AnimatePresence initial={false}>
+          {showMobileFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="overflow-hidden border-t border-slate-100 dark:border-slate-800/80 pt-2.5 mt-1"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Status</span>
+                  <select
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    aria-label="Status filter option"
+                  >
+                    <option value="all">Any status</option>
+                    {RTI_STATUSES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Category</span>
+                  <select
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    aria-label="Category filter option"
+                  >
+                    <option value="all">Any category</option>
+                    {RTI_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Priority</span>
+                  <select
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    aria-label="Priority filter option"
+                  >
+                    <option value="all">Any priority</option>
+                    {PRIORITIES.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Deadline</span>
+                  <select
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    aria-label="Deadline filter option"
+                  >
+                    {DEADLINE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {hasFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={reset}
+                  className="h-10 mt-3 w-full text-xs font-bold text-slate-500 dark:border-slate-800 dark:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-250 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <X className="h-4 w-4" /> Reset Filters
+                </Button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Desktop & Tablet Table Layout */}
@@ -574,9 +737,9 @@ export function RtiTable({
       </div>
 
       {/* Mobile Card Layout */}
-      <div className="block md:hidden space-y-4">
+      <div className="block md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-muted-foreground dark:bg-slate-900/40 dark:border-slate-800">
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-muted-foreground dark:bg-slate-900/40 dark:border-slate-800 select-none">
             No RTIs match these filters.
           </div>
         ) : (
@@ -585,52 +748,49 @@ export function RtiTable({
             return (
               <Card
                 key={r.id}
-                className="border border-slate-200 bg-white shadow-xs rounded-xl overflow-hidden hover:border-blue-200 dark:bg-slate-900/40 dark:border-slate-800 transition-all duration-200"
+                className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs rounded-xl overflow-hidden hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200 select-none animate-in fade-in slide-in-from-bottom-1 duration-150"
               >
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-bold text-foreground">
-                        {orDash(r.internal_ref, "Pending")}
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                        {formatDate(r.created_at)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <RtiStatusBadge status={r.status} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-sm text-slate-805 dark:text-slate-205 line-clamp-2 leading-relaxed">
-                      {r.subject}
-                    </h3>
-                    <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider pl-0.5">
-                      Stage: {getWorkflowStage(r.status)}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <CategoryChip category={r.category} />
+                <CardContent className="p-3.5 space-y-2.5">
+                  {/* Row 1: Status & Priority badges */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <RtiStatusBadge status={r.status} />
                     <PriorityChip priority={r.priority} />
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-auto">
+                      {getWorkflowStage(r.status)}
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 mt-1">
-                    <div className="flex items-center gap-2">
-                      <DeadlineBadge rti={r} rules={rules} />
-                    </div>
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-semibold"
-                    >
-                      <Link href={`/rti/${r.id}`}>
-                        View Details <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </Button>
+                  {/* Row 2: Ref & Date */}
+                  <div className="flex items-center justify-between text-xs border-b border-slate-100 dark:border-slate-800/80 pb-2">
+                    <span className="font-mono font-bold text-slate-850 dark:text-slate-200">
+                      {orDash(r.internal_ref, "Pending")}
+                    </span>
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">
+                      {formatDate(r.created_at)}
+                    </span>
                   </div>
+
+                  {/* Row 3: Subject Title */}
+                  <h3 className="font-bold text-[15px] sm:text-base text-slate-855 dark:text-slate-200 line-clamp-2 leading-relaxed">
+                    {r.subject}
+                  </h3>
+
+                  {/* Row 4: Category & Deadline */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                    <CategoryChip category={r.category} />
+                    <DeadlineBadge rti={r} rules={rules} />
+                  </div>
+
+                  {/* Row 5: View Details button */}
+                  <Button
+                    asChild
+                    variant="default"
+                    className="w-full h-11 justify-center mt-2.5 font-bold hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer text-xs uppercase tracking-wide"
+                  >
+                    <Link href={`/rti/${r.id}`}>
+                      View Details
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             );
@@ -638,8 +798,8 @@ export function RtiTable({
         )}
       </div>
 
-      {/* Pagination & Footer */}
-      <div className="mt-3 flex items-center justify-between text-sm text-slate-500 dark:text-slate-455 no-print">
+      {/* Desktop Pagination & Footer */}
+      <div className="hidden md:flex mt-3 items-center justify-between text-sm text-slate-500 dark:text-slate-455 no-print select-none">
         <span className="font-medium">
           Showing {fromRow}–{toRow} of {totalRows} RTIs
         </span>
@@ -649,7 +809,7 @@ export function RtiTable({
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
-            className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg"
+            className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
           >
             Previous
           </Button>
@@ -661,11 +821,43 @@ export function RtiTable({
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
-            className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg"
+            className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
           >
             Next
           </Button>
         </div>
+      </div>
+
+      {/* Mobile Pagination & Footer */}
+      <div className="flex md:hidden flex-col items-center gap-3 mt-4 text-sm text-slate-500 dark:text-slate-455 no-print select-none w-full border-t border-slate-100 dark:border-slate-800/80 pt-3">
+        <span className="font-semibold text-xs text-slate-400 dark:text-slate-505">
+          Showing {fromRow}–{toRow} of {totalRows} RTIs
+        </span>
+        {table.getPageCount() > 1 && (
+          <div className="flex items-center gap-2.5 w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="h-11 flex-1 text-xs font-bold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer bg-white"
+            >
+              Previous
+            </Button>
+            <span className="text-xs font-semibold px-3 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-750 shrink-0">
+              {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="h-11 flex-1 text-xs font-bold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer bg-white"
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
