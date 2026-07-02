@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Upload, X, ArrowUp, ArrowDown, FileText, AlertTriangle } from "lucide-react";
+import { Camera, Upload, X, ArrowUp, ArrowDown, FileText, AlertTriangle, CheckCircle2, ExternalLink, Sparkles, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { uploadComplaintScanAction } from "@/lib/actions/complaints";
+import { uploadComplaintScanAction, getDocumentViewUrl } from "@/lib/actions/complaints";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
+import { captureScanFromVideo } from "@/lib/client/scan-enhance";
 
 const selectCls =
   "flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -25,9 +27,12 @@ function todayLocal(): string {
 }
 
 /**
- * Capture-first complaint document upload: live-camera photos and/or a scanned PDF,
- * merged into one optimised PDF on the server (sharp normalises photos like a scan),
- * then OCR + AI summary. Mirrors the RTI document-capture UX.
+ * Capture-first complaint document upload. On MOBILE the live camera is the
+ * hero: high-resolution captures are processed like a scan (auto-levels →
+ * paper white, ink black) page by page; every page of the set merges into ONE
+ * PDF on the server (sharp normalises again), then OCR + AI summary run. On
+ * desktop it's a plain multi-file picker (no camera). After upload the merged
+ * PDF is immediately previewable.
  */
 export function ScanCapture({
   complaintId,
@@ -41,6 +46,7 @@ export function ScanCapture({
   onDone?: () => void;
 }) {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const idRef = React.useRef(0);
   const [docType, setDocType] = React.useState(defaultDocType ?? docTypes[0] ?? "Other evidence");
   const [title, setTitle] = React.useState("");
@@ -50,6 +56,10 @@ export function ScanCapture({
   const [statusMsg, setStatusMsg] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [cameraOn, setCameraOn] = React.useState(false);
+  const [scanMode, setScanMode] = React.useState(true); // process captures like a scan
+  const [flash, setFlash] = React.useState(false);
+  const [uploaded, setUploaded] = React.useState<{ documentId: string; pageCount: number; docType: string; firstPageUrl: string | null } | null>(null);
+  const [openingDoc, setOpeningDoc] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
 
@@ -99,7 +109,16 @@ export function ScanCapture({
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      // Ask for the rear camera at the HIGHEST resolution it offers — these
+      // captures become legal-document scans, not thumbnails.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 4096 },
+          height: { ideal: 3072 },
+        },
+        audio: false,
+      });
       streamRef.current = stream;
       setCameraOn(true);
       requestAnimationFrame(() => {
@@ -113,19 +132,13 @@ export function ScanCapture({
     }
   }
 
-  function capturePage() {
+  async function capturePage() {
     const video = videoRef.current;
-    if (!video || !video.videoWidth) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      addFiles([new File([blob], `page-${pages.length + 1}.jpg`, { type: "image/jpeg" })]);
-    }, "image/jpeg", 0.9);
+    if (!video) return;
+    setFlash(true);
+    setTimeout(() => setFlash(false), 180);
+    const file = await captureScanFromVideo(video, `page-${pages.length + 1}.jpg`, { enhance: scanMode });
+    if (file) addFiles([file]);
   }
 
   React.useEffect(() => {
@@ -160,10 +173,18 @@ export function ScanCapture({
         setError(res.error ?? "Upload failed");
         return;
       }
-      pages.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+      // Success → show the uploaded set (preview stays visible) and refresh
+      // the document list behind us. "Scan another" starts the next set.
+      const firstPageUrl = pages.find((p) => p.url)?.url ?? null;
+      pages.forEach((p) => p.url && p.url !== firstPageUrl && URL.revokeObjectURL(p.url));
+      setUploaded({
+        documentId: res.documentId ?? "",
+        pageCount: pages.length,
+        docType,
+        firstPageUrl,
+      });
       setPages([]);
       setTitle("");
-      onDone?.();
       router.refresh();
     } catch (e) {
       clearInterval(interval);
@@ -173,12 +194,71 @@ export function ScanCapture({
     }
   }
 
+  async function openUploadedDoc() {
+    if (!uploaded?.documentId) return;
+    setOpeningDoc(true);
+    try {
+      const r = await getDocumentViewUrl(uploaded.documentId);
+      if (r.url) window.open(r.url, "_blank", "noopener,noreferrer");
+      else setError(r.error ?? "Could not open the document.");
+    } finally {
+      setOpeningDoc(false);
+    }
+  }
+
+  function resetForNextSet() {
+    if (uploaded?.firstPageUrl) URL.revokeObjectURL(uploaded.firstPageUrl);
+    setUploaded(null);
+    setError(null);
+  }
+
   if (busy) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
         <Spinner size="lg" className="text-primary" />
         <p className="animate-pulse text-sm font-medium">{statusMsg || "Processing…"}</p>
         <p className="text-xs text-muted-foreground">Pages are merged into one optimised PDF, then OCR + AI summary run on the server.</p>
+      </div>
+    );
+  }
+
+  // ── uploaded: preview of the merged set ────────────────────────────────────
+  if (uploaded) {
+    return (
+      <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-950/50">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              {uploaded.pageCount} page{uploaded.pageCount === 1 ? "" : "s"} merged into one PDF and uploaded
+            </p>
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
+              {uploaded.docType} · OCR + AI summary are running in the background.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {uploaded.firstPageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- local object-URL preview of the captured first page
+            <img src={uploaded.firstPageUrl} alt="First page" className="h-24 w-20 rounded-md border object-cover" />
+          )}
+          <Button type="button" onClick={openUploadedDoc} disabled={!uploaded.documentId || openingDoc}>
+            {openingDoc ? <Spinner size="sm" /> : <ExternalLink className="h-4 w-4" />} View the uploaded PDF
+          </Button>
+          <Button type="button" variant="outline" onClick={resetForNextSet}>
+            <RotateCcw className="h-4 w-4" /> Scan another document
+          </Button>
+          {onDone && (
+            <Button type="button" variant="ghost" onClick={onDone}>
+              Done
+            </Button>
+          )}
+        </div>
+        <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/70">
+          It&apos;s in the Documents list below too — the preview opens the exact merged PDF that was stored.
+        </p>
       </div>
     );
   }
@@ -203,23 +283,70 @@ export function ScanCapture({
       </div>
 
       {cameraOn ? (
-        <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- live camera preview, no audio */}
-          <video ref={videoRef} playsInline muted className="mx-auto max-h-80 w-full rounded-lg bg-black object-contain" />
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button type="button" onClick={capturePage}><Camera className="h-4 w-4" /> Capture page</Button>
-            <Button type="button" variant="outline" onClick={stopCamera}>Done capturing</Button>
+        <div className="space-y-3 rounded-xl border bg-slate-950 p-3">
+          <div className="relative overflow-hidden rounded-lg">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption -- live camera preview, no audio */}
+            <video ref={videoRef} playsInline muted className="mx-auto max-h-[26rem] w-full bg-black object-contain" />
+            {flash && <div className="pointer-events-none absolute inset-0 bg-white/80" />}
+            <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white tabular-nums">
+              {pages.length} page{pages.length === 1 ? "" : "s"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setScanMode((v) => !v)}
+              className={`absolute right-2 top-2 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                scanMode ? "bg-primary text-primary-foreground" : "bg-black/60 text-white/80"
+              }`}
+              title="Process captures like a scanned document (auto-contrast, paper white)"
+            >
+              <Sparkles className="h-3 w-3" /> Scan mode {scanMode ? "ON" : "OFF"}
+            </button>
+          </div>
+          <div className="flex items-center justify-center gap-6 pb-1">
+            <Button type="button" variant="outline" className="h-10 border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={stopCamera}>
+              Done capturing
+            </Button>
+            <button
+              type="button"
+              onClick={() => void capturePage()}
+              aria-label="Capture page"
+              className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-white/20 transition-transform active:scale-90"
+            >
+              <span className="h-11 w-11 rounded-full bg-white" />
+            </button>
+            <span className="w-[7.5rem] text-center text-[11px] text-white/60">
+              High-res capture, processed {scanMode ? "as a scan" : "as-is"}
+            </span>
           </div>
         </div>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Button type="button" variant="outline" className="h-auto py-4" onClick={startCamera}>
-            <Camera className="h-5 w-5" /> Use live camera
-          </Button>
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 py-4 text-center hover:bg-primary/10">
+        <div className={`grid gap-2 ${isMobile ? "sm:grid-cols-2" : ""}`}>
+          {/* Live camera is a MOBILE feature — desktops rarely have a usable
+              document camera, so there we only offer the file picker. */}
+          {isMobile && (
+            <button
+              type="button"
+              onClick={startCamera}
+              className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-primary/50 bg-primary/5 py-5 text-center transition-colors hover:bg-primary/10 active:scale-[0.99]"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15">
+                <Camera className="h-6 w-6 text-primary" />
+              </span>
+              <span className="text-sm font-bold text-primary">Open the camera</span>
+              <span className="text-[11px] text-muted-foreground">Click each page — they merge into one PDF</span>
+            </button>
+          )}
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 py-5 text-center hover:bg-primary/10">
             <span className="flex items-center gap-2 text-sm font-medium text-primary"><Upload className="h-5 w-5" /> Scan / choose files</span>
             <span className="text-xs text-muted-foreground">JPEG, PNG, WebP or PDF · multiple allowed</span>
-            <input type="file" accept="image/*,application/pdf" capture="environment" multiple className="hidden" onChange={onPick} />
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              {...(isMobile ? { capture: "environment" as const } : {})}
+              multiple
+              className="hidden"
+              onChange={onPick}
+            />
           </label>
         </div>
       )}

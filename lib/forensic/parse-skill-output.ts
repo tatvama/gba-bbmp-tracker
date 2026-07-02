@@ -185,16 +185,58 @@ export function parseJob(jobCode: string, entries: RawEntry[]): ForensicJobResul
   });
   const roles = new Set<ForensicFileRole>(detected.map((d) => d.role));
   const byRole = (r: ForensicFileRole) => entries.find((e) => classifyRelPath(e.relPath) === r);
+  const allOfRole = (r: ForensicFileRole) => entries.filter((e) => classifyRelPath(e.relPath) === r);
 
-  // Dataset: prefer the rich data/<code>.json, fall back to the skeleton min.json.
-  const richFile = byRole("rich_json");
+  // Dataset: several JSONs can share the rich_json role (the newer _AUDIT_REPORT
+  // layout ships <code>_FORENSIC_REPORT.json AND <code>_DOC_COMPLETENESS.json,
+  // and the completeness file sorts FIRST alphabetically) — so rank candidates
+  // by name and take the first that actually parses into forensic content,
+  // instead of blindly reading whichever entry came first.
+  const richRank = (p: string) => {
+    const l = p.toLowerCase();
+    if (l.includes("forensic_report")) return 0;
+    if (/(^|\/)data\//.test(l)) return 1;
+    if (l.includes("doc_completeness")) return 3;
+    return 2;
+  };
+  const richCandidates = [...allOfRole("rich_json")].sort((a, b) => richRank(a.relPath) - richRank(b.relPath));
+  let dataset: ForensicDataset | null = null;
+  for (const c of richCandidates) {
+    dataset = parseJsonText(c.text);
+    if (dataset) break;
+  }
   const minFile = byRole("min_json");
-  const dataset = parseJsonText(richFile?.text) ?? parseJsonText(minFile?.text);
+  dataset = dataset ?? parseJsonText(minFile?.text);
+  // Fold the skill's document-completeness JSON into the dataset (which docs
+  // are present/missing) when the dataset itself doesn't carry it.
+  const completeness = richCandidates.find((c) => c.relPath.toLowerCase().includes("doc_completeness"));
+  if (dataset && !dataset.document_presence && completeness?.text) {
+    try {
+      const cj = JSON.parse(completeness.text) as unknown;
+      if (cj && typeof cj === "object" && !Array.isArray(cj)) dataset.document_presence = cj as Record<string, unknown>;
+    } catch {
+      /* completeness JSON is optional */
+    }
+  }
 
   const letterDocx = detected.find((d) => d.role === "letter_docx") ?? null;
   const letterPdf = detected.find((d) => d.role === "letter_pdf") ?? null;
-  const letterText = cap(byRole("letter_docx")?.text ?? byRole("letter_pdf")?.text);
-  const extractedText = cap(byRole("text")?.text);
+  // Several .txt files can share the text role (the OCR dump AND a plain-text
+  // copy of the drafted letter) — the OCR/work text is the extractedText; a
+  // complaint-named .txt is a letter-text fallback when DOCX extraction fails.
+  const textRank = (p: string) => {
+    const l = p.toLowerCase();
+    if (l.includes("ocr_text")) return 0;
+    if (/(^|\/)work\//.test(l)) return 1;
+    if (l.includes("complaint")) return 3;
+    return 2;
+  };
+  const textEntries = [...allOfRole("text")].sort((a, b) => textRank(a.relPath) - textRank(b.relPath));
+  const letterTxt = textEntries.find((e) => baseName(e.relPath).toLowerCase().includes("complaint"));
+  // `||` not `??` — a letter DOCX whose text extraction produced "" must fall
+  // through to the PDF text, then to the plain-text letter copy.
+  const letterText = cap(byRole("letter_docx")?.text || byRole("letter_pdf")?.text || letterTxt?.text);
+  const extractedText = cap(textEntries.find((e) => e !== letterTxt)?.text);
 
   if (!validCode) warnings.push(`"${jobCode}" is not a valid job code (ddd-yy-nnnnnn).`);
 

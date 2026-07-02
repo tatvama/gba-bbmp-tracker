@@ -1,13 +1,13 @@
 import Link from "next/link";
 import {
-  FileText, FilePlus2, Clock, AlertOctagon, MailCheck, Wrench, MailX,
-  CalendarClock, TrendingUp, ScanLine, FileWarning, ClipboardCheck, ArrowRight, Sparkles, ShieldAlert,
+  FileText, Clock, AlertOctagon, MailX, CheckCircle2, UploadCloud, FilePlus2,
+  ArrowRight, Sparkles, LayoutGrid,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
+import { OrgTreemap, type OrgTreemapRow } from "@/components/complaints/org-treemap";
 import { complaintDashboardStats, listComplaints, listAiAdvisorWorklist } from "@/lib/queries";
 import { formatNumber, formatDate } from "@/lib/format";
 
@@ -21,41 +21,93 @@ const RISK_BADGE: Record<string, BadgeProps["variant"]> = {
   Critical: "critical",
 };
 
+/**
+ * Deliberately SIMPLE dashboard: five numbers, one treemap (where the
+ * complaints are, by Division → Sub-division → Ward), one "needs attention"
+ * list, three quick actions. Every deeper report lives on its own page.
+ */
 export default async function ComplaintDashboard() {
   const today = new Date().toISOString().slice(0, 10);
   const [stats, complaints, aiWorklist] = await Promise.all([
     complaintDashboardStats(),
     listComplaints(),
-    listAiAdvisorWorklist(8),
+    listAiAdvisorWorklist(6),
   ]);
-  const recent = complaints.slice(0, 6);
-  const dueToday = complaints.filter((c) => c.next_follow_up_date === today).slice(0, 8);
+
+  const resolved = complaints.filter((c) => c.status === "Resolved" || c.status === "Closed").length;
+  const treemapRows: OrgTreemapRow[] = complaints.map((c) => ({
+    division: c.division?.name ?? null,
+    subDivision: c.eng_subdivision?.name ?? null,
+    wardNo: c.ward?.new_no ?? null,
+    wardName: c.ward?.new_name ?? null,
+    status: c.status,
+  }));
+
   const overdue = complaints
     .filter((c) => c.next_follow_up_date && c.next_follow_up_date < today && c.status !== "Resolved" && c.status !== "Closed")
-    .slice(0, 8);
+    .sort((a, b) => (a.next_follow_up_date ?? "").localeCompare(b.next_follow_up_date ?? ""));
 
-  // Each card deep-links to the matching pre-filtered worklist (or the reports
-  // page for the document-level OCR cards) so the dashboard drives action.
+  // One merged "needs attention" list: overdue first, then what the AI flags.
+  const aiOnly = aiWorklist.filter((a) => !overdue.some((o) => o.id === a.id));
+  const attention: {
+    id: string;
+    title: string;
+    caseNo: string | null;
+    href: string;
+    badge: { text: string; variant: BadgeProps["variant"] };
+    sub: string;
+  }[] = [
+    ...overdue.slice(0, 5).map((c) => ({
+      id: c.id,
+      title: c.title,
+      caseNo: c.internal_case_number ?? null,
+      href: `/complaints/${c.id}`,
+      badge: { text: "Overdue", variant: "destructive" as BadgeProps["variant"] },
+      sub: c.next_follow_up_date ? `follow-up was due ${formatDate(c.next_follow_up_date)}` : c.status,
+    })),
+    ...aiOnly.slice(0, 4).map((a) => ({
+      id: a.id,
+      title: a.title,
+      caseNo: a.internal_case_number,
+      href: `/complaints/${a.id}?tab=ai`,
+      badge: { text: `AI: ${a.risk_level}`, variant: RISK_BADGE[a.risk_level] ?? "muted" },
+      sub: a.recommendation ?? a.status,
+    })),
+  ].slice(0, 8);
+
   const cards = [
-    { label: "Total", value: stats.total, icon: FileText, cls: "text-primary", bg: "bg-primary/8", href: "/complaints" },
-    { label: "Filed this month", value: stats.filedThisMonth, icon: FilePlus2, cls: "text-teal", bg: "bg-teal/8", href: "/complaints?status=Filed" },
-    { label: "Pending", value: stats.pending, icon: Clock, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints?flag=open" },
+    { label: "Total complaints", value: stats.total, icon: FileText, cls: "text-primary", bg: "bg-primary/8", href: "/complaints" },
+    { label: "Active", value: stats.pending, icon: Clock, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints?flag=open" },
+    { label: "Awaiting reply", value: stats.noReply, icon: MailX, cls: "text-destructive", bg: "bg-destructive/8", href: "/complaints?flag=noreply" },
     { label: "Overdue", value: stats.overdue, icon: AlertOctagon, cls: "text-destructive", bg: "bg-destructive/8", href: "/complaints?flag=overdue" },
-    { label: "Replies received", value: stats.repliesReceived, icon: MailCheck, cls: "text-teal", bg: "bg-teal/8", href: "/complaints?flag=reply" },
-    { label: "Action taken", value: stats.actionTaken, icon: Wrench, cls: "text-teal", bg: "bg-teal/8", href: "/complaints?flag=action" },
-    { label: "No reply", value: stats.noReply, icon: MailX, cls: "text-destructive", bg: "bg-destructive/8", href: "/complaints?flag=noreply" },
-    { label: "Follow-ups today", value: stats.followUpsDueToday, icon: CalendarClock, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints?flag=today" },
-    { label: "Escalations", value: stats.escalationsPending, icon: TrendingUp, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints?status=Escalated" },
-    { label: "OCR pending", value: stats.ocrPending, icon: ScanLine, cls: "text-primary", bg: "bg-primary/8", href: "/complaints/reports" },
-    { label: "Low-confidence OCR", value: stats.lowConfidenceOcr, icon: FileWarning, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints/reports" },
-    { label: "Needs review", value: stats.needsManualReview, icon: ClipboardCheck, cls: "text-primary", bg: "bg-primary/8", href: "/complaints/reports" },
-    { label: "AI: Critical risk", value: stats.aiCriticalRisk, icon: ShieldAlert, cls: "text-destructive", bg: "bg-destructive/8", href: "/complaints" },
-    { label: "AI: Needs reminder/escalation", value: stats.aiNeedsAction, icon: Sparkles, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints" },
+    { label: "Resolved / closed", value: resolved, icon: CheckCircle2, cls: "text-teal", bg: "bg-teal/8", href: "/complaints?status=Resolved" },
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Complaint dashboard" description="Live complaint, reply, action-taken, OCR and follow-up status across the platform." />
+      <PageHeader title="Complaint dashboard" description="Where things stand — and what needs you next." />
+
+      {/* quick actions */}
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/complaints/import"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+        >
+          <UploadCloud className="h-4 w-4" /> Upload ZIP / letter
+        </Link>
+        <Link
+          href="/complaints/new"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-card px-4 py-2.5 text-sm font-bold text-foreground shadow-2xs transition-all hover:border-primary/40 hover:-translate-y-0.5 dark:border-slate-700"
+        >
+          <FilePlus2 className="h-4 w-4" /> New complaint
+        </Link>
+        <Link
+          href="/complaints"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-card px-4 py-2.5 text-sm font-bold text-foreground shadow-2xs transition-all hover:border-primary/40 hover:-translate-y-0.5 dark:border-slate-700"
+        >
+          <FileText className="h-4 w-4" /> All complaints
+        </Link>
+      </div>
 
       {stats.overdue > 0 && (
         <Link
@@ -68,24 +120,21 @@ export default async function ComplaintDashboard() {
         </Link>
       )}
 
-      {/* Grid of KPI cards. Supports single column on 320px screens up to lg:grid-cols-6 */}
-      <div className="grid grid-cols-1 min-[340px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* five numbers */}
+      <div className="grid grid-cols-1 min-[340px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {cards.map((c, idx) => {
           const Icon = c.icon;
-          const staggerClass = `stagger-${(idx % 4) + 1}`;
           return (
-            <Link
-              key={c.label}
-              href={c.href}
-              className={cn("group block animate-fade-in", staggerClass)}
-            >
+            <Link key={c.label} href={c.href} className={`group block animate-fade-in stagger-${(idx % 4) + 1}`}>
               <div className="stat-card h-full rounded-xl border bg-card p-4 shadow-2xs group-hover:border-primary/30 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">{formatNumber(c.value)}</p>
                     <p className="mt-2 text-xs font-semibold text-foreground/80 break-words leading-tight">{c.label}</p>
                   </div>
-                  <div className={`shrink-0 rounded-lg p-2 ${c.bg}`}><Icon className={`h-4 w-4 ${c.cls}`} /></div>
+                  <div className={`shrink-0 rounded-lg p-2 ${c.bg}`}>
+                    <Icon className={`h-4 w-4 ${c.cls}`} />
+                  </div>
                 </div>
               </div>
             </Link>
@@ -93,127 +142,47 @@ export default async function ComplaintDashboard() {
         })}
       </div>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-4">
-        {/* Overdue — chase now */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+        {/* treemap: where the complaints are */}
+        <Card className="shadow-2xs rounded-xl border lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
+              <LayoutGrid className="h-3.5 w-3.5 text-primary" /> Complaints by area
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 pt-0 px-4">
+            <OrgTreemap rows={treemapRows} />
+          </CardContent>
+        </Card>
+
+        {/* needs attention */}
         <Card className="shadow-2xs rounded-xl border">
           <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-destructive">Overdue — chase now</CardTitle>
+            <CardTitle className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
+              <Sparkles className="h-3.5 w-3.5 text-primary" /> Needs attention
+            </CardTitle>
             <Link href="/complaints?flag=overdue" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
               All <ArrowRight className="h-3 w-3" />
             </Link>
           </CardHeader>
           <CardContent className="pb-4 pt-0 px-4">
-            {overdue.length === 0 ? (
-              <div className="py-6 text-center"><EmptyState title="Nothing overdue" /></div>
-            ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-850">
-                {overdue.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-3">
-                    <Link href={`/complaints/${c.id}`} className="min-w-0 flex-1 group">
-                      <p className="text-sm font-medium hover:text-primary break-words line-clamp-2 leading-snug">{c.title}</p>
-                      <p className="truncate text-xs text-muted-foreground mt-1 font-mono">
-                        {c.internal_case_number ?? "—"}{c.next_follow_up_date ? ` · due ${formatDate(c.next_follow_up_date)}` : ""}
-                      </p>
-                    </Link>
-                    <Badge variant="destructive" className="shrink-0 text-[10px] font-bold py-0.5">{c.status}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Follow-ups Section */}
-        <Card className="shadow-2xs rounded-xl border">
-          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">Follow-ups due today</CardTitle>
-            <Link href="/complaints?flag=today" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
-              All <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent className="pb-4 pt-0 px-4">
-            {dueToday.length === 0 ? (
+            {attention.length === 0 ? (
               <div className="py-6 text-center">
-                <EmptyState title="Nothing due today" />
+                <EmptyState title="All clear" description="Nothing overdue, nothing flagged." />
               </div>
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-850">
-                {dueToday.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-3">
-                    <Link href={`/complaints/${c.id}`} className="min-w-0 flex-1 group">
-                      <p className="text-sm font-medium hover:text-primary break-words line-clamp-2 leading-snug">
-                        {c.title}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground mt-1 font-mono">
-                        {c.internal_case_number ?? "—"}
+                {attention.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-3 py-3">
+                    <Link href={a.href} className="min-w-0 flex-1 group">
+                      <p className="text-sm font-medium hover:text-primary break-words line-clamp-2 leading-snug">{a.title}</p>
+                      <p className="truncate text-xs text-muted-foreground mt-1">
+                        <span className="font-mono">{a.caseNo ?? "—"}</span> · {a.sub}
                       </p>
                     </Link>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge variant="warning" className="text-[10px] font-bold py-0.5">{c.status}</Badge>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recently Updated Section */}
-        <Card className="shadow-2xs rounded-xl border">
-          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">Recently updated</CardTitle>
-            <Link href="/complaints" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
-              All <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent className="pb-4 pt-0 px-4">
-            {recent.length === 0 ? (
-              <div className="py-6 text-center">
-                <EmptyState title="No complaints yet" />
-              </div>
-            ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-850">
-                {recent.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-3">
-                    <Link href={`/complaints/${c.id}`} className="min-w-0 flex-1 group">
-                      <p className="text-sm font-medium hover:text-primary break-words line-clamp-2 leading-snug">
-                        {c.title}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground mt-1 font-mono">
-                        {c.internal_case_number ?? "—"} · {formatDate(c.updated_at)}
-                      </p>
-                    </Link>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge variant="muted" className="text-[10px] font-bold py-0.5">{c.status}</Badge>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* AI Advisor — needs attention */}
-        <Card className="shadow-2xs rounded-xl border">
-          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
-            <CardTitle className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
-              <Sparkles className="h-3.5 w-3.5 text-primary" /> AI Advisor
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 pt-0 px-4">
-            {aiWorklist.length === 0 ? (
-              <div className="py-6 text-center"><EmptyState title="Nothing flagged" /></div>
-            ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-850">
-                {aiWorklist.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-3">
-                    <Link href={`/complaints/${c.id}?tab=ai`} className="min-w-0 flex-1 group">
-                      <p className="text-sm font-medium hover:text-primary break-words line-clamp-2 leading-snug">{c.title}</p>
-                      <p className="truncate text-xs text-muted-foreground mt-1 font-mono">
-                        {c.internal_case_number ?? "—"}{c.recommendation ? ` · ${c.recommendation}` : ""}
-                      </p>
-                    </Link>
-                    <Badge variant={RISK_BADGE[c.risk_level] ?? "muted"} className="shrink-0 text-[10px] font-bold py-0.5">{c.risk_level}</Badge>
+                    <Badge variant={a.badge.variant} className="shrink-0 text-[10px] font-bold py-0.5">
+                      {a.badge.text}
+                    </Badge>
                   </li>
                 ))}
               </ul>

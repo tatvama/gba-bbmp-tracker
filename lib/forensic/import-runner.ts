@@ -20,14 +20,24 @@ function decode(bytes: Buffer): string {
   }
 }
 
+export interface AnalyzeProgress {
+  /** 0..1 across all job folders in the batch */
+  fraction: number;
+  message: string;
+}
+
 /**
  * Background inventory + parse of an extracted forensic ZIP (runs in Next
- * `after()`). Reads from the local temp dir the route handler already
- * extracted into — no re-download, no re-unzip (the raw ZIP is never
- * uploaded anywhere). Does NOT delete tempDirPath: the commit step
- * (lib/actions/forensic-zip-import.ts) still needs it.
+ * `after()` for direct uploads, or from the import-queue worker for chunked
+ * uploads). Reads from the local temp dir already extracted into — no
+ * re-download, no re-unzip (the raw ZIP is never uploaded anywhere). Does NOT
+ * delete tempDirPath: the commit step still needs it.
  */
-export async function processForensicBatch(batchId: string, tempDirPath: string): Promise<void> {
+export async function processForensicBatch(
+  batchId: string,
+  tempDirPath: string,
+  onProgress?: (p: AnalyzeProgress) => void,
+): Promise<void> {
   const admin = createAdminClient();
   try {
     console.log(`[processForensicBatch] started batch=${batchId} tempDir=${tempDirPath} ts=${new Date().toISOString()}`);
@@ -48,7 +58,10 @@ export async function processForensicBatch(batchId: string, tempDirPath: string)
     }
 
     const jobs: ForensicJobResult[] = [];
+    let jobIdx = 0;
     for (const [code, es] of grouped) {
+      onProgress?.({ fraction: jobIdx / Math.max(1, grouped.size), message: `Reading job folder ${code} (${jobIdx + 1}/${grouped.size})…` });
+      jobIdx += 1;
       let letterDocxRel: string | null = null;
       let letterPdfRel: string | null = null;
       for (const e of es) {

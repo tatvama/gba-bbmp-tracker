@@ -22,6 +22,7 @@
     "db:create-admin": "tsx scripts/create-admin.ts",
     "db:backfill-fingerprints": "tsx scripts/backfill-fingerprints.ts",
     "db:seed-sr": "tsx scripts/seed-sr-rates.ts",
+    "import:zip": "tsx --tsconfig scripts/tsconfig.pipeline.json scripts/import-forensic-zip.ts",
     "mcp:start": "tsx mcp/bbmp-server.ts"
   },
   "dependencies": {

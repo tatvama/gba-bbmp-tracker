@@ -342,9 +342,11 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
   const [type, setType] = React.useState("all");
   const [priority, setPriority] = React.useState("all");
   const [flag, setFlag] = React.useState(() => searchParams.get("flag") ?? "all"); // overdue | reply | action | noreply | today | open
-  const [division, setDivision] = React.useState("all");
-  const [subDivision, setSubDivision] = React.useState("all");
-  const [ward, setWard] = React.useState("all");
+  // Division / sub-division / ward also deep-link (the dashboard treemap links
+  // straight to e.g. /complaints?division=Yelahanka&ward=1).
+  const [division, setDivision] = React.useState(() => searchParams.get("division") ?? "all");
+  const [subDivision, setSubDivision] = React.useState(() => searchParams.get("subDivision") ?? "all");
+  const [ward, setWard] = React.useState(() => searchParams.get("ward") ?? "all");
 
   const divisionOpts = React.useMemo(
     () => [...new Set(data.map((c) => c.division?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),

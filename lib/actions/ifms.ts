@@ -7,7 +7,7 @@ import { uploadBuffer, buildPath } from "@/lib/storage/supabase-upload";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { processQueuedJobDocs } from "@/lib/ocr/process-job-document";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
-import { getComplaintSettings } from "@/lib/settings";
+import { convertJobCaseCore } from "@/lib/forensic/convert-job-case";
 import {
   checkPortalReachable,
   resolveTargets,
@@ -380,55 +380,12 @@ export async function convertJobCaseToComplaint(jobCaseId: string): Promise<Conv
   }
   const admin = createAdminClient();
 
-  const { data: jc } = await admin.from("job_cases").select("*").eq("id", jobCaseId).single();
-  if (!jc) return { ok: false, error: "Job case not found." };
-
-  // Already converted → return the existing complaint (idempotent).
-  if (jc.complaint_id) {
-    const { data: existing } = await admin.from("complaints").select("internal_case_number").eq("id", jc.complaint_id).maybeSingle();
-    return { ok: true, complaintId: jc.complaint_id as string, caseNumber: (existing?.internal_case_number as string) ?? undefined };
+  // Body extracted to convertJobCaseCore so the background import worker can
+  // create complaints outside a request scope (no cookies there).
+  const result = await convertJobCaseCore(admin, jobCaseId, user.id);
+  if (result.ok) {
+    revalidatePath("/complaints/portal");
+    revalidatePath("/complaints");
   }
-
-  const settings = await getComplaintSettings();
-  const year = new Date().getFullYear();
-  const { data: rpc, error: rpcError } = await admin.rpc("next_complaint_case_number", {
-    p_prefix: settings.caseNumberPrefix || "DM-CMP",
-    p_year: year,
-  });
-  if (rpcError || !rpc) return { ok: false, error: `Could not generate a case number: ${rpcError?.message ?? "unknown"}` };
-  const caseNumber = rpc as string;
-
-  const jobNumber = jc.job_number as string;
-  const title = (jc.description as string)?.trim() || `BBMP works job ${jobNumber}`;
-  const { data: comp, error } = await admin
-    .from("complaints")
-    .insert({
-      title: title.slice(0, 300),
-      type: "Tender Irregularity",
-      status: "Draft",
-      priority: "Medium",
-      job_number: jobNumber,
-      internal_case_number: caseNumber,
-      complaint_mode: "Online portal",
-      description: `Imported from the BBMP IFMS portal (job ${jobNumber}). Contractor: ${jc.contractor ?? "—"}. Documents downloaded and audited under this job number; draft the bill-stop / complaint letter from the forensic audit.`,
-      created_by: user.id,
-      updated_by: user.id,
-    })
-    .select("id")
-    .single();
-  if (error || !comp) return { ok: false, error: error?.message ?? "Could not create the complaint." };
-  const complaintId = comp.id as string;
-
-  await admin.from("job_cases").update({ complaint_id: complaintId, status: "converted" }).eq("id", jobCaseId);
-  await admin.from("complaint_timeline").insert({
-    complaint_id: complaintId,
-    event_type: "Created",
-    title: "Complaint created from BBMP portal job",
-    summary: `${caseNumber} — job ${jobNumber}`,
-    created_by: user.id,
-  });
-
-  revalidatePath("/complaints/portal");
-  revalidatePath("/complaints");
-  return { ok: true, complaintId, caseNumber };
+  return result;
 }

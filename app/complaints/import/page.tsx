@@ -24,7 +24,7 @@ export default async function ComplaintUploadPage() {
     <div className="mx-auto max-w-3xl space-y-5">
       <PageHeader
         title="Upload a ZIP or a letter"
-        description="One place to start a complaint. Drop a forensic-audit ZIP (one folder per job code) or a single complaint letter/PDF — it auto-detects which and runs the right task."
+        description="Drop one or many forensic-audit ZIPs (one folder per job code — multi-GB is fine): they upload one by one with live progress, and each job becomes a complaint automatically. You can close this page any time; it resumes where it left off. Or drop a single letter/PDF for AI intake."
       />
       {!isAiConfigured() && (
         <p className="rounded-lg border border-amber-200/50 bg-amber-50/30 p-3 text-xs text-amber-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-amber-400">
