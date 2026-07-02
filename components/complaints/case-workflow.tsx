@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight,
-  FileText, Eye, Search, Printer,
+  FileText, Eye, Search, Printer, CircleCheck, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import {
   fileCounterReplyAction,
   fileEscalationAction,
   listComplaintReplyFilesAction,
+  listComplaintEscalationFilesAction,
   type ReplyFile,
 } from "@/lib/actions/complaints";
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
@@ -84,8 +85,15 @@ const STEPS = [
   { key: "acknowledge", label: "Acknowledge", icon: FileCheck2 },
   { key: "reply", label: "Reply / report", icon: MessageSquareReply },
   { key: "escalate", label: "Escalate", icon: Gavel },
+  { key: "close", label: "Close", icon: CircleCheck },
 ] as const;
 type StepKey = (typeof STEPS)[number]["key"];
+
+/** Terminal statuses — the case is fully closed (Close step complete). */
+function isClosedStatus(status: string): boolean {
+  const s = status.toLowerCase();
+  return s === "resolved" || s === "closed";
+}
 
 /**
  * Map a complaint status to how far the workflow has progressed (0-based
@@ -96,21 +104,23 @@ type StepKey = (typeof STEPS)[number]["key"];
  */
 function stepFromStatus(status: string): number {
   const s = status.toLowerCase();
-  if (s === "escalated" || s.includes("rti")) return 4;
-  if (s.includes("reply") || s.includes("action taken") || s.includes("resolved") || s === "closed" || s.includes("partially")) return 3;
+  if (s === "resolved" || s === "closed") return 5; // Close step complete (terminal)
+  if (s === "escalated" || s.includes("rti")) return 4; // Escalate complete
+  if (s.includes("reply") || s.includes("action taken") || s.includes("partially") || s.includes("reopen")) return 3; // Reply complete
   if (s === "acknowledged" || s.includes("review") || s.includes("assigned") || s.includes("site visit") || s.includes("work in progress")) return 2;
   if (s === "filed") return 1;
   return 0; // Draft / unknown
 }
 
 /**
- * Which step tab to open by default. After a reply is received we stay on the
- * Reply step (its counter-reply tools + recent files live there) rather than
- * auto-jumping to Escalate; only an actually-escalated case opens Escalate.
+ * Which step tab to open by default. A closed case opens the Close step; an
+ * escalated case opens Escalate; otherwise we stay on the Reply step (its
+ * counter-reply tools + recent files) rather than auto-jumping ahead.
  */
 function activeIdxFor(status: string, reached: number): number {
   const s = status.toLowerCase();
-  if (s === "escalated" || s.includes("rti")) return 3;
+  if (isClosedStatus(status)) return 4; // Close
+  if (s === "escalated" || s.includes("rti")) return 3; // Escalate
   return Math.min(reached, 2);
 }
 
@@ -143,7 +153,8 @@ export function CaseWorkflow({
   // opens ?step=escalate) over the default step, as long as it's not locked.
   const stepParam = searchParams.get("step");
   const paramIdx = STEPS.findIndex((s) => s.key === stepParam);
-  const paramLocked = paramIdx === 3 ? reached < 1 : paramIdx > reached;
+  // Escalate (3) and Close (4) are lateral actions — reachable once filed.
+  const paramLocked = paramIdx >= 3 ? reached < 1 : paramIdx > reached;
   const initialIdx = paramIdx >= 0 && !paramLocked ? paramIdx : activeIdxFor(status, reached);
   const [active, setActive] = React.useState<StepKey>(STEPS[initialIdx]!.key);
   const [busy, setBusy] = React.useState(false);
@@ -176,11 +187,10 @@ export function CaseWorkflow({
             const done = i < reached;
             const isActive = s.key === active;
             // Steps are sequential — you can't jump ahead of where the case has
-            // reached — EXCEPT Escalate, which is a lateral action valid on any
-            // filed complaint (non-response, inadequate reply, etc.). Otherwise
-            // it could never be opened, since a case only "reaches" the escalate
-            // step AFTER it has already been escalated.
-            const locked = s.key === "escalate" ? reached < 1 : i > reached;
+            // reached — EXCEPT Escalate and Close, which are lateral actions
+            // available on any filed complaint (escalate for non-response /
+            // inadequate reply; close to resolve or shut the case at any point).
+            const locked = s.key === "escalate" || s.key === "close" ? reached < 1 : i > reached;
             return (
               <React.Fragment key={s.key}>
                 <button
@@ -257,6 +267,10 @@ export function CaseWorkflow({
 
         {active === "escalate" && (
           <EscalatePanel complaintId={complaintId} caseNumber={caseNumber} aiConfigured={aiConfigured} onEscalated={() => router.refresh()} />
+        )}
+
+        {active === "close" && (
+          <ClosePanel complaintId={complaintId} status={status} onChanged={() => router.refresh()} />
         )}
       </CardContent>
     </Card>
@@ -692,6 +706,21 @@ function EscalatePanel({
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
 
+  const [escalationFiles, setEscalationFiles] = React.useState<ReplyFile[]>([]);
+  const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
+  const [refreshKey, setRefreshKey] = React.useState(0);
+
+  const loadFiles = React.useCallback(async () => {
+    const r = await listComplaintEscalationFilesAction(complaintId);
+    setEscalationFiles(r.files);
+  }, [complaintId]);
+
+  React.useEffect(() => { void loadFiles(); }, [loadFiles, refreshKey]);
+  React.useEffect(() => {
+    const id = setInterval(() => void loadFiles(), 5000);
+    return () => clearInterval(id);
+  }, [loadFiles]);
+
   async function fileEscalation() {
     if (!kind || !draft.trim()) return;
     setFiling(true);
@@ -701,6 +730,7 @@ function EscalatePanel({
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file the escalation."); return; }
     setSavedMsg("Escalation filed as a PDF — view it from the Correspondence tab.");
+    setRefreshKey((prev) => prev + 1);
     onEscalated();
   }
 
@@ -738,6 +768,7 @@ function EscalatePanel({
     const r = await addComplaintEscalation(complaintId, {}, fd);
     if (r.error) { setError(r.error); return; }
     setSavedMsg(`Escalation to ${toLevel} recorded.`);
+    setRefreshKey((prev) => prev + 1);
     onEscalated();
   }
 
@@ -802,6 +833,123 @@ function EscalatePanel({
             </div>
           </div>
           {savedMsg && <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> {savedMsg}</p>}
+        </div>
+      )}
+
+      <div className="mt-4 border-t pt-4">
+        <h4 className="text-xs font-semibold mb-1">Upload filed escalation copy</h4>
+        <p className="text-[11px] text-muted-foreground mb-3">If you manually filed/submitted the escalation, photograph or scan the acknowledged copy here.</p>
+        <ScanCapture
+          complaintId={complaintId}
+          docTypes={[
+            "Escalation letter",
+            "Records-preservation request",
+            "Lokayukta complaint",
+            "Chief Secretary / UDD letter",
+            "Other escalation document"
+          ]}
+          defaultDocType="Escalation letter"
+          onDone={() => setRefreshKey((prev) => prev + 1)}
+        />
+      </div>
+
+      {escalationFiles.length > 0 && (
+        <div className="mt-4 space-y-2 rounded-md border bg-muted/20 p-3">
+          <p className="text-xs font-semibold text-muted-foreground">Recent escalation files</p>
+          <ul className="space-y-1.5">
+            {escalationFiles.map((f) => (
+              <li key={f.id} className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                  Filed
+                </span>
+                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="font-medium truncate max-w-[200px]" title={f.title}>{f.title}</span>
+                <span className="text-[11px] text-muted-foreground">({f.documentType})</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto h-7"
+                  onClick={() => setViewTarget({ documentId: f.id, title: f.title, mimeType: f.mimeType, fileName: f.fileName })}
+                >
+                  <Eye className="h-3.5 w-3.5" /> View
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
+    </StepPanel>
+  );
+}
+
+/**
+ * Close / resolve step — the terminal state of the case. Records the outcome
+ * (which stamps closure_date + a Closure timeline entry via setComplaintStatus)
+ * with an optional closing note, and offers a Reopen when the case is already
+ * closed. This is what lets each complaint reach its complete final status.
+ */
+const CLOSE_OUTCOMES: { status: string; label: string; hint: string }[] = [
+  { status: "Resolved", label: "Mark resolved", hint: "The issue was fixed / the records were produced." },
+  { status: "Partially Resolved", label: "Partially resolved", hint: "Some of it was addressed; the rest is dropped or deferred." },
+  { status: "Closed", label: "Close case", hint: "Shut the case with no further action (e.g. withdrawn, out of scope)." },
+];
+
+function ClosePanel({ complaintId, status, onChanged }: { complaintId: string; status: string; onChanged: () => void }) {
+  const [note, setNote] = React.useState("");
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const closed = isClosedStatus(status);
+
+  async function setOutcome(next: string) {
+    setBusy(next);
+    setError(null);
+    const r = await setComplaintStatus(complaintId, next, note.trim() || undefined);
+    setBusy(null);
+    if (r.error) { setError(r.error); return; }
+    onChanged();
+  }
+
+  return (
+    <StepPanel
+      title="Close or resolve this case"
+      hint="Record the final outcome when the complaint is resolved, closed, or dead. This stamps the closure date and completes the case; you can reopen it later if needed."
+    >
+      <div className={`flex items-center gap-2 rounded-md border p-3 text-xs ${closed ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-slate-200 bg-muted/30 dark:border-slate-800"}`}>
+        {closed ? <CircleCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" /> : <MessageSquareReply className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        <span>Current status: <span className="font-semibold">{status}</span>{closed ? " — this case is closed." : ""}</span>
+      </div>
+
+      {!closed && (
+        <div className="space-y-1">
+          <Label className="text-xs">Closing note (optional)</Label>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="e.g. Road re-laid and verified on site; contractor produced the MB copies."
+            className="w-full rounded-md border border-input bg-background p-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
+      )}
+
+      {error && <p className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
+
+      {closed ? (
+        <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setOutcome("Reopened")}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Reopen case
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          {CLOSE_OUTCOMES.map((o) => (
+            <div key={o.status} className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant={o.status === "Closed" ? "outline" : "default"} disabled={busy !== null} onClick={() => setOutcome(o.status)}>
+                {busy === o.status ? <Loader2 className="h-4 w-4 animate-spin" /> : <CircleCheck className="h-4 w-4" />} {o.label}
+              </Button>
+              <span className="text-xs text-muted-foreground">{o.hint}</span>
+            </div>
+          ))}
         </div>
       )}
     </StepPanel>
