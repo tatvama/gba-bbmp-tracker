@@ -25,6 +25,7 @@ import {
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
+import type { ComplaintDocument } from "@/lib/types";
 import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
 
 export interface WorkflowLetter {
@@ -81,6 +82,7 @@ export function CaseWorkflow({
   caseNumber,
   aiConfigured,
   letter,
+  documents = [],
 }: {
   complaintId: string;
   status: string;
@@ -88,11 +90,29 @@ export function CaseWorkflow({
   caseNumber: string | null;
   aiConfigured: boolean;
   letter?: WorkflowLetter | null;
+  documents?: ComplaintDocument[];
 }) {
   const router = useRouter();
   const reached = stepFromStatus(status);
   const [active, setActive] = React.useState<StepKey>(STEPS[Math.min(reached, 3)]!.key);
   const [busy, setBusy] = React.useState(false);
+  const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
+
+  const ackDocs = (documents ?? []).filter(
+    (d) =>
+      d.document_type === "Complaint acknowledgement" ||
+      d.document_type === "Postal receipt" ||
+      d.document_type === "Email printout" ||
+      d.document_type === "Portal screenshot"
+  );
+
+  const replyDocs = (documents ?? []).filter(
+    (d) =>
+      d.document_type === "Department reply" ||
+      d.document_type === "Engineer reply" ||
+      d.document_type === "Action Taken Report" ||
+      d.document_type === "Site inspection note"
+  );
 
   React.useEffect(() => {
     setActive(STEPS[Math.min(reached, 3)]!.key);
@@ -152,11 +172,46 @@ export function CaseWorkflow({
 
         {active === "acknowledge" && (
           <StepPanel title="Upload the acknowledgement" hint="Scan or photograph the officer's acknowledgement / “forwarded to the concerned officer” slip. It is OCR'd and AI-summarised.">
-            <ScanCapture
-              complaintId={complaintId}
-              docTypes={["Complaint acknowledgement", "Postal receipt", "Email printout", "Portal screenshot"]}
-              defaultDocType="Complaint acknowledgement"
-            />
+            {ackDocs.length > 0 ? (
+              <div className="space-y-3">
+                {ackDocs.map((doc) => (
+                  <div key={doc.id} className="rounded-md border bg-muted/30 p-3 animate-fade-in">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{doc.title || doc.original_file_name}</span>
+                      <Badge variant="muted" className="text-[10px]">uploaded</Badge>
+                    </div>
+                    {doc.ai_summary && (
+                      <div className="mb-2.5 text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10 max-w-xl">
+                        <span className="font-semibold block mb-0.5 text-emerald-850 dark:text-emerald-250">AI Summary:</span>
+                        {doc.ai_summary}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setViewTarget({ documentId: doc.id, title: doc.title || doc.original_file_name, mimeType: doc.mime_type, fileName: doc.original_file_name })}>
+                        <Eye className="h-4 w-4" /> View acknowledgement
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Still allow scanning more if needed */}
+                <div className="mt-4 border-t pt-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Upload another document:</p>
+                  <ScanCapture
+                    complaintId={complaintId}
+                    docTypes={["Complaint acknowledgement", "Postal receipt", "Email printout", "Portal screenshot"]}
+                    defaultDocType="Complaint acknowledgement"
+                  />
+                </div>
+              </div>
+            ) : (
+              <ScanCapture
+                complaintId={complaintId}
+                docTypes={["Complaint acknowledgement", "Postal receipt", "Email printout", "Portal screenshot"]}
+                defaultDocType="Complaint acknowledgement"
+              />
+            )}
             <div className="mt-3">
               <Button size="sm" variant="outline" disabled={busy || reached > 1 || status.toLowerCase() === "acknowledged"} onClick={() => mark("Acknowledged")}>
                 <FileCheck2 className="h-4 w-4" /> Mark acknowledged
@@ -167,11 +222,46 @@ export function CaseWorkflow({
 
         {active === "reply" && (
           <StepPanel title="Upload the department reply / report" hint="After some days the department replies or files an Action Taken Report. Capture it here; OCR + AI extract the reply and any pending issues.">
-            <ScanCapture
-              complaintId={complaintId}
-              docTypes={["Department reply", "Engineer reply", "Action Taken Report", "Site inspection note"]}
-              defaultDocType="Department reply"
-            />
+            {replyDocs.length > 0 ? (
+              <div className="space-y-3">
+                {replyDocs.map((doc) => (
+                  <div key={doc.id} className="rounded-md border bg-muted/30 p-3 animate-fade-in">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{doc.title || doc.original_file_name}</span>
+                      <Badge variant="muted" className="text-[10px]">{doc.document_type}</Badge>
+                    </div>
+                    {doc.ai_summary && (
+                      <div className="mb-2.5 text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10 max-w-xl">
+                        <span className="font-semibold block mb-0.5 text-emerald-850 dark:text-emerald-250">AI Summary:</span>
+                        {doc.ai_summary}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setViewTarget({ documentId: doc.id, title: doc.title || doc.original_file_name, mimeType: doc.mime_type, fileName: doc.original_file_name })}>
+                        <Eye className="h-4 w-4" /> View reply/report
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Still allow scanning more if needed */}
+                <div className="mt-4 border-t pt-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Upload another reply / report:</p>
+                  <ScanCapture
+                    complaintId={complaintId}
+                    docTypes={["Department reply", "Engineer reply", "Action Taken Report", "Site inspection note"]}
+                    defaultDocType="Department reply"
+                  />
+                </div>
+              </div>
+            ) : (
+              <ScanCapture
+                complaintId={complaintId}
+                docTypes={["Department reply", "Engineer reply", "Action Taken Report", "Site inspection note"]}
+                defaultDocType="Department reply"
+              />
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Reply Received")}>
                 <MessageSquareReply className="h-4 w-4" /> Mark reply received
@@ -191,6 +281,7 @@ export function CaseWorkflow({
           <EscalatePanel complaintId={complaintId} caseNumber={caseNumber} aiConfigured={aiConfigured} onEscalated={() => router.refresh()} />
         )}
       </CardContent>
+      <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
     </Card>
   );
 }
