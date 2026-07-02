@@ -48,12 +48,17 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
   const jobDocuments = complaint.job_number ? await getJobDocumentsByNumber(complaint.job_number) : [];
 
   // The complaint letter the forensic ZIP already drafted (shown in the Submit
-  // step for view/download/read — never regenerated).
+  // step for view/download/read — never regenerated) — plus its print status,
+  // since the cycle starts at the printer, not at submission.
   const letter = {
+    letterId: letterDraft?.id ?? null,
     text: letterDraft?.content ?? null,
     fileName: letterDraft?.file_name ?? null,
     pdfDocId: documents.find((d) => d.document_type === "Generated complaint letter (PDF)")?.id ?? null,
     docxDocId: documents.find((d) => d.document_type === "Generated complaint letter")?.id ?? null,
+    printStatus: letterDraft?.print_status ?? "none",
+    printedAt: letterDraft?.printed_at ?? null,
+    printedByName: letterDraft?.printed_by_name ?? null,
   };
 
   const flags = {

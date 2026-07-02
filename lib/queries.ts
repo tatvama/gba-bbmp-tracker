@@ -974,19 +974,138 @@ export async function getComplaint(id: string): Promise<ComplaintWithRelations |
  * step of the case workflow, so the user reads what the skill already produced
  * instead of regenerating it. Returns null when no letter is stored.
  */
-export async function getComplaintLetterDraft(
-  complaintId: string,
-): Promise<{ id: string; content: string | null; file_name: string | null; variant: string | null; language: string | null } | null> {
+export interface ComplaintLetterDraft {
+  id: string;
+  content: string | null;
+  file_name: string | null;
+  variant: string | null;
+  language: string | null;
+  print_status: "none" | "pending" | "printed";
+  printed_at: string | null;
+  printed_by_name: string | null;
+}
+
+export async function getComplaintLetterDraft(complaintId: string): Promise<ComplaintLetterDraft | null> {
   const supabase = await sb();
   const { data, error } = await supabase
     .from("letter_drafts")
-    .select("id, content, file_name, variant, language")
+    .select("id, content, file_name, variant, language, print_status, printed_at, printed_by_profile:profiles!printed_by(name)")
     .eq("complaint_id", complaintId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   logErr("getComplaintLetterDraft", error);
-  return (data as { id: string; content: string | null; file_name: string | null; variant: string | null; language: string | null } | null) ?? null;
+  if (!data) return null;
+  const row = data as Record<string, any>;
+  return {
+    id: row.id,
+    content: row.content ?? null,
+    file_name: row.file_name ?? null,
+    variant: row.variant ?? null,
+    language: row.language ?? null,
+    print_status: (row.print_status as ComplaintLetterDraft["print_status"]) ?? "none",
+    printed_at: row.printed_at ?? null,
+    printed_by_name: row.printed_by_profile?.name ?? null,
+  };
+}
+
+// ── Letter print queue ────────────────────────────────────────────────────────
+
+export interface PrintQueueLetter {
+  id: string;
+  complaintId: string | null;
+  jobNumber: string | null;
+  variant: string | null;
+  language: string | null;
+  fileName: string | null;
+  printStatus: "pending" | "printed";
+  printedAt: string | null;
+  printedByName: string | null;
+  createdAt: string;
+  caseNumber: string | null;
+  complaintTitle: string | null;
+  complaintStatus: string | null;
+  complaintMode: string | null;
+  dateSubmitted: string | null;
+  riskBand: string | null;
+  pdfDocId: string | null;
+  docxDocId: string | null;
+}
+
+/**
+ * Every letter in the print pipeline: 'pending' (waiting to print) and
+ * 'printed' (stamped who/when; the submission is then recorded on the
+ * complaint itself). Letter PDF/DOCX ids resolve from complaint_documents so
+ * the queue opens the exact stored file.
+ */
+export async function listPrintQueueLetters(): Promise<PrintQueueLetter[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("letter_drafts")
+    .select(
+      "id, complaint_id, job_number, variant, language, file_name, print_status, printed_at, created_at, band, printed_by_profile:profiles!printed_by(name), complaint:complaints!complaint_id(id, internal_case_number, title, status, complaint_mode, date_submitted)",
+    )
+    .in("print_status", ["pending", "printed"])
+    .order("created_at", { ascending: true })
+    .limit(200);
+  logErr("listPrintQueueLetters", error);
+  const rows = (data as Record<string, any>[]) ?? [];
+
+  // One query for all the letter documents of the involved complaints.
+  const complaintIds = [...new Set(rows.map((r) => r.complaint_id).filter(Boolean))] as string[];
+  const docsByComplaint = new Map<string, { pdfDocId: string | null; docxDocId: string | null }>();
+  if (complaintIds.length) {
+    const { data: docs } = await supabase
+      .from("complaint_documents")
+      .select("id, complaint_id, document_type")
+      .in("complaint_id", complaintIds)
+      .in("document_type", ["Generated complaint letter (PDF)", "Generated complaint letter"]);
+    for (const d of (docs as Record<string, any>[]) ?? []) {
+      const entry = docsByComplaint.get(d.complaint_id) ?? { pdfDocId: null, docxDocId: null };
+      if (d.document_type === "Generated complaint letter (PDF)" && !entry.pdfDocId) entry.pdfDocId = d.id;
+      if (d.document_type === "Generated complaint letter" && !entry.docxDocId) entry.docxDocId = d.id;
+      docsByComplaint.set(d.complaint_id, entry);
+    }
+  }
+
+  return rows
+    .map((r) => ({
+      id: r.id,
+      complaintId: r.complaint_id ?? null,
+      jobNumber: r.job_number ?? null,
+      variant: r.variant ?? null,
+      language: r.language ?? null,
+      fileName: r.file_name ?? null,
+      printStatus: r.print_status as "pending" | "printed",
+      printedAt: r.printed_at ?? null,
+      printedByName: r.printed_by_profile?.name ?? null,
+      createdAt: r.created_at,
+      caseNumber: r.complaint?.internal_case_number ?? null,
+      complaintTitle: r.complaint?.title ?? null,
+      complaintStatus: r.complaint?.status ?? null,
+      complaintMode: r.complaint?.complaint_mode ?? null,
+      dateSubmitted: r.complaint?.date_submitted ?? null,
+      riskBand: r.band ?? null,
+      pdfDocId: r.complaint_id ? (docsByComplaint.get(r.complaint_id)?.pdfDocId ?? null) : null,
+      docxDocId: r.complaint_id ? (docsByComplaint.get(r.complaint_id)?.docxDocId ?? null) : null,
+    }))
+    // A PRINTED letter drops out of the queue once its complaint has actually
+    // been submitted (fileComplaint moves status off 'Draft') — the cycle has
+    // moved on. A never-printed letter always stays visible regardless of
+    // complaint status (it still needs printing before anything else).
+    .filter((l) => l.printStatus === "pending" || l.complaintStatus === "Draft" || !l.complaintId);
+}
+
+/** Count of letters still waiting to print (dashboard banner) — excludes
+ *  already-printed letters, even if their complaint hasn't been filed yet. */
+export async function countPrintPendingLetters(): Promise<number> {
+  const supabase = await sb();
+  const { count, error } = await supabase
+    .from("letter_drafts")
+    .select("id", { count: "exact", head: true })
+    .eq("print_status", "pending");
+  logErr("countPrintPendingLetters", error);
+  return count ?? 0;
 }
 
 /** A job-case evidence document (the source PDFs/JSON imported from the ZIP). */
