@@ -120,7 +120,12 @@ export function DocumentList({
                 </div>
               </div>
 
-              {d.ai_summary && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{d.ai_summary}</p>}
+              {d.ai_summary && (
+                <div className="mt-2.5 text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10">
+                  <span className="font-semibold block mb-0.5 text-emerald-850 dark:text-emerald-250">AI Summary:</span>
+                  {d.ai_summary}
+                </div>
+              )}
 
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Button size="sm" variant="outline" onClick={() => view(d)}>

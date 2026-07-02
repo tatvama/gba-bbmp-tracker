@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { FileText } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -136,14 +137,31 @@ export function ComplaintTabs({
       <TabsContent value="replies">
         <div className="space-y-4">
           {flags.canEdit && <ReplyForm complaintId={c.id} documents={docOpts} />}
-          {replies.length === 0 ? <EmptyState title="No replies recorded" /> : replies.map((r) => (
-            <Card key={r.id}><CardContent className="pt-6">
-              <div className="flex items-center justify-between"><span className="font-medium">{orDash(r.replied_by_name)} {r.replied_by_designation ? `(${r.replied_by_designation})` : ""}</span><span className="text-xs text-muted-foreground">{formatDate(r.reply_date)}</span></div>
-              <p className="mt-1 text-sm">{orDash(r.reply_summary)}</p>
-              {r.issues_remaining && <p className="mt-1 text-xs text-amber-dark">Issues remaining: {r.issues_remaining}</p>}
-              {r.is_satisfactory != null && <Badge className="mt-2" variant={r.is_satisfactory ? "success" : "warning"}>{r.is_satisfactory ? "Satisfactory" : "Not satisfactory"}</Badge>}
-            </CardContent></Card>
-          ))}
+          {replies.length === 0 ? <EmptyState title="No replies recorded" /> : replies.map((r) => {
+            const doc = documents.find((d) => d.id === r.document_id);
+            return (
+              <Card key={r.id}><CardContent className="pt-6">
+                <div className="flex items-center justify-between"><span className="font-medium">{orDash(r.replied_by_name)} {r.replied_by_designation ? `(${r.replied_by_designation})` : ""}</span><span className="text-xs text-muted-foreground">{formatDate(r.reply_date)}</span></div>
+                <p className="mt-1 text-sm">{orDash(r.reply_summary)}</p>
+                {r.issues_remaining && <p className="mt-1 text-xs text-amber-dark">Issues remaining: {r.issues_remaining}</p>}
+                {r.is_satisfactory != null && <Badge className="mt-2" variant={r.is_satisfactory ? "success" : "warning"}>{r.is_satisfactory ? "Satisfactory" : "Not satisfactory"}</Badge>}
+                {doc && (
+                  <div className="mt-3.5 space-y-2 rounded border bg-muted/20 p-2.5">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Linked Document: {doc.title || doc.original_file_name}</span>
+                    </div>
+                    {doc.ai_summary && (
+                      <div className="text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10">
+                        <span className="font-semibold block mb-0.5 text-emerald-850 dark:text-emerald-250">AI Summary:</span>
+                        {doc.ai_summary}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent></Card>
+            );
+          })}
         </div>
       </TabsContent>
 
