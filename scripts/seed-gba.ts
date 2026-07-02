@@ -29,7 +29,7 @@ async function main() {
   if (!rows?.length) throw new Error("No GBA wards found in data file.");
 
   await client.query("begin");
-  await client.query("truncate table public.gba_wards");
+  await client.query("truncate table public.gba_wards cascade");
 
   let n = 0;
   for (const w of rows) {
