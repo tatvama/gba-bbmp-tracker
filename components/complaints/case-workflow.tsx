@@ -113,9 +113,16 @@ export function CaseWorkflow({
               <React.Fragment key={s.key}>
                 <button
                   type="button"
+                  disabled={i > reached}
                   onClick={() => setActive(s.key)}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-                    isActive ? "bg-primary text-primary-foreground" : done ? "text-emerald-600 hover:bg-muted" : "text-muted-foreground hover:bg-muted"
+                    isActive
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : done
+                      ? "text-emerald-600 hover:bg-muted"
+                      : i > reached
+                      ? "text-muted-foreground/35 cursor-not-allowed"
+                      : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   {done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
