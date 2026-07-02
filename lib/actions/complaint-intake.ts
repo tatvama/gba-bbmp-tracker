@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { COMPLAINT_WRITE_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
+import { COMPLAINT_WRITE_ROLES, STORAGE_BUCKETS, R2_STORAGE_SENTINEL } from "@/lib/constants";
 import { buildMergedPdf } from "@/lib/pdf/merge";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { uploadToR2, downloadFromR2 } from "@/lib/storage/r2-upload";
-import { uploadBuffer, buildPath } from "@/lib/storage/supabase-upload";
+import { buildPath } from "@/lib/storage/supabase-upload";
 import { getComplaintSettings } from "@/lib/settings";
 import {
   analyzeComplaintIntake,
@@ -147,7 +147,7 @@ export async function commitComplaintIntakeAction(input: {
     if (pdf) {
       const fileName = `${caseNumber}-letter.pdf`;
       const path = buildPath(complaintId, fileName, Date.now(), Math.random().toString(36).slice(2, 8));
-      await uploadBuffer({ bucket: STORAGE_BUCKETS.documents, path, body: pdf, contentType: "application/pdf" });
+      await uploadToR2({ key: path, body: pdf, contentType: "application/pdf" });
       const docType =
         ex.documentType === "acknowledgement"
           ? "Complaint acknowledgement"
@@ -159,7 +159,7 @@ export async function commitComplaintIntakeAction(input: {
         document_type: docType,
         title: fileName,
         original_file_name: fileName,
-        storage_bucket: STORAGE_BUCKETS.documents,
+        storage_bucket: R2_STORAGE_SENTINEL,
         storage_path: path,
         mime_type: "application/pdf",
         file_size: pdf.byteLength,

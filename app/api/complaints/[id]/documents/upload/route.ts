@@ -8,7 +8,8 @@ import { findPhotoMatches, deriveStage } from "@/lib/dedupe-photos";
 import { geofencePhoto } from "@/lib/geo";
 import { getComplaintSettings, getForensicsRules } from "@/lib/settings";
 import { isAiConfigured } from "@/lib/ai/provider";
-import { COMPLAINT_FIELD_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
+import { uploadToR2 } from "@/lib/storage/r2-upload";
+import { COMPLAINT_FIELD_ROLES, STORAGE_BUCKETS, R2_STORAGE_SENTINEL } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -41,12 +42,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const documentType = (form.get("documentType") as string) || null;
   const asEvidence = String(form.get("asEvidence")) === "true";
   const isSitePhoto = !!documentType && documentType.startsWith("Site photo");
-  const bucket = asEvidence || isSitePhoto ? STORAGE_BUCKETS.evidence : STORAGE_BUCKETS.documents;
   const path = buildPath(id, file.name || "upload", Date.now(), Math.random().toString(36).slice(2, 8));
 
-  // 1) Upload original to PRIVATE storage.
+  // 1) Upload original to PRIVATE storage (R2).
   try {
-    await uploadBuffer({ bucket, path, body: buffer, contentType: mime });
+    await uploadToR2({ key: path, body: buffer, contentType: mime });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Storage upload failed." }, { status: 500 });
   }
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       title: (form.get("title") as string) || file.name || null,
       description: (form.get("description") as string) || null,
       original_file_name: file.name || null,
-      storage_bucket: bucket,
+      storage_bucket: R2_STORAGE_SENTINEL,
       storage_path: path,
       mime_type: mime,
       file_size: file.size,

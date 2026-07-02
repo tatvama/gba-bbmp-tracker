@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ALLOWED_UPLOAD_MIME, STORAGE_BUCKETS } from "@/lib/constants";
+import { ALLOWED_UPLOAD_MIME, STORAGE_BUCKETS, R2_STORAGE_SENTINEL } from "@/lib/constants";
+import { downloadFromR2ByKey, deleteFromR2 } from "./r2-upload";
 
 /**
  * Server-only Supabase Storage helpers. All access uses the service-role admin
@@ -103,6 +104,10 @@ export async function getSignedUrl(
 /** Remove an object (best-effort). */
 export async function removeObject(bucket: string, path: string): Promise<void> {
   if (!bucket || !path) return;
+  if (bucket === R2_STORAGE_SENTINEL) {
+    await deleteFromR2(path);
+    return;
+  }
   try {
     const admin = createAdminClient();
     await admin.storage.from(bucket).remove([path]);
@@ -113,6 +118,9 @@ export async function removeObject(bucket: string, path: string): Promise<void> 
 
 /** Download an object to a Buffer (server-side OCR re-runs). */
 export async function downloadBuffer(bucket: string, path: string): Promise<Buffer | null> {
+  if (bucket === R2_STORAGE_SENTINEL) {
+    return downloadFromR2ByKey(path);
+  }
   try {
     const admin = createAdminClient();
     const { data, error } = await admin.storage.from(bucket).download(path);

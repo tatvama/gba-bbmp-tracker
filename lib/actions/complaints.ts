@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError, type SessionUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSignedUrl, uploadBuffer, buildPath, validateUpload } from "@/lib/storage/supabase-upload";
-import { getR2SignedUrl } from "@/lib/storage/r2-upload";
+import { getR2SignedUrl, uploadToR2 } from "@/lib/storage/r2-upload";
 import { buildMergedPdf } from "@/lib/pdf/merge";
 import { processDocumentOcr } from "@/lib/ocr/process-document";
 import { writeAudit, diffFields } from "@/lib/audit";
@@ -686,7 +686,7 @@ export async function uploadComplaintScanAction(
   const fileName = `${slugify(docType)}.pdf`;
   const path = buildPath(complaintId, fileName, Date.now(), Math.random().toString(36).slice(2, 8));
   try {
-    await uploadBuffer({ bucket: STORAGE_BUCKETS.documents, path, body: merged.pdf, contentType: "application/pdf" });
+    await uploadToR2({ key: path, body: merged.pdf, contentType: "application/pdf" });
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
   }
@@ -698,7 +698,7 @@ export async function uploadComplaintScanAction(
       document_type: docType,
       title: title ?? docType,
       original_file_name: fileName,
-      storage_bucket: STORAGE_BUCKETS.documents,
+      storage_bucket: R2_STORAGE_SENTINEL,
       storage_path: path,
       mime_type: "application/pdf",
       file_size: merged.pdf.byteLength,
