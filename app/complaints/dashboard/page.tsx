@@ -1,22 +1,33 @@
 import Link from "next/link";
 import {
   FileText, FilePlus2, Clock, AlertOctagon, MailCheck, Wrench, MailX,
-  CalendarClock, TrendingUp, ScanLine, FileWarning, ClipboardCheck, ArrowRight,
+  CalendarClock, TrendingUp, ScanLine, FileWarning, ClipboardCheck, ArrowRight, Sparkles, ShieldAlert,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
-import { complaintDashboardStats, listComplaints } from "@/lib/queries";
+import { complaintDashboardStats, listComplaints, listAiAdvisorWorklist } from "@/lib/queries";
 import { formatNumber, formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Complaint dashboard" };
 
+const RISK_BADGE: Record<string, BadgeProps["variant"]> = {
+  Low: "success",
+  Medium: "warning",
+  High: "destructive",
+  Critical: "critical",
+};
+
 export default async function ComplaintDashboard() {
   const today = new Date().toISOString().slice(0, 10);
-  const [stats, complaints] = await Promise.all([complaintDashboardStats(), listComplaints()]);
+  const [stats, complaints, aiWorklist] = await Promise.all([
+    complaintDashboardStats(),
+    listComplaints(),
+    listAiAdvisorWorklist(8),
+  ]);
   const recent = complaints.slice(0, 6);
   const dueToday = complaints.filter((c) => c.next_follow_up_date === today).slice(0, 8);
   const overdue = complaints
@@ -38,6 +49,8 @@ export default async function ComplaintDashboard() {
     { label: "OCR pending", value: stats.ocrPending, icon: ScanLine, cls: "text-primary", bg: "bg-primary/8", href: "/complaints/reports" },
     { label: "Low-confidence OCR", value: stats.lowConfidenceOcr, icon: FileWarning, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints/reports" },
     { label: "Needs review", value: stats.needsManualReview, icon: ClipboardCheck, cls: "text-primary", bg: "bg-primary/8", href: "/complaints/reports" },
+    { label: "AI: Critical risk", value: stats.aiCriticalRisk, icon: ShieldAlert, cls: "text-destructive", bg: "bg-destructive/8", href: "/complaints" },
+    { label: "AI: Needs reminder/escalation", value: stats.aiNeedsAction, icon: Sparkles, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints" },
   ];
 
   return (
@@ -80,7 +93,7 @@ export default async function ComplaintDashboard() {
         })}
       </div>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-4">
         {/* Overdue — chase now */}
         <Card className="shadow-2xs rounded-xl border">
           <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
@@ -173,6 +186,34 @@ export default async function ComplaintDashboard() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Badge variant="muted" className="text-[10px] font-bold py-0.5">{c.status}</Badge>
                     </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* AI Advisor — needs attention */}
+        <Card className="shadow-2xs rounded-xl border">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
+            <CardTitle className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
+              <Sparkles className="h-3.5 w-3.5 text-primary" /> AI Advisor
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 pt-0 px-4">
+            {aiWorklist.length === 0 ? (
+              <div className="py-6 text-center"><EmptyState title="Nothing flagged" /></div>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-850">
+                {aiWorklist.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 py-3">
+                    <Link href={`/complaints/${c.id}?tab=ai`} className="min-w-0 flex-1 group">
+                      <p className="text-sm font-medium hover:text-primary break-words line-clamp-2 leading-snug">{c.title}</p>
+                      <p className="truncate text-xs text-muted-foreground mt-1 font-mono">
+                        {c.internal_case_number ?? "—"}{c.recommendation ? ` · ${c.recommendation}` : ""}
+                      </p>
+                    </Link>
+                    <Badge variant={RISK_BADGE[c.risk_level] ?? "muted"} className="shrink-0 text-[10px] font-bold py-0.5">{c.risk_level}</Badge>
                   </li>
                 ))}
               </ul>

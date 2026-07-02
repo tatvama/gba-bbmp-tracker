@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useActionState } from "react";
 import {
-  Binary, Calendar, Languages, Brain, EyeOff, HardDrive, Info, RefreshCw, Save, Check, AlertCircle
+  Binary, Calendar, Languages, Brain, EyeOff, HardDrive, Info, RefreshCw, Save, Check, AlertCircle, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,7 +82,24 @@ const METAS: Record<keyof ComplaintSettings, FieldMeta> = {
     label: "Private Documents",
     defaultVal: "OFF",
     explanation: "Marks all uploaded documents as private by default, restricting access to authorized roles."
-  }
+  },
+  aiAdvisorEnabled: {
+    label: "AI Advisor",
+    defaultVal: "ON",
+    explanation: "Runs the AI Complaint Advisor in the background after every complaint update, surfacing health scores and recommendations. Turn off to disable all automatic analysis."
+  },
+  aiAdvisorReminderSlaDays: {
+    label: "Reminder SLA",
+    unit: "Days",
+    defaultVal: "18 Days",
+    explanation: "Days with no reply before the advisor recommends generating a reminder letter."
+  },
+  aiAdvisorEscalationSlaDays: {
+    label: "Escalation SLA",
+    unit: "Days",
+    defaultVal: "10 Days",
+    explanation: "Days after a reminder is generated, still with no reply, before the advisor recommends escalation."
+  },
 };
 
 export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings }) {
@@ -575,6 +592,127 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
                 />
                 <div className="h-10 px-3 bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-bold flex items-center border border-l-0 border-slate-200 dark:border-slate-800 rounded-r-lg">
                   {METAS.maxUploadMb.unit}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* SECTION 7: AI Advisor */}
+        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center shrink-0">
+              <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+                AI Advisor Configuration
+              </h2>
+              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+                Background health scoring, recommendations and reminder/escalation SLAs
+              </p>
+            </div>
+          </div>
+          <CardContent className="p-4 space-y-4">
+            {/* Switch: Enable AI Advisor */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/10 group">
+                <div className="flex flex-col gap-1 pr-4 min-w-0">
+                  <span className="text-xs font-bold text-slate-850 dark:text-slate-205 flex items-center gap-1.5">
+                    AI Advisor
+                    <button
+                      type="button"
+                      onClick={() => setActiveHelp(activeHelp === "aiAdvisorEnabled" ? null : "aiAdvisorEnabled")}
+                      className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
+                      aria-label="Info"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                  <span className="text-[10px] text-slate-450 dark:text-slate-400 leading-normal">
+                    Analyses every complaint in the background and surfaces recommendations. Advisory only — never sends anything automatically.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center shrink-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="aiAdvisorEnabled"
+                    checked={formValues.aiAdvisorEnabled}
+                    onChange={(e) => handleInputChange("aiAdvisorEnabled", e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:bg-slate-200 peer-checked:bg-orange-600 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600" />
+                </label>
+              </div>
+              {renderTooltip("aiAdvisorEnabled")}
+            </div>
+
+            {/* Field: aiAdvisorReminderSlaDays */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                  Reminder SLA
+                  <button
+                    type="button"
+                    onClick={() => setActiveHelp(activeHelp === "aiAdvisorReminderSlaDays" ? null : "aiAdvisorReminderSlaDays")}
+                    className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
+                    aria-label="Info"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </Label>
+                <Badge variant="muted" className="text-[10px] py-0 px-2 font-mono text-slate-500">
+                  Default: {METAS.aiAdvisorReminderSlaDays.defaultVal}
+                </Badge>
+              </div>
+              {renderTooltip("aiAdvisorReminderSlaDays")}
+              <div className="relative rounded-lg overflow-hidden flex shadow-2xs">
+                <Input
+                  type="number"
+                  min={1}
+                  name="aiAdvisorReminderSlaDays"
+                  value={formValues.aiAdvisorReminderSlaDays}
+                  onChange={(e) => handleInputChange("aiAdvisorReminderSlaDays", parseInt(e.target.value, 10))}
+                  required
+                  className="flex-1 h-10 pr-12 text-sm font-semibold rounded-r-none border-slate-200 dark:border-slate-800"
+                />
+                <div className="h-10 px-3 bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-bold flex items-center border border-l-0 border-slate-200 dark:border-slate-800 rounded-r-lg">
+                  {METAS.aiAdvisorReminderSlaDays.unit}
+                </div>
+              </div>
+            </div>
+
+            {/* Field: aiAdvisorEscalationSlaDays */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                  Escalation SLA
+                  <button
+                    type="button"
+                    onClick={() => setActiveHelp(activeHelp === "aiAdvisorEscalationSlaDays" ? null : "aiAdvisorEscalationSlaDays")}
+                    className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
+                    aria-label="Info"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </Label>
+                <Badge variant="muted" className="text-[10px] py-0 px-2 font-mono text-slate-500">
+                  Default: {METAS.aiAdvisorEscalationSlaDays.defaultVal}
+                </Badge>
+              </div>
+              {renderTooltip("aiAdvisorEscalationSlaDays")}
+              <div className="relative rounded-lg overflow-hidden flex shadow-2xs">
+                <Input
+                  type="number"
+                  min={1}
+                  name="aiAdvisorEscalationSlaDays"
+                  value={formValues.aiAdvisorEscalationSlaDays}
+                  onChange={(e) => handleInputChange("aiAdvisorEscalationSlaDays", parseInt(e.target.value, 10))}
+                  required
+                  className="flex-1 h-10 pr-12 text-sm font-semibold rounded-r-none border-slate-200 dark:border-slate-800"
+                />
+                <div className="h-10 px-3 bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-bold flex items-center border border-l-0 border-slate-200 dark:border-slate-800 rounded-r-lg">
+                  {METAS.aiAdvisorEscalationSlaDays.unit}
                 </div>
               </div>
             </div>

@@ -88,6 +88,9 @@ export async function updateComplaintSettings(
     aiAutoSummary: bool("aiAutoSummary"),
     maxUploadMb: num("maxUploadMb", DEFAULT_COMPLAINT_SETTINGS.maxUploadMb),
     documentsPrivateByDefault: bool("documentsPrivateByDefault"),
+    aiAdvisorEnabled: bool("aiAdvisorEnabled"),
+    aiAdvisorReminderSlaDays: num("aiAdvisorReminderSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorReminderSlaDays),
+    aiAdvisorEscalationSlaDays: num("aiAdvisorEscalationSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorEscalationSlaDays),
   };
 
   const supabase = await createClient();

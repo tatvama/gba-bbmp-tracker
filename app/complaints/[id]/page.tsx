@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/print-button";
 import { ComplaintTabs } from "@/components/complaints/complaint-tabs";
 import { CaseWorkflow } from "@/components/complaints/case-workflow";
+import { AIInsightsPanel } from "@/components/ai/AIInsightsPanel";
+import { getComplaintAiRecommendationAction } from "@/lib/actions/ai-advisor";
 import {
   getComplaint, listComplaintDocuments, listComplaintTimeline, listComplaintReplies,
   listComplaintActions, listComplaintCommunications, listComplaintReminders,
@@ -24,7 +26,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
   const complaint = await getComplaint(id);
   if (!complaint) notFound();
 
-  const [documents, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, options, letterDraft, user] =
+  const [documents, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, options, letterDraft, user, aiRecommendation] =
     await Promise.all([
       listComplaintDocuments(id),
       listComplaintTimeline(id),
@@ -38,6 +40,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
       getComplaintFormOptions(),
       getComplaintLetterDraft(id),
       getSessionUser(),
+      getComplaintAiRecommendationAction(id),
     ]);
 
   // The job case's imported evidence (source PDFs/JSON) lives in job_documents,
@@ -61,8 +64,9 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
   };
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <div className="mx-auto max-w-7xl grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
+      <div className="min-w-0 max-w-5xl xl:max-w-none">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Button asChild variant="ghost" size="sm" className="no-print -ml-2">
           <Link href="/complaints"><ArrowLeft className="h-4 w-4" /> Complaints</Link>
         </Button>
@@ -140,6 +144,10 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
         officers={options.contacts}
         flags={flags}
       />
+    </div>
+      <aside className="xl:sticky xl:top-4 order-first xl:order-none">
+        <AIInsightsPanel complaintId={id} initialRecommendation={aiRecommendation} aiConfigured={flags.aiConfigured} />
+      </aside>
     </div>
   );
 }

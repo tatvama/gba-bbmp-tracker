@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { CORP_NAME, CORPORATION_CODES, COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
 import { getDeadlineRules } from "@/lib/settings";
 import { activeDeadline } from "@/lib/rti-deadlines";
@@ -1160,6 +1161,8 @@ export interface ComplaintDashboardStats {
   ocrPending: number;
   lowConfidenceOcr: number;
   needsManualReview: number;
+  aiCriticalRisk: number;
+  aiNeedsAction: number;
 }
 
 export async function complaintDashboardStats(): Promise<ComplaintDashboardStats> {
@@ -1181,9 +1184,27 @@ export async function complaintDashboardStats(): Promise<ComplaintDashboardStats
   };
   const notDeleted = (q: any) => q.is("deleted_at", null);
 
+  // complaint_ai_recommendations has no RLS (matches background_jobs/notifications
+  // — bookkeeping tables read via the admin client only), so these two counts use
+  // createAdminClient() instead of the session-scoped `count()` closure above.
+  const adminCount = async (table: string, mod?: (q: any) => any) => {
+    try {
+      const admin = createAdminClient();
+      let q = admin.from(table).select("*", { count: "exact", head: true });
+      if (mod) q = mod(q);
+      const { count: c, error } = await q;
+      logErr(`count:${table}`, error);
+      return c ?? 0;
+    } catch (e) {
+      logErr(`count:${table}`, e);
+      return 0;
+    }
+  };
+
   const [
     total, filedThisMonth, pending, overdue, repliesReceived, actionTaken,
     followUpsDueToday, escalationsPending, ocrPending, lowConfidenceOcr, needsManualReview, noReply,
+    aiCriticalRisk, aiNeedsAction,
   ] = await Promise.all([
     count("complaints", notDeleted),
     count("complaints", (q) => notDeleted(q).gte("date_submitted", monthStart)),
@@ -1197,12 +1218,67 @@ export async function complaintDashboardStats(): Promise<ComplaintDashboardStats
     count("complaint_documents", (q) => q.eq("ocr_status", "Needs Manual Review")),
     count("complaint_documents", (q) => q.in("verification_status", ["Pending Review", "Low Confidence", "Needs Correction"])),
     count("complaints", (q) => notDeleted(q).is("latest_reply_date", null).in("status", ["Filed", "Acknowledged", "Under Review", "Assigned To Engineer"])),
+    adminCount("complaint_ai_recommendations", (q) => q.in("risk_level", ["High", "Critical"])),
+    adminCount("complaint_ai_recommendations", (q) => q.in("recommendation_action", ["generate_reminder", "escalate", "review"])),
   ]);
 
   return {
     total, filedThisMonth, pending, overdue, repliesReceived, actionTaken, noReply,
     followUpsDueToday, escalationsPending, ocrPending, lowConfidenceOcr, needsManualReview,
+    aiCriticalRisk, aiNeedsAction,
   };
+}
+
+export interface AiAdvisorWorklistItem {
+  id: string;
+  title: string;
+  internal_case_number: string | null;
+  status: string;
+  risk_level: "Low" | "Medium" | "High" | "Critical";
+  health_score: number;
+  recommendation: string | null;
+  recommendation_action: string | null;
+}
+
+/**
+ * Complaints the AI Advisor flags as needing attention (a reminder/escalation/
+ * review recommended, or High/Critical risk), for the dashboard worklist card.
+ * Read via the admin client (this table has no RLS, matching background_jobs).
+ */
+export async function listAiAdvisorWorklist(limit = 8): Promise<AiAdvisorWorklistItem[]> {
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    logErr("listAiAdvisorWorklist", e);
+    return [];
+  }
+  const { data, error } = await admin
+    .from("complaint_ai_recommendations")
+    .select("recommendation, recommendation_action, risk_level, health_score, complaint:complaints!complaint_id(id,title,internal_case_number,status,deleted_at)")
+    .or("recommendation_action.in.(generate_reminder,escalate,review),risk_level.in.(High,Critical)")
+    .order("health_score", { ascending: true })
+    .limit(limit * 3); // over-fetch — some rows may point at soft-deleted complaints
+  logErr("listAiAdvisorWorklist", error);
+
+  type Row = {
+    recommendation: string | null;
+    recommendation_action: string | null;
+    risk_level: "Low" | "Medium" | "High" | "Critical";
+    health_score: number;
+    complaint: { id: string; title: string; internal_case_number: string | null; status: string; deleted_at: string | null } | null;
+  };
+  const rows = ((data as unknown as Row[]) ?? []).filter((r) => r.complaint && !r.complaint.deleted_at);
+  return rows.slice(0, limit).map((r) => ({
+    id: r.complaint!.id,
+    title: r.complaint!.title,
+    internal_case_number: r.complaint!.internal_case_number,
+    status: r.complaint!.status,
+    risk_level: r.risk_level,
+    health_score: r.health_score,
+    recommendation: r.recommendation,
+    recommendation_action: r.recommendation_action,
+  }));
 }
 
 export async function rtiDashboardStats(): Promise<RtiDashboardStats> {

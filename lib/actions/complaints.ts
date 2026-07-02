@@ -26,6 +26,7 @@ import { getComplaintSettings } from "@/lib/settings";
 import { addDays } from "@/lib/rti-deadlines";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
+import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 
@@ -256,6 +257,7 @@ export async function createComplaint(_prev: ActionState, formData: FormData): P
     changes: [{ field: "created", oldValue: null, newValue: caseNumber ?? parsed.data.title }],
   });
   revalidatePath("/complaints");
+  void triggerAdvisorAnalysis(id);
   return { success: true, id };
 }
 
@@ -278,6 +280,7 @@ export async function updateComplaint(id: string, _prev: ActionState, formData: 
   await writeAudit(admin, { entityType: "complaint", entityId: id, changedBy: user.id, changes: diffFields(before ?? null, row) });
   revalidatePath(`/complaints/${id}`);
   revalidatePath("/complaints");
+  void triggerAdvisorAnalysis(id);
   return { success: true, id };
 }
 
@@ -305,6 +308,7 @@ export async function setComplaintStatus(id: string, status: string): Promise<Ac
   await writeAudit(admin, { entityType: "complaint", entityId: id, changedBy: user.id, changes: [{ field: "status", oldValue: before?.status, newValue: status }] });
   revalidatePath(`/complaints/${id}`);
   revalidatePath("/complaints");
+  void triggerAdvisorAnalysis(id);
   return { success: true, id };
 }
 
@@ -377,6 +381,7 @@ export async function fileComplaint(input: {
   });
   revalidatePath(`/complaints/${input.complaintId}`);
   revalidatePath("/complaints");
+  void triggerAdvisorAnalysis(input.complaintId);
   return { success: true, id: input.complaintId };
 }
 
@@ -426,6 +431,7 @@ export async function addComplaintReply(complaintId: string, _prev: ActionState,
   if (followUp) await addReminder(admin, { complaintId, title: "Follow up — issues remain after reply", dueDate: followUp, reminderType: "Follow-up with engineer", createdBy: user.id });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "reply", oldValue: null, newValue: d.replySummary ?? "reply added" }] });
   revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -479,6 +485,7 @@ export async function addComplaintActionTaken(complaintId: string, _prev: Action
   if (verify) await addReminder(admin, { complaintId, title: "Verify site action", dueDate: verify, reminderType: "Verify site action", createdBy: user.id });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "action_taken", oldValue: null, newValue: d.actionSummary ?? "action added" }] });
   revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -515,6 +522,7 @@ export async function addComplaintCommunication(complaintId: string, _prev: Acti
   if (d.nextActionDate) await addReminder(admin, { complaintId, title: d.nextAction || "Follow up", dueDate: d.nextActionDate, reminderType: "Follow-up with engineer", createdBy: user.id });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "communication", oldValue: null, newValue: d.communicationType }] });
   revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -529,6 +537,7 @@ export async function completeComplaintReminder(reminderId: string, complaintId:
   await addTimeline(admin, { complaintId, eventType: "Reminder", title: "Reminder completed", createdBy: user.id });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "reminder", oldValue: null, newValue: "Completed" }] });
   revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -556,6 +565,7 @@ export async function addComplaintEscalation(complaintId: string, _prev: ActionS
   await addTimeline(admin, { complaintId, eventType: "Escalation", title: `Escalated${toLevel ? ` to ${toLevel}` : ""}`, summary: reason || null, createdBy: user.id });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "escalation", oldValue: null, newValue: toLevel || "escalated" }] });
   revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -606,6 +616,7 @@ export async function applyDocumentExtraction(_prev: ActionState, formData: Form
   await admin.from("complaint_documents").update({ verification_status: "Verified", verified_by: user.id, verified_at: new Date().toISOString() }).eq("id", d.documentId);
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "document_applied", oldValue: null, newValue: d.documentId }] });
   revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -716,6 +727,7 @@ export async function uploadComplaintScanAction(
   }
 
   revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
   return { ok: true, documentId, ocrStatus };
 }
 
