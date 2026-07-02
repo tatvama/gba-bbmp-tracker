@@ -142,7 +142,7 @@ export function CaseWorkflow({
               defaultDocType="Complaint acknowledgement"
             />
             <div className="mt-3">
-              <Button size="sm" variant="outline" disabled={busy || reached >= 1} onClick={() => mark("Acknowledged")}>
+              <Button size="sm" variant="outline" disabled={busy || reached > 1 || status.toLowerCase() === "acknowledged"} onClick={() => mark("Acknowledged")}>
                 <FileCheck2 className="h-4 w-4" /> Mark acknowledged
               </Button>
             </div>
