@@ -2,7 +2,8 @@
 .gitignore
 node_modules
 .next
-.env.local
-.env*.local
+.env
+.env.*
+!.env.example
 *.log
 .npm
