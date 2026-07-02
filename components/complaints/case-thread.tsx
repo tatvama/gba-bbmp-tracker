@@ -29,9 +29,14 @@ type ThreadEntry = {
 };
 
 const isCounterReplyDoc = (t: string | null | undefined) => !!t && /counter[- ]?reply/i.test(t);
+const isEscalationDoc = (t: string | null | undefined) => !!t && /escalation letter/i.test(t);
 const isLetterDoc = (t: string | null | undefined) => !!t && /generated complaint letter/i.test(t);
 const isAckDoc = (t: string | null | undefined) => !!t && /acknowledg|receipt|postal|inward/i.test(t);
 const isReplyDoc = (t: string | null | undefined) => !!t && /reply|action taken|atr|report|inspection/i.test(t);
+
+/** Draft kinds that get FILED as their own outbound document (shown from the
+ *  document, not a duplicate draft entry). Other kinds still show as drafts. */
+const FILED_DRAFT_KINDS = new Set(["counter_reply", "escalation_letter", "lokayukta_complaint", "chief_secretary_letter", "records_preservation"]);
 
 /**
  * Unified case correspondence: the whole cycle in one chronological thread —
@@ -54,10 +59,6 @@ export function CaseThread({
 
   for (const d of documents) {
     const t = d.document_type;
-    // A filed counter-reply is stored BOTH as this document and as an ai_draft;
-    // the draft entry below already represents it in the thread (as an outgoing
-    // "Draft"), so skip the document to avoid showing it twice.
-    if (isCounterReplyDoc(t)) continue;
     const target: ViewerTarget = {
       documentId: d.id,
       title: d.title || d.original_file_name,
@@ -65,7 +66,13 @@ export function CaseThread({
       fileName: d.original_file_name,
       fallbackText: d.ocr_clean_text || d.ocr_raw_text,
     };
-    if (isLetterDoc(t)) {
+    // Order matters: "Counter-reply" / "Escalation letter" also match the
+    // reply regex, so classify them (outbound, ours) BEFORE isReplyDoc.
+    if (isCounterReplyDoc(t)) {
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Counter-reply", title: d.title || "Counter-reply", subtitle: d.ai_summary, viewer: target });
+    } else if (isEscalationDoc(t)) {
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Escalation", title: d.title || "Escalation letter", subtitle: d.ai_summary, viewer: target });
+    } else if (isLetterDoc(t)) {
       entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Complaint letter", title: d.title || "Drafted complaint letter", subtitle: d.document_type, viewer: target });
     } else if (isAckDoc(t)) {
       entries.push({ id: d.id, date: d.uploaded_at, dir: "in", kind: "Acknowledgement", title: d.title || d.document_type || "Acknowledgement", subtitle: d.ai_summary, viewer: target });
@@ -77,6 +84,10 @@ export function CaseThread({
   }
 
   for (const dr of aiDrafts) {
+    // Counter-reply / escalation drafts are shown from their filed PDF document
+    // above (viewable). Skip them here so they don't appear twice; other draft
+    // kinds (follow-up, reminder, RTI, WhatsApp) still show as drafts.
+    if (FILED_DRAFT_KINDS.has(dr.kind ?? "")) continue;
     const kindLabel = (COMPLAINT_DRAFT_KINDS as Record<string, string>)[dr.kind ?? ""] ?? dr.kind ?? "AI draft";
     entries.push({
       id: `draft-${dr.id}`,

@@ -25,6 +25,7 @@ const ACTIONABLE = new Set<RecommendationAction>([
   "counter_reply",
   "request_clarification",
   "close",
+  "convert_to_rti",
 ]);
 
 /**

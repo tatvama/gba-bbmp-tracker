@@ -26,6 +26,7 @@ export const ACTION_LABELS: Record<RecommendationAction, string> = {
   review: "Manual review needed",
   none: "No action needed",
   request_clarification: "Request clarification from the department",
+  convert_to_rti: "Convert to an RTI request",
 };
 
 function fallback(action: RecommendationAction, healthScore: HealthScoreResult): AdvisorNarrative {

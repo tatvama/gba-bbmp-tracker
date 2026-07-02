@@ -74,7 +74,8 @@ export type RecommendationAction =
   | "upload_evidence"
   | "review"
   | "none"
-  | "request_clarification";
+  | "request_clarification"
+  | "convert_to_rti";
 
 /** The actions the AI is allowed to pick as the single primary next step. */
 export const RECOMMENDATION_ACTIONS: readonly RecommendationAction[] = [
@@ -87,6 +88,7 @@ export const RECOMMENDATION_ACTIONS: readonly RecommendationAction[] = [
   "review",
   "none",
   "request_clarification",
+  "convert_to_rti",
 ] as const;
 
 /** Minimal shape of an escalation_logs row (no dedicated type exists yet). */

@@ -204,10 +204,11 @@ Work through these questions against the COMPLETE correspondence above:
 - Did the department make commitments, and were they fulfilled, overdue, or ignored?
 - Has enough evidence now been provided?
 - Would another counter-reply be meaningful, or is escalation now appropriate?
+- Has an escalation already been sent and then STALLED — escalated with no response on record for a long time? If so, converting to a formal RTI request to compel the records is usually the strongest next step.
 - Has the complaint been satisfactorily resolved / can it be recommended for closure?
 
 Then choose EXACTLY ONE primary next action from: ${actionList}.
-Guidance: 'wait' = within SLA, nothing to do yet; 'generate_reminder' = no reply and the wait has run long; 'request_clarification' = a reply came but is ambiguous/incomplete on specific points; 'counter_reply' = a reply came but left demands unaddressed and pressing it is still worthwhile; 'upload_evidence' = our own case needs more supporting documents; 'escalate' = the department is stonewalling, contradicting itself, or has broken commitments and a higher authority is now warranted; 'close' = fully resolved or nothing further is useful; 'review' = you cannot judge and a human must look.
+Guidance: 'wait' = within SLA, nothing to do yet; 'generate_reminder' = no reply and the wait has run long; 'request_clarification' = a reply came but is ambiguous/incomplete on specific points; 'counter_reply' = a reply came but left demands unaddressed and pressing it is still worthwhile; 'upload_evidence' = our own case needs more supporting documents; 'escalate' = the department is stonewalling, contradicting itself, or has broken commitments and a higher authority is now warranted; 'convert_to_rti' = an escalation has already been sent and STALLED (no response for a long time), so an RTI request under the RTI Act 2005 is now the strongest lever to compel the records; 'close' = fully resolved or nothing further is useful; 'review' = you cannot judge and a human must look.
 
 Output STRICT JSON of EXACTLY this shape:
 {

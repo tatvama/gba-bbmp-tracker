@@ -4,11 +4,11 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles, Loader2, AlertTriangle, ArrowRight, Bell, Gavel, MessageSquareReply,
-  Camera, CircleCheck, Clock, Search, HelpCircle, ListChecks,
+  Camera, CircleCheck, Clock, Search, HelpCircle, ListChecks, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { startAiDraftJob, getJobAction } from "@/lib/actions/jobs";
-import { markReminderGenerated, markEscalationGenerated } from "@/lib/actions/ai-advisor";
+import { markReminderGenerated } from "@/lib/actions/ai-advisor";
 import type { RecommendationRow, RecommendationAction } from "@/lib/ai/advisor/types";
 import { AIHealthScore } from "./AIHealthScore";
 
@@ -20,6 +20,7 @@ const ACTION_META: Record<
   escalate: { icon: Gavel, buttonLabel: "Draft escalation letter" },
   counter_reply: { icon: MessageSquareReply, buttonLabel: "Draft counter-reply" },
   request_clarification: { icon: HelpCircle, buttonLabel: "Draft clarification request" },
+  convert_to_rti: { icon: FileText, buttonLabel: "Draft RTI request" },
   upload_evidence: { icon: Camera, buttonLabel: "Go to documents" },
   review: { icon: Search, buttonLabel: "Review documents" },
   close: { icon: CircleCheck, buttonLabel: "Go to case overview" },
@@ -58,12 +59,18 @@ export function AIRecommendationCard({
       router.push(`/complaints/${complaintId}?tab=overview`);
       return;
     }
+    // Escalation is done from the workflow's Escalate step (generate → file →
+    // record), so send the user there rather than generating in the background.
+    if (action === "escalate") {
+      router.push(`/complaints/${complaintId}?step=escalate`);
+      return;
+    }
 
     const kind =
       action === "generate_reminder" ? "reminder_email"
-      : action === "escalate" ? "escalation_letter"
       : action === "counter_reply" ? "counter_reply"
       : action === "request_clarification" ? "clarification_request"
+      : action === "convert_to_rti" ? "rti_from_complaint"
       : null;
     if (!kind) return;
 
@@ -81,7 +88,6 @@ export function AIRecommendationCard({
       const status = r.job?.status;
       if (status === "done") {
         if (action === "generate_reminder") await markReminderGenerated(complaintId);
-        if (action === "escalate") await markEscalationGenerated(complaintId);
         setBusy(false);
         router.push(`/complaints/${complaintId}?tab=ai`);
         return;

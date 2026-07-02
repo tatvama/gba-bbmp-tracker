@@ -934,6 +934,88 @@ export async function fileCounterReplyAction(
   return { ok: true, documentId };
 }
 
+/**
+ * FILE a generated escalation letter as a document — mirrors
+ * fileCounterReplyAction. Renders the escalation draft to a government-format
+ * PDF, stores it in R2 + complaint_documents (document_type "Escalation
+ * letter", so it's viewable from the Correspondence thread), records it in
+ * ai_drafts under its specific kind for the advisor, logs the timeline, and
+ * re-runs the advisor. "Escalation letter" contains no "reply"/"report", so it
+ * is never mistaken for an inbound department reply.
+ */
+export async function fileEscalationAction(
+  complaintId: string,
+  content: string,
+  opts?: { kind?: ComplaintDraftKind; title?: string; language?: string },
+): Promise<{ ok: boolean; documentId?: string; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const { user, admin } = a;
+  if (!content.trim()) return { ok: false, error: "Nothing to file — generate the escalation letter first." };
+  const label = opts?.title || "Escalation letter";
+
+  let pdf: Buffer;
+  let fileName: string;
+  try {
+    const r = await generateDraftPdfService(label, content);
+    pdf = r.buffer;
+    fileName = `escalation-${Date.now()}.pdf`;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? `Could not render the PDF: ${e.message}` : "Could not render the PDF." };
+  }
+
+  const key = `complaints/${complaintId}/${fileName}`;
+  try {
+    await uploadToR2({ key, body: pdf, contentType: "application/pdf", contentLength: pdf.byteLength });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
+  }
+
+  const { data: doc, error } = await admin
+    .from("complaint_documents")
+    .insert({
+      complaint_id: complaintId,
+      document_type: "Escalation letter",
+      title: label,
+      original_file_name: fileName,
+      storage_bucket: R2_STORAGE_SENTINEL,
+      storage_path: key,
+      mime_type: "application/pdf",
+      file_size: pdf.byteLength,
+      document_date: todayISO(),
+      ocr_status: "Skipped",
+      ocr_clean_text: content,
+      ai_summary: content.slice(0, 300),
+      uploaded_by: user.id,
+    })
+    .select("id")
+    .single();
+  if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the escalation document." };
+  const documentId = doc.id as string;
+
+  await admin.from("ai_drafts").insert({
+    entity_type: "complaint",
+    entity_id: complaintId,
+    kind: opts?.kind ?? "escalation_letter",
+    content,
+    language: opts?.language ?? null,
+    created_by: user.id,
+  });
+
+  await addTimeline(admin, {
+    complaintId,
+    eventType: "Escalation",
+    title: `${label} filed`,
+    summary: "Escalation letter rendered to PDF and filed to the case.",
+    relatedDocumentId: documentId,
+    createdBy: user.id,
+  });
+
+  revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
+  return { ok: true, documentId };
+}
+
 export interface ReplyFile {
   id: string;
   title: string;

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight,
   FileText, Eye, Search, Printer,
@@ -21,6 +21,7 @@ import {
   saveComplaintAiDraft,
   addComplaintEscalation,
   fileCounterReplyAction,
+  fileEscalationAction,
   listComplaintReplyFilesAction,
   type ReplyFile,
 } from "@/lib/actions/complaints";
@@ -136,14 +137,25 @@ export function CaseWorkflow({
   letter?: WorkflowLetter | null;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const reached = stepFromStatus(status);
-  const [active, setActive] = React.useState<StepKey>(STEPS[activeIdxFor(status, reached)]!.key);
+  // Honor a ?step= deep link (e.g. the AI advisor's "Draft escalation letter"
+  // opens ?step=escalate) over the default step, as long as it's not locked.
+  const stepParam = searchParams.get("step");
+  const paramIdx = STEPS.findIndex((s) => s.key === stepParam);
+  const paramLocked = paramIdx === 3 ? reached < 1 : paramIdx > reached;
+  const initialIdx = paramIdx >= 0 && !paramLocked ? paramIdx : activeIdxFor(status, reached);
+  const [active, setActive] = React.useState<StepKey>(STEPS[initialIdx]!.key);
   const [busy, setBusy] = React.useState(false);
   // Bumped when a reply/report is uploaded so the counter-reply panel's
   // "recent reply files" list re-fetches (the upload happens in a sibling).
   const [replyFilesKey, setReplyFilesKey] = React.useState(0);
 
+  // Auto-advance the active tab only when the case's status actually changes —
+  // not on mount (which would clobber a ?step= deep link).
+  const firstRun = React.useRef(true);
   React.useEffect(() => {
+    if (firstRun.current) { firstRun.current = false; return; }
     setActive(STEPS[activeIdxFor(status, reached)]!.key);
   }, [reached, status]);
 
@@ -678,6 +690,19 @@ function EscalatePanel({
   const [error, setError] = React.useState<string | null>(null);
   const [savedMsg, setSavedMsg] = React.useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = React.useState(false);
+  const [filing, setFiling] = React.useState(false);
+
+  async function fileEscalation() {
+    if (!kind || !draft.trim()) return;
+    setFiling(true);
+    setError(null);
+    setSavedMsg(null);
+    const r = await fileEscalationAction(complaintId, draft, { kind, title: COMPLAINT_DRAFT_KINDS[kind] });
+    setFiling(false);
+    if (!r.ok) { setError(r.error ?? "Could not file the escalation."); return; }
+    setSavedMsg("Escalation filed as a PDF — view it from the Correspondence tab.");
+    onEscalated();
+  }
 
   async function gen(k: ComplaintDraftKind, level: string) {
     setGenerating(k);
@@ -746,6 +771,9 @@ function EscalatePanel({
           )}
           <LetterDraftArea value={draft} onChange={setDraft} />
           <div className="flex flex-wrap items-end gap-2">
+            <Button size="sm" onClick={fileEscalation} disabled={filing}>
+              {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File escalation
+            </Button>
             <Button size="sm" variant="outline" onClick={save}><Save className="h-4 w-4" /> Save draft</Button>
             <Button
               size="sm"
