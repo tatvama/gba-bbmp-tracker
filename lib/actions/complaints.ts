@@ -296,16 +296,19 @@ export async function deleteComplaint(id: string): Promise<ActionState> {
   return { success: true };
 }
 
-export async function setComplaintStatus(id: string, status: string): Promise<ActionState> {
+export async function setComplaintStatus(id: string, status: string, note?: string): Promise<ActionState> {
   const a = await authed(COMPLAINT_WRITE_ROLES);
   if ("error" in a) return { error: a.error };
   const { user, admin } = a;
   const { data: before } = await admin.from("complaints").select("status").eq("id", id).single();
   const update: Record<string, unknown> = { status, updated_by: user.id };
   if (status === "Closed" || status === "Resolved") update.closure_date = todayISO();
+  // Reopening a closed/resolved case clears the closure date.
+  if (status === "Reopened") update.closure_date = null;
   const { error } = await admin.from("complaints").update(update).eq("id", id);
   if (error) return { error: error.message };
-  await addTimeline(admin, { complaintId: id, eventType: status === "Closed" ? "Closure" : "Status Change", title: `Status → ${status}`, createdBy: user.id });
+  const isClosure = status === "Closed" || status === "Resolved";
+  await addTimeline(admin, { complaintId: id, eventType: isClosure ? "Closure" : status === "Reopened" ? "Reopened" : "Status Change", title: `Status → ${status}`, summary: note?.trim() || null, createdBy: user.id });
   await writeAudit(admin, { entityType: "complaint", entityId: id, changedBy: user.id, changes: [{ field: "status", oldValue: before?.status, newValue: status }] });
   revalidatePath(`/complaints/${id}`);
   revalidatePath("/complaints");
@@ -1052,6 +1055,32 @@ export async function listComplaintReplyFilesAction(complaintId: string): Promis
       title: (d.title as string) || (d.original_file_name as string) || dt || "Document",
       documentType: dt,
       direction: /counter/i.test(dt) ? "out" : "in",
+      uploadedAt: (d.uploaded_at as string) ?? "",
+      mimeType: (d.mime_type as string) ?? null,
+      fileName: (d.original_file_name as string) ?? null,
+    };
+  });
+  return { files };
+}
+
+export async function listComplaintEscalationFilesAction(complaintId: string): Promise<{ files: ReplyFile[]; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { files: [], error: a.error };
+  const { admin } = a;
+  const { data } = await admin
+    .from("complaint_documents")
+    .select("id, title, original_file_name, document_type, mime_type, uploaded_at")
+    .eq("complaint_id", complaintId)
+    .or("document_type.ilike.%escalation%,document_type.ilike.%preservation%,document_type.ilike.%lokayukta%,document_type.ilike.%secretary%,document_type.ilike.%udd%")
+    .order("uploaded_at", { ascending: false })
+    .limit(8);
+  const files: ReplyFile[] = ((data as Record<string, unknown>[]) ?? []).map((d) => {
+    const dt = (d.document_type as string) ?? "";
+    return {
+      id: d.id as string,
+      title: (d.title as string) || (d.original_file_name as string) || dt || "Document",
+      documentType: dt,
+      direction: "out",
       uploadedAt: (d.uploaded_at as string) ?? "",
       mimeType: (d.mime_type as string) ?? null,
       fileName: (d.original_file_name as string) ?? null,

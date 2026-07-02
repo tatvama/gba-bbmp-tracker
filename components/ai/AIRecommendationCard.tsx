@@ -56,7 +56,7 @@ export function AIRecommendationCard({
       return;
     }
     if (action === "close") {
-      router.push(`/complaints/${complaintId}?tab=overview`);
+      router.push(`/complaints/${complaintId}?step=close`);
       return;
     }
     // Escalation is done from the workflow's Escalate step (generate → file →
