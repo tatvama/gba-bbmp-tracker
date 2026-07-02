@@ -23,7 +23,7 @@ export function WardsHeader() {
         <div className="text-xs text-slate-550 dark:text-slate-400 leading-relaxed">
           {expanded ? (
             <p>
-              All 225 notified BBMP wards with their lineage (old 198 → new 225 → derived GBA corporation), engineering sub-division, property count and verification status. The corporation column is derived from each ward's Assembly Constituency.
+              All 225 notified BBMP wards with their lineage (old 198 → new 225 → derived GBA corporation), engineering sub-division, property count and verification status. The corporation column is derived from each ward&apos;s Assembly Constituency.
             </p>
           ) : (
             <p className="line-clamp-2">
