@@ -22,15 +22,20 @@ import {
   saveComplaintAiDraft,
   addComplaintEscalation,
 } from "@/lib/actions/complaints";
+import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
 
 export interface WorkflowLetter {
+  letterId: string | null;
   text: string | null;
   docxDocId: string | null;
   pdfDocId: string | null;
   fileName: string | null;
+  printStatus: "none" | "pending" | "printed";
+  printedAt: string | null;
+  printedByName: string | null;
 }
 
 const SUBMIT_CHANNELS = [
@@ -227,9 +232,41 @@ function SubmitPanel({
   const [filedTo, setFiledTo] = React.useState("");
   const [followUpDays, setFollowUpDays] = React.useState("30");
   const [busy, setBusy] = React.useState(false);
+  const [printBusy, setPrintBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [printStatus, setPrintStatus] = React.useState(letter?.printStatus ?? "none");
+  const [printedAt, setPrintedAt] = React.useState(letter?.printedAt ?? null);
+  const [printedByName, setPrintedByName] = React.useState(letter?.printedByName ?? null);
 
   const hasLetter = Boolean(letter && (letter.text || letter.pdfDocId || letter.docxDocId));
+  // Only bill_stop / forensic-imported letters go through the print queue
+  // (letterId present + printStatus tracked); manually drafted letters skip
+  // straight to submission — nothing to gate there.
+  const isTracked = printStatus === "pending" || printStatus === "printed";
+  const isPrinted = printStatus === "printed";
+
+  async function markPrinted() {
+    if (!letter?.letterId) return;
+    setPrintBusy(true);
+    setError(null);
+    const r = await markLetterPrintedAction(letter.letterId);
+    setPrintBusy(false);
+    if (!r.success) { setError(r.error ?? "Could not record the print."); return; }
+    setPrintStatus("printed");
+    setPrintedAt(new Date().toISOString());
+  }
+
+  async function undoPrinted() {
+    if (!letter?.letterId) return;
+    setPrintBusy(true);
+    setError(null);
+    const r = await undoLetterPrintedAction(letter.letterId);
+    setPrintBusy(false);
+    if (!r.success) { setError(r.error ?? "Could not undo."); return; }
+    setPrintStatus("pending");
+    setPrintedAt(null);
+    setPrintedByName(null);
+  }
 
   async function submit() {
     setBusy(true);
@@ -290,12 +327,45 @@ function SubmitPanel({
         </div>
       )}
 
+      {/* Print status — the cycle starts here for imported letters */}
+      {!filed && isTracked && (
+        <div className={`flex flex-wrap items-center gap-2.5 rounded-md border p-3 ${isPrinted ? "border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-950/20" : "border-amber-200 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/20"}`}>
+          <Printer className={`h-4 w-4 shrink-0 ${isPrinted ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"}`} />
+          <div className="min-w-0 flex-1 text-xs">
+            {isPrinted ? (
+              <span className="font-medium text-blue-700 dark:text-blue-400">
+                Printed {printedAt ? new Date(printedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}
+                {printedByName ? ` by ${printedByName}` : ""}. Submit it below once it&apos;s handed over / posted.
+              </span>
+            ) : (
+              <span className="font-medium text-amber-700 dark:text-amber-400">
+                Print pending — this letter is in the <Link href="/complaints/print-queue" className="underline">print queue</Link>.
+              </span>
+            )}
+          </div>
+          {isPrinted ? (
+            <Button size="sm" variant="ghost" onClick={undoPrinted} disabled={printBusy}>
+              {printBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Undo
+            </Button>
+          ) : (
+            <Button size="sm" onClick={markPrinted} disabled={printBusy}>
+              {printBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />} Mark as printed
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Record the submission */}
       {filed ? (
         <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> This complaint is marked as filed. Move to the Acknowledge step when you receive the officer&apos;s acknowledgement.</p>
       ) : (
         <div className="space-y-3 rounded-md border p-3">
           <p className="text-xs font-medium">Have you submitted this letter? Record it:</p>
+          {isTracked && !isPrinted && (
+            <p className="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3 w-3 shrink-0" /> Not printed yet — you can still record the submission if it went out another way (e.g. email/portal).
+            </p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label className="text-xs">Submitted on</Label>

@@ -1,14 +1,14 @@
 import Link from "next/link";
 import {
   FileText, Clock, AlertOctagon, MailX, CheckCircle2, UploadCloud, FilePlus2,
-  ArrowRight, Sparkles, LayoutGrid,
+  ArrowRight, Sparkles, LayoutGrid, Printer,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { OrgTreemap, type OrgTreemapRow } from "@/components/complaints/org-treemap";
-import { complaintDashboardStats, listComplaints, listAiAdvisorWorklist } from "@/lib/queries";
+import { complaintDashboardStats, listComplaints, listAiAdvisorWorklist, countPrintPendingLetters } from "@/lib/queries";
 import { formatNumber, formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +28,11 @@ const RISK_BADGE: Record<string, BadgeProps["variant"]> = {
  */
 export default async function ComplaintDashboard() {
   const today = new Date().toISOString().slice(0, 10);
-  const [stats, complaints, aiWorklist] = await Promise.all([
+  const [stats, complaints, aiWorklist, printPending] = await Promise.all([
     complaintDashboardStats(),
     listComplaints(),
     listAiAdvisorWorklist(6),
+    countPrintPendingLetters(),
   ]);
 
   const resolved = complaints.filter((c) => c.status === "Resolved" || c.status === "Closed").length;
@@ -77,6 +78,7 @@ export default async function ComplaintDashboard() {
 
   const cards = [
     { label: "Total complaints", value: stats.total, icon: FileText, cls: "text-primary", bg: "bg-primary/8", href: "/complaints" },
+    { label: "Print pending", value: printPending, icon: Printer, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints/print-queue" },
     { label: "Active", value: stats.pending, icon: Clock, cls: "text-amber-dark", bg: "bg-amber/8", href: "/complaints?flag=open" },
     { label: "Awaiting reply", value: stats.noReply, icon: MailX, cls: "text-destructive", bg: "bg-destructive/8", href: "/complaints?flag=noreply" },
     { label: "Overdue", value: stats.overdue, icon: AlertOctagon, cls: "text-destructive", bg: "bg-destructive/8", href: "/complaints?flag=overdue" },
@@ -109,6 +111,17 @@ export default async function ComplaintDashboard() {
         </Link>
       </div>
 
+      {printPending > 0 && (
+        <Link
+          href="/complaints/print-queue"
+          className="flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-50/60 px-4 py-3 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-400"
+        >
+          <Printer className="h-4 w-4 shrink-0" />
+          {printPending} letter{printPending === 1 ? "" : "s"} waiting to be printed — the cycle starts there
+          <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
+        </Link>
+      )}
+
       {stats.overdue > 0 && (
         <Link
           href="/complaints?flag=overdue"
@@ -120,8 +133,8 @@ export default async function ComplaintDashboard() {
         </Link>
       )}
 
-      {/* five numbers */}
-      <div className="grid grid-cols-1 min-[340px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* key numbers */}
+      <div className="grid grid-cols-1 min-[340px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {cards.map((c, idx) => {
           const Icon = c.icon;
           return (

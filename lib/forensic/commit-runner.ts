@@ -433,6 +433,9 @@ export async function commitForensicJobs(
             ai_used: job.source === "ai-from-letter",
             lint_ok: false,
             file_name: letterDocxPath?.name ?? letterPdfPath?.name ?? null,
+            // The cycle starts at the printer: every imported letter waits in
+            // the Print-queue page until someone prints + submits it.
+            print_status: "pending",
             created_by: userId,
           });
         }
@@ -458,8 +461,8 @@ export async function commitForensicJobs(
         await admin.from("complaint_timeline").insert({
           complaint_id: complaintId,
           event_type: "Note",
-          title: "Forensic letter imported from skill output",
-          summary: `Drafted Kannada complaint letter attached for job ${code}.`,
+          title: "Forensic letter imported — print pending",
+          summary: `Drafted Kannada complaint letter attached for job ${code}. It is waiting in the print queue; print it, then record the submission.`,
           created_by: userId,
         });
       }
