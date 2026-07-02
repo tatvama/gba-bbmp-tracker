@@ -497,6 +497,7 @@ export const COMPLAINT_DRAFT_KINDS = {
   chief_secretary_letter: "Chief Secretary / UDD letter",
   records_preservation: "Records-preservation request",
   counter_reply: "Counter-reply to department reply",
+  clarification_request: "Clarification request to department",
 } as const;
 export type ComplaintDraftKind = keyof typeof COMPLAINT_DRAFT_KINDS;
 

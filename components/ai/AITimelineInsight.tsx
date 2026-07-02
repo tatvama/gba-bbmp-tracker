@@ -1,14 +1,28 @@
-import { AlertTriangle, FileWarning } from "lucide-react";
+import { AlertTriangle, FileWarning, GitCompareArrows, Handshake } from "lucide-react";
 import type { RecommendationRow } from "@/lib/ai/advisor/types";
 
 const styleFor = (i: number) =>
   ["text-rose-600 dark:text-rose-400", "text-amber-600 dark:text-amber-400"][i % 2];
 
+const COMMITMENT_CHIP: Record<string, string> = {
+  fulfilled: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  pending: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  overdue: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  unmet: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
+};
+
 export function AITimelineInsight({ recommendation }: { recommendation: RecommendationRow | null }) {
   if (!recommendation) return null;
-  const { timeline_summary, detected_risks, missing_information } = recommendation;
+  const { timeline_summary, detected_risks, missing_information, contradictions, commitments } = recommendation;
 
-  if (!timeline_summary && !detected_risks.length && !missing_information.length) return null;
+  if (
+    !timeline_summary &&
+    !detected_risks.length &&
+    !missing_information.length &&
+    !contradictions.length &&
+    !commitments.length
+  )
+    return null;
 
   return (
     <div className="space-y-2.5 rounded-md border bg-muted/30 p-3 text-xs">
@@ -16,6 +30,41 @@ export function AITimelineInsight({ recommendation }: { recommendation: Recommen
         <div>
           <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Timeline summary</p>
           <p className="text-foreground/90">{timeline_summary}</p>
+        </div>
+      )}
+      {contradictions.length > 0 && (
+        <div>
+          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <GitCompareArrows className="h-3 w-3" /> Contradictions
+          </p>
+          <ul className="space-y-1">
+            {contradictions.map((c, i) => (
+              <li key={i} className="text-rose-600 dark:text-rose-400">
+                • {c.summary}
+                {c.conflictsWith && <span className="text-muted-foreground"> — conflicts with: {c.conflictsWith}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {commitments.length > 0 && (
+        <div>
+          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <Handshake className="h-3 w-3" /> Department commitments
+          </p>
+          <ul className="space-y-1">
+            {commitments.map((m, i) => (
+              <li key={i} className="flex items-start gap-1.5">
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${COMMITMENT_CHIP[m.status] ?? COMMITMENT_CHIP.pending}`}>
+                  {m.status}
+                </span>
+                <span className="text-foreground/90">
+                  {m.commitment}
+                  {m.dueBy && <span className="text-muted-foreground"> (due {m.dueBy})</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {detected_risks.length > 0 && (

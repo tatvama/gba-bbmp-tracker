@@ -8,6 +8,7 @@ import type {
   ComplaintActionTaken,
   ComplaintDocument,
   Reminder,
+  AiDraft,
 } from "@/lib/types";
 import type { AdvisorContext, EscalationLogRow, RecommendationRow } from "./types";
 
@@ -39,6 +40,7 @@ export async function buildAdvisorContext(
     { data: escalations },
     { data: reminders },
     { data: documents },
+    { data: aiDrafts },
     { data: previousRecommendation },
   ] = await Promise.all([
     admin.from("complaint_timeline").select("*").eq("complaint_id", complaintId).order("event_date", { ascending: true }).limit(200),
@@ -47,6 +49,10 @@ export async function buildAdvisorContext(
     admin.from("escalation_logs").select("id,escalated_on,to_level,to_officer,reason,status,response_received").eq("entity_type", "complaint").eq("entity_id", complaintId).order("escalated_on", { ascending: true }).limit(50),
     admin.from("reminders").select("*").eq("entity_type", "complaint").eq("entity_id", complaintId).order("due_date", { ascending: true }).limit(100),
     admin.from("complaint_documents").select("*").eq("complaint_id", complaintId).order("uploaded_at", { ascending: true }).limit(200),
+    // Our own generated correspondence (counter-replies, reminders, escalation
+    // letters) — the advisor must reason about what WE already argued, not just
+    // the department's replies. Oldest-first so the thread reads in order.
+    admin.from("ai_drafts").select("*").eq("entity_type", "complaint").eq("entity_id", complaintId).order("created_at", { ascending: true }).limit(100),
     admin.from("complaint_ai_recommendations").select("*").eq("complaint_id", complaintId).maybeSingle(),
   ]);
 
@@ -63,6 +69,7 @@ export async function buildAdvisorContext(
     escalations: (escalations as EscalationLogRow[]) ?? [],
     reminders: (reminders as Reminder[]) ?? [],
     documents: (documents as ComplaintDocument[]) ?? [],
+    aiDrafts: (aiDrafts as AiDraft[]) ?? [],
     previousRecommendation: (previousRecommendation as RecommendationRow | null) ?? null,
     settings,
     reopenedCount,

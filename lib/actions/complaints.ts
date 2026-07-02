@@ -831,6 +831,9 @@ export async function saveComplaintAiDraft(input: {
   if (error) return { ok: false, error: error.message };
   await addTimeline(admin, { complaintId: input.complaintId, eventType: "Note", title: `AI draft saved: ${input.title ?? input.kind}`, createdBy: user.id });
   revalidatePath(`/complaints/${input.complaintId}`);
+  // A saved counter-reply/letter is fresh correspondence — re-run the advisor
+  // so its next-step reasoning accounts for what we just argued.
+  void triggerAdvisorAnalysis(input.complaintId);
   return { ok: true, id: data.id };
 }
 
