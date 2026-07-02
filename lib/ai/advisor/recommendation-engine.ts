@@ -28,6 +28,16 @@ const ACTIONABLE = new Set<RecommendationAction>([
 ]);
 
 /**
+ * A run that dies mid-flight (a dev-server restart killing the after() callback,
+ * a crash, or a timeout) leaves analysis_status='running' forever — and the
+ * single-flight claim would then refuse EVERY future analysis for that
+ * complaint, so the panel spins on "Analysing…" indefinitely. A 'running' lock
+ * older than this is therefore treated as dead and reclaimable. No real run
+ * (a single AI call) approaches two minutes, so a live run is never interrupted.
+ */
+const STALE_LOCK_MS = 120_000;
+
+/**
  * Orchestrator: build context -> single-flight claim -> deterministic health
  * score (always, cheap) -> context-hash cache gate -> reply/reminder decision
  * -> AI narrative -> upsert. Never throws — callers (triggerAdvisorAnalysis's
@@ -41,12 +51,16 @@ export async function runAdvisorAnalysis(admin: SupabaseClient, complaintId: str
     .from("complaint_ai_recommendations")
     .upsert({ complaint_id: complaintId }, { onConflict: "complaint_id", ignoreDuplicates: true });
 
-  // Single-flight claim: only proceed if no other run currently owns this row.
+  // Single-flight claim: proceed only if no OTHER run currently owns this row —
+  // i.e. it's not 'running', OR its 'running' lock is stale (a prior run died).
+  // Row-level UPDATE locking still makes two concurrent claimers mutually
+  // exclusive; this only lets a caller reclaim a dead lock, never a live one.
+  const staleCutoff = new Date(Date.now() - STALE_LOCK_MS).toISOString();
   const { data: claimed, error: claimError } = await admin
     .from("complaint_ai_recommendations")
     .update({ analysis_status: "running" })
     .eq("complaint_id", complaintId)
-    .neq("analysis_status", "running")
+    .or(`analysis_status.neq.running,updated_at.lt.${staleCutoff}`)
     .select("id")
     .maybeSingle();
   if (claimError) return { ok: false, error: claimError.message };
