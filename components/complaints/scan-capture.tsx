@@ -58,7 +58,7 @@ export function ScanCapture({
   const [cameraOn, setCameraOn] = React.useState(false);
   const [scanMode, setScanMode] = React.useState(true); // process captures like a scan
   const [flash, setFlash] = React.useState(false);
-  const [uploaded, setUploaded] = React.useState<{ documentId: string; pageCount: number; docType: string; firstPageUrl: string | null } | null>(null);
+  const [uploaded, setUploaded] = React.useState<{ documentId: string; pageCount: number; docType: string; firstPageUrl: string | null; aiSummary?: string; ocrStatus?: string } | null>(null);
   const [openingDoc, setOpeningDoc] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
@@ -182,6 +182,8 @@ export function ScanCapture({
         pageCount: pages.length,
         docType,
         firstPageUrl,
+        aiSummary: res.aiSummary,
+        ocrStatus: res.ocrStatus,
       });
       setPages([]);
       setTitle("");
@@ -235,8 +237,14 @@ export function ScanCapture({
               {uploaded.pageCount} page{uploaded.pageCount === 1 ? "" : "s"} merged into one PDF and uploaded
             </p>
             <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
-              {uploaded.docType} · OCR + AI summary are running in the background.
+              {uploaded.docType} · {uploaded.ocrStatus === "Completed" ? "OCR + AI summary complete!" : "OCR + AI summary are running in the background."}
             </p>
+            {uploaded.aiSummary && (
+              <div className="mt-2 text-xs bg-emerald-100/30 text-emerald-900 p-2.5 rounded border border-emerald-200/50 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/30 max-w-xl">
+                <span className="font-semibold block mb-1 text-emerald-850 dark:text-emerald-200">Extracted AI Summary:</span>
+                <p className="leading-relaxed">{uploaded.aiSummary}</p>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
