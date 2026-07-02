@@ -201,7 +201,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({
     ok: true,
     documentId,
-    bucket,
+    bucket: R2_STORAGE_SENTINEL,
     ocrStatus,
     aiConfigured: isAiConfigured(),
     duplicateWarning,
