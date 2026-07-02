@@ -131,7 +131,6 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           caseNumber={complaint.internal_case_number ?? null}
           aiConfigured={flags.aiConfigured}
           letter={letter}
-          documents={documents}
         />
       )}
 

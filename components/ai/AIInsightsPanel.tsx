@@ -13,8 +13,10 @@ const STALE_MS = 120_000;
  * Sticky AI insights panel for the complaint detail page. Receives the
  * server-fetched initial recommendation as a prop (no extra round-trip on first
  * paint), then:
- *  - polls every 3s WHILE an analysis is in flight, so a long deep pass (which
- *    can take 15–40s) is picked up whenever it finishes — not just once; and
+ *  - polls every 4s the WHOLE time it's open, so an analysis triggered by ANY
+ *    later action — uploading a reply, filing a counter-reply, an edit — is
+ *    reflected within a few seconds (React ignores prop changes after mount, so
+ *    a one-shot / in-flight-only poll would miss these); and
  *  - on open, kicks a fresh analysis if the row is missing (never analysed) or
  *    stuck in a stale in-flight lock (a prior run died mid-flight), so the panel
  *    never spins on "Analysing…" forever.
@@ -30,8 +32,6 @@ export function AIInsightsPanel({
 }) {
   const [recommendation, setRecommendation] = React.useState(initialRecommendation);
   const activeRef = React.useRef(true);
-  const statusRef = React.useRef(recommendation?.analysis_status);
-  statusRef.current = recommendation?.analysis_status;
   React.useEffect(() => () => { activeRef.current = false; }, []);
 
   const refresh = React.useCallback(async () => {
@@ -39,13 +39,12 @@ export function AIInsightsPanel({
     if (activeRef.current && fresh) setRecommendation(fresh);
   }, [complaintId]);
 
-  // Poll only while an analysis is in flight (ref-guarded so it keeps ticking
-  // across a long run, and re-engages if a later re-trigger flips the status
-  // back to running — one cheap status check every 3s otherwise).
+  // Poll for the whole time the panel is open. The row is a single indexed
+  // read, so a 4s cadence is cheap, and it's the only reliable way to catch an
+  // analysis kicked off elsewhere (e.g. a reply uploaded in the workflow panel)
+  // since this client component won't see the refreshed server prop.
   React.useEffect(() => {
-    const id = setInterval(() => {
-      if (statusRef.current === "queued" || statusRef.current === "running") void refresh();
-    }, 3000);
+    const id = setInterval(() => void refresh(), 4000);
     return () => clearInterval(id);
   }, [refresh]);
 
