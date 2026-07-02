@@ -27,6 +27,7 @@ import { addDays } from "@/lib/rti-deadlines";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
+import { generateDraftPdfService } from "@/lib/pdf/document-service";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 
@@ -846,6 +847,135 @@ export async function saveComplaintAiDraft(input: {
   // so its next-step reasoning accounts for what we just argued.
   void triggerAdvisorAnalysis(input.complaintId);
   return { ok: true, id: data.id };
+}
+
+/**
+ * FILE a generated counter-reply as an actual document, so it sits next to the
+ * department's reply as a downloadable file (not just editable text). Renders
+ * the counter-reply to a government-format PDF, stores it in R2 +
+ * complaint_documents (document_type "Counter-reply", OCR skipped — we already
+ * have the text), ALSO records it in ai_drafts so the AI advisor keeps seeing
+ * our outgoing letters, logs the timeline, and re-runs the advisor. The
+ * "Counter-reply" document type is deliberately EXCLUDED from inbound-reply
+ * detection everywhere (lifecycle.gatherReplyGapInputs, the advisor's
+ * thread-decision agent, case-thread) so our own letter is never mistaken for
+ * the department's reply.
+ */
+export async function fileCounterReplyAction(
+  complaintId: string,
+  content: string,
+  opts?: { language?: string },
+): Promise<{ ok: boolean; documentId?: string; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const { user, admin } = a;
+  if (!content.trim()) return { ok: false, error: "Nothing to file — generate the counter-reply first." };
+
+  let pdf: Buffer;
+  let fileName: string;
+  try {
+    const r = await generateDraftPdfService("Counter-reply", content);
+    pdf = r.buffer;
+    fileName = `counter-reply-${Date.now()}.pdf`;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? `Could not render the PDF: ${e.message}` : "Could not render the PDF." };
+  }
+
+  const key = `complaints/${complaintId}/${fileName}`;
+  try {
+    await uploadToR2({ key, body: pdf, contentType: "application/pdf", contentLength: pdf.byteLength });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
+  }
+
+  const { data: doc, error } = await admin
+    .from("complaint_documents")
+    .insert({
+      complaint_id: complaintId,
+      document_type: "Counter-reply",
+      title: "Counter-reply",
+      original_file_name: fileName,
+      storage_bucket: R2_STORAGE_SENTINEL,
+      storage_path: key,
+      mime_type: "application/pdf",
+      file_size: pdf.byteLength,
+      document_date: todayISO(),
+      ocr_status: "Skipped",
+      ocr_clean_text: content, // we already have the text — viewable/searchable
+      ai_summary: content.slice(0, 300),
+      uploaded_by: user.id,
+    })
+    .select("id")
+    .single();
+  if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the counter-reply document." };
+  const documentId = doc.id as string;
+
+  // Keep the AI advisor's view of OUR outgoing letters complete.
+  await admin.from("ai_drafts").insert({
+    entity_type: "complaint",
+    entity_id: complaintId,
+    kind: "counter_reply",
+    content,
+    language: opts?.language ?? null,
+    created_by: user.id,
+  });
+
+  await addTimeline(admin, {
+    complaintId,
+    eventType: "Note",
+    title: "Counter-reply filed",
+    summary: "Counter-reply rendered to PDF and filed alongside the department's reply.",
+    relatedDocumentId: documentId,
+    createdBy: user.id,
+  });
+
+  revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
+  return { ok: true, documentId };
+}
+
+export interface ReplyFile {
+  id: string;
+  title: string;
+  documentType: string;
+  direction: "in" | "out";
+  uploadedAt: string;
+  mimeType: string | null;
+  fileName: string | null;
+}
+
+/**
+ * The recent "reply files" of a complaint's exchange: the department's replies /
+ * reports (incoming) and our filed counter-replies (outgoing), newest first —
+ * so the Reply step can show the two most recent side by side. Direction is
+ * derived from the document type ("Counter-reply" = outgoing).
+ */
+export async function listComplaintReplyFilesAction(complaintId: string): Promise<{ files: ReplyFile[]; error?: string }> {
+  // Same role set as the Reply-step panel that calls this (COMPLAINT_FIELD_ROLES
+  // == the write roles + Field Officer).
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { files: [], error: a.error };
+  const { admin } = a;
+  const { data } = await admin
+    .from("complaint_documents")
+    .select("id, title, original_file_name, document_type, mime_type, uploaded_at")
+    .eq("complaint_id", complaintId)
+    .or("document_type.ilike.%reply%,document_type.ilike.%action taken%,document_type.ilike.%atr%,document_type.ilike.%report%")
+    .order("uploaded_at", { ascending: false })
+    .limit(8);
+  const files: ReplyFile[] = ((data as Record<string, unknown>[]) ?? []).map((d) => {
+    const dt = (d.document_type as string) ?? "";
+    return {
+      id: d.id as string,
+      title: (d.title as string) || (d.original_file_name as string) || dt || "Document",
+      documentType: dt,
+      direction: /counter/i.test(dt) ? "out" : "in",
+      uploadedAt: (d.uploaded_at as string) ?? "",
+      mimeType: (d.mime_type as string) ?? null,
+      fileName: (d.original_file_name as string) ?? null,
+    };
+  });
+  return { files };
 }
 
 export async function getCorporationsAction() {

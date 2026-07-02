@@ -65,9 +65,12 @@ export async function gatherReplyGapInputs(
       .eq("complaint_id", complaintId)
       .order("uploaded_at", { ascending: false })
       .limit(20);
-    const replyDoc = (docs ?? []).find(
-      (d) => /reply|action taken|atr/i.test((d.document_type as string) ?? "") && (d.ocr_clean_text || d.ocr_raw_text),
-    );
+    const replyDoc = (docs ?? []).find((d) => {
+      const dt = (d.document_type as string) ?? "";
+      // Our OWN filed counter-reply is a document whose type contains "reply" —
+      // it must NEVER be picked as "the department's reply" to analyse against.
+      return /reply|action taken|atr/i.test(dt) && !/counter/i.test(dt) && (d.ocr_clean_text || d.ocr_raw_text);
+    });
     if (replyDoc) replyText = ((replyDoc.ocr_clean_text as string) || (replyDoc.ocr_raw_text as string) || "").trim();
   }
   if (!replyText) {

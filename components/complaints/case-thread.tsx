@@ -28,6 +28,7 @@ type ThreadEntry = {
   viewer?: ViewerTarget;
 };
 
+const isCounterReplyDoc = (t: string | null | undefined) => !!t && /counter[- ]?reply/i.test(t);
 const isLetterDoc = (t: string | null | undefined) => !!t && /generated complaint letter/i.test(t);
 const isAckDoc = (t: string | null | undefined) => !!t && /acknowledg|receipt|postal|inward/i.test(t);
 const isReplyDoc = (t: string | null | undefined) => !!t && /reply|action taken|atr|report|inspection/i.test(t);
@@ -53,6 +54,10 @@ export function CaseThread({
 
   for (const d of documents) {
     const t = d.document_type;
+    // A filed counter-reply is stored BOTH as this document and as an ai_draft;
+    // the draft entry below already represents it in the thread (as an outgoing
+    // "Draft"), so skip the document to avoid showing it twice.
+    if (isCounterReplyDoc(t)) continue;
     const target: ViewerTarget = {
       documentId: d.id,
       title: d.title || d.original_file_name,

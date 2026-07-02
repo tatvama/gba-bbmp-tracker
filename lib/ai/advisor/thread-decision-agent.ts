@@ -105,8 +105,12 @@ function buildCorrespondence(ctx: AdvisorContext, demands: string): { text: stri
     }
   }
 
-  // Reply/report documents (OCR) that aren't already captured as structured replies.
-  const replyDocs = ctx.documents.filter((d) => /reply|action taken|atr|report|inspection/i.test(d.document_type ?? ""));
+  // Reply/report documents (OCR) that aren't already captured as structured
+  // replies — EXCLUDING our own filed counter-replies (they're outbound, shown
+  // in the "letters we sent" block below, and their type contains "reply").
+  const replyDocs = ctx.documents.filter(
+    (d) => /reply|action taken|atr|report|inspection/i.test(d.document_type ?? "") && !/counter/i.test(d.document_type ?? ""),
+  );
   if (replyDocs.length) {
     lines.push("\n=== UPLOADED REPLY / REPORT DOCUMENTS (OCR) ===");
     for (const d of replyDocs) {
