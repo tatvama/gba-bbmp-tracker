@@ -57,7 +57,7 @@ function stepFromStatus(status: string): number {
   const s = status.toLowerCase();
   if (s === "escalated" || s.includes("rti")) return 3;
   if (s.includes("reply") || s.includes("action taken") || s.includes("resolved") || s === "closed" || s.includes("partially")) return 2;
-  if (s === "acknowledged" || s.includes("review") || s.includes("assigned") || s.includes("site visit") || s.includes("work in progress")) return 1;
+  if (s === "acknowledged" || s.includes("review") || s.includes("assigned") || s.includes("site visit") || s.includes("work in progress")) return 2;
   if (s === "filed") return 1;
   return 0; // Draft / unknown
 }
@@ -88,6 +88,10 @@ export function CaseWorkflow({
   const reached = stepFromStatus(status);
   const [active, setActive] = React.useState<StepKey>(STEPS[Math.min(reached, 3)]!.key);
   const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    setActive(STEPS[Math.min(reached, 3)]!.key);
+  }, [reached]);
 
   async function mark(next: string) {
     setBusy(true);
