@@ -93,7 +93,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
 
       <div className="mb-4">
         <p className="font-mono text-xs text-muted-foreground">{complaint.internal_case_number ?? "—"}</p>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{complaint.title}</h1>
+        <h1 className="text-lg font-semibold tracking-tight sm:text-xl">{complaint.title}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge variant="muted">{complaint.status}</Badge>
           {complaint.priority && <Badge variant="outline">{complaint.priority} priority</Badge>}
