@@ -195,7 +195,7 @@ export function CaseWorkflow({
                         <Badge variant="muted" className="text-[10px]">uploaded</Badge>
                       </div>
                       {doc.ai_summary && (
-                        <div className="mb-2.5 text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10 max-w-xl">
+                        <div className="mb-2.5 text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10">
                           <span className="font-semibold block mb-0.5 text-emerald-850 dark:text-emerald-250">AI Summary:</span>
                           {doc.ai_summary}
                         </div>
@@ -244,7 +244,7 @@ export function CaseWorkflow({
                         <Badge variant="muted" className="text-[10px]">{doc.document_type}</Badge>
                       </div>
                       {doc.ai_summary && (
-                        <div className="mb-2.5 text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10 max-w-xl">
+                        <div className="mb-2.5 text-xs text-muted-foreground leading-relaxed bg-emerald-500/5 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-350 p-2.5 rounded border border-emerald-500/10">
                           <span className="font-semibold block mb-0.5 text-emerald-850 dark:text-emerald-250">AI Summary:</span>
                           {doc.ai_summary}
                         </div>
