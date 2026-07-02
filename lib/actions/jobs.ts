@@ -5,6 +5,7 @@ import { requireRole, getSessionUser, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
+import { runAdvisorAnalysis } from "@/lib/ai/advisor/recommendation-engine";
 import { notifyUser } from "@/lib/notifications";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 
@@ -85,6 +86,11 @@ export async function startAiDraftJob(input: {
       await a.from("ai_drafts").insert({ entity_type: "complaint", entity_id: input.complaintId, kind: input.kind, content: r.text, language: input.language ?? null, created_by: userId });
       await a.from("background_jobs").update({ status: "done", progress: 100, result: { text: r.text, lintWarning: r.lintWarning ?? null }, finished_at: nowISO() }).eq("id", jobId);
       await notifyUser(a, userId, { type: "job_done", title: `Draft ready — ${title}`, body: "Open the complaint to review, edit and print it.", link, entityType: "complaint", entityId: input.complaintId });
+      // The generated letter is fresh correspondence — re-run the advisor so its
+      // next-step reasoning reflects what we just sent. We're already inside an
+      // after() background context, so call the engine DIRECTLY (never nest
+      // triggerAdvisorAnalysis, whose own after() wouldn't fire here).
+      await runAdvisorAnalysis(a, input.complaintId).catch(() => {});
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Generation failed";
       await a.from("background_jobs").update({ status: "failed", error: msg, finished_at: nowISO() }).eq("id", jobId).then(() => {}, () => {});

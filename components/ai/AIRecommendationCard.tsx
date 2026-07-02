@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles, Loader2, AlertTriangle, ArrowRight, Bell, Gavel, MessageSquareReply,
-  Camera, CircleCheck, Clock, Search,
+  Camera, CircleCheck, Clock, Search, HelpCircle, ListChecks,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { startAiDraftJob, getJobAction } from "@/lib/actions/jobs";
@@ -19,6 +19,7 @@ const ACTION_META: Record<
   generate_reminder: { icon: Bell, buttonLabel: "Generate reminder letter" },
   escalate: { icon: Gavel, buttonLabel: "Draft escalation letter" },
   counter_reply: { icon: MessageSquareReply, buttonLabel: "Draft counter-reply" },
+  request_clarification: { icon: HelpCircle, buttonLabel: "Draft clarification request" },
   upload_evidence: { icon: Camera, buttonLabel: "Go to documents" },
   review: { icon: Search, buttonLabel: "Review documents" },
   close: { icon: CircleCheck, buttonLabel: "Go to case overview" },
@@ -58,7 +59,12 @@ export function AIRecommendationCard({
       return;
     }
 
-    const kind = action === "generate_reminder" ? "reminder_email" : action === "escalate" ? "escalation_letter" : action === "counter_reply" ? "counter_reply" : null;
+    const kind =
+      action === "generate_reminder" ? "reminder_email"
+      : action === "escalate" ? "escalation_letter"
+      : action === "counter_reply" ? "counter_reply"
+      : action === "request_clarification" ? "clarification_request"
+      : null;
     if (!kind) return;
 
     setBusy(true);
@@ -129,7 +135,10 @@ export function AIRecommendationCard({
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wide text-primary">Recommendation</p>
             {recommendation.confidence && (
-              <span className="text-[10px] font-semibold text-muted-foreground">{recommendation.confidence} confidence</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">
+                {recommendation.confidence}
+                {typeof recommendation.confidence_score === "number" ? ` · ${recommendation.confidence_score}%` : ""} confidence
+              </span>
             )}
           </div>
           <p className="text-sm font-semibold">{recommendation.recommendation}</p>
@@ -141,6 +150,32 @@ export function AIRecommendationCard({
         <div className="space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Expected outcome</p>
           <p className="text-xs text-muted-foreground">{recommendation.expected_outcome}</p>
+        </div>
+      )}
+
+      {recommendation?.outstanding_issues && recommendation.outstanding_issues.length > 0 && (
+        <div className="space-y-1">
+          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <ListChecks className="h-3 w-3" /> Outstanding issues
+          </p>
+          <ul className="space-y-1">
+            {recommendation.outstanding_issues.map((o, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-xs">
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                    o.status === "answered"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      : o.status === "partial"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                        : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                  }`}
+                >
+                  {o.status}
+                </span>
+                <span className="text-foreground/90">{o.issue}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

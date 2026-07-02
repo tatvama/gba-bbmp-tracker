@@ -195,6 +195,9 @@ export function buildComplaintDraftPrompt(input: {
     counter_reply:
       "Respond POINT-BY-POINT to the department's latest reply in the case history. For each original demand, state whether the reply addressed it; list the specific demands and records that remain UNADDRESSED; demand the specific records named in the forensic findings; and reserve escalation if a complete response is not received within a stated period. " +
       CAUTION,
+    clarification_request:
+      "Write a short, courteous letter asking the department to CLARIFY specific points that its reply left ambiguous or incomplete — where the response was given but is unclear, internally inconsistent, or does not squarely answer what was asked. List each point needing clarification as a numbered, specific question tied to the case history; do NOT re-argue settled points or make new demands. This is a request for clarity, not an escalation. " +
+      CAUTION,
   };
   const extra = extraByKind[input.kind] ?? "";
   return {

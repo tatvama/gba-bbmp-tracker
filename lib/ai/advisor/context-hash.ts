@@ -27,6 +27,9 @@ export function computeContextHash(ctx: AdvisorContext): string {
     actions: { count: ctx.actions.length, lastId: lastId(ctx.actions) },
     escalations: { count: ctx.escalations.length, lastId: lastId(ctx.escalations) },
     documents: { count: ctx.documents.length, lastId: lastId(ctx.documents) },
+    // Our own generated correspondence — a newly-saved counter-reply/reminder/
+    // escalation letter must re-trigger the deep pass, so it belongs in the hash.
+    aiDrafts: { count: ctx.aiDrafts.length, lastId: lastId(ctx.aiDrafts) },
     reminders: {
       count: ctx.reminders.length,
       pending: ctx.reminders.filter((r) => r.status === "Pending").length,
