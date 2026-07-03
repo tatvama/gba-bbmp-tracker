@@ -8,6 +8,7 @@ import { stagedPathFor, stagedSize } from "@/lib/import-queue/staging";
 import { kickImportWorker } from "@/lib/import-queue/worker";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**

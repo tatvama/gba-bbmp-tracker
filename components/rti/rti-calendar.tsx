@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   CalendarClock,
   AlertTriangle,
@@ -13,16 +14,14 @@ import {
   FileText,
   MapPin,
   Building2,
-  Calendar,
+  Calendar as CalendarIcon,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
-  Folder,
-  Construction,
-  Droplet,
-  Trash2,
-  Lightbulb,
-  Briefcase
+  TrendingUp,
+  Inbox,
+  Sparkles,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,38 +63,52 @@ export function RtiCalendar({
       .sort((a, b) => (a.active!.due < b.active!.due ? -1 : 1));
   }, [rtis, now, rules]);
 
-  // Summary counts
+  // Executive summary counts
   const overdueCount = React.useMemo(
     () => allItems.filter((x) => x.days !== null && x.days < 0).length,
-    [allItems],
+    [allItems]
+  );
+  const dueTodayCount = React.useMemo(
+    () => allItems.filter((x) => x.days === 0).length,
+    [allItems]
   );
   const dueThisWeekCount = React.useMemo(
     () => allItems.filter((x) => x.days !== null && x.days >= 0 && x.days <= 7).length,
-    [allItems],
+    [allItems]
   );
   const upcomingCount = React.useMemo(
     () => allItems.filter((x) => x.days !== null && x.days > 7).length,
-    [allItems],
+    [allItems]
+  );
+  const repliesCount = React.useMemo(
+    () => allItems.filter((x) => x.active!.label.toUpperCase().includes("REPLY")).length,
+    [allItems]
   );
   const firstAppealsCount = React.useMemo(
     () => allItems.filter((x) => x.active!.label.toUpperCase().includes("FIRST APPEAL")).length,
-    [allItems],
+    [allItems]
   );
   const secondAppealsCount = React.useMemo(
     () => allItems.filter((x) => x.active!.label.toUpperCase().includes("SECOND APPEAL")).length,
-    [allItems],
+    [allItems]
+  );
+  const appealsCount = firstAppealsCount + secondAppealsCount;
+  const urgentCount = React.useMemo(
+    () => allItems.filter((x) => x.rti.priority === "Urgent" || x.rti.is_life_liberty).length,
+    [allItems]
   );
 
-  // Filter items based on header quick filters
+  // Filter items based on active quick filter tab
   const quickFilteredItems = React.useMemo(() => {
     return allItems.filter((x) => {
       if (activeFilter === "all") return true;
       if (activeFilter === "overdue") return x.days !== null && x.days < 0;
+      if (activeFilter === "today") return x.days === 0;
       if (activeFilter === "due-week") return x.days !== null && x.days >= 0 && x.days <= 7;
       if (activeFilter === "reply") return x.active!.label.toUpperCase().includes("REPLY");
-      if (activeFilter === "first-appeal") return x.active!.label.toUpperCase().includes("FIRST APPEAL");
+      if (activeFilter === "appeals") return x.active!.label.toUpperCase().includes("APPEAL");
       if (activeFilter === "second-appeal") return x.active!.label.toUpperCase().includes("SECOND APPEAL");
-      if (activeFilter === "life-liberty") return x.rti.priority === "Urgent";
+      if (activeFilter === "life-liberty") return x.rti.priority === "Urgent" || x.rti.is_life_liberty;
       return true;
     });
   }, [allItems, activeFilter]);
@@ -179,359 +192,467 @@ export function RtiCalendar({
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [finalDisplayItems]);
 
+  // Redesigned empty states with high visual fidelity
+  const renderEmptyState = (title: string, description: string, icon: React.ReactNode) => {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800/80 rounded-xl bg-slate-50/20 dark:bg-slate-900/10 transition-all duration-300">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 mb-3 shadow-xs">
+          {icon}
+        </div>
+        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+          {title}
+        </h4>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-sm leading-relaxed font-medium">
+          {description}
+        </p>
+        <div className="mt-4 flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedDate(null);
+              router.refresh();
+            }}
+            className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900"
+          >
+            Refresh Calendar
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const filterChips = [
-    { id: "all", label: "All Deadlines", count: allItems.length },
+    { id: "all", label: "All", count: allItems.length },
     { id: "overdue", label: "Overdue", count: overdueCount },
-    { id: "due-week", label: "Due This Week", count: dueThisWeekCount },
-    { id: "reply", label: "Replies", count: allItems.filter(x => x.active!.label.toUpperCase().includes("REPLY")).length },
-    { id: "first-appeal", label: "First Appeal", count: firstAppealsCount },
-    { id: "second-appeal", label: "Second Appeal", count: secondAppealsCount },
-    { id: "life-liberty", label: "Life & Liberty", count: allItems.filter(x => x.rti.priority === "Urgent").length },
+    { id: "today", label: "Today", count: dueTodayCount },
+    { id: "due-week", label: "This Week", count: dueThisWeekCount },
+    { id: "reply", label: "Replies", count: repliesCount },
+    { id: "appeals", label: "Appeals", count: appealsCount },
+    { id: "second-appeal", label: "2nd Appeal", count: secondAppealsCount },
+    { id: "life-liberty", label: "Life & Liberty", count: urgentCount },
   ];
 
+  // Animation variants
+  const metricsContainerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const metricItemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { type: "spring" as const, stiffness: 100, damping: 15 }
+    }
+  };
+
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* 1. DASHBOARD SUMMARY BAR */}
-      <div className="grid gap-2.5 sm:gap-3.5 grid-cols-2 md:grid-cols-5 no-print">
-        {/* Overdue */}
-        <div className="p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between h-20 md:h-24 border-t-2 border-t-rose-500 hover:shadow-sm hover:scale-[1.01] transition-all duration-150">
-          <div className="flex items-center justify-between gap-1.5 text-rose-600">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">Overdue</span>
-            <AlertTriangle className="h-3.5 w-3.5 md:h-4.5 md:w-4.5" />
+    <div className="space-y-6">
+      {/* 1. EXECUTIVE SUMMARY BANNER */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="rounded-2xl border border-border bg-gradient-to-r from-card via-card to-primary/[0.015] p-6 shadow-2xs space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-primary" /> Compliance Deadline Overview
+            </h2>
+            <p className="text-sm text-foreground/80 leading-relaxed font-semibold">
+              Currently monitoring statutory SLA limits for <strong className="text-primary font-black">{rtis.length}</strong> active filings. 
+              Review priority actions below categorized by urgency and date context.
+            </p>
           </div>
-          <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+          {/* Summary badging */}
+          <div className="flex flex-wrap gap-2 text-xs font-bold shrink-0">
+            <span className="bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 px-2.5 py-1 rounded border border-rose-100 dark:border-rose-900/50">
+              {overdueCount} Overdue
+            </span>
+            <span className="bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 px-2.5 py-1 rounded border border-purple-100 dark:border-purple-900/50">
+              {appealsCount} Appeals
+            </span>
+            <span className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded border border-amber-100 dark:border-amber-900/50">
+              {dueTodayCount} Due Today
+            </span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 2. DEADLINE KPI OVERVIEW */}
+      <motion.div
+        variants={metricsContainerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-5 no-print"
+      >
+        {/* Overdue */}
+        <motion.button
+          variants={metricItemVariants}
+          onClick={() => { setActiveFilter("overdue"); setSelectedDate(null); }}
+          className="text-left p-3.5 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-rose-400 dark:hover:border-rose-800 hover:shadow-xs transition-all duration-200 flex flex-col justify-between h-24 cursor-pointer relative overflow-hidden border-t-2 border-t-rose-500"
+        >
+          <div className="flex items-center justify-between gap-1.5 w-full">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Overdue</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0">
+              <AlertTriangle className="h-3.5 w-3.5" />
+            </div>
+          </div>
+          <span className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {overdueCount}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-rose-600 dark:text-rose-400">
-            Action needed
+          <span className="text-[9.5px] font-bold text-rose-600 dark:text-rose-400/90 leading-none">
+            Statutes Breached
           </span>
-        </div>
+        </motion.button>
+
+        {/* Due Today */}
+        <motion.button
+          variants={metricItemVariants}
+          onClick={() => { setActiveFilter("today"); setSelectedDate(null); }}
+          className="text-left p-3.5 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-amber-400 dark:hover:border-amber-800 hover:shadow-xs transition-all duration-200 flex flex-col justify-between h-24 cursor-pointer relative overflow-hidden border-t-2 border-t-amber-500"
+        >
+          <div className="flex items-center justify-between gap-1.5 w-full">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Due Today</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock className="h-3.5 w-3.5" />
+            </div>
+          </div>
+          <span className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+            {dueTodayCount}
+          </span>
+          <span className="text-[9.5px] font-bold text-amber-600 dark:text-amber-500/90 leading-none">
+            Action Required
+          </span>
+        </motion.button>
 
         {/* Due This Week */}
-        <div className="p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between h-20 md:h-24 border-t-2 border-t-amber-500 hover:shadow-sm hover:scale-[1.01] transition-all duration-150">
-          <div className="flex items-center justify-between gap-1.5 text-amber-600">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">Due This Week</span>
-            <Clock className="h-3.5 w-3.5 md:h-4.5 md:w-4.5" />
+        <motion.button
+          variants={metricItemVariants}
+          onClick={() => { setActiveFilter("due-week"); setSelectedDate(null); }}
+          className="text-left p-3.5 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-amber-400 dark:hover:border-amber-800 hover:shadow-xs transition-all duration-200 flex flex-col justify-between h-24 cursor-pointer relative overflow-hidden border-t-2 border-t-amber-500"
+        >
+          <div className="flex items-center justify-between gap-1.5 w-full">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">This Week</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock className="h-3.5 w-3.5" />
+            </div>
           </div>
-          <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+          <span className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {dueThisWeekCount}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-amber-600 dark:text-amber-500">
-            Requires attention
+          <span className="text-[9.5px] font-bold text-amber-600 dark:text-amber-500/90 leading-none">
+            Next 7 Days
           </span>
-        </div>
+        </motion.button>
 
-        {/* Upcoming */}
-        <div className="p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between h-20 md:h-24 border-t-2 border-t-emerald-500 hover:shadow-sm hover:scale-[1.01] transition-all duration-150">
-          <div className="flex items-center justify-between gap-1.5 text-emerald-600">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">Upcoming</span>
-            <Calendar className="h-3.5 w-3.5 md:h-4.5 md:w-4.5" />
+        {/* Appeals */}
+        <motion.button
+          variants={metricItemVariants}
+          onClick={() => { setActiveFilter("appeals"); setSelectedDate(null); }}
+          className="text-left p-3.5 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-purple-500 dark:hover:border-purple-800 hover:shadow-xs transition-all duration-200 flex flex-col justify-between h-24 cursor-pointer relative overflow-hidden border-t-2 border-t-purple-500"
+        >
+          <div className="flex items-center justify-between gap-1.5 w-full">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Appeals</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">
+              <Scale className="h-3.5 w-3.5" />
+            </div>
           </div>
-          <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
-            {upcomingCount}
+          <span className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+            {appealsCount}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-emerald-600 dark:text-emerald-500">
-            Within timeline
+          <span className="text-[9.5px] font-bold text-purple-600 dark:text-purple-400/90 leading-none">
+            FAA & Commission
           </span>
-        </div>
+        </motion.button>
 
-        {/* First Appeals */}
-        <div className="p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between h-20 md:h-24 border-t-2 border-t-purple-500 hover:shadow-sm hover:scale-[1.01] transition-all duration-150">
-          <div className="flex items-center justify-between gap-1.5 text-purple-600">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">1st Appeals</span>
-            <Scale className="h-3.5 w-3.5 md:h-4.5 md:w-4.5" />
+        {/* Life & Liberty */}
+        <motion.button
+          variants={metricItemVariants}
+          onClick={() => { setActiveFilter("life-liberty"); setSelectedDate(null); }}
+          className="text-left p-3.5 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-rose-500 dark:hover:border-rose-800 hover:shadow-xs transition-all duration-200 flex flex-col justify-between h-24 cursor-pointer relative overflow-hidden border-t-2 border-t-rose-500"
+        >
+          <div className="flex items-center justify-between gap-1.5 w-full">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Urgent</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0">
+              <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+            </div>
           </div>
-          <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
-            {firstAppealsCount}
+          <span className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+            {urgentCount}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-purple-600 dark:text-purple-400">
-            FAA Level
+          <span className="text-[9.5px] font-bold text-rose-600 dark:text-rose-400/90 leading-none">
+            Life / Liberty cases
           </span>
-        </div>
+        </motion.button>
+      </motion.div>
 
-        {/* Second Appeals */}
-        <div className="p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between h-20 md:h-24 border-t-2 border-t-purple-500 hover:shadow-sm hover:scale-[1.01] transition-all duration-150">
-          <div className="flex items-center justify-between gap-1.5 text-purple-600">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">2nd Appeals</span>
-            <Building className="h-3.5 w-3.5 md:h-4.5 md:w-4.5" />
-          </div>
-          <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
-            {secondAppealsCount}
-          </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-purple-600 dark:text-purple-400">
-            Commission Level
-          </span>
-        </div>
-      </div>
-
-      {/* 2. QUICK FILTER CHIPS */}
-      <div className="flex flex-wrap gap-1.5 sm:gap-2 no-print border-b border-slate-200/60 dark:border-slate-800/60 pb-3">
-        {filterChips.map((chip) => (
-          <button
-            key={chip.id}
-            onClick={() => {
-              setActiveFilter(chip.id);
-              setSelectedDate(null); // clear date filter on chip toggle
-            }}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-3 h-11 sm:h-8.5 text-xs font-semibold rounded-lg border transition-all duration-155 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-800 hover:scale-[1.01] active:scale-[0.99]",
-              activeFilter === chip.id
-                ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900 shadow-sm"
-                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800",
-            )}
-          >
-            <span>{chip.label}</span>
-            <span
+      {/* 3. QUICK TIMELINE FILTERS */}
+      <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-none pb-2 no-print border-b border-slate-200/60 dark:border-slate-800/60">
+        <div className="flex items-center bg-slate-100/70 dark:bg-slate-950/50 p-0.5 rounded-xl border dark:border-slate-800/80">
+          {filterChips.map((chip) => (
+            <button
+              key={chip.id}
+              onClick={() => {
+                setActiveFilter(chip.id);
+                setSelectedDate(null); // clear date filter on chip toggle
+              }}
               className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded-md font-bold shrink-0",
+                "px-3 py-1.5 rounded-lg text-xs transition-all duration-200 cursor-pointer font-bold flex items-center gap-1.5",
                 activeFilter === chip.id
-                  ? "bg-white/20 text-white dark:bg-slate-900/10 dark:text-slate-900"
-                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                  ? "bg-white dark:bg-slate-800 text-foreground shadow-xs border dark:border-slate-700/60"
+                  : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               )}
             >
-              {chip.count}
-            </span>
-          </button>
-        ))}
+              <span>{chip.label}</span>
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded-md font-extrabold",
+                activeFilter === chip.id
+                  ? "bg-primary/10 text-primary"
+                  : "bg-slate-200/60 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              )}>
+                {chip.count}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* 3. CALENDAR + LIST SPLIT VIEW */}
-      <div className="grid gap-6 md:grid-cols-[320px_1fr] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-5 shadow-xs">
+      {/* 4. TODAY'S PRIORITY PANEL */}
+      <div className="bg-slate-50/50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800/80 no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-bold">
+        <div className="flex items-center gap-2 flex-wrap text-foreground/80">
+          <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" /> Urgent Tasklist Summary:</span>
+          <span className="flex items-center gap-1.5 bg-rose-500/10 text-rose-600 px-2 py-0.5 rounded-md border border-rose-200/40 dark:bg-rose-500/20 dark:text-rose-400"><AlertTriangle className="h-3 w-3" /> {overdueCount} Critical Overdue</span>
+          <span className="flex items-center gap-1.5 bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-md border border-amber-200/40 dark:bg-amber-500/20 dark:text-amber-400"><Clock className="h-3 w-3" /> {dueTodayCount} Due Today</span>
+          <span className="flex items-center gap-1.5 bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-md border border-blue-200/40 dark:bg-blue-500/20 dark:text-blue-400"><FileText className="h-3 w-3" /> {repliesCount} Awaiting Reply</span>
+          <span className="flex items-center gap-1.5 bg-purple-500/10 text-purple-600 px-2 py-0.5 rounded-md border border-purple-200/40 dark:bg-purple-500/20 dark:text-purple-400"><Scale className="h-3 w-3" /> {firstAppealsCount} First Appeal</span>
+        </div>
+        {selectedDate && (
+          <Button
+            variant="link"
+            size="sm"
+            onClick={() => setSelectedDate(null)}
+            className="h-6 text-[11px] font-bold text-primary p-0"
+          >
+            Clear Selected Date filter
+          </Button>
+        )}
+      </div>
+
+      {/* 5. CALENDAR + AGENDA WORKSPACE (Responsive layouts) */}
+      <div className="grid gap-6 md:grid-cols-[280px_1fr] lg:grid-cols-[300px_1fr]">
         
-        {/* Left Column: Custom Grid Calendar */}
-        <div className="space-y-4 md:pr-4 md:border-r border-slate-100 dark:border-slate-800 select-none">
-          
-          {/* Calendar Header Controls */}
-          <div className="flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800 pb-2">
-            {/* Mobile Title View: Combined Month + Year */}
-            <h3 className="md:hidden text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-200 pl-1 capitalize">
-              {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </h3>
-
-            {/* Desktop selectors view */}
-            <div className="hidden md:flex items-center gap-1 min-w-0">
-              {/* Month Select */}
-              <Select
-                value={String(month)}
-                onValueChange={(val) => {
-                  const m = parseInt(val || "", 10);
-                  if (!isNaN(m)) {
-                    setCurrentDate(new Date(year, m, 1));
-                    setSelectedDate(null);
-                  }
-                }}
-              >
-                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-1.5 text-sm font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0">
-                  <SelectValue>{currentDate.toLocaleDateString("en-US", { month: "long" })}</SelectValue>
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const optDate = new Date(2000, i, 1);
-                    const label = optDate.toLocaleDateString("en-US", { month: "long" });
-                    return (
-                      <SelectItem key={i} value={String(i)}>
-                        {label}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-
-              {/* Year Select */}
-              <Select
-                value={String(year)}
-                onValueChange={(val) => {
-                  const y = parseInt(val || "", 10);
-                  if (!isNaN(y)) {
-                    setCurrentDate(new Date(y, month, 1));
-                    setSelectedDate(null);
-                  }
-                }}
-              >
-                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-1 text-sm font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0">
-                  <SelectValue>{year}</SelectValue>
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {Array.from({ length: 16 }, (_, i) => {
-                    const optYear = new Date().getFullYear() - 5 + i;
-                    return (
-                      <SelectItem key={optYear} value={String(optYear)}>
-                        {optYear}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Navigation buttons: enlarged on mobile for 44px touch targets */}
-            <div className="flex items-center gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={prevMonth}
-                className="h-11 w-11 md:h-8 md:w-8 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-                aria-label="Previous month"
-              >
-                <ChevronLeft className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={nextMonth}
-                className="h-11 w-11 md:h-8 md:w-8 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-                aria-label="Next month"
-              >
-                <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Weekday Columns Labels */}
-          <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-1">
-            <span>S</span>
-            <span>M</span>
-            <span>T</span>
-            <span>W</span>
-            <span>T</span>
-            <span>F</span>
-            <span>S</span>
-          </div>
-
-          {/* Grid Cells */}
-          <div className="grid grid-cols-7 gap-y-1 sm:gap-y-1.5 justify-items-center">
-            {cells.map((day, idx) => {
-              if (day === null) {
-                return <div key={`empty-${idx}`} className="h-9 w-9" />;
-              }
-
-              const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const hasDeadlines = deadlinesByDate.has(dateStr);
-              
-              const dayIsSelected = selectedDate &&
-                selectedDate.getFullYear() === year &&
-                selectedDate.getMonth() === month &&
-                selectedDate.getDate() === day;
-
-              const isToday = now.getDate() === day &&
-                now.getMonth() === month &&
-                now.getFullYear() === year;
-
-              return (
-                <button
-                  key={`day-${day}`}
-                  type="button"
-                  onClick={() => {
-                    const clicked = new Date(year, month, day);
-                    if (selectedDate && selectedDate.toDateString() === clicked.toDateString()) {
+        {/* Left Column: Compact navigation calendar widget */}
+        <div className="space-y-4 md:pr-4 md:border-r border-slate-100 dark:border-slate-800 select-none no-print">
+          <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900/40 p-4 space-y-4 shadow-2xs">
+            {/* Calendar Header Month selectors */}
+            <div className="flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800/60 pb-2">
+              <div className="flex items-center gap-1 min-w-0">
+                <Select
+                  value={String(month)}
+                  onValueChange={(val) => {
+                    const m = parseInt(val || "", 10);
+                    if (!isNaN(m)) {
+                      setCurrentDate(new Date(year, m, 1));
                       setSelectedDate(null);
-                    } else {
-                      setSelectedDate(clicked);
                     }
                   }}
-                  className="h-9 w-9 flex items-center justify-center rounded-full text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 cursor-pointer relative"
-                  aria-label={`${dayIsSelected ? 'Selected day ' : ''}${day} ${currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`}
                 >
-                  <span
-                    className={cn(
-                      "h-8 w-8 flex items-center justify-center rounded-full transition-all duration-150 relative",
-                      dayIsSelected
-                        ? "bg-blue-600 text-white dark:bg-blue-500 dark:text-slate-900 font-extrabold shadow-sm scale-105"
-                        : hasDeadlines
-                        ? "border border-slate-300 text-slate-900 bg-slate-50/50 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 font-bold"
-                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800",
-                      isToday && !dayIsSelected && "ring-2 ring-primary ring-offset-1 dark:ring-offset-slate-900"
-                    )}
-                  >
-                    {day}
-                    {hasDeadlines && !dayIsSelected && (
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-blue-600 dark:bg-blue-400" />
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-1.5 text-xs font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0">
+                    <SelectValue>{currentDate.toLocaleDateString("en-US", { month: "long" })}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[250px]">
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const optDate = new Date(2000, i, 1);
+                      return (
+                        <SelectItem key={i} value={String(i)} className="text-xs">
+                          {optDate.toLocaleDateString("en-US", { month: "long" })}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
 
-          {/* Selection indicator message */}
-          {selectedDate && (
-            <div className="pt-2 text-center">
-              <Button
-                variant="link"
-                size="sm"
-                className="text-[11px] font-bold text-blue-600 h-6 px-2 hover:text-blue-700 cursor-pointer"
-                onClick={() => setSelectedDate(null)}
-              >
-                Clear Day Selection
-              </Button>
+                <Select
+                  value={String(year)}
+                  onValueChange={(val) => {
+                    const y = parseInt(val || "", 10);
+                    if (!isNaN(y)) {
+                      setCurrentDate(new Date(y, month, 1));
+                      setSelectedDate(null);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-1 text-xs font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0">
+                    <SelectValue>{year}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[250px]">
+                    {Array.from({ length: 16 }, (_, i) => {
+                      const optYear = new Date().getFullYear() - 5 + i;
+                      return (
+                        <SelectItem key={optYear} value={String(optYear)} className="text-xs">
+                          {optYear}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Prev / Next controls */}
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={prevMonth}
+                  className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md cursor-pointer"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft className="h-4 w-4 text-slate-500" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={nextMonth}
+                  className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md cursor-pointer"
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="h-4 w-4 text-slate-500" />
+                </Button>
+              </div>
             </div>
-          )}
+
+            {/* Weekday Columns Labels */}
+            <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-1">
+              <span>S</span>
+              <span>M</span>
+              <span>T</span>
+              <span>W</span>
+              <span>T</span>
+              <span>F</span>
+              <span>S</span>
+            </div>
+
+            {/* Cells */}
+            <div className="grid grid-cols-7 gap-y-1 justify-items-center">
+              {cells.map((day, idx) => {
+                if (day === null) {
+                  return <div key={`empty-${idx}`} className="h-8 w-8" />;
+                }
+
+                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const dayDeadlines = deadlinesByDate.get(dateStr) || [];
+                const hasDeadlines = dayDeadlines.length > 0;
+                
+                const hasOverdue = dayDeadlines.some(x => x.days !== null && x.days < 0);
+                const hasAppeals = dayDeadlines.some(x => x.active!.label.toUpperCase().includes("APPEAL"));
+
+                const dayIsSelected = selectedDate &&
+                  selectedDate.getFullYear() === year &&
+                  selectedDate.getMonth() === month &&
+                  selectedDate.getDate() === day;
+
+                const isToday = now.getDate() === day &&
+                  now.getMonth() === month &&
+                  now.getFullYear() === year;
+
+                return (
+                  <button
+                    key={`day-${day}`}
+                    type="button"
+                    onClick={() => {
+                      const clicked = new Date(year, month, day);
+                      if (selectedDate && selectedDate.toDateString() === clicked.toDateString()) {
+                        setSelectedDate(null);
+                      } else {
+                        setSelectedDate(clicked);
+                      }
+                    }}
+                    className="h-8 w-8 flex items-center justify-center rounded-full text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 cursor-pointer relative"
+                  >
+                    <span
+                      className={cn(
+                        "h-7 w-7 flex items-center justify-center rounded-full transition-all duration-150 relative",
+                        dayIsSelected
+                          ? "bg-primary text-primary-foreground font-black shadow-sm scale-105"
+                          : isToday
+                          ? "ring-2 ring-primary ring-offset-1 dark:ring-offset-slate-900 font-bold"
+                          : hasDeadlines
+                          ? "border border-slate-300 dark:border-slate-700 bg-slate-50/20 text-slate-800 dark:text-slate-100 font-bold"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800",
+                      )}
+                    >
+                      {day}
+                      {/* Indication Dot triggers */}
+                      {hasDeadlines && !dayIsSelected && (
+                        <span className={cn(
+                          "absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full",
+                          hasOverdue ? "bg-rose-500 animate-pulse" : hasAppeals ? "bg-purple-500" : "bg-blue-500"
+                        )} />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Right Column: Deadlines Timeline */}
+        {/* Right Column: Deadlines Timeline Agenda Workspace */}
         <div className="space-y-4 min-w-0">
-          <div className="flex items-center justify-between border-b pb-2 dark:border-slate-800">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <CalendarClock className="h-4 w-4 shrink-0" />
+          <div className="flex items-center justify-between border-b pb-2.5 dark:border-slate-800">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 shrink-0 text-slate-400" />
               {selectedDate ? (
-                <span>Deadlines for {formatDate(selectedDate.toISOString().slice(0, 10))}</span>
+                <span>Deadlines: {formatDate(selectedDate.toISOString().slice(0, 10))}</span>
               ) : (
-                <span>Deadlines in {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+                <span>Agenda: {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
               )}
             </h4>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border dark:border-slate-700">
-              {finalDisplayItems.length} {finalDisplayItems.length === 1 ? "deadline" : "deadlines"}
+              {finalDisplayItems.length} {finalDisplayItems.length === 1 ? "action item" : "action items"}
             </span>
           </div>
 
           {finalDisplayItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/20 dark:bg-slate-900/10">
-              <CalendarClock className="h-10 w-10 text-slate-300 dark:text-slate-600 mb-3 animate-pulse" />
-              <h5 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                No Deadlines Scheduled
-              </h5>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs leading-normal">
-                {selectedDate 
-                  ? "There are no statutory deadlines scheduled for this specific day."
-                  : `There are no deadlines scheduled in ${currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}.`
-                }
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSelectedDate(null);
-                  router.refresh();
-                }}
-                className="mt-4 h-9 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-800"
-              >
-                Refresh Calendars
-              </Button>
-            </div>
+            renderEmptyState(
+              "No Scheduled Deadlines",
+              selectedDate 
+                ? "There are no statutory deadlines scheduled for this specific day."
+                : `There are no deadlines scheduled in ${currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}.`,
+              <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+            )
           ) : (
-            <div className="relative border-l border-slate-200/50 dark:border-slate-800/50 ml-4 pl-6 space-y-5 py-2">
+            /* Agenda Timeline style list */
+            <div className="relative border-l border-slate-200 dark:border-slate-800/80 ml-3 pl-5 space-y-6 py-2">
               {displayedGroups.map(([date, group]) => {
                 const dateObj = new Date(date);
                 const dayName = dateObj.toLocaleDateString("en-US", { weekday: "long" });
                 return (
                   <div key={date} className="relative space-y-3">
-                    {/* Timeline Dot */}
-                    <div className="absolute -left-[31px] top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-950 dark:bg-slate-800">
-                      <div className="h-2 w-2 rounded-full bg-primary" />
+                    {/* Connective Timeline Circle Dot */}
+                    <div className="absolute -left-[27.5px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 shadow-2xs">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary" />
                     </div>
 
-                    {/* Group Date Header */}
+                    {/* Timeline Date labels */}
                     <div className="flex flex-wrap items-baseline gap-2">
                       <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
                         {formatDate(date)}
                       </h3>
-                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         {dayName}
                       </span>
                     </div>
 
-                    {/* Group Cards List */}
+                    {/* Timeline Cards Container */}
                     <div className="space-y-3 pl-0.5">
                       {group.map(({ rti, active, days }) => {
                         let borderCls = "border-l-4 border-l-blue-500";
@@ -547,29 +668,29 @@ export function RtiCalendar({
                           <Card
                             key={rti.id}
                             className={cn(
-                              "overflow-hidden border border-slate-200 bg-white shadow-xs rounded-xl hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 transition-all duration-200 group hover:shadow-2xs",
+                              "overflow-hidden border border-slate-200 bg-white shadow-3xs rounded-xl hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700/80 transition-all duration-200 group hover:shadow-2xs",
                               borderCls,
                             )}
                           >
-                            <CardContent className="p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                              {/* Document details */}
-                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                <div className="mt-0.5 shrink-0 flex h-7.5 w-7.5 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                            <CardContent className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                              {/* Document Details Block */}
+                              <div className="flex items-start gap-3 min-w-0 flex-1">
+                                <div className="mt-0.5 shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shadow-3xs">
                                   <FileText className="h-4 w-4" />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <Link href={`/rti/${rti.id}`}>
-                                    <p className="font-bold text-sm text-slate-800 dark:text-slate-200 group-hover:text-primary transition-colors leading-snug line-clamp-2 cursor-pointer">
+                                    <p className="font-bold text-sm text-foreground/90 dark:text-slate-100 group-hover:text-primary transition-colors leading-snug line-clamp-1 cursor-pointer">
                                       {rti.subject}
                                     </p>
                                   </Link>
-                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-500">
-                                    <span className="font-mono">{rti.internal_ref ?? "—"}</span>
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                                    <span className="font-mono text-slate-500">{rti.internal_ref ?? "—"}</span>
                                     {rti.ward && (
                                       <>
                                         <span>•</span>
                                         <span className="flex items-center gap-0.5">
-                                          <MapPin className="h-3 w-3" />
+                                          <MapPin className="h-3 w-3 text-slate-400" />
                                           Ward {rti.ward.new_no}
                                         </span>
                                       </>
@@ -578,7 +699,7 @@ export function RtiCalendar({
                                       <>
                                         <span>•</span>
                                         <span className="flex items-center gap-0.5 truncate max-w-[140px] sm:max-w-[200px]">
-                                          <Building2 className="h-3 w-3" />
+                                          <Building2 className="h-3 w-3 text-slate-400" />
                                           {rti.public_authority}
                                         </span>
                                       </>
@@ -587,7 +708,7 @@ export function RtiCalendar({
                                 </div>
                               </div>
 
-                              {/* Status & Deadline Badges */}
+                              {/* Badging & Quick Detail actions */}
                               <div className="flex items-center justify-between lg:justify-end gap-2.5 pt-2 lg:pt-0 border-t border-slate-50 lg:border-t-0 dark:border-slate-800 mt-1 lg:mt-0 shrink-0">
                                 <div className="flex items-center gap-2">
                                   <RtiStatusBadge status={rti.status} />
@@ -597,7 +718,7 @@ export function RtiCalendar({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8.5 w-8.5 rounded-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity text-slate-400 hover:text-foreground dark:text-slate-500 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer"
+                                    className="h-8 w-8 rounded-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity text-slate-400 hover:text-primary dark:text-slate-500 dark:hover:text-primary flex items-center justify-center cursor-pointer"
                                     aria-label="View RTI details"
                                   >
                                     <ArrowRight className="h-4 w-4" />

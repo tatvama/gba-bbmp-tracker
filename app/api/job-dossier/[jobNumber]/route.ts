@@ -5,6 +5,7 @@ import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { getJobAudit, getJobDossier, getJobLinkedRtis } from "@/lib/queries";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const inr = (n: number | null | undefined) =>

@@ -48,11 +48,11 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Civic editorial palette (from reference design)
-        ink: "#1B2A4A",
-        amber: { DEFAULT: "#E0922F", dark: "#B5701A" },
-        teal: "#1F7A6E",
-        clay: "#9A8C7A",
+        // Civic editorial palette (from reference design) - modern premium tones
+        ink: "#0F172A",
+        amber: { DEFAULT: "#F59E0B", dark: "#B45309" },
+        teal: "#0D9488",
+        clay: "#64748B",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -87,11 +87,16 @@ const config: Config = {
           "0%": { left: "-35%" },
           "100%": { left: "100%" },
         },
+        "page-slide": {
+          from: { opacity: "0", transform: "translateY(4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "progress-slide": "progress-slide 1.4s ease-in-out infinite",
+        "page-slide": "page-slide 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
       },
     },
   },

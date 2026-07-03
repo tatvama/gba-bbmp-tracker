@@ -26,6 +26,7 @@ import {
 import { ContactCard } from "@/components/contacts/contact-card";
 import { VerificationBadge } from "@/components/badges";
 import { EmptyState } from "@/components/empty-state";
+import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { VERIFICATION_STATUSES, DESIGNATIONS } from "@/lib/constants";
 import { findDuplicates } from "@/lib/dedupe";
 import { formatPhone } from "@/lib/phone";
@@ -112,6 +113,24 @@ export function ContactDirectory({
     setMissingOnly(false);
   }
 
+  const filterPills = React.useMemo(() => {
+    const pills = [];
+    if (status !== "all") {
+      pills.push({ label: `Status: ${status.replace(/_/g, " ")}`, onRemove: () => setStatus("all") });
+    }
+    if (designation !== "all") {
+      pills.push({ label: `Designation: ${designation}`, onRemove: () => setDesignation("all") });
+    }
+    if (corp !== "all") {
+      const corpName = corps.find(([code]) => code === corp)?.[1] ?? corp;
+      pills.push({ label: `Corp: ${corpName}`, onRemove: () => setCorp("all") });
+    }
+    if (missingOnly) {
+      pills.push({ label: "Missing Details", onRemove: () => setMissingOnly(false) });
+    }
+    return pills;
+  }, [status, designation, corp, missingOnly, corps]);
+
   function doExport(format: "csv" | "xlsx") {
     exportRows(
       filtered.map((c) => ({
@@ -134,107 +153,125 @@ export function ContactDirectory({
   }
 
   return (
-    <div>
-      {/* Filter toolbar */}
-      <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
-        <Input
-          placeholder="Search name, phone, email…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="lg:max-w-xs"
-        />
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="lg:w-44">
-            <SelectValue placeholder="All statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            {VERIFICATION_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s.replace(/_/g, " ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={designation} onValueChange={setDesignation}>
-          <SelectTrigger className="lg:w-52">
-            <SelectValue placeholder="All designations" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All designations</SelectItem>
-            {DESIGNATIONS.map((d) => (
-              <SelectItem key={d} value={d}>
-                {d}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {corps.length > 0 && (
-          <Select value={corp} onValueChange={setCorp}>
-            <SelectTrigger className="lg:w-48">
-              <SelectValue placeholder="All corporations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All corporations</SelectItem>
-              {corps.map(([code, name]) => (
-                <SelectItem key={code} value={code}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="missing"
-            checked={missingOnly}
-            onCheckedChange={(v) => setMissingOnly(!!v)}
-          />
-          <Label htmlFor="missing" className="cursor-pointer text-sm">
-            Missing details only
-          </Label>
-        </div>
+    <div className="space-y-6">
+      {/* Integrated Action Toolbar */}
+      <FilterToolbar
+        searchPlaceholder="Search by name, designation, sub-division, email..."
+        searchValue={q}
+        onSearchChange={setQ}
+        actions={
+          <>
+            {/* Export dropdown */}
+            <div className="flex items-center border border-border/60 rounded-lg overflow-hidden bg-background">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => doExport("csv")}
+                className="h-8 rounded-none border-r border-border/60 px-3 font-semibold text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Download className="h-3.5 w-3.5 mr-1" /> CSV
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => doExport("xlsx")}
+                className="h-8 rounded-none px-3 font-semibold text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Download className="h-3.5 w-3.5 mr-1" /> XLSX
+              </Button>
+            </div>
 
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={resetFilters}
-            className="text-muted-foreground"
-          >
-            <X className="h-3.5 w-3.5" /> Clear
-          </Button>
-        )}
+            {/* View layout toggler */}
+            <div className="flex items-center border border-border/60 rounded-lg p-0.5 bg-muted/30">
+              <Button
+                variant={view === "cards" ? "secondary" : "ghost"}
+                size="icon-sm"
+                onClick={() => setView("cards")}
+                className="h-7 w-7 rounded-md"
+                aria-label="Card grid view"
+              >
+                <LayoutGrid className="h-3.5 w-3.5 text-foreground/80" />
+              </Button>
+              <Button
+                variant={view === "table" ? "secondary" : "ghost"}
+                size="icon-sm"
+                onClick={() => setView("table")}
+                className="h-7 w-7 rounded-md"
+                aria-label="Table directory view"
+              >
+                <TableIcon className="h-3.5 w-3.5 text-foreground/80" />
+              </Button>
+            </div>
+          </>
+        }
+        advancedFilters={
+          <div className="flex flex-col gap-3.5 sm:flex-row sm:flex-wrap sm:items-center w-full">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              {/* Status Selector */}
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-8 w-full sm:w-40 text-xs font-semibold">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {VERIFICATION_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-        <div className="flex items-center gap-2 lg:ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => doExport("csv")}
-          >
-            <Download className="h-4 w-4" /> CSV
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => doExport("xlsx")}
-          >
-            <Download className="h-4 w-4" /> XLSX
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setView(view === "cards" ? "table" : "cards")}
-            aria-label="Toggle view"
-          >
-            {view === "cards" ? (
-              <TableIcon className="h-4 w-4" />
-            ) : (
-              <LayoutGrid className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
+              {/* Designation Selector */}
+              <Select value={designation} onValueChange={setDesignation}>
+                <SelectTrigger className="h-8 w-full sm:w-48 text-xs font-semibold">
+                  <SelectValue placeholder="All Designations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Designations</SelectItem>
+                  {DESIGNATIONS.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Corporation Selector */}
+              {corps.length > 0 && (
+                <Select value={corp} onValueChange={setCorp}>
+                  <SelectTrigger className="h-8 w-full sm:w-44 text-xs font-semibold">
+                    <SelectValue placeholder="All Corporations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Corporations</SelectItem>
+                    {corps.map(([code, name]) => (
+                      <SelectItem key={code} value={code}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Duplicates / Missing Switch */}
+            <div className="flex items-center gap-2 sm:ml-auto">
+              <Checkbox
+                id="missing"
+                checked={missingOnly}
+                onCheckedChange={(v) => setMissingOnly(!!v)}
+                className="h-4 w-4 border-border/80"
+              />
+              <Label htmlFor="missing" className="cursor-pointer text-xs font-bold text-muted-foreground hover:text-foreground">
+                Missing Details Only
+              </Label>
+            </div>
+          </div>
+        }
+        filterPills={filterPills}
+        onClearAll={resetFilters}
+      />
 
       {/* Meta row */}
       <div className="mb-3 flex items-center gap-3 text-sm text-muted-foreground">
@@ -280,25 +317,15 @@ export function ContactDirectory({
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-xs">
           <Table className="data-table">
             <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Name
-                </TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Designation
-                </TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Sub-division
-                </TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Phone
-                </TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Status
-                </TableHead>
+              <TableRow className="bg-muted/15 border-b border-border/40 hover:bg-muted/15">
+                <TableHead>Name</TableHead>
+                <TableHead>Designation</TableHead>
+                <TableHead>Sub-division</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -306,24 +333,24 @@ export function ContactDirectory({
                 <TableRow
                   key={c.id}
                   className={
-                    dupeIds.has(c.id) ? "bg-destructive/5" : undefined
+                    dupeIds.has(c.id) ? "bg-destructive/[0.03] hover:bg-destructive/[0.05]" : undefined
                   }
                 >
                   <TableCell>
                     <a
                       href={`/contacts/${c.id}`}
-                      className="font-medium text-primary hover:underline"
+                      className="font-bold text-foreground/95 hover:text-primary transition-colors"
                     >
                       {c.full_name}
                     </a>
                   </TableCell>
-                  <TableCell className="text-sm text-foreground/80">
+                  <TableCell className="text-muted-foreground/95">
                     {c.designation}
                   </TableCell>
-                  <TableCell className="text-sm text-foreground/70">
+                  <TableCell className="text-muted-foreground/85">
                     {c.eng_subdivision?.name ?? "—"}
                   </TableCell>
-                  <TableCell className="tabular-nums text-sm">
+                  <TableCell className="tabular-nums text-foreground/80">
                     {c.phone ? formatPhone(c.phone) : "—"}
                   </TableCell>
                   <TableCell>

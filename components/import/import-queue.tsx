@@ -453,15 +453,15 @@ export function ImportQueue({
   const activeCount = ordered.filter((s) => ACTIVE_STATUSES.has(s.status)).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {error && (
-        <p className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50/70 p-3.5 text-xs font-semibold text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-400">
+        <p className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50/70 p-3.5 text-xs font-semibold text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-450">
           <AlertTriangle className="h-4.5 w-4.5 shrink-0" /> {error}
         </p>
       )}
 
       {/* Two Column Ingestion Hero Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left Column: Upload Workspace */}
         <div className="lg:col-span-2 space-y-4">
           <Card className="border border-border/80 shadow-2xs hover:shadow-xs transition-shadow rounded-xl overflow-hidden bg-card">
@@ -490,7 +490,7 @@ export function ImportQueue({
                   <span className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-250 block">
                     Drag &amp; Drop ZIP files or Complaint Letters
                   </span>
-                  <span className="text-xs text-slate-400 max-w-md block">
+                  <span className="text-xs text-slate-455 max-w-md block">
                     Supported formats: <strong className="text-slate-500 font-bold">ZIP, PDF, JPG, PNG</strong> · Max file size: <strong className="text-slate-500 font-bold">4 GB</strong>
                   </span>
                 </div>
@@ -541,7 +541,7 @@ export function ImportQueue({
               </div>
 
               {/* Bottom Ingest Stats Panel */}
-              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-850 pt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-850 pt-4 text-xs font-semibold text-slate-550 dark:text-slate-400">
                 <div className="flex items-center gap-4 flex-wrap">
                   <span className="flex items-center gap-1.5">
                     {live ? <Wifi className="h-3.5 w-3.5 text-emerald-500" /> : <WifiOff className="h-3.5 w-3.5 text-amber-500 animate-pulse" />}
@@ -549,18 +549,18 @@ export function ImportQueue({
                   </span>
                   <div className="h-3 w-px bg-slate-200 dark:bg-slate-800" />
                   <span className="flex items-center gap-1">
-                    <Activity className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Queue Status: {activeCount > 0 ? "Active Ingestion" : "Idle"}</span>
+                    <Activity className="h-3.5 w-3.5 text-slate-450" />
+                    <span>Queue: {activeCount > 0 ? "Active Ingestion" : "Idle"}</span>
                   </span>
                   <div className="h-3 w-px bg-slate-200 dark:bg-slate-800" />
                   <span className="flex items-center gap-1">
-                    <User className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Available Workers: 4 Online</span>
+                    <User className="h-3.5 w-3.5 text-slate-450" />
+                    <span>Workers: 4 Online</span>
                   </span>
                   <div className="h-3 w-px bg-slate-200 dark:bg-slate-800" />
                   <span className="flex items-center gap-1">
-                    <FolderArchive className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Storage Usage: 1.2 TB / 10 TB</span>
+                    <FolderArchive className="h-3.5 w-3.5 text-slate-450" />
+                    <span>Storage: 1.2 TB / 10 TB</span>
                   </span>
                 </div>
                 
@@ -627,32 +627,7 @@ export function ImportQueue({
             </CardContent>
           </Card>
 
-          {/* Card 3: Best Practices */}
-          <Card className="border border-border/80 shadow-2xs bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border/50 bg-slate-50/40 dark:bg-slate-900/30 flex items-center gap-2">
-              <Info className="h-4 w-4 text-slate-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Best Practices</span>
-            </div>
-            <CardContent className="p-4 space-y-2 text-xs font-medium text-slate-600 dark:text-slate-400">
-              <div className="flex items-start gap-2">
-                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>One job structure per ZIP archive</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>Include all related audit annexures together</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>Ensure scans are clean and readable for OCR engine</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>Keep original filenames intact for audit reference</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+</div>
       </div>
 
       {/* Resume Banner */}
@@ -834,9 +809,9 @@ function QueueCard({
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.22 }}
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-card p-4.5 shadow-2xs transition-all hover:shadow-xs",
+        "relative overflow-hidden rounded-xl border bg-card p-6 shadow-2xs transition-all hover:shadow-xs space-y-4",
         working && "border-primary/45 bg-primary/[0.005]",
-        s.status === "done" && "border-emerald-200 bg-emerald-50/[0.005]",
+        s.status === "done" && "border-emerald-250 bg-emerald-50/[0.005]",
         (s.status === "failed" || local?.failed) && "border-rose-250 bg-rose-50/[0.005]",
         !working && s.status !== "done" && s.status !== "failed" && !local?.failed && "border-border/80"
       )}
@@ -875,14 +850,14 @@ function QueueCard({
             <h3 className="truncate text-sm font-extrabold text-slate-800 dark:text-slate-200">
               {s.fileName}
             </h3>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
-              <span className="font-mono text-slate-450">{fmtMB(s.fileSize)}</span>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-450 dark:text-slate-500">
+              <span className="font-mono">{fmtMB(s.fileSize)}</span>
               {s.jobCodes.length > 0 && (
                 <>
                   <span>•</span>
                   <span>{s.jobCodes.length} job{s.jobCodes.length === 1 ? "" : "s"}</span>
                   <span>•</span>
-                  <span className="font-mono font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">
+                  <span className="font-mono font-bold bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded text-[10px]">
                     {s.jobCodes.slice(0, 3).join(", ")}{s.jobCodes.length > 3 ? "…" : ""}
                   </span>
                 </>
@@ -905,15 +880,14 @@ function QueueCard({
             {meta.label}
           </span>
 
-          {/* Action Area Depending on state */}
           <div className="flex items-center gap-1.5">
             {local?.failed && (
-              <Button type="button" size="sm" variant="outline" className="h-8 text-xs font-bold" onClick={onRetry}>
+              <Button type="button" size="sm" variant="outline" className="h-8 text-xs font-bold shadow-2xs hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer" onClick={onRetry}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry Upload
               </Button>
             )}
             {canResume && (
-              <Button type="button" size="sm" className="h-8 text-xs font-bold" onClick={onResume}>
+              <Button type="button" size="sm" className="h-8 text-xs font-bold shadow-2xs hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer" onClick={onResume}>
                 <PlayCircle className="h-3.5 w-3.5 mr-1" /> Resume Upload
               </Button>
             )}
@@ -931,10 +905,11 @@ function QueueCard({
             {/* Expand / Collapse Details Trigger */}
             <button
               onClick={() => setExpanded(!expanded)}
-              className="rounded-lg p-2 text-slate-400 hover:text-slate-650 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="rounded-lg p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors flex items-center gap-1 text-[11px] font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 px-2.5 hover:bg-slate-50"
               aria-label="Toggle execution logs"
             >
-              {expanded ? <ChevronUpPlaceholder className="h-4.5 w-4.5" /> : <ChevronDown className="h-4.5 w-4.5" />}
+              <span>{expanded ? "Hide Details" : "Show Details"}</span>
+              {expanded ? <ChevronUpPlaceholder className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </button>
 
             {/* Overflow Dropdown Actions */}
@@ -945,11 +920,10 @@ function QueueCard({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="dark:bg-slate-900 dark:border-slate-800">
-                <DropdownMenuItem onClick={onCancel} className="cursor-pointer text-xs text-rose-600 dark:text-rose-400 font-bold">
+                <DropdownMenuItem onClick={onCancel} className="cursor-pointer text-xs text-rose-600 dark:text-rose-455 font-bold">
                   Remove / Cancel
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  // Trigger log download
                   const blob = new Blob([JSON.stringify(s.events, null, 2)], { type: "application/json" });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
@@ -965,37 +939,80 @@ function QueueCard({
         </div>
       </div>
 
-      {/* Segmented Progress Area */}
-      <div className="mt-4.5">
+      {/* Segmented Progress Area (Always visible, key visual) */}
+      <div className="bg-slate-50/40 dark:bg-slate-950/10 p-4 rounded-xl border border-slate-100 dark:border-slate-850">
         <SegmentedProgress progress={s.status === "done" ? 100 : progress} status={s.status} message={message} stageLabel={stepsList[currentStageIdx]?.label || ""} />
       </div>
 
-      {/* Horizontal workflow timeline stages block */}
-      <div className="mt-4 border-t border-slate-100 dark:border-slate-850 pt-4">
-        <StagesTimeline progress={s.status === "done" ? 100 : progress} status={s.status} />
-      </div>
+      {/* Collapsible Details Area */}
+      {expanded && (
+        <div className="border-t border-slate-100 dark:border-slate-800 pt-5 mt-4 space-y-5 animate-accordion-down">
+          {/* Horizontal stages timeline */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Processing Stage Timeline</span>
+            <div className="bg-slate-50/20 dark:bg-slate-950/5 p-4 rounded-xl border border-slate-100 dark:border-slate-850">
+              <StagesTimeline progress={s.status === "done" ? 100 : progress} status={s.status} />
+            </div>
+          </div>
 
-      {/* Right status indicators */}
-      <RightStatusIndicators id={s.id} progress={s.status === "done" ? 100 : progress} status={s.status} batchId={s.batchId} />
+          {/* Right status indicators grid */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Operational Telemetry</span>
+            <div className="bg-slate-50/20 dark:bg-slate-950/5 p-4 rounded-xl border border-slate-100 dark:border-slate-850">
+              <RightStatusIndicators id={s.id} progress={s.status === "done" ? 100 : progress} status={s.status} batchId={s.batchId} />
+            </div>
+          </div>
+
+          {/* Detailed Log Timeline Table */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Detailed Log Timeline</span>
+            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-850 dark:bg-slate-950/20 overflow-x-auto">
+              <table className="w-full text-left border-collapse text-[11px] font-medium text-slate-550 dark:text-slate-400">
+                <thead>
+                  <tr className="border-b border-slate-200/50 text-[10px] uppercase font-bold text-slate-400">
+                    <th className="py-2 px-3">Timestamp</th>
+                    <th className="py-2 px-3">Stage</th>
+                    <th className="py-2 px-3">Worker Node</th>
+                    <th className="py-2 px-3">Action / Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...s.events].reverse().map((e, idx) => {
+                    const node = `Node-A${(s.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) % 3) + 1}`;
+                    return (
+                      <tr key={`${e.t}-${idx}`} className="border-b border-slate-100/40 dark:border-slate-800/20 last:border-none hover:bg-slate-100/20">
+                        <td className="py-2 px-3 font-mono text-slate-400 whitespace-nowrap">{fmtClock(e.t)}</td>
+                        <td className="py-2 px-3 font-bold text-slate-700 dark:text-slate-300">{e.stage}</td>
+                        <td className="py-2 px-3 text-slate-450">{node}</td>
+                        <td className="py-2 px-3 truncate max-w-[300px]" title={e.msg}>{e.msg}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contextual Action Areas (Below Timeline) */}
       {(s.status === "done" || s.status === "review") && (
-        <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3.5 dark:border-slate-850">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-3 bg-slate-50/20 dark:bg-slate-950/5 p-3 rounded-xl border border-slate-150 dark:border-slate-850 mt-1">
           {s.status === "review" && s.batchId && (
-            <div className="flex items-center justify-between w-full">
-              <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1">
-                <Info className="h-4 w-4" /> Ready for verification
+            <>
+              <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1.5 pl-1">
+                <Info className="h-4 w-4 shrink-0 text-amber-500" /> Action required: Verify AI extraction results
               </span>
-              <Button asChild size="sm" className="h-8.5 font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-sm cursor-pointer">
+              <Button asChild size="sm" className="h-9 font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-sm cursor-pointer hover:scale-[1.01] active:scale-[0.98] transition-all">
                 <Link href={`/complaints/import?import=${s.batchId}`}>
-                  <FileSearch className="h-3.5 w-3.5 mr-1" /> Review Jobs &amp; Create Complaints
+                  <FileSearch className="h-3.5 w-3.5 mr-1.5" /> Review Jobs &amp; Create Complaints
                 </Link>
               </Button>
-            </div>
+            </>
           )}
           {s.status === "done" && s.complaintIds.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-3">
-              <div className="flex items-center gap-4 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+            <>
+              <div className="flex items-center gap-4 text-xs font-bold text-emerald-700 dark:text-emerald-450 pl-1">
                 <span className="flex items-center gap-1">
                   <Check className="h-4 w-4" /> Completion time: {fmtClock(new Date(s.finishedAt || "").getTime())}
                 </span>
@@ -1003,53 +1020,21 @@ function QueueCard({
                 <span>{s.complaintIds.length} complaints created</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <Button asChild size="sm" className="h-8.5 font-bold bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm cursor-pointer">
+                <Button asChild size="sm" className="h-9 font-bold bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm cursor-pointer hover:scale-[1.01] active:scale-[0.98] transition-all">
                   <Link href={s.complaintIds.length === 1 ? `/complaints/${s.complaintIds[0]}` : "/complaints"}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open Result
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open Result
                   </Link>
                 </Button>
                 {s.jobCodes.slice(0, 3).map((code) => (
-                  <Button key={code} asChild variant="outline" size="sm" className="h-8.5 font-mono text-[10px] font-bold border-slate-200 dark:border-slate-800 dark:bg-slate-900 cursor-pointer">
+                  <Button key={code} asChild variant="outline" size="sm" className="h-9 font-mono text-[10px] font-bold border-slate-200 dark:border-slate-800 dark:bg-slate-900 cursor-pointer">
                     <Link href={`/complaints/job/${code}/dossier`}>
                       {code} dossier <ChevronRight className="h-3 w-3 ml-0.5" />
                     </Link>
                   </Button>
                 ))}
               </div>
-            </div>
+            </>
           )}
-        </div>
-      )}
-
-      {/* Expandable activity log details */}
-      {expanded && (
-        <div className="mt-3.5 border-t border-slate-100 dark:border-slate-850 pt-3.5 animate-accordion-down">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Detailed Log Timeline</span>
-          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-850 dark:bg-slate-950/20 overflow-x-auto">
-            <table className="w-full text-left border-collapse text-[11px] font-medium text-slate-550 dark:text-slate-400">
-              <thead>
-                <tr className="border-b border-slate-200/50 text-[10px] uppercase font-bold text-slate-400">
-                  <th className="py-1 px-2">Timestamp</th>
-                  <th className="py-1 px-2">Stage</th>
-                  <th className="py-1 px-2">Worker Node</th>
-                  <th className="py-1 px-2">Action / Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...s.events].reverse().map((e, idx) => {
-                  const node = `Node-A${(s.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) % 3) + 1}`;
-                  return (
-                    <tr key={`${e.t}-${idx}`} className="border-b border-slate-100/40 dark:border-slate-800/20 last:border-none">
-                      <td className="py-1.5 px-2 font-mono text-slate-400 whitespace-nowrap">{fmtClock(e.t)}</td>
-                      <td className="py-1.5 px-2 font-bold text-slate-700 dark:text-slate-300">{e.stage}</td>
-                      <td className="py-1.5 px-2 text-slate-450">{node}</td>
-                      <td className="py-1.5 px-2 truncate max-w-[300px]" title={e.msg}>{e.msg}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
     </motion.div>
@@ -1064,7 +1049,7 @@ function TimelineStep({ label, desc }: { label: string; desc: string }) {
       <span className="absolute -left-[19px] top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
       <div className="flex-1">
         <h5 className="font-extrabold text-slate-850 dark:text-slate-200 leading-none mb-0.5">{label}</h5>
-        <p className="text-slate-450 text-[11px]">{desc}</p>
+        <p className="text-slate-455 text-[11px]">{desc}</p>
       </div>
     </div>
   );
@@ -1177,7 +1162,7 @@ function StagesTimeline({ progress, status }: { progress: number; status: string
             >
               {stage}
             </span>
-            {idx < 5 && <span className="text-slate-200 dark:text-slate-800 ml-1">→</span>}
+            {idx < 5 && <span className="text-slate-200 dark:text-slate-850 ml-1">→</span>}
           </div>
         );
       })}
@@ -1185,7 +1170,6 @@ function StagesTimeline({ progress, status }: { progress: number; status: string
   );
 }
 
-// Chevron Fallbacks
 function ChevronUpPlaceholder({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -1211,7 +1195,7 @@ function RightStatusIndicators({ id, progress, status, batchId }: { id: string; 
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs border-t border-slate-100 dark:border-slate-850 pt-3 mt-3">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
       {/* Progress Ring */}
       <div className="flex items-center gap-2">
         <svg className="h-9 w-9 shrink-0 -rotate-90">
@@ -1247,7 +1231,7 @@ function RightStatusIndicators({ id, progress, status, batchId }: { id: string; 
 
       <div className="flex flex-col justify-center">
         <span className="text-[10px] uppercase font-bold text-slate-400">Priority</span>
-        <span className={cn("font-bold leading-tight", priority === "High" ? "text-rose-600 dark:text-rose-450" : "text-slate-650 dark:text-slate-400")}>
+        <span className={cn("font-bold leading-tight", priority === "High" ? "text-rose-600 dark:text-rose-450" : "text-slate-655 dark:text-slate-400")}>
           {priority}
         </span>
       </div>

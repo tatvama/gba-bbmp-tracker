@@ -33,42 +33,42 @@ export function AITimelineInsight({ recommendation }: { recommendation: Recommen
     return null;
 
   return (
-    <div className="space-y-2.5 rounded-md border bg-muted/30 p-3 text-xs">
+    <div className="space-y-4 rounded-xl border border-slate-150 bg-slate-50/15 p-5 text-xs dark:border-slate-850 shadow-2xs">
       {timeline_summary && (
-        <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">ಕಾಲಾನುಕ್ರಮ ಸಾರಾಂಶ</p>
-          <p className="text-foreground/90">{timeline_summary}</p>
+        <div className="space-y-1">
+          <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-450">ಕಾಲಾನುಕ್ರಮ ಸಾರಾಂಶ (Timeline Summary)</p>
+          <p className="text-slate-700 dark:text-slate-300 font-semibold leading-relaxed">{timeline_summary}</p>
         </div>
       )}
       {contradictions.length > 0 && (
-        <div>
-          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-            <GitCompareArrows className="h-3 w-3" /> ವಿರೋಧಾಭಾಸಗಳು
+        <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-850">
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-550">
+            <GitCompareArrows className="h-4 w-4 text-rose-500" /> ವಿರೋಧಾಭಾಸಗಳು (Contradictions)
           </p>
           <ul className="space-y-1">
             {contradictions.map((c, i) => (
-              <li key={i} className="text-rose-600 dark:text-rose-400">
+              <li key={i} className="text-rose-600 dark:text-rose-400 font-semibold leading-relaxed">
                 • {c.summary}
-                {c.conflictsWith && <span className="text-muted-foreground"> — ವಿರುದ್ಧವಾಗಿದೆ: {c.conflictsWith}</span>}
+                {c.conflictsWith && <span className="text-muted-foreground font-normal"> — ವಿರುದ್ಧವಾಗಿದೆ: {c.conflictsWith}</span>}
               </li>
             ))}
           </ul>
         </div>
       )}
       {commitments.length > 0 && (
-        <div>
-          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-            <Handshake className="h-3 w-3" /> ಇಲಾಖೆಯ ಬದ್ಧತೆಗಳು
+        <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-850">
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-550">
+            <Handshake className="h-4 w-4 text-primary" /> ಇಲಾಖೆಯ ಬದ್ಧತೆಗಳು (Department Commitments)
           </p>
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {commitments.map((m, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${COMMITMENT_CHIP[m.status] ?? COMMITMENT_CHIP.pending}`}>
+              <li key={i} className="flex items-start gap-2 font-semibold leading-relaxed">
+                <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${COMMITMENT_CHIP[m.status] ?? COMMITMENT_CHIP.pending}`}>
                   {COMMITMENT_STATUS_KN[m.status] ?? m.status}
                 </span>
-                <span className="text-foreground/90">
+                <span className="text-slate-800 dark:text-slate-205">
                   {m.commitment}
-                  {m.dueBy && <span className="text-muted-foreground"> (ಗಡುವು {m.dueBy})</span>}
+                  {m.dueBy && <span className="text-muted-foreground font-normal"> (ಗಡುವು {m.dueBy})</span>}
                 </span>
               </li>
             ))}
@@ -76,23 +76,23 @@ export function AITimelineInsight({ recommendation }: { recommendation: Recommen
         </div>
       )}
       {detected_risks.length > 0 && (
-        <div>
-          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-            <AlertTriangle className="h-3 w-3" /> ಪತ್ತೆಯಾದ ಅಪಾಯಗಳು
+        <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-850">
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-550">
+            <AlertTriangle className="h-4 w-4 text-amber-500" /> ಪತ್ತೆಯಾದ ಅಪಾಯಗಳು (Detected Risks)
           </p>
           <ul className="space-y-1">
             {detected_risks.map((r, i) => (
-              <li key={i} className={styleFor(i)}>• {r}</li>
+              <li key={i} className={`${styleFor(i)} font-semibold leading-relaxed`}>• {r}</li>
             ))}
           </ul>
         </div>
       )}
       {missing_information.length > 0 && (
-        <div>
-          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-            <FileWarning className="h-3 w-3" /> ಕಾಣೆಯಾದ ಮಾಹಿತಿ
+        <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-850">
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-550">
+            <FileWarning className="h-4 w-4 text-rose-500" /> ಕಾಣೆಯಾದ ಮಾಹಿತಿ (Missing Information)
           </p>
-          <ul className="space-y-1 text-muted-foreground">
+          <ul className="space-y-1 text-slate-550 dark:text-slate-400 font-semibold leading-relaxed">
             {missing_information.map((m, i) => (
               <li key={i}>• {m}</li>
             ))}

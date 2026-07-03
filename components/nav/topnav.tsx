@@ -12,6 +12,7 @@ import { JobsIndicator } from "./jobs-indicator";
 import { NotificationsBell } from "./notifications-bell";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { KbdShortcut } from "@/components/kbd-shortcut";
 
 export function TopNav({ email, role }: UserMenuProps) {
   const router = useRouter();
@@ -19,30 +20,30 @@ export function TopNav({ email, role }: UserMenuProps) {
 
   function openPalette() {
     document.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }),
+      new KeyboardEvent("keydown", { key: "k", ctrlKey: true, metaKey: true, bubbles: true }),
     );
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/90 no-print relative">
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-md no-print relative">
       <div className="flex items-center gap-3.5">
         {/* Mobile nav */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden h-11 w-11 sm:h-9 sm:w-9 cursor-pointer"
+            className="lg:hidden h-9 w-9 cursor-pointer hover:bg-muted/80"
             aria-label="Open navigation"
             onClick={() => setMobileOpen(true)}
           >
-            <Menu className="h-4 w-4" />
+            <Menu className="h-4 w-4 text-foreground/80" />
           </Button>
-          <SheetContent side="left" className="p-0 flex flex-col h-full w-72 bg-card">
-            <SheetTitle className="border-b px-4 py-3 text-sm font-semibold text-foreground">
+          <SheetContent side="left" className="p-0 flex flex-col h-full w-72 bg-card border-r border-border/80">
+            <SheetTitle className="border-b border-border/60 px-4 py-3.5 text-sm font-semibold text-foreground/90">
               Navigation
             </SheetTitle>
-            <div className="flex-1 overflow-y-auto" onClick={() => setMobileOpen(false)}>
-              <Sidebar />
+            <div className="flex-1 overflow-y-auto animate-page-slide" onClick={() => setMobileOpen(false)}>
+              <Sidebar isMobile />
             </div>
           </SheetContent>
         </Sheet>
@@ -50,7 +51,7 @@ export function TopNav({ email, role }: UserMenuProps) {
         {/* Brand */}
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-3 group"
+          className="flex shrink-0 items-center gap-3 group transition-transform duration-200 active:scale-[0.98]"
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
             e.preventDefault();
@@ -63,14 +64,14 @@ export function TopNav({ email, role }: UserMenuProps) {
             }
           }}
         >
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-[10px] font-bold tracking-tight text-primary-foreground shadow-sm">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary font-black text-[11px] tracking-tight text-primary-foreground shadow-sm border border-primary/10 transition-all duration-250 group-hover:scale-105 group-hover:shadow-md active:scale-95">
             GBA
           </span>
           <div className="hidden flex-col sm:flex">
-            <span className="text-[13px] font-bold leading-tight text-slate-800 dark:text-slate-200 tracking-tight">
+            <span className="text-[13px] font-bold leading-tight text-foreground/95 tracking-tight group-hover:text-primary transition-colors">
               BBMP Ward Tracker
             </span>
-            <span className="text-[10px] font-medium leading-none text-slate-400 dark:text-slate-500 mt-0.5">
+            <span className="text-[10px] font-medium leading-none text-muted-foreground mt-0.5">
               Bengaluru · 225 wards
             </span>
           </div>
@@ -81,14 +82,12 @@ export function TopNav({ email, role }: UserMenuProps) {
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:block">
         <button
           onClick={openPalette}
-          className="h-9 w-[320px] flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-400 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/35 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-slate-900/60 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-800"
+          className="h-9 w-[320px] flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 text-xs text-muted-foreground transition-all duration-200 hover:border-muted-foreground/30 hover:bg-muted/50 hover:text-foreground/80 focus:outline-none focus:ring-2 focus:ring-primary/45"
           aria-label="Open command palette"
         >
-          <Search className="h-3.5 w-3.5 shrink-0 opacity-80 text-slate-400" />
+          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
           <span className="flex-1 text-left font-medium">Search wards, contacts…</span>
-          <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 select-none rounded border border-slate-200 bg-white px-1.5 font-mono text-[10px] font-medium text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 shadow-2xs">
-            ⌘K
-          </kbd>
+          <KbdShortcut className="hidden sm:inline-flex" />
         </button>
       </div>
 
@@ -97,7 +96,7 @@ export function TopNav({ email, role }: UserMenuProps) {
         asChild
         variant="ghost"
         size="icon"
-        className="flex sm:hidden h-11 w-11 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+        className="flex sm:hidden h-9 w-9 hover:bg-muted transition-colors cursor-pointer"
         aria-label="Search"
       >
         <Link href="/search">
@@ -105,7 +104,7 @@ export function TopNav({ email, role }: UserMenuProps) {
         </Link>
       </Button>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <JobsIndicator />
         <NotificationsBell />
         <ModeToggle />

@@ -6,6 +6,7 @@ import { buildLetterDocx } from "@/lib/docx/bill-stop-builder";
 import type { LetterSkeleton } from "@/lib/letters/types";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**

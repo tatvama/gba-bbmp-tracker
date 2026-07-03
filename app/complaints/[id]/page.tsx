@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, ShieldAlert, FolderArchive, Gavel, ScrollText } from "lucide-react";
+import { Pencil, ShieldAlert, FolderArchive, Gavel, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/print-button";
@@ -8,6 +8,7 @@ import { ComplaintTabs } from "@/components/complaints/complaint-tabs";
 import { CaseWorkflow } from "@/components/complaints/case-workflow";
 import { AIInsightsPanel } from "@/components/ai/AIInsightsPanel";
 import { getComplaintAiRecommendationAction } from "@/lib/actions/ai-advisor";
+import { cn } from "@/lib/utils";
 import {
   getComplaint, listComplaintDocuments, listComplaintTimeline, listComplaintReplies,
   listComplaintActions, listComplaintCommunications, listComplaintReminders,
@@ -20,6 +21,17 @@ import { COMPLAINT_WRITE_ROLES, COMPLAINT_VERIFY_ROLES, COMPLAINT_FIELD_ROLES } 
 import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+
+const getBadgeStyles = (status: string) => {
+  const s = status.toLowerCase();
+  if (s === "filed") return "bg-blue-50/80 text-blue-700 border-blue-200/60 dark:bg-blue-950/30 dark:border-blue-900/40 dark:text-blue-400";
+  if (s === "draft") return "bg-slate-50/80 text-slate-600 border-slate-200/60 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400";
+  if (s === "pending" || s.includes("awaiting")) return "bg-amber-50/80 text-amber-700 border-amber-200/60 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-400";
+  if (s === "escalated") return "bg-purple-50/80 text-purple-700 border-purple-200/60 dark:bg-purple-950/30 dark:border-purple-900/40 dark:text-purple-400";
+  if (s === "closed" || s === "resolved") return "bg-emerald-50/80 text-emerald-700 border-emerald-200/60 dark:bg-emerald-950/30 dark:border-emerald-900/40 dark:text-emerald-400";
+  if (s === "overdue") return "bg-rose-50/80 text-rose-700 border-rose-200/60 dark:bg-rose-950/30 dark:border-rose-900/40 dark:text-rose-400";
+  return "bg-slate-50 text-slate-700 border-slate-200";
+};
 
 export default async function ComplaintDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,13 +55,8 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
       getComplaintAiRecommendationAction(id),
     ]);
 
-  // The job case's imported evidence (source PDFs/JSON) lives in job_documents,
-  // keyed by job number — surfaced on the complaint so every imported file is viewable here.
   const jobDocuments = complaint.job_number ? await getJobDocumentsByNumber(complaint.job_number) : [];
 
-  // The complaint letter the forensic ZIP already drafted (shown in the Submit
-  // step for view/download/read — never regenerated) — plus its print status,
-  // since the cycle starts at the printer, not at submission.
   const letter = {
     letterId: letterDraft?.id ?? null,
     text: letterDraft?.content ?? null,
@@ -69,88 +76,111 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
   };
 
   return (
-    <div className="mx-auto max-w-7xl grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
-      <div className="min-w-0 max-w-5xl xl:max-w-none">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <Button asChild variant="ghost" size="sm" className="no-print -ml-2">
-          <Link href="/complaints"><ArrowLeft className="h-4 w-4" /> Complaints</Link>
-        </Button>
-        <div className="no-print flex flex-wrap gap-2">
-          <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/print`}>Case file</Link></Button>
-          {flags.canVerify && (
-            <>
-              <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/forensics`}><ShieldAlert className="h-4 w-4" /> Forensic audit</Link></Button>
-              {complaint.job_number && (
-                <>
-                  <Button asChild size="sm" variant="outline"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/audit`}><Gavel className="h-4 w-4" /> Job-number audit</Link></Button>
-                  <Button asChild size="sm" variant="outline"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/letter`}><ScrollText className="h-4 w-4" /> Draft letter</Link></Button>
-                </>
-              )}
-              <Button asChild size="sm" variant="outline"><Link href={`/complaints/${id}/dossier`}><FolderArchive className="h-4 w-4" /> Dossier</Link></Button>
-            </>
-          )}
-          <PrintButton />
-          {flags.canEdit && (
-            <Button asChild size="sm"><Link href={`/complaints/${id}/edit`}><Pencil className="h-4 w-4" /> Edit</Link></Button>
-          )}
+    <div className="mx-auto max-w-7xl grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8 items-start px-4 md:px-6">
+      <div className="min-w-0 max-w-5xl xl:max-w-none space-y-6">
+        {/* Sticky Action Toolbar & Breadcrumbs */}
+        <div className="no-print sticky top-0 z-30 flex flex-wrap items-center justify-between gap-4 border-b border-slate-150 bg-background/95 py-3.5 backdrop-blur dark:border-slate-850">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 select-none">
+            <Link href="/complaints" className="hover:text-primary transition-colors">Complaints</Link>
+            <span className="text-slate-350">/</span>
+            <span className="text-slate-800 dark:text-slate-200 font-bold">Case Details</span>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/print`}>Case file</Link></Button>
+            {flags.canVerify && (
+              <>
+                <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/forensics`}><ShieldAlert className="h-4 w-4 mr-1 text-rose-500" /> Forensic audit</Link></Button>
+                {complaint.job_number && (
+                  <>
+                    <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/audit`}><Gavel className="h-4 w-4 mr-1 text-slate-550" /> Job-number audit</Link></Button>
+                    <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/letter`}><ScrollText className="h-4 w-4 mr-1 text-slate-550" /> Draft letter</Link></Button>
+                  </>
+                )}
+                <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/dossier`}><FolderArchive className="h-4 w-4 mr-1 text-slate-550" /> Dossier</Link></Button>
+              </>
+            )}
+            <PrintButton className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5" />
+            {flags.canEdit && (
+              <Button asChild className="h-10 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/edit`}><Pencil className="h-4 w-4 mr-1.5" /> Edit</Link></Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="mb-4">
-        <p className="font-mono text-xs text-muted-foreground">{complaint.internal_case_number ?? "—"}</p>
-        <h1 className="text-lg font-semibold tracking-tight sm:text-xl">{complaint.title}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge variant="muted">{complaint.status}</Badge>
-          {complaint.priority && <Badge variant="outline">{complaint.priority} priority</Badge>}
-          {(() => {
-            const today = new Date().toISOString().slice(0, 10);
-            const dd = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
-            const badges: React.ReactNode[] = [];
-            if (complaint.date_submitted) {
-              const ago = dd(today, complaint.date_submitted);
-              badges.push(<Badge key="filed" variant="outline">Filed {ago <= 0 ? "today" : `${ago}d ago`}</Badge>);
-            }
-            if (complaint.next_follow_up_date) {
-              const left = dd(complaint.next_follow_up_date, today);
-              badges.push(
-                left < 0
-                  ? <Badge key="fu" variant="destructive">Overdue {Math.abs(left)}d · follow-up was {formatDate(complaint.next_follow_up_date)}</Badge>
-                  : <Badge key="fu" variant="warning">Follow-up {left === 0 ? "today" : `in ${left}d`} ({formatDate(complaint.next_follow_up_date)})</Badge>,
-              );
-            }
-            return badges;
-          })()}
+        {/* Complaint Main Title Section */}
+        <div className="space-y-2 select-none">
+          <p className="font-mono text-xs font-bold text-slate-450 dark:text-slate-500 tracking-wider">
+            {complaint.internal_case_number ?? "—"}
+          </p>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight sm:text-[30px] leading-tight max-w-4xl">
+            {complaint.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-2 pt-1.5">
+            <Badge className={cn("text-[11px] px-2.5 h-6 rounded-md font-bold border", getBadgeStyles(complaint.status))}>
+              {complaint.status}
+            </Badge>
+            {complaint.priority && (
+              <Badge className={cn(
+                "text-[11px] px-2.5 h-6 rounded-md font-bold border",
+                complaint.priority.toLowerCase() === "urgent" ? "border-rose-250 bg-rose-50/70 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-455" :
+                complaint.priority.toLowerCase() === "high" ? "border-amber-250 bg-amber-50/70 text-amber-800 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-455" :
+                "border-slate-200 bg-slate-50 text-slate-700 dark:bg-slate-900/40"
+              )}>
+                {complaint.priority} priority
+              </Badge>
+            )}
+            {(() => {
+              const today = new Date().toISOString().slice(0, 10);
+              const dd = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
+              const badges: React.ReactNode[] = [];
+              if (complaint.date_submitted) {
+                const ago = dd(today, complaint.date_submitted);
+                badges.push(
+                  <Badge key="filed" className="text-[11px] px-2.5 h-6 rounded-md font-bold border border-slate-200 bg-slate-50/60 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350">
+                    Filed {ago <= 0 ? "today" : `${ago}d ago`}
+                  </Badge>
+                );
+              }
+              if (complaint.next_follow_up_date) {
+                const left = dd(complaint.next_follow_up_date, today);
+                badges.push(
+                  left < 0
+                    ? <Badge key="fu" className="text-[11px] px-2.5 h-6 rounded-md font-bold border border-rose-250 bg-rose-50/70 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-455">Overdue {Math.abs(left)}d · follow-up was {formatDate(complaint.next_follow_up_date)}</Badge>
+                    : <Badge key="fu" className="text-[11px] px-2.5 h-6 rounded-md font-bold border border-amber-250 bg-amber-50/70 text-amber-800 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-455">Follow-up {left === 0 ? "today" : `in ${left}d`} ({formatDate(complaint.next_follow_up_date)})</Badge>,
+                );
+              }
+              return badges;
+            })()}
+          </div>
         </div>
-      </div>
 
-      {flags.canField && (
-        <CaseWorkflow
-          complaintId={complaint.id}
-          status={complaint.status}
-          jobNumber={complaint.job_number ?? null}
-          caseNumber={complaint.internal_case_number ?? null}
-          aiConfigured={flags.aiConfigured}
-          letter={letter}
+        {flags.canField && (
+          <CaseWorkflow
+            complaintId={complaint.id}
+            status={complaint.status}
+            jobNumber={complaint.job_number ?? null}
+            caseNumber={complaint.internal_case_number ?? null}
+            aiConfigured={flags.aiConfigured}
+            letter={letter}
+          />
+        )}
+
+        <ComplaintTabs
+          complaint={complaint}
+          documents={documents}
+          jobDocuments={jobDocuments}
+          timeline={timeline}
+          replies={replies}
+          actions={actions}
+          communications={communications}
+          reminders={reminders}
+          escalations={escalations}
+          aiDrafts={aiDrafts}
+          audit={audit}
+          officers={options.contacts}
+          flags={flags}
         />
-      )}
-
-      <ComplaintTabs
-        complaint={complaint}
-        documents={documents}
-        jobDocuments={jobDocuments}
-        timeline={timeline}
-        replies={replies}
-        actions={actions}
-        communications={communications}
-        reminders={reminders}
-        escalations={escalations}
-        aiDrafts={aiDrafts}
-        audit={audit}
-        officers={options.contacts}
-        flags={flags}
-      />
-    </div>
-      <aside className="xl:sticky xl:top-4 order-first xl:order-none">
+      </div>
+      <aside className="xl:sticky xl:top-6 space-y-4">
         <AIInsightsPanel complaintId={id} initialRecommendation={aiRecommendation} aiConfigured={flags.aiConfigured} />
       </aside>
     </div>

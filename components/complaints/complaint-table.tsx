@@ -106,7 +106,7 @@ function TypeChip({ type }: { type: string | null }) {
   return (
     <Badge
       variant="outline"
-      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 h-6 rounded-md border-slate-200 bg-slate-50 text-slate-700 font-medium text-xs dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300 animate-fade-in"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 whitespace-nowrap rounded-md border-slate-200 bg-slate-50 text-slate-700 font-medium text-xs dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300 animate-fade-in"
     >
       <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
       {type}
@@ -491,45 +491,6 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
   }, [data]);
 
   const columns = React.useMemo<ColumnDef<ComplaintWithRelations>[]>(() => [
-    {
-      id: "select",
-      header: ({ table }) => (
-        <div className="flex items-center justify-center pl-1">
-          <input
-            type="checkbox"
-            checked={selectedIds.length > 0 && selectedIds.length === filtered.length}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedIds(filtered.map((c) => c.id));
-              } else {
-                setSelectedIds([]);
-              }
-            }}
-            className="rounded border-slate-350 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
-            aria-label="Select all rows"
-          />
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center pl-1">
-          <input
-            type="checkbox"
-            checked={selectedIds.includes(row.original.id)}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedIds((prev) => [...prev, row.original.id]);
-              } else {
-                setSelectedIds((prev) => prev.filter((id) => id !== row.original.id));
-              }
-            }}
-            className="rounded border-slate-350 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
-            aria-label={`Select row ${row.original.internal_case_number}`}
-          />
-        </div>
-      ),
-      size: 40,
-      enableSorting: false,
-    },
     {
       accessorKey: "internal_case_number",
       header: ({ column }) => <SortBtn column={column} label="Ref" />,

@@ -1,5 +1,4 @@
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { DeadlineRulesForm } from "@/components/rti/deadline-rules-form";
 import { getDeadlineRules } from "@/lib/settings";
@@ -13,7 +12,7 @@ export default async function RtiSettingsPage() {
   const [rules, user] = await Promise.all([getDeadlineRules(), getSessionUser()]);
   if (!hasRole(user, ["ADMIN"])) {
     return (
-      <div>
+      <div className="mx-auto max-w-5xl px-3 md:px-4 lg:px-6">
         <PageHeader title="RTI settings" />
         <EmptyState title="Admins only" description="Only admins can change the deadline rules." />
       </div>
@@ -21,17 +20,17 @@ export default async function RtiSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl px-3 md:px-4 lg:px-6 space-y-6">
+      <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 select-none no-print">
+        Settings / RTI Deadline Rules
+      </div>
+      
       <PageHeader
-        title="RTI deadline rules"
+        title="RTI deadline rules console"
         description="Configure the statutory deadline windows. The law/rules can change — edits here drive all deadline computation, countdown badges, and reports."
       />
-      <Card>
-        <CardHeader><CardTitle className="text-base">Deadline configuration</CardTitle></CardHeader>
-        <CardContent>
-          <DeadlineRulesForm action={updateDeadlineRules} initial={rules} />
-        </CardContent>
-      </Card>
+
+      <DeadlineRulesForm action={updateDeadlineRules} initial={rules} />
     </div>
   );
 }

@@ -61,49 +61,87 @@ interface Cell {
 
 function buildCells(level: Level, corps: GbaTreeCorp[]): Cell[] {
   if (level.kind === "root") {
-    return corps.map((c) => ({
-      key: c.code,
-      label: c.name,
-      detail: `${c.divisionCount} div · ${c.subdivisionCount} sub-div`,
-      count: c.wardCount,
-      countUnit: "wards",
-      tint: CORP_TINT[c.code] ?? "#8A8478",
-      next: { kind: "corp" as const, corp: c },
-    }));
+    return corps.map((c: any) => {
+      const hasComplaints = c.complaintCount !== undefined;
+      const count = hasComplaints ? c.complaintCount : c.wardCount;
+      const countUnit = hasComplaints ? "Complaints" : "wards";
+      const detail = hasComplaints
+        ? `Act: ${c.activeCount || 0} · Pend: ${c.pendingCount || 0} · Ovd: ${c.overdueCount || 0} · Clsd: ${c.closedCount || 0}`
+        : `${c.divisionCount} div · ${c.subdivisionCount} sub-div`;
+
+      return {
+        key: c.code,
+        label: c.name,
+        detail,
+        count,
+        countUnit,
+        tint: CORP_TINT[c.code] ?? "#8A8478",
+        next: { kind: "corp" as const, corp: c },
+      };
+    });
   }
   if (level.kind === "corp") {
     const tint = CORP_TINT[level.corp.code] ?? "#8A8478";
-    return level.corp.divisions.map((div) => ({
-      key: div.name,
-      label: div.name,
-      detail: div.ac ?? undefined,
-      count: div.wardCount,
-      countUnit: "wards",
-      tint,
-      next: { kind: "div" as const, corp: level.corp, div },
-    }));
+    return level.corp.divisions.map((div: any) => {
+      const hasComplaints = div.complaintCount !== undefined;
+      const count = hasComplaints ? div.complaintCount : div.wardCount;
+      const countUnit = hasComplaints ? "Complaints" : "wards";
+      const detail = hasComplaints
+        ? `Act: ${div.activeCount || 0} · Pend: ${div.pendingCount || 0} · Ovd: ${div.overdueCount || 0} · Clsd: ${div.closedCount || 0}`
+        : div.ac ?? undefined;
+
+      return {
+        key: div.name,
+        label: div.name,
+        detail,
+        count,
+        countUnit,
+        tint,
+        next: { kind: "div" as const, corp: level.corp, div },
+      };
+    });
   }
   if (level.kind === "div") {
     const tint = CORP_TINT[level.corp.code] ?? "#8A8478";
-    return level.div.subdivisions.map((sub) => ({
-      key: sub.name,
-      label: sub.name,
-      count: sub.wardCount,
-      countUnit: "wards",
-      tint,
-      next: { kind: "sub" as const, corp: level.corp, div: level.div, sub },
-    }));
+    return level.div.subdivisions.map((sub: any) => {
+      const hasComplaints = sub.complaintCount !== undefined;
+      const count = hasComplaints ? sub.complaintCount : sub.wardCount;
+      const countUnit = hasComplaints ? "Complaints" : "wards";
+      const detail = hasComplaints
+        ? `Act: ${sub.activeCount || 0} · Pend: ${sub.pendingCount || 0} · Ovd: ${sub.overdueCount || 0} · Clsd: ${sub.closedCount || 0}`
+        : undefined;
+
+      return {
+        key: sub.name,
+        label: sub.name,
+        detail,
+        count,
+        countUnit,
+        tint,
+        next: { kind: "sub" as const, corp: level.corp, div: level.div, sub },
+      };
+    });
   }
   const tint = CORP_TINT[level.corp.code] ?? "#8A8478";
-  return level.sub.wards.map((w) => ({
-    key: String(w.no),
-    label: w.name,
-    count: 1,
-    countUnit: "",
-    tint,
-    wardNo: w.no,
-    legible: w.legible,
-  }));
+  return level.sub.wards.map((w: any) => {
+    const hasComplaints = w.complaintCount !== undefined;
+    const count = hasComplaints ? w.complaintCount : 1;
+    const countUnit = hasComplaints ? "Complaints" : "";
+    const detail = hasComplaints
+      ? `Act: ${w.activeCount || 0} · Pend: ${w.pendingCount || 0} · Ovd: ${w.overdueCount || 0} · Clsd: ${w.closedCount || 0}`
+      : undefined;
+
+    return {
+      key: String(w.no),
+      label: w.name,
+      detail,
+      count,
+      countUnit,
+      tint,
+      wardNo: w.no,
+      legible: w.legible,
+    };
+  });
 }
 
 /* ── tooltip state ───────────────────────────────────────────── */
@@ -286,7 +324,7 @@ export function TreemapExplorer({ corps }: { corps: GbaTreeCorp[] }) {
               const H = Math.max(t.h - 3, 0);
 
               /* size thresholds */
-              const showBigCount = W > 72 && H > 56 && !isLeaf;
+              const showBigCount = W > 72 && H > 56 && (!isLeaf || c.countUnit === "Complaints");
               const showLabel    = W > 40 && H > 30;
               const showDetail   = c.detail && W > 110 && H > 70;
               const showWardNo   = c.wardNo !== undefined && W > 40 && H > 28;

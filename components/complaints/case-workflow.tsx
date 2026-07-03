@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { cn } from "@/lib/utils";
 import {
   Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight,
   FileText, Eye, Search, Printer, CircleCheck, RotateCcw,
@@ -178,42 +179,63 @@ export function CaseWorkflow({
   }
 
   return (
-    <Card className="no-print mb-4">
-      <CardContent className="py-4">
-        {/* Step header */}
-        <div className="mb-4 flex items-center gap-1 overflow-x-auto">
-          {STEPS.map((s, i) => {
-            const Icon = s.icon;
-            const done = i < reached;
-            const isActive = s.key === active;
-            // Steps are sequential — you can't jump ahead of where the case has
-            // reached — EXCEPT Escalate and Close, which are lateral actions
-            // available on any filed complaint (escalate for non-response /
-            // inadequate reply; close to resolve or shut the case at any point).
-            const locked = s.key === "escalate" || s.key === "close" ? reached < 1 : i > reached;
-            return (
-              <React.Fragment key={s.key}>
-                <button
-                  type="button"
-                  disabled={locked}
-                  onClick={() => setActive(s.key)}
-                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-                    isActive
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : done
-                      ? "text-emerald-600 hover:bg-muted"
-                      : locked
-                      ? "text-muted-foreground/35 cursor-not-allowed"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                  {s.label}
-                </button>
-                {i < STEPS.length - 1 && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />}
-              </React.Fragment>
-            );
-          })}
+    <Card className="no-print border border-slate-150 dark:border-slate-850 shadow-xs rounded-xl overflow-hidden mb-6">
+      <CardContent className="p-6">
+        {/* Progress Tracker (Timeline Style) */}
+        <div className="mb-6 px-4 py-6 select-none bg-slate-50/45 dark:bg-slate-950/20 rounded-xl border border-slate-150 dark:border-slate-850">
+          <div className="relative flex flex-col md:flex-row items-start justify-between gap-6 md:gap-0">
+            {/* Horizontal connection line for desktop */}
+            <div className="absolute top-[18px] left-[10%] right-[10%] hidden md:block h-0.5 bg-slate-200 dark:bg-slate-800 z-0">
+              <div 
+                className="h-full bg-primary transition-all duration-500" 
+                style={{ width: `${Math.min(100, (reached / (STEPS.length - 1)) * 100)}%` }}
+              />
+            </div>
+            
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              const done = i < reached;
+              const isActive = s.key === active;
+              const locked = s.key === "escalate" || s.key === "close" ? reached < 1 : i > reached;
+
+              return (
+                <div key={s.key} className="relative z-10 flex flex-col items-center flex-1 text-center group">
+                  <button
+                    type="button"
+                    disabled={locked}
+                    onClick={() => setActive(s.key)}
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 relative focus:outline-none",
+                      done
+                        ? cn(
+                            "border-emerald-500 bg-emerald-500 text-white",
+                            isActive && "scale-110 ring-4 ring-emerald-500/20 shadow-md"
+                          )
+                        : isActive
+                        ? "border-primary bg-primary text-primary-foreground shadow-md scale-110 ring-4 ring-primary/20"
+                        : locked
+                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-600"
+                        : "border-slate-300 bg-white text-slate-600 hover:border-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-350 cursor-pointer"
+                    )}
+                    title={locked ? "Locked" : `Go to ${s.label}`}
+                  >
+                    {done ? <Check className="h-4.5 w-4.5 stroke-[3.5]" /> : <Icon className="h-4 w-4" />}
+                  </button>
+                  <div className="mt-4 space-y-0.5">
+                    <p className={cn(
+                      "text-xs font-black tracking-wide uppercase",
+                      isActive ? "text-primary" : done ? "text-emerald-600" : "text-slate-500"
+                    )}>
+                      {s.label}
+                    </p>
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                      {isActive ? "Active" : done ? "Done" : locked ? "Locked" : "Pending"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Active step panel */}

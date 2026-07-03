@@ -16,21 +16,21 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md",
+          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/95 hover:opacity-[0.99]",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:shadow-md",
+          "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/95 hover:opacity-[0.99]",
         outline:
-          "border border-input bg-background shadow-xs hover:bg-muted hover:border-foreground/20 hover:text-foreground",
+          "border border-border/80 bg-background shadow-3xs hover:bg-muted/70 hover:border-border/100 hover:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/70",
+          "bg-secondary/80 text-secondary-foreground shadow-3xs hover:bg-secondary hover:text-foreground",
         ghost:
-          "hover:bg-muted hover:text-foreground",
+          "hover:bg-muted/70 hover:text-foreground",
         link:
           "h-auto p-0 text-primary underline-offset-4 hover:underline shadow-none",
         teal:
-          "bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 hover:shadow-md",
+          "bg-accent text-accent-foreground shadow-xs hover:bg-accent/95 hover:opacity-[0.99]",
         amber:
-          "bg-amber text-white shadow-sm hover:bg-amber/90 hover:shadow-md",
+          "bg-amber text-white shadow-xs hover:bg-amber/95 hover:opacity-[0.99]",
       },
       size: {
         default:   "h-9 rounded-md px-4 text-sm [&_svg]:size-4",

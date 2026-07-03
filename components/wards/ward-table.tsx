@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import {
   Select,
   SelectContent,
@@ -185,6 +186,24 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
     setVerification("all");
   }
 
+  const filterPills = React.useMemo(() => {
+    const pills = [];
+    if (zone !== "all") {
+      pills.push({ label: `Zone: ${zone}`, onRemove: () => setZone("all") });
+    }
+    if (corp !== "all") {
+      const corpName = corps.find(([code]) => code === corp)?.[1] ?? corp;
+      pills.push({ label: `Corp: ${corpName}`, onRemove: () => setCorp("all") });
+    }
+    if (ac !== "all") {
+      pills.push({ label: `AC: ${ac}`, onRemove: () => setAc("all") });
+    }
+    if (verification !== "all") {
+      pills.push({ label: `Verification: ${verification.replace(/_/g, " ")}`, onRemove: () => setVerification("all") });
+    }
+    return pills;
+  }, [zone, corp, ac, verification, corps]);
+
   const columns = React.useMemo<ColumnDef<WardWithRelations>[]>(
     () => [
       {
@@ -281,8 +300,10 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
         header: "Actions",
         cell: ({ row }) => (
           <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push(`/wards/${row.original.new_no}`)}
-            className="h-7 px-4 text-xs font-bold rounded-lg bg-[#e27226] hover:bg-[#c95d18] text-white border-0 cursor-pointer transition-colors shadow-xs"
+            className="h-7 px-3 text-[11px] font-bold"
           >
             View
           </Button>
@@ -417,69 +438,94 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
         )}
       </div>
 
-      {/* Desktop Filter Toolbar (Unchanged) */}
-      <div className="hidden md:flex mb-3 flex-row flex-wrap items-center gap-2">
-        <Input
-          placeholder="Search wards, AC, zone…"
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="sm:max-w-xs"
-        />
-        <Select value={zone} onValueChange={setZone}>
-          <SelectTrigger className="sm:w-44">
-            <SelectValue placeholder="All zones" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All zones</SelectItem>
-            {zones.map((z) => (
-              <SelectItem key={z} value={z}>
-                {z}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={corp} onValueChange={setCorp}>
-          <SelectTrigger className="sm:w-52">
-            <SelectValue placeholder="All corporations" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All corporations</SelectItem>
-            {corps.map(([code, name]) => (
-              <SelectItem key={code} value={code}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Integrated Action Toolbar (Desktop) */}
+      <FilterToolbar
+        className="hidden md:block mb-6"
+        searchPlaceholder="Search by name, constituency, zone..."
+        searchValue={globalFilter}
+        onSearchChange={setGlobalFilter}
+        actions={
+          <div className="flex items-center border border-border/60 rounded-lg overflow-hidden bg-background">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => doExport("csv")}
+              className="h-8 rounded-none border-r border-border/60 px-3 font-semibold text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Download className="h-3.5 w-3.5 mr-1" /> CSV
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => doExport("xlsx")}
+              className="h-8 rounded-none px-3 font-semibold text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Download className="h-3.5 w-3.5 mr-1" /> XLSX
+            </Button>
+          </div>
+        }
+        advancedFilters={
+          <div className="flex items-center flex-wrap gap-3">
+            <Select value={zone} onValueChange={setZone}>
+              <SelectTrigger className="h-8 w-40 text-xs font-semibold">
+                <SelectValue placeholder="All zones" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All zones</SelectItem>
+                {zones.map((z) => (
+                  <SelectItem key={z} value={z}>
+                    {z}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={resetFilters}
-            className="text-muted-foreground"
-          >
-            <X className="h-3.5 w-3.5" /> Clear
-          </Button>
-        )}
+            <Select value={corp} onValueChange={setCorp}>
+              <SelectTrigger className="h-8 w-48 text-xs font-semibold">
+                <SelectValue placeholder="All corporations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All corporations</SelectItem>
+                {corps.map(([code, name]) => (
+                  <SelectItem key={code} value={code}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => doExport("csv")}
-          >
-            <Download className="h-4 w-4" /> CSV
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => doExport("xlsx")}
-          >
-            <Download className="h-4 w-4" /> XLSX
-          </Button>
-        </div>
-      </div>
+            <Select value={ac} onValueChange={setAc}>
+              <SelectTrigger className="h-8 w-48 text-xs font-semibold">
+                <SelectValue placeholder="All ACs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All constituencies</SelectItem>
+                {assemblyConstituencies.map((val) => (
+                  <SelectItem key={val} value={val}>
+                    {val}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={verification} onValueChange={setVerification}>
+              <SelectTrigger className="h-8 w-44 text-xs font-semibold">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {verificationStatuses.map((val) => (
+                  <SelectItem key={val} value={val}>
+                    {val.replace(/_/g, " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+        filterPills={filterPills}
+        onClearAll={resetFilters}
+      />
 
       {/* Desktop Table View (Unchanged) */}
       <div className="hidden md:block">

@@ -3,9 +3,9 @@ import type { BadgeProps } from "@/components/ui/badge";
 
 const VARIANT: Record<string, BadgeProps["variant"]> = {
   Draft: "muted",
-  "Ready to File": "secondary",
-  Filed: "secondary",
-  "Awaiting Reply": "secondary",
+  "Ready to File": "info",
+  Filed: "info",
+  "Awaiting Reply": "info",
   "Reply Received": "success",
   "Partial Reply": "warning",
   Rejected: "destructive",
@@ -15,7 +15,7 @@ const VARIANT: Record<string, BadgeProps["variant"]> = {
   "FAA Order Received": "success",
   "Second Appeal Drafted": "warning",
   "Second Appeal Filed": "warning",
-  "Complaint Filed": "destructive",
+  "Complaint Filed": "critical",
   Closed: "muted",
 };
 
@@ -23,7 +23,7 @@ export function RtiStatusBadge({ status }: { status: string }) {
   return (
     <Badge
       variant={VARIANT[status] ?? "outline"}
-      className="text-[11px] px-2.5 h-6 rounded-md font-semibold tracking-wide select-none inline-flex items-center gap-1.5 leading-none"
+      className="text-[11px] px-2.5 h-6 rounded-md font-bold tracking-wide select-none inline-flex items-center gap-1.5 leading-none"
       dot
     >
       {status}

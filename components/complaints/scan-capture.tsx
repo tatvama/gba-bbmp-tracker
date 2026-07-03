@@ -10,9 +10,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { uploadComplaintScanAction, getDocumentViewUrl } from "@/lib/actions/complaints";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { captureScanFromVideo } from "@/lib/client/scan-enhance";
+import { cn } from "@/lib/utils";
 
 const selectCls =
-  "flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-background px-3.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all cursor-pointer font-semibold text-slate-800 dark:text-slate-200";
 
 interface Page {
   id: number;
@@ -273,20 +274,20 @@ export function ScanCapture({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label>Document type</Label>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="space-y-2">
+          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Document type</Label>
           <select className={selectCls} value={docType} onChange={(e) => setDocType(e.target.value)}>
             {docTypes.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="space-y-1.5">
-          <Label>Title (optional)</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ack receipt 29-Jun" className="h-11" />
+        <div className="space-y-2">
+          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Title (optional)</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ack receipt 29-Jun" className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 placeholder:font-normal" />
         </div>
-        <div className="space-y-1.5">
-          <Label>Document date</Label>
-          <Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} className="h-11" />
+        <div className="space-y-2">
+          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Document date</Label>
+          <Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200" />
         </div>
       </div>
 
@@ -328,25 +329,33 @@ export function ScanCapture({
           </div>
         </div>
       ) : (
-        <div className={`grid gap-2 ${isMobile ? "sm:grid-cols-2" : ""}`}>
+        <div className="grid gap-4 sm:grid-cols-2">
           {/* Live camera is a MOBILE feature — desktops rarely have a usable
               document camera, so there we only offer the file picker. */}
           {isMobile && (
             <button
               type="button"
               onClick={startCamera}
-              className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-primary/50 bg-primary/5 py-5 text-center transition-colors hover:bg-primary/10 active:scale-[0.99]"
+              className="flex flex-col items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5/30 py-6 text-center hover:bg-primary/5 hover:border-primary/50 transition-all duration-300 shadow-2xs hover:shadow-xs active:scale-[0.99]"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15">
-                <Camera className="h-6 w-6 text-primary" />
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Camera className="h-6 w-6" />
               </span>
-              <span className="text-sm font-bold text-primary">Open the camera</span>
-              <span className="text-[11px] text-muted-foreground">Click each page — they merge into one PDF</span>
+              <span className="text-sm font-black text-primary">Open the camera</span>
+              <span className="text-[11px] font-bold text-muted-foreground/80">Click each page — they merge into one PDF</span>
             </button>
           )}
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 py-5 text-center hover:bg-primary/10">
-            <span className="flex items-center gap-2 text-sm font-medium text-primary"><Upload className="h-5 w-5" /> Scan / choose files</span>
-            <span className="text-xs text-muted-foreground">JPEG, PNG, WebP or PDF · multiple allowed</span>
+          <label className={cn(
+            "group flex cursor-pointer flex-col items-center justify-center gap-3.5 rounded-2xl border-2 border-dashed border-primary/25 bg-primary/5/20 py-8 px-6 text-center hover:bg-primary/5 hover:border-primary/50 transition-all duration-300 shadow-2xs hover:shadow-xs",
+            !isMobile && "col-span-2"
+          )}>
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:scale-105 transition-transform duration-250">
+              <Upload className="h-6 w-6" />
+            </span>
+            <div className="space-y-1">
+              <span className="block text-sm font-black text-slate-800 dark:text-slate-200">Scan / choose files to upload</span>
+              <span className="block text-[11.5px] font-bold text-slate-450 dark:text-slate-500">Supports JPEG, PNG, WebP or PDF · upload multiple pages to merge</span>
+            </div>
             <input
               type="file"
               accept="image/*,application/pdf"

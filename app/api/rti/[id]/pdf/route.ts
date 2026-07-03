@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { generateRtiPdfService } from "@/lib/pdf/document-service";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Puppeteer PDF generation might take a few seconds
 
 export async function GET(

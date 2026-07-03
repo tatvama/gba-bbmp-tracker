@@ -47,16 +47,16 @@ export function DocumentSummaryCard({
   const showStats = summary.wordCount > 0 || summary.totalQuestions > 0;
 
   // Adaptive Grid Column Spans
-  let summarySpan = "md:col-span-7";
+  let summarySpan = "md:col-span-6";
   let topicsSpan = "md:col-span-3";
-  let statsSpan = "md:col-span-2";
+  let statsSpan = "md:col-span-3";
 
   if (!hasHighlights && showStats) {
-    summarySpan = "md:col-span-9";
-    statsSpan = "md:col-span-3";
+    summarySpan = "md:col-span-8";
+    statsSpan = "md:col-span-4";
   } else if (hasHighlights && !showStats) {
-    summarySpan = "md:col-span-9";
-    topicsSpan = "md:col-span-3";
+    summarySpan = "md:col-span-8";
+    topicsSpan = "md:col-span-4";
   } else if (!hasHighlights && !showStats) {
     summarySpan = "md:col-span-12";
   }
@@ -113,41 +113,41 @@ export function DocumentSummaryCard({
             Statistics
           </h4>
           <div className="space-y-2.5 pt-0.5 text-xs font-sans text-slate-500 dark:text-slate-400">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 shrink-0">
                 <FileText className="h-3.5 w-3.5 text-slate-400" />
                 <span>Type</span>
               </span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{documentType}</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">{documentType}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 shrink-0">
                 <HelpCircle className="h-3.5 w-3.5 text-slate-400" />
                 <span>Questions</span>
               </span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{summary.totalQuestions}</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">{summary.totalQuestions}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 shrink-0">
                 <AlignLeft className="h-3.5 w-3.5 text-slate-400" />
                 <span>Words</span>
               </span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{summary.wordCount.toLocaleString()}</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">{summary.wordCount.toLocaleString()}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 shrink-0">
                 <Clock className="h-3.5 w-3.5 text-slate-400" />
                 <span>Reading Time</span>
               </span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{summary.readingTimeMin} min</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">{summary.readingTimeMin} min</span>
             </div>
             {lastUpdatedDate && (
-              <div className="flex items-center justify-between border-t border-slate-100/50 dark:border-slate-800/50 pt-2 mt-2">
-                <span className="flex items-center gap-2">
+              <div className="flex items-center justify-between border-t border-slate-100/50 dark:border-slate-800/50 pt-2 mt-2 gap-3">
+                <span className="flex items-center gap-2 shrink-0">
                   <Calendar className="h-3.5 w-3.5 text-slate-400" />
                   <span>Updated</span>
                 </span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">{formatDate(lastUpdatedDate)}</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">{formatDate(lastUpdatedDate)}</span>
               </div>
             )}
           </div>
@@ -192,7 +192,7 @@ export function DocumentSummaryCard({
           </CardContent>
         </Card>
       ) : (
-        <div className="w-full bg-slate-50/50 dark:bg-slate-900/10 p-5 rounded-xl border border-slate-100 dark:border-slate-800 space-y-6">
+        <div className="w-full bg-slate-50/50 dark:bg-slate-900/10 p-6 rounded-xl border border-slate-100 dark:border-slate-800 space-y-6">
           {contentMarkup}
           {viewDetailsButton}
         </div>

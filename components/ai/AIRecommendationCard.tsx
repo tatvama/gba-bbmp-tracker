@@ -116,10 +116,10 @@ export function AIRecommendationCard({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-primary" /> AI ಸಲಹೆಗಾರ
+    <div className="space-y-4 rounded-xl border border-slate-150 bg-card p-5 shadow-2xs dark:border-slate-850">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+        <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-450">
+          <Sparkles className="h-4 w-4 text-primary" /> AI ಸಲಹೆಗಾರ (Advisor)
         </div>
         {recommendation && (
           <AIHealthScore score={recommendation.health_score} riskLevel={recommendation.risk_level} compact />
@@ -127,85 +127,85 @@ export function AIRecommendationCard({
       </div>
 
       {!aiConfigured && (
-        <p className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-400">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> AI ವಿವರಣೆ ಲಭ್ಯವಿಲ್ಲ — ಶಿಫಾರಸುಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ANTHROPIC_API_KEY ಹೊಂದಿಸಿ. ಆರೋಗ್ಯ ಸ್ಕೋರ್ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಿಸುತ್ತದೆ.
+        <p className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-400 font-semibold leading-relaxed">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> AI ವಿವರಣೆ ಲಭ್ಯವಿಲ್ಲ — ಶಿಫಾರಸುಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ANTHROPIC_API_KEY ಹೊಂದಿಸಿ. ಆರೋಗ್ಯ ಸ್ಕೋರ್ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಿಸುತ್ತದೆ.
         </p>
       )}
 
       {isAnalyzing && (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ…
+        <p className="flex items-center gap-2 text-xs text-slate-400 font-bold">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" /> ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ…
         </p>
       )}
 
       {!recommendation && !isAnalyzing && (
-        <p className="text-xs text-muted-foreground">ಇನ್ನೂ ವಿಶ್ಲೇಷಿಸಿಲ್ಲ. ಈ ದೂರನ್ನು ಮುಂದಿನ ನವೀಕರಣದಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತದೆ.</p>
+        <p className="text-xs text-slate-455 dark:text-slate-500 font-semibold leading-relaxed">ಇನ್ನೂ ವಿಶ್ಲೇಷಿಸಿಲ್ಲ. ಈ ದೂರನ್ನು ಮುಂದಿನ ನವೀಕರಣದಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತದೆ.</p>
       )}
 
       {recommendation?.current_situation && (
-        <div className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">ಪ್ರಸ್ತುತ ಸ್ಥಿತಿ</p>
-          <p className="text-sm">{recommendation.current_situation}</p>
+        <div className="space-y-1 pt-1">
+          <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">ಪ್ರಸ್ತುತ ಸ್ಥಿತಿ (Current situation)</p>
+          <p className="text-xs font-semibold text-slate-855 dark:text-slate-205 leading-relaxed">{recommendation.current_situation}</p>
         </div>
       )}
 
       {recommendation?.recommendation && (
-        <div className="space-y-1 rounded-md bg-primary/5 p-2.5">
+        <div className="space-y-2 rounded-xl bg-primary/5 p-4.5 border border-primary/10">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-primary">ಶಿಫಾರಸು</p>
+            <p className="text-[11px] font-black uppercase tracking-wider text-primary">ಶಿಫಾರಸು (Recommendation)</p>
             {recommendation.confidence && (
-              <span className="text-[10px] font-semibold text-muted-foreground">
+              <span className="text-[10px] font-extrabold text-primary/80">
                 {CONFIDENCE_KN[recommendation.confidence] ?? recommendation.confidence}
                 {typeof recommendation.confidence_score === "number" ? ` · ${recommendation.confidence_score}%` : ""} ವಿಶ್ವಾಸ
               </span>
             )}
           </div>
-          <p className="text-sm font-semibold">{recommendation.recommendation}</p>
-          {recommendation.reasoning && <p className="text-xs text-muted-foreground">{recommendation.reasoning}</p>}
+          <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100 leading-normal">{recommendation.recommendation}</p>
+          {recommendation.reasoning && <p className="text-xs text-slate-550 dark:text-slate-400 leading-relaxed font-semibold">{recommendation.reasoning}</p>}
         </div>
       )}
 
       {recommendation?.expected_outcome && (
         <div className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">ನಿರೀಕ್ಷಿತ ಫಲಿತಾಂಶ</p>
-          <p className="text-xs text-muted-foreground">{recommendation.expected_outcome}</p>
+          <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">ನಿರೀಕ್ಷಿತ ಫಲಿತಾಂಶ (Expected outcome)</p>
+          <p className="text-xs text-slate-550 dark:text-slate-400 leading-relaxed font-semibold">{recommendation.expected_outcome}</p>
         </div>
       )}
 
       {recommendation?.outstanding_issues && recommendation.outstanding_issues.length > 0 && (
-        <div className="space-y-1">
-          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-            <ListChecks className="h-3 w-3" /> ಬಾಕಿ ಇರುವ ವಿಷಯಗಳು
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400">
+            <ListChecks className="h-3.5 w-3.5" /> ಬಾಕಿ ಇರುವ ವಿಷಯಗಳು (Outstanding Issues)
           </p>
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {recommendation.outstanding_issues.map((o, i) => (
-              <li key={i} className="flex items-start gap-1.5 text-xs">
+              <li key={i} className="flex items-start gap-2 text-xs font-semibold leading-relaxed">
                 <span
-                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                  className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
                     o.status === "answered"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                       : o.status === "partial"
-                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                        : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                        : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
                   }`}
                 >
                   {ISSUE_STATUS_KN[o.status] ?? o.status}
                 </span>
-                <span className="text-foreground/90">{o.issue}</span>
+                <span className="text-slate-800 dark:text-slate-205">{o.issue}</span>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {error && <p className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
+      {error && <p className="flex items-center gap-1.5 text-xs text-destructive font-semibold"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
 
       {meta?.buttonLabel && action && (
         GENERATE_ACTIONS.has(action) ? (
           // Draft-producing actions ask which language ("ask each time").
           <LanguageChoiceButton
             size="sm"
-            className="w-full"
+            className="w-full h-9 font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
             busy={busy}
             icon={meta.icon}
             onChoose={(language) => runOneClickAction(language)}
@@ -214,7 +214,7 @@ export function AIRecommendationCard({
           </LanguageChoiceButton>
         ) : (
           // Navigation actions (review, upload evidence, escalate, close) — no draft, no prompt.
-          <Button size="sm" className="w-full" disabled={busy} onClick={() => runOneClickAction()}>
+          <Button size="sm" className="w-full h-9 font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer" disabled={busy} onClick={() => runOneClickAction()}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <meta.icon className="h-4 w-4" />}
             {meta.buttonLabel}
             {!busy && <ArrowRight className="ml-auto h-3.5 w-3.5" />}
@@ -222,7 +222,7 @@ export function AIRecommendationCard({
         )
       )}
 
-      <p className="text-[10px] text-muted-foreground">ಇದು ಕೇವಲ ಸಲಹೆ — ಕರಡುಗಳನ್ನು ಸಂಪಾದಿಸಬಹುದು ಮತ್ತು ಎಂದಿಗೂ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ. ನಿರ್ಧಾರ ಯಾವಾಗಲೂ ನಿಮ್ಮದೇ.</p>
+      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal pt-2 border-t border-slate-100 dark:border-slate-850">ಇದು ಕೇವಲ ಸಲಹೆ — ಕರಡುಗಳನ್ನು ಸಂಪಾದಿಸಬಹುದು ಮತ್ತು ಎಂದಿಗೂ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ. ನಿರ್ಧಾರ ಯಾವಾಗಲೂ ನಿಮ್ಮದೇ.</p>
     </div>
   );
 }

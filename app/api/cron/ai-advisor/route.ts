@@ -4,6 +4,7 @@ import { COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
 import { runAdvisorAnalysis } from "@/lib/ai/advisor/recommendation-engine";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BATCH_SIZE = 200;

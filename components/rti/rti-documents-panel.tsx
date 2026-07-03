@@ -10,11 +10,13 @@ import {
   ExternalLink,
   Loader2,
   Lock,
+  UploadCloud,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/empty-state";
 import { DocumentCapture } from "@/components/rti/document-capture";
 import type { RtiDocument } from "@/lib/types";
 import {
@@ -44,20 +46,10 @@ function statusVariant(status: string): "success" | "warning" | "destructive" | 
   }
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
-  if (!value) return null;
-  return (
-    <div>
-      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="text-sm">{value}</dd>
-    </div>
-  );
-}
-
 function DocTypeBadge({ type }: { type: string }) {
   if (type === "Application") {
     return (
-      <Badge variant="info" className="text-[12px] px-3 py-1 font-semibold shadow-sm" dot>
+      <Badge variant="info" className="text-[10px] px-2 py-0.5 font-bold shadow-3xs" dot>
         {type}
       </Badge>
     );
@@ -66,7 +58,7 @@ function DocTypeBadge({ type }: { type: string }) {
     return (
       <Badge
         variant="outline"
-        className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.1)] dark:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-[12px] px-3 py-1 font-semibold"
+        className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-400 text-[10px] px-2 py-0.5 font-bold shadow-3xs"
         dot
       >
         {type}
@@ -75,13 +67,13 @@ function DocTypeBadge({ type }: { type: string }) {
   }
   if (type === "Reply") {
     return (
-      <Badge variant="success" className="text-[12px] px-3 py-1 font-semibold shadow-sm" dot>
+      <Badge variant="success" className="text-[10px] px-2 py-0.5 font-bold shadow-3xs" dot>
         {type}
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="text-[12px] px-3 py-1 font-semibold shadow-sm" dot>
+    <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-bold shadow-3xs" dot>
       {type}
     </Badge>
   );
@@ -102,36 +94,43 @@ function DocumentRow({
   onDelete: (id: string) => void;
   pending: boolean;
 }) {
+  const [showSummary, setShowSummary] = React.useState(false);
   const ex = doc.ai_extracted ?? null;
   const ocrProcessing = doc.ocr_status === "Processing" || doc.ocr_status === "Pending";
   const aiProcessing = doc.ai_status === "Processing" || doc.ai_status === "Pending";
 
   return (
-    <div className="rounded-lg border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <DocTypeBadge type={doc.doc_type} />
-            <span className="text-sm font-medium">{doc.title || "Untitled document"}</span>
+    <div className="rounded-xl border border-border/40 p-5 bg-card shadow-3xs space-y-3.5 animate-page-slide">
+      {/* Upper row: Title, Type badge, and status indicators */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-1 h-8 w-8 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shrink-0">
+            <FileText className="h-4.5 w-4.5" />
           </div>
-          <p className="text-xs text-muted-foreground">
-            {doc.page_count} page{doc.page_count > 1 ? "s" : ""}
-            {doc.doc_date ? ` · dated ${fmtDate(doc.doc_date)}` : ""}
-            {` · added ${fmtDate(doc.created_at)}`}
-            {doc.uploader_name ? ` by ${doc.uploader_name}` : ""}
-          </p>
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <DocTypeBadge type={doc.doc_type} />
+              <span className="text-sm font-bold text-foreground leading-none">{doc.title || "Untitled document"}</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground/60 font-semibold uppercase tracking-wider">
+              Version v1.0 · {doc.page_count} page{doc.page_count > 1 ? "s" : ""}
+              {doc.doc_date ? ` · dated ${fmtDate(doc.doc_date)}` : ""}
+              {doc.uploader_name ? ` · by ${doc.uploader_name}` : ""}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
+
+        <div className="flex flex-wrap items-center gap-1.5">
           <Badge
             variant={statusVariant(doc.ocr_status)}
-            className="text-[12px] px-3 py-1 font-semibold shadow-sm"
+            className="text-[10px] px-2 py-0.5 font-bold shadow-3xs"
             dot={ocrProcessing}
           >
             OCR: {doc.ocr_status}
           </Badge>
           <Badge
             variant={statusVariant(doc.ai_status)}
-            className="text-[12px] px-3 py-1 font-semibold shadow-sm"
+            className="text-[10px] px-2 py-0.5 font-bold shadow-3xs"
             dot={aiProcessing}
           >
             AI: {doc.ai_status}
@@ -139,31 +138,67 @@ function DocumentRow({
         </div>
       </div>
 
+      {/* Dynamic Summary Accordion */}
       {doc.ai_summary && (
-        <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{doc.ai_summary}</p>
+        <div className="border-t border-border/10 pt-2.5 space-y-1.5">
+          <button
+            type="button"
+            onClick={() => setShowSummary(!showSummary)}
+            className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase hover:text-foreground transition-colors"
+          >
+            {showSummary ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            AI Document Analysis
+          </button>
+          {showSummary && (
+            <p className="whitespace-pre-wrap text-xs text-muted-foreground/95 leading-relaxed font-medium pl-4 border-l border-primary/20">
+              {doc.ai_summary}
+            </p>
+          )}
+        </div>
       )}
 
+      {/* Key Extracted Info */}
       {ex && (ex.authority || ex.subject || ex.referenceNumber || ex.documentDate) && (
-        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-          <Field label="Authority" value={ex.authority} />
-          <Field label="Subject" value={ex.subject} />
-          <Field label="Reference no." value={ex.referenceNumber} />
-          <Field label="Date on document" value={ex.documentDate ? fmtDate(ex.documentDate) : null} />
-        </dl>
+        <div className="border-t border-border/10 pt-2.5 grid gap-3 sm:grid-cols-2 text-xs">
+          {ex.authority && (
+            <div className="space-y-0.5">
+              <span className="text-[10px] text-muted-foreground/60 font-semibold uppercase">Extracted Authority</span>
+              <span className="font-bold text-foreground block">{ex.authority}</span>
+            </div>
+          )}
+          {ex.subject && (
+            <div className="space-y-0.5">
+              <span className="text-[10px] text-muted-foreground/60 font-semibold uppercase">Extracted Subject</span>
+              <span className="font-bold text-foreground block line-clamp-2">{ex.subject}</span>
+            </div>
+          )}
+          {ex.referenceNumber && (
+            <div className="space-y-0.5">
+              <span className="text-[10px] text-muted-foreground/60 font-semibold uppercase">Reference Code</span>
+              <span className="font-bold text-foreground block font-mono">{ex.referenceNumber}</span>
+            </div>
+          )}
+          {ex.documentDate && (
+            <div className="space-y-0.5">
+              <span className="text-[10px] text-muted-foreground/60 font-semibold uppercase">Document Date</span>
+              <span className="font-bold text-foreground block">{fmtDate(ex.documentDate)}</span>
+            </div>
+          )}
+        </div>
       )}
 
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => onView(doc.pdf_path)}>
-          <ExternalLink className="h-3.5 w-3.5" /> View PDF
+      {/* Row action tools */}
+      <div className="border-t border-border/10 pt-2.5 flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={() => onView(doc.pdf_path)} className="font-semibold text-xs bg-white dark:bg-slate-900 border-border/60">
+          <ExternalLink className="h-3.5 w-3.5 mr-1" /> View Document
         </Button>
         {canEdit && (
           <>
-            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => onReprocess(doc.id)}>
-              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Re-run OCR &amp; AI
+            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => onReprocess(doc.id)} className="font-semibold text-xs bg-white dark:bg-slate-900 border-border/60">
+              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />} Re-run Sync
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="text-destructive" disabled={pending} onClick={() => onDelete(doc.id)}>
-              <Trash2 className="h-3.5 w-3.5" /> Delete
+            <Button type="button" size="sm" variant="ghost" className="text-destructive font-semibold text-xs" disabled={pending} onClick={() => onDelete(doc.id)}>
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
             </Button>
           </>
         )}
@@ -220,16 +255,16 @@ export function RtiDocumentsPanel({
   );
 
   return (
-    <Card className="mt-6">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <FileText className="h-5 w-5 text-primary" /> Documents
-          <span className="text-sm font-normal text-muted-foreground">({documents.length})</span>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 border-b border-border/20">
+        <CardTitle className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wider text-muted-foreground/80">
+          <FileText className="h-4.5 w-4.5 text-primary" /> Case Documents
+          <span className="text-xs font-normal text-muted-foreground">({documents.length})</span>
         </CardTitle>
         {canEdit ? (
           !adding && (
-            <Button type="button" size="sm" onClick={() => setAdding(true)}>
-              <Plus className="h-4 w-4" /> Add document
+            <Button type="button" size="sm" onClick={() => setAdding(true)} className="font-semibold text-xs">
+              <Plus className="h-4 w-4 mr-1" /> Add Document
             </Button>
           )
         ) : (
@@ -238,9 +273,9 @@ export function RtiDocumentsPanel({
           </span>
         )}
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="pt-4 space-y-4">
         {adding && (
-          <div className="rounded-lg border bg-muted/20 p-4">
+          <div className="rounded-xl border bg-muted/5 p-4 animate-page-slide">
             <DocumentCapture
               rtiId={rtiId}
               existingTypes={documents.map((d) => d.doc_type)}
@@ -250,12 +285,27 @@ export function RtiDocumentsPanel({
         )}
 
         {documents.length === 0 && !adding ? (
-          <EmptyState
-            title="No documents yet"
-            description="Scan a PDF or capture photos of the filed RTI and its acknowledgement. They are merged into one PDF, OCR'd, and summarised — and the reply countdown starts from the filing date."
-          />
+          <div className="border border-dashed border-border/60 rounded-xl p-8 text-center space-y-4 bg-muted/5 animate-page-slide">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-cyan-100 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400">
+              <UploadCloud className="h-6 w-6" />
+            </div>
+            <div className="space-y-1.5 max-w-sm mx-auto">
+              <h4 className="text-sm font-bold text-foreground">No case documents uploaded</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Scan or capture photos of the filed RTI, acknowledgements, or responses. They are automatically merged, OCR-indexed, and summarized.
+              </p>
+            </div>
+            <div className="text-[10px] text-muted-foreground/60 font-semibold">
+              Supported formats: PDF, PNG, JPG (Auto-PDF compilation)
+            </div>
+            {canEdit && (
+              <Button type="button" size="sm" onClick={() => setAdding(true)} className="font-semibold text-xs">
+                <Plus className="h-3.5 w-3.5 mr-1" /> Upload Case Document
+              </Button>
+            )}
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {documents.map((doc) => (
               <DocumentRow
                 key={doc.id}

@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   },
   description:
     "Trace any Bengaluru locality across the 198 → 225 → 369 ward restructures and reach the responsible engineering sub-division.",
+  icons: {
+    icon: "/icon.svg?v=4",
+  },
 };
 
 export default async function RootLayout({
@@ -44,9 +47,7 @@ export default async function RootLayout({
           <div className="flex min-h-screen flex-col">
             <TopNav email={user?.email ?? null} role={user?.role ?? null} />
             <div className="flex flex-1">
-              <aside className="sticky top-13 hidden h-[calc(100vh-3.25rem)] w-56 shrink-0 overflow-y-auto border-r bg-card/80 lg:block">
-                <Sidebar />
-              </aside>
+              <Sidebar />
               <main
                 id="main-content"
                 className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10"

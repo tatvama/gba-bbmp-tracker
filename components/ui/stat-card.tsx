@@ -5,15 +5,47 @@ import { cn } from "@/lib/utils";
 import { StatCardValue } from "./stat-card-value";
 
 /**
- * Everything defined in THIS file is a plain (server-compatible) component —
- * no hooks, no browser APIs — so a Server Component page can pass an icon
- * component REFERENCE (e.g. Building2 from lucide-react) straight through as a
- * prop. Only StatCardValue needs client interactivity (its mount-count-up
- * animation), so it lives in its own "use client" module (./stat-card-value)
- * and is re-exported below. Keeping it in this file would force every export
- * here to be a Client Component, and a raw icon reference isn't serializable
- * across that boundary — see the "Only plain objects can be passed to Client
- * Components" RSC error this file was split to fix.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * COMPONENT DOCUMENTATION: StatCard
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Purpose:
+ *   Standardized card components for rendering statistical figures, summary
+ *   metrics, and indicators on dashboards.
+ *
+ * Usage:
+ *   ```tsx
+ *   import { StatCard, StatCardRow, StatCardIcon, StatCardValue, StatCardLabel } from "@/components/ui/stat-card";
+ *   import { Building2 } from "lucide-react";
+ *
+ *   <StatCard href="/wards">
+ *     <StatCardRow>
+ *       <StatCardValue value={142} />
+ *       <StatCardLabel>Total Wards</StatCardLabel>
+ *       <StatCardSub>All active jurisdictions</StatCardSub>
+ *       <StatCardIcon icon={Building2} bgClassName="bg-primary/10" className="text-primary" />
+ *     </StatCardRow>
+ *   </StatCard>
+ *   ```
+ *
+ * Props (StatCard):
+ *   - href (string, optional): Navigation link when the card is interactive.
+ *   - children (React.ReactNode): Metric elements.
+ *   - className (string, optional): Style override classes.
+ *
+ * Responsive Behavior:
+ *   - Scales dynamically in CSS grid systems. Values stack neatly on narrow screens.
+ *
+ * Accessibility:
+ *   - Wrapped in <Link> with visual active states when interactive.
+ *   - Number output uses tabular-nums class for screen reader reading stability.
+ *
+ * Do's:
+ *   - Do use tabular numbers (StatCardValue) to align digits vertically.
+ *   - Do specify secondary description labels.
+ *
+ * Don'ts:
+ *   - Don't apply custom drop shadows or gradients outside standard HSL tokens.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 function StatCard({
@@ -30,7 +62,7 @@ function StatCard({
   const card = (
     <div
       className={cn(
-        "stat-card group-hover:border-primary/30 flex h-full flex-col rounded-xl border bg-card p-4",
+        "stat-card flex h-full flex-col rounded-xl border border-border/50 bg-card p-4 transition-all duration-250 ease-out hover:border-primary/20 hover:shadow-xs",
         className,
       )}
       style={style}
@@ -39,7 +71,7 @@ function StatCard({
     </div>
   );
   return href ? (
-    <Link href={href} className="group block">
+    <Link href={href} className="group block active:scale-[0.99] transition-transform duration-100">
       {card}
     </Link>
   ) : (
@@ -48,7 +80,7 @@ function StatCard({
 }
 
 function StatCardRow({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-start justify-between gap-2">{children}</div>;
+  return <div className="flex items-start justify-between gap-3">{children}</div>;
 }
 
 function StatCardIcon({
@@ -61,22 +93,22 @@ function StatCardIcon({
   bgClassName?: string;
 }) {
   return (
-    <div className={cn("shrink-0 rounded-lg p-2", bgClassName)}>
-      <Icon className={cn("h-4 w-4", className)} />
+    <div className={cn("shrink-0 rounded-lg p-2 transition-all duration-250 group-hover:scale-[1.03] group-hover:shadow-3xs", bgClassName)}>
+      <Icon className={cn("h-4.5 w-4.5", className)} />
     </div>
   );
 }
 
 function StatCardLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-2 break-words text-xs font-semibold leading-tight text-foreground/80">
+    <p className="mt-1.5 break-words text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 leading-normal">
       {children}
     </p>
   );
 }
 
 function StatCardSub({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] text-muted-foreground">{children}</p>;
+  return <p className="text-[10px] font-medium text-muted-foreground/50 mt-0.5">{children}</p>;
 }
 
 function StatCardTrend({

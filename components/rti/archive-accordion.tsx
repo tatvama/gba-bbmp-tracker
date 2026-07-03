@@ -144,7 +144,7 @@ export function ArchiveAccordion({
                       variant="outline"
                       size="sm"
                       disabled={isPending}
-                      className="text-xs h-7.5 gap-1 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      className="text-xs h-8 gap-1 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                       onClick={() => onViewCopy(arch.ack_image_path)}
                     >
                       <Eye className="h-3.5 w-3.5 text-slate-400" />
@@ -155,7 +155,7 @@ export function ArchiveAccordion({
                       variant="outline"
                       size="sm"
                       disabled={isPending}
-                      className="text-xs h-7.5 gap-1 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      className="text-xs h-8 gap-1 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                       onClick={() => onDownloadCopy(arch.ack_image_path)}
                     >
                       <FileDown className="h-3.5 w-3.5 text-slate-400" />

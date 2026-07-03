@@ -18,6 +18,7 @@ import { ReplyForm, ActionForm, CommunicationForm, EscalationForm } from "@/comp
 import { ComplaintAiDrafts } from "@/components/complaints/complaint-ai-drafts";
 import { completeComplaintReminder } from "@/lib/actions/complaints";
 import { formatDate, formatDateTime, orDash } from "@/lib/format";
+import { Folder, MapPin, Activity, Clock, FileText } from "lucide-react";
 import type {
   ComplaintWithRelations, ComplaintDocument, ComplaintTimelineEntry,
   ComplaintReply, ComplaintActionTaken, CommunicationLog, Reminder, AiDraft, AuditLog,
@@ -54,45 +55,160 @@ export function ComplaintTabs({
   }
 
   return (
-    <Tabs defaultValue={initialTab}>
-      <div className="overflow-x-auto">
-        <TabsList className="mb-4 inline-flex w-max">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="correspondence">Correspondence</TabsTrigger>
-          <TabsTrigger value="documents">Documents &amp; OCR ({documents.length + jobDocuments.length})</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="replies">Replies ({replies.length})</TabsTrigger>
-          <TabsTrigger value="actions">Action Taken ({actions.length})</TabsTrigger>
-          <TabsTrigger value="comms">Communications ({communications.length})</TabsTrigger>
-          <TabsTrigger value="followups">Follow-ups ({reminders.filter((r) => r.status === "Pending").length})</TabsTrigger>
-          <TabsTrigger value="escalations">Escalations ({escalations.length})</TabsTrigger>
-          <TabsTrigger value="ai">AI Drafts</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
-        </TabsList>
+    <Tabs defaultValue={initialTab} className="space-y-6">
+      {/* Sticky Tab Navigation Bar */}
+      <div className="sticky top-[62px] z-25 bg-background/95 backdrop-blur py-3 border-b border-slate-150/85 -mx-4 md:-mx-6 px-4 md:px-6 no-print">
+        <div className="overflow-x-auto scrollbar-none">
+          <TabsList className="inline-flex w-max bg-slate-100/60 dark:bg-slate-900/60 p-1 rounded-xl gap-1 border border-slate-200/50 dark:border-slate-800">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Overview</TabsTrigger>
+            <TabsTrigger value="correspondence" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Correspondence</TabsTrigger>
+            <TabsTrigger value="documents" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Documents &amp; OCR ({documents.length + jobDocuments.length})</TabsTrigger>
+            <TabsTrigger value="timeline" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Timeline</TabsTrigger>
+            <TabsTrigger value="replies" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Replies ({replies.length})</TabsTrigger>
+            <TabsTrigger value="actions" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Action Taken ({actions.length})</TabsTrigger>
+            <TabsTrigger value="comms" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Communications ({communications.length})</TabsTrigger>
+            <TabsTrigger value="followups" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Follow-ups ({reminders.filter((r) => r.status === "Pending").length})</TabsTrigger>
+            <TabsTrigger value="escalations" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Escalations ({escalations.length})</TabsTrigger>
+            <TabsTrigger value="ai" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">AI Drafts</TabsTrigger>
+            <TabsTrigger value="audit" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Audit</TabsTrigger>
+          </TabsList>
+        </div>
       </div>
 
-      <TabsContent value="overview">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card><CardContent className="pt-6">
-            <DetailRow label="Internal case number"><span className="font-mono">{orDash(c.internal_case_number)}</span></DetailRow>
-            <DetailRow label="External complaint no.">{orDash(c.complaint_number)}</DetailRow>
-            <DetailRow label="Type">{c.type}{c.complaint_subtype ? ` / ${c.complaint_subtype}` : ""}</DetailRow>
-            <DetailRow label="Priority / impact">{orDash(c.priority)}{c.public_impact ? ` · ${c.public_impact}` : ""}</DetailRow>
-            <DetailRow label="Complaint given">{formatDate(c.date_submitted)}</DetailRow>
-            <DetailRow label="Acknowledged">{formatDate(c.acknowledgment_date)}</DetailRow>
-            <DetailRow label="Filed mode / to">{orDash(c.complaint_mode)}{c.complaint_filed_to ? ` → ${c.complaint_filed_to}` : ""}</DetailRow>
-          </CardContent></Card>
-          <Card><CardContent className="pt-6">
-            <DetailRow label="Ward">{c.ward ? `${c.ward.new_no} · ${c.ward.new_name}` : "—"}</DetailRow>
-            <DetailRow label="Division / sub-division">{orDash(c.division?.name)}{c.eng_subdivision ? ` · ${c.eng_subdivision.name}` : ""}</DetailRow>
-            <DetailRow label="Assigned engineer">{c.assigned_engineer ? `${c.assigned_engineer.full_name} — ${c.assigned_engineer.designation}` : "—"}</DetailRow>
-            <DetailRow label="Responsible department">{orDash(c.responsible_department)}</DetailRow>
-            <DetailRow label="Latest reply">{c.latest_reply_date ? `${formatDate(c.latest_reply_date)} — ${orDash(c.latest_reply_summary)}` : "No reply yet"}</DetailRow>
-            <DetailRow label="Latest action taken">{c.latest_action_taken_date ? `${formatDate(c.latest_action_taken_date)} — ${orDash(c.latest_action_taken_summary)}` : "None recorded"}</DetailRow>
-            <DetailRow label="Next follow-up">{formatDate(c.next_follow_up_date)}</DetailRow>
-          </CardContent></Card>
+      <TabsContent value="overview" className="space-y-6 animate-in fade-in duration-200">
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Card 1: Case Information */}
+          <Card className="border border-slate-150 dark:border-slate-850 bg-card rounded-xl shadow-2xs overflow-hidden flex flex-col">
+            <CardContent className="p-6 flex-1 flex flex-col space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+                <Folder className="h-5 w-5 text-primary shrink-0" />
+                <h3 className="text-[15px] font-black text-slate-900 dark:text-slate-150 uppercase tracking-wider">Case Information</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4 flex-1">
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Internal Case Number</span>
+                  <span className="font-mono text-sm font-extrabold text-slate-800 dark:text-slate-205">{orDash(c.internal_case_number)}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">External Complaint No</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{orDash(c.complaint_number)}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Type</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{c.type}{c.complaint_subtype ? ` / ${c.complaint_subtype}` : ""}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Filed Mode &amp; Recipient</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{orDash(c.complaint_mode)}{c.complaint_filed_to ? ` → ${c.complaint_filed_to}` : ""}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Location & Assignment */}
+          <Card className="border border-slate-150 dark:border-slate-850 bg-card rounded-xl shadow-2xs overflow-hidden flex flex-col">
+            <CardContent className="p-6 flex-1 flex flex-col space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+                <MapPin className="h-5 w-5 text-primary shrink-0" />
+                <h3 className="text-[15px] font-black text-slate-900 dark:text-slate-150 uppercase tracking-wider">Location &amp; Assignment</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4 flex-1">
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Ward Details</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{c.ward ? `${c.ward.new_no} · ${c.ward.new_name}` : "—"}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Division / Sub-Division</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{orDash(c.division?.name)}{c.eng_subdivision ? ` · ${c.eng_subdivision.name}` : ""}</span>
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Assigned Engineer</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{c.assigned_engineer ? `${c.assigned_engineer.full_name} (${c.assigned_engineer.designation})` : "—"}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 3: Status & Metadata */}
+          <Card className="border border-slate-150 dark:border-slate-850 bg-card rounded-xl shadow-2xs overflow-hidden flex flex-col">
+            <CardContent className="p-6 flex-1 flex flex-col space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+                <Clock className="h-5 w-5 text-primary shrink-0" />
+                <h3 className="text-[15px] font-black text-slate-900 dark:text-slate-150 uppercase tracking-wider">Status &amp; Timeline</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4 flex-1">
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Priority / Impact</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{orDash(c.priority)}{c.public_impact ? ` · ${c.public_impact}` : ""}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Complaint Given Date</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{formatDate(c.date_submitted)}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Acknowledged Date</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{formatDate(c.acknowledgment_date)}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Next Follow-up</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{formatDate(c.next_follow_up_date)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 4: Action & Reply Snapshot */}
+          <Card className="border border-slate-150 dark:border-slate-850 bg-card rounded-xl shadow-2xs overflow-hidden flex flex-col">
+            <CardContent className="p-6 flex-1 flex flex-col space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+                <Activity className="h-5 w-5 text-primary shrink-0" />
+                <h3 className="text-[15px] font-black text-slate-900 dark:text-slate-150 uppercase tracking-wider">Action &amp; Reply Snapshot</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-4 flex-1">
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Responsible Department</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{orDash(c.responsible_department)}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Latest Reply Summary</span>
+                  <span className="text-sm font-extrabold text-slate-850 dark:text-slate-205">{c.latest_reply_date ? `${formatDate(c.latest_reply_date)} — ${orDash(c.latest_reply_summary)}` : "No reply yet"}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Latest Action Taken Summary</span>
+                  <span className="text-sm font-extrabold text-slate-850 dark:text-slate-250">{c.latest_action_taken_date ? `${formatDate(c.latest_action_taken_date)} — ${orDash(c.latest_action_taken_summary)}` : "None recorded"}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        {c.description && <Card className="mt-6"><CardContent className="pt-6"><DetailRow label="Description">{c.description}</DetailRow>{c.requested_action && <DetailRow label="Requested action">{c.requested_action}</DetailRow>}</CardContent></Card>}
+
+        {/* Rich Document Card for Description */}
+        {c.description && (
+          <Card className="border border-slate-150 dark:border-slate-850 bg-card rounded-xl shadow-2xs overflow-hidden">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+                <FileText className="h-5 w-5 text-primary shrink-0" />
+                <h3 className="text-[15px] font-black text-slate-900 dark:text-slate-150 uppercase tracking-wider">Detailed Description &amp; Scope</h3>
+              </div>
+              <div className="max-w-3xl space-y-4">
+                <div className="space-y-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Complaint narrative</span>
+                  <p className="text-sm text-slate-800 dark:text-slate-300 leading-relaxed font-semibold">
+                    {c.description}
+                  </p>
+                </div>
+                {c.requested_action && (
+                  <div className="space-y-1 pt-2">
+                    <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Requested Action</span>
+                    <p className="text-sm text-slate-800 dark:text-slate-350 leading-relaxed font-semibold italic">
+                      {c.requested_action}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </TabsContent>
 
       <TabsContent value="correspondence">

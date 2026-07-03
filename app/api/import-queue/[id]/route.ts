@@ -8,6 +8,7 @@ import { appendChunkAt, deleteStagedFile, looksLikeZip, stagedPathFor } from "@/
 import { kickImportWorker } from "@/lib/import-queue/worker";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**

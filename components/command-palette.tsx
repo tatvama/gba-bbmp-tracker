@@ -6,6 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Search, ArrowRight, CornerDownLeft, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav/nav-items";
+import { KbdShortcut } from "@/components/kbd-shortcut";
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false);
@@ -182,7 +183,7 @@ export function CommandPalette() {
             </span>
             <span className="ml-auto">
               Press{" "}
-              <kbd className="rounded border bg-card px-1">⌘K</kbd> anytime
+              <KbdShortcut className="px-1" /> anytime
             </span>
           </div>
         </Dialog.Content>

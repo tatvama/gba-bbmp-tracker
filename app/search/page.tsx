@@ -15,6 +15,7 @@ import { CorpPill, VerificationBadge } from "@/components/badges";
 import { SearchBox } from "@/components/search-box";
 import { globalSearch } from "@/lib/queries";
 import { formatPhone } from "@/lib/phone";
+import { KbdShortcut } from "@/components/kbd-shortcut";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ export default async function SearchPage({
             Type a ward number, officer name, phone, or AC name to search.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Also press <kbd className="rounded border bg-card px-1.5 py-0.5 text-[10px]">⌘K</kbd> from any page to search quickly.
+            Also press <KbdShortcut className="px-1.5 py-0.5" /> from any page to search quickly.
           </p>
         </div>
       )}

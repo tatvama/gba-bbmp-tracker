@@ -8,6 +8,7 @@ import { buildQuantityTable, buildRiskTable } from "@/lib/letters/tables";
 import type { LetterSkeleton, QuantityRow, LetterFinding } from "@/lib/letters/types";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**

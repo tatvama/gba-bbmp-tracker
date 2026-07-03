@@ -3,7 +3,40 @@
 import * as React from "react";
 import { formatNumber } from "@/lib/format";
 
-/** Animates 0 → value on mount (ease-out, ~500ms); skipped for non-numeric values or reduced-motion. */
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * COMPONENT DOCUMENTATION: StatCardValue
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Purpose:
+ *   Sub-component of StatCard. Animates number counting on mount (0 -> value).
+ *   Uses high-readability font configurations.
+ *
+ * Usage:
+ *   ```tsx
+ *   import { StatCardValue } from "@/components/ui/stat-card";
+ *
+ *   <StatCardValue value={142} />
+ *   ```
+ *
+ * Props:
+ *   - value (number | string): Number/text value to render.
+ *   - animate (boolean, optional): Set to true to animate count-up on mount.
+ *
+ * Responsive Behavior:
+ *   - Text sizes scale dynamically from 24px (mobile) to 30px (desktop).
+ *
+ * Accessibility:
+ *   - Uses tabular-nums class to prevent layouts shaking.
+ *   - Automatically skips animation when `prefers-reduced-motion` is matched.
+ *
+ * Do's:
+ *   - Do specify values as numbers to trigger counting animation.
+ *
+ * Don'ts:
+ *   - Don't wrap with custom text overrides.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 export function StatCardValue({ value, animate = true }: { value: number | string; animate?: boolean }) {
   const numeric = typeof value === "number";
   const [display, setDisplay] = React.useState<number | string>(numeric && animate ? 0 : value);
@@ -29,7 +62,7 @@ export function StatCardValue({ value, animate = true }: { value: number | strin
   }, [value, numeric, animate]);
 
   return (
-    <p className="text-2xl font-bold tabular-nums leading-none tracking-tight text-foreground">
+    <p className="text-2xl font-extrabold tabular-nums leading-none tracking-tight text-foreground/95 sm:text-3xl">
       {typeof display === "number" ? formatNumber(display) : display}
     </p>
   );
