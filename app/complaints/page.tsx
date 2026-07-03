@@ -14,12 +14,6 @@ export default async function ComplaintsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Complaint tracker"
-        description="Every civic complaint with internal case number, replies, action taken, documents (OCR/AI), and follow-up reminders."
-      >
-        <ComplaintsHeaderActions canEdit={canEdit} />
-      </PageHeader>
       <ComplaintTable data={complaints} canEdit={canEdit} />
     </div>
   );
