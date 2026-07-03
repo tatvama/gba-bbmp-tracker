@@ -31,13 +31,13 @@
     --ring:               27 80% 50%;
     --radius:             0.5rem;
 
-    /* ── Shadow system ───────────────────────────────────────────────────── */
-    --shadow-xs:    0 1px 2px 0 hsl(220 45% 16% / 0.04);
-    --shadow-sm:    0 1px 3px 0 hsl(220 45% 16% / 0.07), 0 1px 2px -1px hsl(220 45% 16% / 0.05);
-    --shadow-md:    0 4px 6px -1px hsl(220 45% 16% / 0.07), 0 2px 4px -2px hsl(220 45% 16% / 0.05);
-    --shadow-lg:    0 10px 15px -3px hsl(220 45% 16% / 0.08), 0 4px 6px -4px hsl(220 45% 16% / 0.05);
-    --shadow-xl:    0 20px 25px -5px hsl(220 45% 16% / 0.09), 0 8px 10px -6px hsl(220 45% 16% / 0.05);
-    --shadow-inset: inset 0 1px 2px hsl(220 45% 16% / 0.06);
+    /* ── Shadow system (Premium layered shadows) ────────────────────────── */
+    --shadow-xs:    0 1px 2px 0 hsl(220 45% 16% / 0.02);
+    --shadow-sm:    0 2px 4px 0 hsl(220 45% 16% / 0.03), 0 1px 2px -1px hsl(220 45% 16% / 0.02);
+    --shadow-md:    0 4px 12px -2px hsl(220 45% 16% / 0.04), 0 2px 6px -2px hsl(220 45% 16% / 0.02);
+    --shadow-lg:    0 12px 24px -4px hsl(220 45% 16% / 0.06), 0 4px 12px -4px hsl(220 45% 16% / 0.02);
+    --shadow-xl:    0 24px 48px -8px hsl(220 45% 16% / 0.08), 0 8px 24px -8px hsl(220 45% 16% / 0.04);
+    --shadow-inset: inset 0 1px 2px hsl(220 45% 16% / 0.04);
 
     /* ── Surface elevations ──────────────────────────────────────────────── */
     --surface-0: hsl(40 28% 97%);
@@ -66,12 +66,13 @@
     --input:             222 16% 20%;
     --ring:               30 78% 56%;
 
-    --shadow-xs:    0 1px 2px 0 hsl(0 0% 0% / 0.25);
-    --shadow-sm:    0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
-    --shadow-md:    0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
-    --shadow-lg:    0 10px 15px -3px hsl(0 0% 0% / 0.35), 0 4px 6px -4px hsl(0 0% 0% / 0.2);
-    --shadow-xl:    0 20px 25px -5px hsl(0 0% 0% / 0.4), 0 8px 10px -6px hsl(0 0% 0% / 0.25);
-    --shadow-inset: inset 0 1px 2px hsl(0 0% 0% / 0.2);
+    /* ── Shadow system (Dark mode) ───────────────────────────────────────── */
+    --shadow-xs:    0 1px 2px 0 hsl(0 0% 0% / 0.15);
+    --shadow-sm:    0 2px 4px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.15);
+    --shadow-md:    0 4px 12px -2px hsl(0 0% 0% / 0.25), 0 2px 6px -2px hsl(0 0% 0% / 0.15);
+    --shadow-lg:    0 12px 24px -4px hsl(0 0% 0% / 0.3), 0 4px 12px -4px hsl(0 0% 0% / 0.15);
+    --shadow-xl:    0 24px 48px -8px hsl(0 0% 0% / 0.35), 0 8px 24px -8px hsl(0 0% 0% / 0.2);
+    --shadow-inset: inset 0 1px 2px hsl(0 0% 0% / 0.15);
 
     --surface-0: hsl(222 36% 9%);
     --surface-1: hsl(222 34% 12%);
@@ -132,8 +133,9 @@
 
   /* ── Focus ───────────────────────────────────────────────────────────── */
   :focus-visible {
-    outline: 2px solid hsl(var(--ring));
+    outline: 2px solid hsl(var(--ring) / 0.85);
     outline-offset: 2px;
+    transition: outline-offset 150ms ease-out, outline-color 150ms ease-out;
     border-radius: calc(var(--radius) - 1px);
   }
 }
@@ -156,14 +158,49 @@
   to   { transform: translateX(100%); }
 }
 
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: hsl(var(--muted) / 0.65);
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--foreground) / 0.02) 20%,
+    hsl(var(--foreground) / 0.05) 60%,
+    transparent
+  );
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
 /* ── Stat cards ─────────────────────────────────────────────────────────── */
 .stat-card {
-  @apply transition-all duration-200;
+  @apply transition-all duration-200 ease-in-out border border-border/60 rounded-xl relative overflow-hidden bg-card;
   box-shadow: var(--shadow-xs);
 }
 .stat-card:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  border-color: hsl(var(--primary) / 0.25);
+  transform: translateY(-1.5px);
+}
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.4), transparent);
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+.stat-card:hover::before {
+  opacity: 1;
 }
 
 /* ── Data table ─────────────────────────────────────────────────────────── */
@@ -172,25 +209,25 @@
   border-spacing: 0;
 }
 .data-table thead th {
-  @apply sticky top-0 z-10 bg-muted/60;
+  @apply sticky top-0 z-10 bg-muted/65;
   @apply text-[11px] font-semibold uppercase tracking-wider text-muted-foreground;
   backdrop-filter: blur(8px);
   border-bottom: 1px solid hsl(var(--border));
 }
 .data-table tbody tr {
-  @apply transition-colors duration-100;
+  @apply transition-colors duration-150 ease-out;
 }
 .data-table tbody tr:hover {
-  @apply bg-primary/[0.03];
+  @apply bg-primary/[0.025];
 }
 .data-table tbody tr:nth-child(even) {
-  @apply bg-muted/20;
+  @apply bg-muted/10;
 }
 .data-table tbody tr:nth-child(even):hover {
-  @apply bg-primary/[0.03];
+  @apply bg-primary/[0.025];
 }
 .data-table td, .data-table th {
-  border-bottom: 1px solid hsl(var(--border) / 0.55);
+  border-bottom: 1px solid hsl(var(--border) / 0.45);
 }
 .data-table tbody tr:last-child td {
   border-bottom: none;
@@ -429,12 +466,38 @@
 
 /* ── Print ──────────────────────────────────────────────────────────────── */
 @media print {
-  .no-print { display: none !important; }
-  body { background: #fff; font-size: 11pt; }
-  .print-card { box-shadow: none !important; border: 1px solid #ccc; page-break-inside: avoid; }
-  table { page-break-inside: auto; }
-  tr    { page-break-inside: avoid; page-break-after: auto; }
-  thead { display: table-header-group; }
+  .no-print, button, input, select, textarea, [role="tablist"], .toolbar, header, nav, footer {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt !important;
+  }
+  .print-card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid !important;
+  }
+  .detail-section, tr, .card {
+    page-break-inside: avoid !important;
+  }
+  table {
+    page-break-inside: auto !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+  thead {
+    display: table-header-group !important;
+  }
+  th, td {
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+  }
 
   /* Letter print-isolation: when printing is triggered from a letter preview,
      body.printing-letter hides everything except the .print-letter block so

@@ -9,7 +9,7 @@ const buttonVariants = cva(
     "ring-offset-background transition-all duration-150",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2",
     "disabled:pointer-events-none disabled:opacity-50",
-    "active:scale-[0.97] active:duration-75",
+    "active:scale-[0.98] active:duration-75",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0",
   ].join(" "),
   {
