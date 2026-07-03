@@ -131,7 +131,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
     if (activeHelp !== key) return null;
     const meta = METAS[key];
     return (
-      <div className="mt-1 p-2.5 rounded-lg bg-blue-50/45 dark:bg-blue-950/20 text-xs text-blue-800 dark:text-blue-300 leading-normal border border-blue-105/40 dark:border-blue-900/30 animate-in fade-in duration-200">
+      <div className="mt-1 p-2.5 rounded-lg bg-blue-50/45 dark:bg-blue-950/20 text-xs text-blue-800 dark:text-blue-300 leading-normal border border-blue-100/40 dark:border-blue-900/30 animate-in fade-in duration-200">
         <p className="font-semibold mb-0.5">{meta.explanation}</p>
         {meta.example && <p className="text-[11px] text-blue-600 dark:text-blue-400 font-mono mt-0.5">{meta.example}</p>}
       </div>
@@ -156,16 +156,16 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* SECTION 1: Complaint Number Prefix & Start Sequence */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950 flex items-center justify-center shrink-0">
               <Binary className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 Complaint Number Indexing
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Case number prefix and sequence configurations
               </p>
             </div>
@@ -173,7 +173,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
           <CardContent className="p-4 space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Case Prefix
                   <button
                     type="button"
@@ -205,7 +205,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Starting Sequence
                   <button
                     type="button"
@@ -240,16 +240,16 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
         </Card>
 
         {/* SECTION 2: Workflow Rules */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center shrink-0">
               <Calendar className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 Workflow Timeline Rules
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Reminders and inspection verification triggers
               </p>
             </div>
@@ -258,7 +258,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             {/* Field: followUpDaysAfterFiling */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Follow-up After Filing
                   <button
                     type="button"
@@ -293,7 +293,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             {/* Field: followUpDaysAfterReply */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Follow-up After Reply
                   <button
                     type="button"
@@ -328,7 +328,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             {/* Field: siteVerificationDaysAfterAction */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Verification Days
                   <button
                     type="button"
@@ -363,16 +363,16 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
         </Card>
 
         {/* SECTION 3: OCR Language & Autostart */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-violet-50 dark:bg-violet-950 flex items-center justify-center shrink-0">
-              <Languages className="h-5 w-5 text-violet-605 dark:text-violet-400" />
+              <Languages className="h-5 w-5 text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 OCR Configuration
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 OCR scanning language and automation configs
               </p>
             </div>
@@ -380,7 +380,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
           <CardContent className="p-4 space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   OCR Language
                   <button
                     type="button"
@@ -412,7 +412,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             <div className="space-y-1">
               <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/10 group">
                 <div className="flex flex-col gap-1 pr-4 min-w-0">
-                  <span className="text-xs font-bold text-slate-850 dark:text-slate-205 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     Run OCR Automatically
                     <button
                       type="button"
@@ -423,7 +423,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
                       <Info className="h-3.5 w-3.5" />
                     </button>
                   </span>
-                  <span className="text-[10px] text-slate-450 dark:text-slate-400 leading-normal">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-400 leading-normal">
                     Initiates text extraction immediately on new document uploads.
                   </span>
                 </div>
@@ -444,16 +444,16 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
         </Card>
 
         {/* SECTION 4: AI summary configs */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-pink-50 dark:bg-pink-950 flex items-center justify-center shrink-0">
               <Brain className="h-5 w-5 text-pink-600 dark:text-pink-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 AI Configuration
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 AI-driven analysis and summary parameters
               </p>
             </div>
@@ -463,7 +463,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             <div className="space-y-1">
               <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/10 group">
                 <div className="flex flex-col gap-1 pr-4 min-w-0">
-                  <span className="text-xs font-bold text-slate-850 dark:text-slate-205 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     Generate AI Summary
                     <button
                       type="button"
@@ -474,7 +474,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
                       <Info className="h-3.5 w-3.5" />
                     </button>
                   </span>
-                  <span className="text-[10px] text-slate-450 dark:text-slate-400 leading-normal">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-400 leading-normal">
                     Triggers AI recap digest automatically when OCR scanner processing concludes.
                   </span>
                 </div>
@@ -495,16 +495,16 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
         </Card>
 
         {/* SECTION 5: Privacy Defaults */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-rose-50 dark:bg-rose-950 flex items-center justify-center shrink-0">
               <EyeOff className="h-5 w-5 text-rose-600 dark:text-rose-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 Privacy Configurations
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Access controls and security defaults
               </p>
             </div>
@@ -514,7 +514,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             <div className="space-y-1">
               <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/10 group">
                 <div className="flex flex-col gap-1 pr-4 min-w-0">
-                  <span className="text-xs font-bold text-slate-850 dark:text-slate-205 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     Private Documents
                     <button
                       type="button"
@@ -525,7 +525,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
                       <Info className="h-3.5 w-3.5" />
                     </button>
                   </span>
-                  <span className="text-[10px] text-slate-450 dark:text-slate-400 leading-normal">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-400 leading-normal">
                     Initial privacy settings status on new document copy uploads.
                   </span>
                 </div>
@@ -546,16 +546,16 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
         </Card>
 
         {/* SECTION 6: Upload Configurations */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950 flex items-center justify-center shrink-0">
-              <HardDrive className="h-5 w-5 text-amber-600 dark:text-amber-450" />
+              <HardDrive className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 Upload Configurations
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Attachment payload limits and memory restrictions
               </p>
             </div>
@@ -564,7 +564,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             {/* Field: maxUploadMb */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Maximum Upload Size
                   <button
                     type="button"
@@ -599,16 +599,16 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
         </Card>
 
         {/* SECTION 7: AI Advisor */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center shrink-0">
               <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 AI Advisor Configuration
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Background health scoring, recommendations and reminder/escalation SLAs
               </p>
             </div>
@@ -618,7 +618,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             <div className="space-y-1">
               <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/10 group">
                 <div className="flex flex-col gap-1 pr-4 min-w-0">
-                  <span className="text-xs font-bold text-slate-850 dark:text-slate-205 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     AI Advisor
                     <button
                       type="button"
@@ -629,7 +629,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
                       <Info className="h-3.5 w-3.5" />
                     </button>
                   </span>
-                  <span className="text-[10px] text-slate-450 dark:text-slate-400 leading-normal">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-400 leading-normal">
                     Analyses every complaint in the background and surfaces recommendations. Advisory only — never sends anything automatically.
                   </span>
                 </div>
@@ -650,7 +650,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             {/* Field: aiAdvisorReminderSlaDays */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Reminder SLA
                   <button
                     type="button"
@@ -685,7 +685,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
             {/* Field: aiAdvisorEscalationSlaDays */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-805 dark:text-slate-205 flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   Escalation SLA
                   <button
                     type="button"
@@ -722,7 +722,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
 
       {/* STICKY SAVE CHANGES ACTION BAR */}
       {isDirty && (
-        <div className="fixed bottom-4 left-4 right-4 md:left-64 md:right-4 z-40 bg-slate-900 text-slate-100 p-3.5 rounded-xl shadow-xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-3 duration-250 border border-slate-805">
+        <div className="fixed bottom-4 left-4 right-4 md:left-64 md:right-4 z-40 bg-slate-900 text-slate-100 p-3.5 rounded-xl shadow-xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-3 duration-250 border border-slate-800">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
             <span className="text-xs font-bold tracking-tight">Unsaved Configuration Changes</span>

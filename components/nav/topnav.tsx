@@ -67,7 +67,7 @@ export function TopNav({ email, role }: UserMenuProps) {
             GBA
           </span>
           <div className="hidden flex-col sm:flex">
-            <span className="text-[13px] font-bold leading-tight text-slate-850 dark:text-slate-200 tracking-tight">
+            <span className="text-[13px] font-bold leading-tight text-slate-800 dark:text-slate-200 tracking-tight">
               BBMP Ward Tracker
             </span>
             <span className="text-[10px] font-medium leading-none text-slate-400 dark:text-slate-500 mt-0.5">
@@ -81,12 +81,12 @@ export function TopNav({ email, role }: UserMenuProps) {
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:block">
         <button
           onClick={openPalette}
-          className="h-9 w-[320px] flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-55 px-3 text-xs text-slate-450 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/35 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-slate-900/60 dark:hover:text-slate-305 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-800"
+          className="h-9 w-[320px] flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-400 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/35 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-slate-900/60 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-800"
           aria-label="Open command palette"
         >
-          <Search className="h-3.5 w-3.5 shrink-0 opacity-80 text-slate-405" />
+          <Search className="h-3.5 w-3.5 shrink-0 opacity-80 text-slate-400" />
           <span className="flex-1 text-left font-medium">Search wards, contacts…</span>
-          <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 select-none rounded border border-slate-200 bg-white px-1.5 font-mono text-[10px] font-medium text-slate-450 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 shadow-2xs">
+          <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 select-none rounded border border-slate-200 bg-white px-1.5 font-mono text-[10px] font-medium text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 shadow-2xs">
             ⌘K
           </kbd>
         </button>

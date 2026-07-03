@@ -241,7 +241,7 @@ export function ScanCapture({
             </p>
             {uploaded.aiSummary && (
               <div className="mt-2 text-xs bg-emerald-100/30 text-emerald-900 p-2.5 rounded border border-emerald-200/50 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/30 max-w-xl">
-                <span className="font-semibold block mb-1 text-emerald-850 dark:text-emerald-200">Extracted AI Summary:</span>
+                <span className="font-semibold block mb-1 text-emerald-800 dark:text-emerald-200">Extracted AI Summary:</span>
                 <p className="leading-relaxed">{uploaded.aiSummary}</p>
               </div>
             )}

@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
+import { DataToolbar, DataToolbarSearch } from "@/components/ui/data-toolbar";
 import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { formatDate } from "@/lib/format";
@@ -42,11 +43,19 @@ export function PrintQueueList({ letters }: { letters: PrintQueueLetter[] }) {
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
 
-  const pending = letters.filter((l) => l.printStatus === "pending");
+  const q = search.trim().toLowerCase();
+  const matches = (l: PrintQueueLetter) =>
+    !q ||
+    (l.complaintTitle ?? "").toLowerCase().includes(q) ||
+    (l.caseNumber ?? "").toLowerCase().includes(q) ||
+    (l.jobNumber ?? "").toLowerCase().includes(q);
+
+  const pending = letters.filter((l) => l.printStatus === "pending" && matches(l));
   // Printed but the complaint hasn't been filed yet — still needs a human
   // to walk it to the post office / hand it over and record that step.
-  const awaitingSubmit = letters.filter((l) => l.printStatus === "printed" && l.complaintStatus === "Draft");
+  const awaitingSubmit = letters.filter((l) => l.printStatus === "printed" && l.complaintStatus === "Draft" && matches(l));
 
   async function doPrint(letter: PrintQueueLetter) {
     setError(null);
@@ -99,6 +108,10 @@ export function PrintQueueList({ letters }: { letters: PrintQueueLetter[] }) {
 
   return (
     <div className="space-y-6">
+      <DataToolbar className="mb-0">
+        <DataToolbarSearch value={search} onChange={setSearch} placeholder="Search complaint, case #, job #…" />
+      </DataToolbar>
+
       {error && (
         <p className="flex items-center gap-1.5 rounded-lg border border-rose-200/60 bg-rose-50/40 p-3 text-sm text-rose-600 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-400">
           <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
@@ -108,7 +121,7 @@ export function PrintQueueList({ letters }: { letters: PrintQueueLetter[] }) {
       {/* pending: never printed */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Waiting to print
           </h2>
           <Badge variant="warning" className="text-[10px]">{pending.length}</Badge>
@@ -134,7 +147,7 @@ export function PrintQueueList({ letters }: { letters: PrintQueueLetter[] }) {
       {/* printed but not yet submitted */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Printed — not yet submitted
           </h2>
           <Badge variant="info" className="text-[10px]">{awaitingSubmit.length}</Badge>
@@ -183,7 +196,7 @@ function LetterCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.2 }}
-      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="rounded-xl border bg-card p-4 shadow-sm"
     >
       <div className="flex flex-wrap items-start gap-3">
         <div className={`rounded-lg p-2 ${l.printStatus === "printed" ? "bg-blue-100 dark:bg-blue-950/40" : "bg-amber-100 dark:bg-amber-950/40"}`}>
@@ -197,11 +210,11 @@ function LetterCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {l.complaintId ? (
-              <Link href={`/complaints/${l.complaintId}`} className="truncate text-sm font-semibold text-slate-800 hover:text-primary dark:text-slate-200">
+              <Link href={`/complaints/${l.complaintId}`} className="truncate text-sm font-semibold text-foreground hover:text-primary">
                 {l.complaintTitle || "Complaint"}
               </Link>
             ) : (
-              <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">{l.complaintTitle || "Complaint"}</span>
+              <span className="truncate text-sm font-semibold text-foreground">{l.complaintTitle || "Complaint"}</span>
             )}
             {l.riskBand && (
               <Badge variant={RISK_BADGE[l.riskBand] ?? "muted"} className="text-[10px]">
@@ -209,12 +222,12 @@ function LetterCard({
               </Badge>
             )}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
             <span className="font-mono">{l.caseNumber ?? "no case #"}</span>
             {l.jobNumber && <> · job <span className="font-mono">{l.jobNumber}</span></>}
             {l.language && <> · {l.language}</>}
           </p>
-          <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3" /> queued {fmtDateTime(l.createdAt)}
           </p>
           {l.printStatus === "printed" && (

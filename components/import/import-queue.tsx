@@ -413,7 +413,7 @@ export function ImportQueue({ presetFiles }: { presetFiles?: File[] } = {}) {
             className={`group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-all ${
               dragOver
                 ? "border-primary bg-primary/5 scale-[1.01]"
-                : "border-slate-250 bg-slate-50/40 hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50"
+                : "border-slate-200 bg-slate-50/40 hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50"
             }`}
           >
             <div className="rounded-2xl bg-primary/10 p-3 transition-transform group-hover:-translate-y-0.5">

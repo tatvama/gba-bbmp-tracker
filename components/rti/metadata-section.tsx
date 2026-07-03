@@ -53,7 +53,7 @@ export function MetadataSection({ meta, rti, isLoading }: MetadataSectionProps) 
             <Skeleton className="h-4 w-4 rounded-full" />
             <Skeleton className="h-4 w-36" />
           </div>
-          <div className="border border-slate-150 dark:border-slate-800 p-4 rounded-xl space-y-4 bg-white dark:bg-slate-900/40">
+          <div className="border border-slate-100 dark:border-slate-800 p-4 rounded-xl space-y-4 bg-white dark:bg-slate-900/40">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="grid grid-cols-12 gap-4">
                 <Skeleton className="h-3.5 col-span-4" />
@@ -69,7 +69,7 @@ export function MetadataSection({ meta, rti, isLoading }: MetadataSectionProps) 
             <Skeleton className="h-4 w-4 rounded-full" />
             <Skeleton className="h-4 w-36" />
           </div>
-          <div className="border border-slate-150 dark:border-slate-800 p-4 rounded-xl space-y-4 bg-white dark:bg-slate-900/40">
+          <div className="border border-slate-100 dark:border-slate-800 p-4 rounded-xl space-y-4 bg-white dark:bg-slate-900/40">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="grid grid-cols-12 gap-4">
                 <Skeleton className="h-3.5 col-span-4" />
@@ -92,9 +92,9 @@ export function MetadataSection({ meta, rti, isLoading }: MetadataSectionProps) 
               <FileText className="h-4 w-4 text-slate-400 shrink-0" />
               Document Information
             </h4>
-            <Separator className="mt-2 bg-slate-100 dark:bg-slate-850" />
+            <Separator className="mt-2 bg-slate-100 dark:bg-slate-800" />
           </div>
-          <dl className="space-y-0.5 bg-white dark:bg-slate-900/45 p-4 rounded-xl border border-slate-250/35 dark:border-slate-800/80 shadow-sm">
+          <dl className="space-y-0.5 bg-white dark:bg-slate-900/45 p-4 rounded-xl border border-slate-200/35 dark:border-slate-800/80 shadow-sm">
             <DescriptionRow
               label="File Name"
               value={meta.originalFileName || meta.fileName || "—"}
@@ -131,9 +131,9 @@ export function MetadataSection({ meta, rti, isLoading }: MetadataSectionProps) 
               <Cpu className="h-4 w-4 text-slate-400 shrink-0" />
               Processing Information
             </h4>
-            <Separator className="mt-2 bg-slate-100 dark:bg-slate-850" />
+            <Separator className="mt-2 bg-slate-100 dark:bg-slate-800" />
           </div>
-          <dl className="space-y-0.5 bg-white dark:bg-slate-900/45 p-4 rounded-xl border border-slate-250/35 dark:border-slate-800/80 shadow-sm">
+          <dl className="space-y-0.5 bg-white dark:bg-slate-900/45 p-4 rounded-xl border border-slate-200/35 dark:border-slate-800/80 shadow-sm">
             <DescriptionRow
               label="OCR Engine"
               value={meta.ocrEngine || "—"}
@@ -169,9 +169,9 @@ export function MetadataSection({ meta, rti, isLoading }: MetadataSectionProps) 
             <User className="h-4 w-4 text-slate-400 shrink-0" />
             Applicant Information
           </h4>
-          <Separator className="mt-2 bg-slate-100 dark:bg-slate-850" />
+          <Separator className="mt-2 bg-slate-100 dark:bg-slate-800" />
         </div>
-        <dl className="space-y-0.5 bg-white dark:bg-slate-900/45 p-4 rounded-xl border border-slate-250/35 dark:border-slate-800/80 shadow-sm">
+        <dl className="space-y-0.5 bg-white dark:bg-slate-900/45 p-4 rounded-xl border border-slate-200/35 dark:border-slate-800/80 shadow-sm">
           <DescriptionRow
             label="Name"
             value={rti.applicant_name || "—"}

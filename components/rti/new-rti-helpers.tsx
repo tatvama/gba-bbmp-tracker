@@ -9,7 +9,7 @@ export function NewRtiIntro() {
 
   return (
     <div className="border-b border-slate-200/60 dark:border-slate-800/80 pb-3">
-      <h1 className="text-2xl sm:text-2.5xl font-extrabold text-slate-900 dark:text-slate-55 tracking-tight">
+      <h1 className="text-2xl sm:text-2.5xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">
         New RTI Application
       </h1>
       
@@ -44,7 +44,7 @@ export function NewRtiIntro() {
       </div>
 
       {/* Desktop view description (static full version) */}
-      <p className="hidden md:block text-xs text-slate-500 dark:text-slate-405 leading-relaxed mt-1.5 max-w-3xl font-medium">
+      <p className="hidden md:block text-xs text-slate-500 dark:text-slate-400 leading-relaxed mt-1.5 max-w-3xl font-medium">
         Create a new RTI record to begin tracking the complete RTI lifecycle.
         After saving, you will upload the RTI Application and Filing Acknowledgement.
         The statutory reply countdown begins once the acknowledgement is confirmed.
@@ -79,7 +79,7 @@ export function NewRtiStepper() {
               1
             </div>
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-850 dark:text-slate-200">Basic Information</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Basic Information</span>
               <span className="text-[10px] text-primary font-semibold">Active</span>
             </div>
           </div>
@@ -88,12 +88,12 @@ export function NewRtiStepper() {
 
           {/* Step 2 */}
           <div className="flex items-center gap-2.5 opacity-60">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
               2
             </div>
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400">Upload Documents</span>
-              <span className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold">Pending</span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Upload Documents</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">Pending</span>
             </div>
           </div>
 
@@ -101,12 +101,12 @@ export function NewRtiStepper() {
 
           {/* Step 3 */}
           <div className="flex items-center gap-2.5 opacity-60">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
               3
             </div>
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400">Verification</span>
-              <span className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold">Pending</span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Verification</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">Pending</span>
             </div>
           </div>
 
@@ -114,12 +114,12 @@ export function NewRtiStepper() {
 
           {/* Step 4 */}
           <div className="flex items-center gap-2.5 opacity-60">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold border dark:border-slate-700">
               4
             </div>
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400">RTI Tracking</span>
-              <span className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold">Pending</span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">RTI Tracking</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">Pending</span>
             </div>
           </div>
         </div>

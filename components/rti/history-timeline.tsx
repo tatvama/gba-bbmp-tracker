@@ -75,8 +75,8 @@ const STYLES: Record<RtiHistoryType, ActivityStyle> = {
     label: "Status Updated",
     Icon: Flag,
     borderClass: "border-l-slate-400 dark:border-l-slate-600",
-    iconBgClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-455",
-    iconTextClass: "text-slate-600 dark:text-slate-455",
+    iconBgClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-500",
+    iconTextClass: "text-slate-600 dark:text-slate-500",
   },
   date_filed: {
     label: "Filing Date Recorded",
@@ -89,15 +89,15 @@ const STYLES: Record<RtiHistoryType, ActivityStyle> = {
     label: "Document Removed",
     Icon: Trash2,
     borderClass: "border-l-rose-500",
-    iconBgClass: "bg-rose-50 dark:bg-rose-955/40 text-rose-600 dark:text-rose-455",
-    iconTextClass: "text-rose-600 dark:text-rose-455",
+    iconBgClass: "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-500",
+    iconTextClass: "text-rose-600 dark:text-rose-500",
   },
   changed: {
     label: "Details Changed",
     Icon: History,
     borderClass: "border-l-slate-400 dark:border-l-slate-600",
-    iconBgClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-455",
-    iconTextClass: "text-slate-600 dark:text-slate-455",
+    iconBgClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-500",
+    iconTextClass: "text-slate-600 dark:text-slate-500",
   },
 };
 
@@ -193,13 +193,13 @@ export const ActivityBadge = React.memo(function ActivityBadge({
   text: string;
   variant?: "success" | "warning" | "error" | "default";
 }) {
-  let badgeCls = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-350 border-slate-200 dark:border-slate-800";
+  let badgeCls = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-800";
   if (variant === "success") {
-    badgeCls = "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-450 dark:border-emerald-900/40";
+    badgeCls = "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40";
   } else if (variant === "warning") {
-    badgeCls = "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/20 dark:text-amber-450 dark:border-amber-900/40";
+    badgeCls = "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/40";
   } else if (variant === "error") {
-    badgeCls = "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-955/20 dark:text-rose-450 dark:border-rose-900/40";
+    badgeCls = "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/40";
   }
 
   return (
@@ -218,7 +218,7 @@ export const ActivityUser = React.memo(function ActivityUser({ event }: { event:
     : "Updated by";
 
   return (
-    <span className="text-[12px] text-slate-500 dark:text-slate-455 font-semibold">
+    <span className="text-[12px] text-slate-500 dark:text-slate-500 font-semibold">
       {actionLabel} <span className="font-bold text-slate-700 dark:text-slate-300">{actor}</span>
     </span>
   );
@@ -226,7 +226,7 @@ export const ActivityUser = React.memo(function ActivityUser({ event }: { event:
 
 export const ActivityTimestamp = React.memo(function ActivityTimestamp({ date }: { date: string }) {
   return (
-    <div className="text-right select-none shrink-0 text-slate-450 dark:text-slate-500 font-semibold text-[11px] self-end mt-1.5 sm:mt-0">
+    <div className="text-right select-none shrink-0 text-slate-400 dark:text-slate-500 font-semibold text-[11px] self-end mt-1.5 sm:mt-0">
       <span>{formatTimestampDate(date)} {formatTimestampTime(date)}</span>
       <span className="mx-1.5">•</span>
       <span className="font-bold text-slate-500 dark:text-slate-400">{timeAgo(date)}</span>
@@ -257,7 +257,7 @@ export const ActivityAttachment = React.memo(function ActivityAttachment({ event
     <button
       onClick={handleDownload}
       disabled={busy}
-      className="inline-flex items-center gap-2 px-2.5 py-1 border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-left hover:border-slate-350 dark:hover:border-slate-700 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 max-w-[280px] sm:max-w-xs group cursor-pointer shadow-3xs text-[11px]"
+      className="inline-flex items-center gap-2 px-2.5 py-1 border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-left hover:border-slate-300 dark:hover:border-slate-700 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 max-w-[280px] sm:max-w-xs group cursor-pointer shadow-3xs text-[11px]"
       aria-label={`View attachment ${name}`}
     >
       <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-500 shrink-0" />
@@ -280,13 +280,13 @@ function ActivityDescription({ text }: { text: string }) {
   const isLong = text.length > 150;
 
   if (!isLong) {
-    return <p className="text-[13px] sm:text-[14px] text-slate-650 dark:text-slate-400 leading-normal">{text}</p>;
+    return <p className="text-[13px] sm:text-[14px] text-slate-600 dark:text-slate-400 leading-normal">{text}</p>;
   }
 
   const displayText = expanded ? text : `${text.slice(0, 130)}...`;
 
   return (
-    <p className="text-[13px] sm:text-[14px] text-slate-650 dark:text-slate-400 leading-normal">
+    <p className="text-[13px] sm:text-[14px] text-slate-600 dark:text-slate-400 leading-normal">
       {displayText}
       <button
         type="button"
@@ -310,31 +310,31 @@ function DetailGrid({ event }: { event: RtiHistoryEvent }) {
       {event.performedBy && (
         <div>
           <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 block">Actor</span>
-          <span className="font-semibold text-slate-700 dark:text-slate-350">{event.performedBy}</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">{event.performedBy}</span>
         </div>
       )}
       {event.docType && (
         <div>
           <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 block">Document Type</span>
-          <span className="font-semibold text-slate-700 dark:text-slate-350">{event.docType}</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">{event.docType}</span>
         </div>
       )}
       {event.pageCount && (
         <div>
           <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 block">Page Count</span>
-          <span className="font-semibold text-slate-700 dark:text-slate-350">{event.pageCount} page(s)</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">{event.pageCount} page(s)</span>
         </div>
       )}
       {event.fieldLabel && (
         <div>
           <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 block">Field Edited</span>
-          <span className="font-semibold text-slate-700 dark:text-slate-350">{event.fieldLabel}</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">{event.fieldLabel}</span>
         </div>
       )}
       {event.oldValue && (
         <div className="col-span-1">
           <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 block">Previous Value</span>
-          <span className="font-semibold text-slate-450 dark:text-slate-500 line-through truncate block max-w-[160px] sm:max-w-[200px]">{event.oldValue}</span>
+          <span className="font-semibold text-slate-400 dark:text-slate-500 line-through truncate block max-w-[160px] sm:max-w-[200px]">{event.oldValue}</span>
         </div>
       )}
       {event.newValue && (
@@ -418,7 +418,7 @@ export const ActivityItem = React.memo(function ActivityItem({ event }: { event:
       className={cn(
         "group border rounded-xl p-3 sm:p-3.5 flex flex-col justify-between bg-card transition-all duration-150 ease-out border-l-2 select-none outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         style.borderClass,
-        "shadow-[0_1px_3px_rgba(0,0,0,0.01)] hover:shadow-xs hover:bg-slate-50/20 dark:hover:bg-slate-850/20",
+        "shadow-[0_1px_3px_rgba(0,0,0,0.01)] hover:shadow-xs hover:bg-slate-50/20 dark:hover:bg-slate-800/20",
         hasMetadata ? "cursor-pointer" : "cursor-default"
       )}
     >
@@ -596,7 +596,7 @@ export function ActivityFeed({ events }: { events: RtiHistoryEvent[] }) {
       {grouped.length === 0 ? (
         <div className="flex flex-col items-center justify-center border border-dashed rounded-xl py-12 text-center bg-card border-slate-200 dark:border-slate-800 select-none">
           <Clock className="h-8 w-8 text-slate-300 dark:text-slate-700 mb-2" />
-          <h5 className="text-xs font-bold text-slate-700 dark:text-slate-350">No events found</h5>
+          <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300">No events found</h5>
           <p className="text-[11px] text-muted-foreground mt-1 max-w-xs leading-normal">
             No history logs match your search and filter criteria.
           </p>

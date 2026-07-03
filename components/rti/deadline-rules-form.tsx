@@ -127,7 +127,7 @@ export function DeadlineRulesForm({
     return (
       <div key={key} className="space-y-2 p-3 rounded-lg bg-slate-50/40 dark:bg-slate-900/10 border border-transparent hover:border-slate-200/50 dark:hover:border-slate-800/50 transition-all duration-200">
         <div className="flex items-center justify-between gap-2">
-          <Label className="text-sm font-bold text-slate-800 dark:text-slate-205 flex items-center gap-1.5">
+          <Label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
             {meta.label}
             <button
               type="button"
@@ -187,16 +187,16 @@ export function DeadlineRulesForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* SECTION 1: NORMAL RTI Response */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950 flex items-center justify-center shrink-0">
               <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 Normal RTI Response
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Statutory windows for initial application processing
               </p>
             </div>
@@ -208,16 +208,16 @@ export function DeadlineRulesForm({
         </Card>
 
         {/* SECTION 2: Appeals */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-purple-50 dark:bg-purple-950 flex items-center justify-center shrink-0">
               <Scale className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 Appeals Filing
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Permitted filing intervals for First and Second Appeals
               </p>
             </div>
@@ -229,16 +229,16 @@ export function DeadlineRulesForm({
         </Card>
 
         {/* SECTION 3: FAA Processing */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950 flex items-center justify-center shrink-0">
-              <Landmark className="h-5 w-5 text-amber-600 dark:text-amber-450" />
+              <Landmark className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 FAA Disposal Target
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Disposal timelines for First Appellate Authority resolutions
               </p>
             </div>
@@ -250,16 +250,16 @@ export function DeadlineRulesForm({
         </Card>
 
         {/* SECTION 4: Alert Thresholds */}
-        <Card className="border border-slate-200 dark:border-slate-850 shadow-2xs rounded-xl">
-          <div className="p-4 border-b dark:border-slate-850 flex items-center gap-2.5">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl">
+          <div className="p-4 border-b dark:border-slate-800 flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950 flex items-center justify-center shrink-0">
               <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-850 dark:text-slate-200 leading-tight">
+              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 leading-tight">
                 Dashboard Alerting
               </h2>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Escalation triggers and countdown indicators configuration
               </p>
             </div>
@@ -273,7 +273,7 @@ export function DeadlineRulesForm({
 
       {/* STICKY SAVE CHANGES NOTIFICATION BAR */}
       {isDirty && (
-        <div className="fixed bottom-4 left-4 right-4 md:left-64 md:right-4 z-40 bg-slate-900 text-slate-100 p-3.5 rounded-xl shadow-xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-3 duration-250 border border-slate-805">
+        <div className="fixed bottom-4 left-4 right-4 md:left-64 md:right-4 z-40 bg-slate-900 text-slate-100 p-3.5 rounded-xl shadow-xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-3 duration-250 border border-slate-800">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
             <span className="text-xs font-bold tracking-tight">Unsaved Configuration Changes</span>

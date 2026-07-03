@@ -52,7 +52,7 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
             {isMatch ? (
               <Badge
                 variant="outline"
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-450 dark:border-emerald-900/50"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                 <span>Matches</span>
@@ -60,7 +60,7 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
             ) : (
               <Badge
                 variant="outline"
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900/50"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50"
               >
                 <XCircle className="h-3.5 w-3.5 shrink-0" />
                 <span>Mismatch</span>
@@ -191,7 +191,7 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
         <Skeleton className="h-20 w-full rounded-xl" />
 
         {/* Checklist Skeleton */}
-        <div className="border border-slate-150 rounded-xl p-4 bg-white dark:bg-slate-900/40 dark:border-slate-800 space-y-4">
+        <div className="border border-slate-100 rounded-xl p-4 bg-white dark:bg-slate-900/40 dark:border-slate-800 space-y-4">
           <Skeleton className="h-4 w-36" />
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex justify-between items-center py-2.5 border-b border-slate-50 last:border-0">
@@ -213,14 +213,14 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
       {bannerMarkup}
 
       {/* 2. Field Match Checklist */}
-      <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-sm dark:bg-slate-900/40 dark:border-slate-850">
+      <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-sm dark:bg-slate-900/40 dark:border-slate-800">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-3 font-mono">
           Field Match Checklist
         </span>
         {hasExtractedInfo ? (
           checklistContent
         ) : (
-          <div className="flex flex-col items-center py-6 text-center text-slate-450">
+          <div className="flex flex-col items-center py-6 text-center text-slate-400">
             <AlertCircle className="h-8 w-8 mb-2 text-slate-300 dark:text-slate-700" />
             <span className="text-xs font-medium">No verification data available</span>
             <p className="text-[10px] text-slate-400 mt-1 max-w-xs">

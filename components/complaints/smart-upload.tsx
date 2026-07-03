@@ -46,7 +46,7 @@ export function SmartUpload() {
 
           <label
             htmlFor="letter-upload-file"
-            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-250 bg-slate-50/40 px-4 py-6 text-center transition-colors hover:border-emerald-400/60 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50"
+            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/40 px-4 py-6 text-center transition-colors hover:border-emerald-400/60 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50"
           >
             <FileType2 className="h-6 w-6 text-slate-400" />
             <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Choose a letter (PDF / photos)</span>
@@ -70,7 +70,7 @@ export function SmartUpload() {
                 {letterFiles.map((f, i) => (
                   <li
                     key={i}
-                    className="flex items-center gap-2 rounded-lg border border-slate-150 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+                    className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
                   >
                     <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                     <span className="truncate">{f.name}</span>

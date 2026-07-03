@@ -19,7 +19,7 @@ export function DeadlineBadge({
 }) {
   if (rti.status === "Closed") {
     return (
-      <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-55/40 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400">
+      <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400">
         <CheckCircle2 className="h-3.5 w-3.5" />
         Closed
       </div>
@@ -57,9 +57,9 @@ export function DeadlineBadge({
         variant === "warning" &&
           "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/20 dark:bg-amber-950/30 dark:text-amber-400",
         variant === "destructive" &&
-          "border-rose-200 bg-rose-55 text-rose-800 dark:border-rose-900/20 dark:bg-rose-950/30 dark:text-rose-400",
+          "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/20 dark:bg-rose-950/30 dark:text-rose-400",
         variant === "info" &&
-          "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/20 dark:bg-blue-950/30 dark:text-blue-450",
+          "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/20 dark:bg-blue-950/30 dark:text-blue-400",
       )}
     >
       {/* Indicator Dot */}

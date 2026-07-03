@@ -39,7 +39,7 @@ export function AckHistoryTimeline({ history }: AckHistoryTimelineProps) {
         <div className="p-4 bg-slate-50/20 border-t border-slate-100 dark:border-slate-800/80 max-h-48 overflow-y-auto space-y-3 scrollbar-thin">
           {!hasLogs ? (
             <div className="flex flex-col items-center justify-center py-4 text-center text-slate-400 dark:text-slate-600">
-              <Clock className="h-6 w-6 mb-1.5 text-slate-300 dark:text-slate-755" />
+              <Clock className="h-6 w-6 mb-1.5 text-slate-300 dark:text-slate-800" />
               <span className="text-xs">No verification events logged</span>
             </div>
           ) : (

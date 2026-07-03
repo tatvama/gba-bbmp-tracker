@@ -245,7 +245,7 @@ export function RtiBulkImport() {
       <Card className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm rounded-xl overflow-hidden">
         <CardContent className="p-6 space-y-5">
           {error && (
-            <p className="rounded-lg border border-rose-250/30 bg-rose-50/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
+            <p className="rounded-lg border border-rose-200/30 bg-rose-50/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
               {error}
             </p>
           )}
@@ -331,7 +331,7 @@ export function RtiBulkImport() {
             ))}
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-t border-slate-150 dark:border-slate-800/85 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-t border-slate-100 dark:border-slate-800/85 pt-4">
             <Button type="button" variant="outline" onClick={reset} className="h-11 sm:h-10 w-full sm:w-auto justify-center cursor-pointer font-medium">
               Start over
             </Button>
@@ -350,7 +350,7 @@ export function RtiBulkImport() {
     <Card className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm rounded-xl overflow-hidden">
       <CardContent className="p-4 md:p-6 space-y-4 md:space-y-5">
         {error && (
-          <p className="rounded-lg border border-rose-250/30 bg-rose-50/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
+          <p className="rounded-lg border border-rose-200/30 bg-rose-50/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
             {error}
           </p>
         )}
@@ -365,7 +365,7 @@ export function RtiBulkImport() {
             <button
               type="button"
               onClick={() => setShowWarningDetails(!showWarningDetails)}
-              className="text-xs text-primary font-bold hover:underline cursor-pointer h-8 px-2.5 flex items-center justify-center border rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-850"
+              className="text-xs text-primary font-bold hover:underline cursor-pointer h-8 px-2.5 flex items-center justify-center border rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
             >
               {showWarningDetails ? "Hide Details" : "Show Details"}
             </button>
@@ -378,7 +378,7 @@ export function RtiBulkImport() {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.15, ease: "easeOut" }}
-                className="overflow-hidden text-xs text-slate-650 dark:text-slate-400 leading-relaxed mt-2"
+                className="overflow-hidden text-xs text-slate-600 dark:text-slate-400 leading-relaxed mt-2"
               >
                 Upload a single office-copy PDF that contains several RTI letters. The system reads it,
                 detects each separate letter, and (after your review) creates one RTI case per letter —
@@ -391,7 +391,7 @@ export function RtiBulkImport() {
         {/* Compact Upload Zone: reduced height on mobile by ~40% (py-6 instead of py-10) */}
         <label
           htmlFor="bulk-rti-file"
-          className="flex cursor-pointer flex-col items-center justify-center gap-1.5 md:gap-2 rounded-xl border-2 border-dashed border-slate-250 bg-slate-50/40 px-4 py-6 md:py-10 text-center transition-all duration-150 hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50 active:scale-[0.995]"
+          className="flex cursor-pointer flex-col items-center justify-center gap-1.5 md:gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/40 px-4 py-6 md:py-10 text-center transition-all duration-150 hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50 active:scale-[0.995]"
         >
           <UploadCloud className="h-8 w-8 text-slate-400 shrink-0" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -413,7 +413,7 @@ export function RtiBulkImport() {
             {files.map((f, i) => (
               <li
                 key={i}
-                className="flex items-center gap-2 rounded-lg border border-slate-150 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+                className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
               >
                 <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 <span className="truncate flex-1">{f.name}</span>
@@ -426,7 +426,7 @@ export function RtiBulkImport() {
         )}
 
         {/* Primary Action Button: full width on mobile, inline on desktop */}
-        <div className="flex justify-end border-t border-slate-150 dark:border-slate-800/85 pt-4">
+        <div className="flex justify-end border-t border-slate-100 dark:border-slate-800/85 pt-4">
           <Button
             type="button"
             onClick={analyze}

@@ -15,6 +15,14 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  StatCard,
+  StatCardRow,
+  StatCardIcon,
+  StatCardValue,
+  StatCardLabel,
+  StatCardSub,
+} from "@/components/ui/stat-card";
 import { VerificationBadge, UnverifiedSeedTag } from "@/components/badges";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -22,7 +30,6 @@ import {
   getRecentlyUpdated,
   getNeedsVerification,
 } from "@/lib/queries";
-import { formatNumber } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -155,27 +162,23 @@ export default async function DashboardPage() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {statCards.map((c) => {
+        {statCards.map((c, idx) => {
           const Icon = c.icon;
           return (
-            <Link key={c.label} href={c.href} className="group block">
-              <div className="stat-card h-full rounded-xl border bg-card p-4 shadow-sm group-hover:border-primary/30">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-2xl font-bold tabular-nums text-foreground">
-                      {formatNumber(c.value)}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-foreground/80">
-                      {c.label}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">{c.sub}</p>
-                  </div>
-                  <div className={`shrink-0 rounded-lg p-2 ${c.bgCls}`}>
-                    <Icon className={`h-4 w-4 ${c.iconCls}`} />
-                  </div>
+            <StatCard
+              key={c.label}
+              href={c.href}
+              className={`animate-fade-in stagger-${(idx % 4) + 1}`}
+            >
+              <StatCardRow>
+                <div className="min-w-0">
+                  <StatCardValue value={c.value} />
+                  <StatCardLabel>{c.label}</StatCardLabel>
+                  <StatCardSub>{c.sub}</StatCardSub>
                 </div>
-              </div>
-            </Link>
+                <StatCardIcon icon={Icon} className={c.iconCls} bgClassName={c.bgCls} />
+              </StatCardRow>
+            </StatCard>
           );
         })}
       </div>

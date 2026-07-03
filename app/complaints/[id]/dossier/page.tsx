@@ -92,7 +92,7 @@ export default async function DossierPage({ params }: { params: Promise<{ id: st
           Evidence manifest ({docs.length} document{docs.length === 1 ? "" : "s"})
         </h2>
         {docs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No documents attached to this case.</p>
+          <EmptyState compact title="No documents" description="No documents attached to this case yet." />
         ) : (
           <ol className="space-y-3 text-sm">
             {docs.map((d, i) => (

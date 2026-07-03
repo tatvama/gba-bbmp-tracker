@@ -316,14 +316,14 @@ export function ReplyAnalyzer({
                     High
                   </Badge>
                 </div>
-                <div className="h-3.5 w-px bg-slate-250" />
+                <div className="h-3.5 w-px bg-slate-200" />
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <span className="font-medium">Type:</span>
                   <Badge variant="secondary" className="font-semibold">
                     {deficient ? "First Appeal" : "None"}
                   </Badge>
                 </div>
-                <div className="h-3.5 w-px bg-slate-250" />
+                <div className="h-3.5 w-px bg-slate-200" />
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <span className="font-medium">Severity:</span>
                   <Badge variant={deficient ? "destructive" : "secondary"} className="font-semibold">
@@ -440,7 +440,7 @@ export function ReplyAnalyzer({
                           {it.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="align-top py-4 text-sm text-slate-655 dark:text-slate-400 max-w-xs">
+                      <TableCell className="align-top py-4 text-sm text-slate-700 dark:text-slate-400 max-w-xs">
                         <div className="line-clamp-2">{it.appealGround || "—"}</div>
                         {it.appealGround && it.appealGround.length > 50 && (
                           <button
@@ -451,7 +451,7 @@ export function ReplyAnalyzer({
                           </button>
                         )}
                       </TableCell>
-                      <TableCell className="align-top py-4 text-sm text-slate-655 dark:text-slate-400 max-w-xs">
+                      <TableCell className="align-top py-4 text-sm text-slate-700 dark:text-slate-400 max-w-xs">
                         <div className="line-clamp-2">{it.notes || "—"}</div>
                         {it.notes && it.notes.length > 50 && (
                           <button
@@ -522,8 +522,8 @@ export function ReplyAnalyzer({
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Recommendation</span>
                 <span className={cn("text-xs font-bold mt-2 px-2.5 py-0.5 rounded-full border", 
                   deficient 
-                    ? "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-450" 
-                    : "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-450"
+                    ? "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400" 
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-400"
                 )}>
                   {deficient ? "Appeal Recommended" : "Complete"}
                 </span>
@@ -532,7 +532,7 @@ export function ReplyAnalyzer({
           </div>
 
           <div className="rounded-md border border-amber/50 bg-amber/5 px-3 py-1.5 text-xs font-medium text-amber-dark flex items-center gap-2">
-            <Info className="h-4 w-4 text-amber-550 shrink-0" />
+            <Info className="h-4 w-4 text-amber-500 shrink-0" />
             <span>AI assessment — review against the actual document before filing an appeal.</span>
           </div>
         </div>
@@ -564,11 +564,11 @@ export function ReplyAnalyzer({
                 </div>
                 <div className="border-b pb-2">
                   <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Suggested Ground</h4>
-                  <p className="mt-1 text-sm text-slate-650 dark:text-slate-350">{activeDialog.item.appealGround || "—"}</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{activeDialog.item.appealGround || "—"}</p>
                 </div>
                 <div>
                   <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Notes</h4>
-                  <p className="mt-1 text-sm text-slate-650 dark:text-slate-350">{activeDialog.item.notes || "—"}</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{activeDialog.item.notes || "—"}</p>
                 </div>
               </div>
             ) : (

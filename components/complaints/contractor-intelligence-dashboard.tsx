@@ -129,7 +129,7 @@ export function ContractorIntelligenceDashboard({
     <div className="space-y-6">
       {/* 1. POSSIBLE WORK-SPLITTING (KTPP THRESHOLD EVASION) */}
       <section className="rounded-xl border bg-card p-4 shadow-sm border-l-4 border-l-amber-500/80">
-        <h2 className="mb-3 flex items-center justify-between text-sm font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400">
+        <h2 className="mb-3 flex items-center justify-between text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-2">
             <Scissors className="h-4 w-4 text-amber-500" /> Possible work-splitting
           </span>
@@ -146,10 +146,10 @@ export function ContractorIntelligenceDashboard({
               {workSplits.map((w, i) => (
                 <div key={i} className="rounded-lg border border-amber-200/50 bg-amber-50/15 p-2.5 text-xs dark:border-amber-900/40 dark:bg-amber-950/20">
                   <div className="flex items-center justify-between gap-1.5 font-bold mb-1">
-                    <span className="text-slate-850 dark:text-slate-200 truncate">{w.contractor}</span>
+                    <span className="text-slate-800 dark:text-slate-200 truncate">{w.contractor}</span>
                     <Badge variant="warning" className="text-[10px] py-px font-bold shrink-0">{inr(w.total)} total</Badge>
                   </div>
-                  <p className="text-[10.5px] text-slate-550 dark:text-slate-400 leading-normal mb-1.5">{w.note}</p>
+                  <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-normal mb-1.5">{w.note}</p>
                   <div className="flex flex-wrap gap-1">
                     {w.jobNumbers.map((j) => (
                       <Link
@@ -171,11 +171,11 @@ export function ContractorIntelligenceDashboard({
                 <li key={i} className="rounded-lg border border-amber-200/50 bg-amber-50/20 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
                   <div className="flex flex-wrap items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
-                    <span className="font-semibold text-slate-850 dark:text-slate-200">{w.contractor}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{w.contractor}</span>
                     <Badge variant="warning">{inr(w.total)} total</Badge>
                     <span className="text-xs text-slate-500 dark:text-slate-400">crosses {inr(w.thresholdCrossed)}</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-550 dark:text-slate-400">{w.note}</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{w.note}</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {w.jobNumbers.map((j) => (
                       <Link key={j} href={`/complaints/job/${encodeURIComponent(j)}/dossier`} className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] dark:border-slate-700 dark:bg-slate-900">{j}</Link>
@@ -190,8 +190,8 @@ export function ContractorIntelligenceDashboard({
 
       {/* 2. CONTRACTOR LEADERBOARD */}
       <section className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-slate-100 dark:border-slate-850 pb-3 mb-3.5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3.5">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <Users className="h-4 w-4 text-slate-400" /> Contractors ({filteredContractors.length})
           </h2>
           <Button
@@ -221,7 +221,7 @@ export function ContractorIntelligenceDashboard({
               type="button"
               variant="outline"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="h-11 px-3 text-xs font-semibold gap-1.5 rounded-lg border-slate-205 dark:border-slate-800"
+              className="h-11 px-3 text-xs font-semibold gap-1.5 rounded-lg border-slate-200 dark:border-slate-800"
             >
               <Filter className="h-4 w-4" /> Filters {hasFilters && <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />}
             </Button>
@@ -230,16 +230,16 @@ export function ContractorIntelligenceDashboard({
           {showMobileFilters && (
             <div className="p-3.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 grid grid-cols-1 gap-2.5">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Division</span>
-                <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={selectedDivision} onChange={(e) => setSelectedDivision(e.target.value)}>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Division</span>
+                <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={selectedDivision} onChange={(e) => setSelectedDivision(e.target.value)}>
                   <option value="all">Any Division</option>
                   {allDivisions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Exposure</span>
-                <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={selectedExposure} onChange={(e) => setSelectedExposure(e.target.value)}>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Exposure</span>
+                <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={selectedExposure} onChange={(e) => setSelectedExposure(e.target.value)}>
                   <option value="all">Any Exposure</option>
                   <option value="high">High (&gt; 5L)</option>
                   <option value="medium">Medium (1L - 5L)</option>
@@ -248,8 +248,8 @@ export function ContractorIntelligenceDashboard({
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Jobs Count</span>
-                <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={selectedJobCount} onChange={(e) => setSelectedJobCount(e.target.value)}>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Jobs Count</span>
+                <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={selectedJobCount} onChange={(e) => setSelectedJobCount(e.target.value)}>
                   <option value="all">Any Count</option>
                   <option value="1">1 Job Only</option>
                   <option value="2-5">2 to 5 Jobs</option>
@@ -257,13 +257,13 @@ export function ContractorIntelligenceDashboard({
                 </select>
               </div>
 
-              <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-250/30">
+              <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-200/30">
                 <span className="text-[10.5px] text-slate-500 font-semibold">
                   {filteredContractors.length} Contractors
                 </span>
                 <div className="flex gap-2">
                   {hasFilters && (
-                    <Button variant="ghost" size="sm" onClick={handleReset} className="h-8 text-xs font-bold text-slate-500 hover:text-slate-750">
+                    <Button variant="ghost" size="sm" onClick={handleReset} className="h-8 text-xs font-bold text-slate-500 hover:text-slate-700">
                       Reset
                     </Button>
                   )}
@@ -313,7 +313,7 @@ export function ContractorIntelligenceDashboard({
         {/* Mobile Contractor Cards list */}
         <div className="block md:hidden space-y-3">
           {filteredContractors.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-455 border border-dashed rounded-xl bg-slate-50/30 dark:bg-slate-900/10">
+            <div className="p-8 text-center text-xs text-slate-500 border border-dashed rounded-xl bg-slate-50/30 dark:bg-slate-900/10">
               No contractors match your active search filters.
             </div>
           ) : (
@@ -327,7 +327,7 @@ export function ContractorIntelligenceDashboard({
                   <div className="flex items-start justify-between gap-2.5">
                     <Link
                       href={`/complaints/contractors/${encodeURIComponent(c.contractor)}`}
-                      className="font-bold text-sm text-slate-850 dark:text-slate-200 hover:text-blue-650 hover:underline leading-tight"
+                      className="font-bold text-sm text-slate-800 dark:text-slate-200 hover:text-blue-600 hover:underline leading-tight"
                     >
                       {c.contractor}
                     </Link>
@@ -343,31 +343,31 @@ export function ContractorIntelligenceDashboard({
                   </div>
 
                   {/* Division & Info */}
-                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-550 dark:text-slate-400 border-t border-slate-100 dark:border-slate-850/60 pt-2">
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/60 pt-2">
                     <div>
                       <span className="font-semibold text-slate-500 block text-[10px] uppercase tracking-wider">Jobs</span>
-                      <span className="font-bold text-slate-850 dark:text-slate-200 text-sm">{c.jobCount}</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{c.jobCount}</span>
                     </div>
                     <div>
                       <span className="font-semibold text-slate-500 block text-[10px] uppercase tracking-wider">Exposure</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-450 text-sm">{inr(c.totalExposure)}</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400 text-sm">{inr(c.totalExposure)}</span>
                     </div>
                   </div>
 
                   {/* GSTIN & Reg Number */}
-                  <div className="space-y-1 bg-slate-50/50 dark:bg-slate-900/80 p-2.5 rounded-lg text-[11px] font-mono leading-none border dark:border-slate-850">
+                  <div className="space-y-1 bg-slate-50/50 dark:bg-slate-900/80 p-2.5 rounded-lg text-[11px] font-mono leading-none border dark:border-slate-800">
                     <div className="flex justify-between items-center text-slate-500">
                       <span>GSTIN:</span>
-                      <span className="font-bold text-slate-805 dark:text-slate-300">{getMockGSTIN(c.contractor)}</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-300">{getMockGSTIN(c.contractor)}</span>
                     </div>
                     <div className="flex justify-between items-center text-slate-500 pt-1">
                       <span>REG NO:</span>
-                      <span className="font-bold text-slate-805 dark:text-slate-300">{getMockReg(c.contractor)}</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-300">{getMockReg(c.contractor)}</span>
                     </div>
                   </div>
 
                   {/* Footer metadata */}
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-850/60 text-[11px] text-slate-450">
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 text-[11px] text-slate-400">
                     <span>Divisions: {c.divisions.join(", ") || "—"}</span>
                     <Badge variant="outline" className="text-[10px] font-bold text-red-500 bg-red-500/5 dark:border-red-900/40">
                       {c.redFlags} Flags
@@ -392,7 +392,7 @@ export function ContractorIntelligenceDashboard({
 
       {/* 3. DIVISION SUMMARY */}
       <section className="rounded-xl border bg-card p-4 shadow-sm">
-        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400">
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           <Building2 className="h-4 w-4 text-slate-400" /> Divisions ({initialDivisions.length})
         </h2>
         {initialDivisions.length === 0 ? (
@@ -429,22 +429,22 @@ export function ContractorIntelligenceDashboard({
             <div className="block md:hidden space-y-3">
               {initialDivisions.map((d) => (
                 <div key={d.division} className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900/30">
-                  <div className="flex justify-between items-center border-b dark:border-slate-850 pb-2 mb-2">
-                    <span className="font-bold text-sm text-slate-805 dark:text-slate-200">{d.division}</span>
+                  <div className="flex justify-between items-center border-b dark:border-slate-800 pb-2 mb-2">
+                    <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{d.division}</span>
                     {d.highRiskJobs > 0 && <Badge variant="warning" className="font-mono text-[10px] font-bold">{d.highRiskJobs} High Risk</Badge>}
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs leading-none">
                     <div>
-                      <span className="text-[10px] text-slate-450 block uppercase tracking-wider mb-1">Jobs</span>
-                      <span className="font-bold text-slate-805 dark:text-slate-200">{d.jobCount}</span>
+                      <span className="text-[10px] text-slate-400 block uppercase tracking-wider mb-1">Jobs</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{d.jobCount}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-450 block uppercase tracking-wider mb-1">Contractors</span>
-                      <span className="font-bold text-slate-805 dark:text-slate-200">{d.contractors}</span>
+                      <span className="text-[10px] text-slate-400 block uppercase tracking-wider mb-1">Contractors</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{d.contractors}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-450 block uppercase tracking-wider mb-1">Exposure</span>
-                      <span className="font-bold text-slate-805 dark:text-slate-200">{inr(d.totalExposure)}</span>
+                      <span className="text-[10px] text-slate-400 block uppercase tracking-wider mb-1">Exposure</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{inr(d.totalExposure)}</span>
                     </div>
                   </div>
                 </div>

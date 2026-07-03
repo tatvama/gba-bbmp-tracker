@@ -88,7 +88,7 @@ export function BillForensicsPanel({ complaintId, aiConfigured }: { complaintId:
                       <div
                         key={i}
                         className={cn(
-                          "rounded-md border p-3 bg-card transition-all duration-300 ease-in-out hover:shadow-sm hover:border-slate-350 dark:hover:border-slate-750 animate-fade-in",
+                          "rounded-md border p-3 bg-card transition-all duration-300 ease-in-out hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-700 animate-fade-in",
                           staggerClass
                         )}
                       >

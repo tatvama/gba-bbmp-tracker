@@ -17,7 +17,9 @@ import {
   Bell,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeader } from "@/components/section-header";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { RtiStatusBadge } from "@/components/rti/rti-status-badge";
 import { DeadlineBadge } from "@/components/rti/deadline-badge";
@@ -66,7 +68,7 @@ export default async function RtiDashboard() {
       href: "/rti/all",
       iconCls: "text-slate-600 dark:text-slate-400",
       bgCls: "bg-slate-100 dark:bg-slate-800",
-      borderCls: "border-t-2 border-t-slate-350 dark:border-t-slate-500",
+      borderCls: "border-t-2 border-t-slate-300 dark:border-t-slate-500",
       helperText: "Not yet filed",
       type: "informational",
     },
@@ -86,7 +88,7 @@ export default async function RtiDashboard() {
       value: stats.awaitingReply,
       icon: Hourglass,
       href: "/rti/all",
-      iconCls: "text-blue-600 dark:text-blue-450",
+      iconCls: "text-blue-600 dark:text-blue-400",
       bgCls: "bg-blue-50 dark:bg-blue-950/30",
       borderCls: "border-t-2 border-t-blue-500",
       helperText: "Within timeline",
@@ -97,7 +99,7 @@ export default async function RtiDashboard() {
       value: stats.replyReceived,
       icon: MailCheck,
       href: "/rti/all",
-      iconCls: "text-emerald-600 dark:text-emerald-455",
+      iconCls: "text-emerald-600 dark:text-emerald-500",
       bgCls: "bg-emerald-50 dark:bg-emerald-950/30",
       borderCls: "border-t-2 border-t-emerald-500",
       helperText: "Awaiting review",
@@ -130,7 +132,7 @@ export default async function RtiDashboard() {
       value: stats.overdue,
       icon: AlertOctagon,
       href: "/rti/reports",
-      iconCls: "text-rose-600 dark:text-rose-450",
+      iconCls: "text-rose-600 dark:text-rose-400",
       bgCls: "bg-rose-50 dark:bg-rose-950/30",
       borderCls: "border-t-2 border-t-rose-500",
       helperText: "Requires action",
@@ -141,7 +143,7 @@ export default async function RtiDashboard() {
       value: stats.urgentLifeLiberty,
       icon: Siren,
       href: "/rti/all",
-      iconCls: "text-rose-600 dark:text-rose-450",
+      iconCls: "text-rose-600 dark:text-rose-400",
       bgCls: "bg-rose-50 dark:bg-rose-950/30",
       borderCls: "border-t-2 border-t-rose-500",
       helperText: "48-hour deadline",
@@ -152,7 +154,7 @@ export default async function RtiDashboard() {
       value: stats.needsReview,
       icon: ClipboardCheck,
       href: "/rti/all",
-      iconCls: "text-rose-600 dark:text-rose-450",
+      iconCls: "text-rose-600 dark:text-rose-400",
       bgCls: "bg-rose-50 dark:bg-rose-950/30",
       borderCls: "border-t-2 border-t-rose-500",
       helperText: "Officer action",
@@ -198,7 +200,7 @@ export default async function RtiDashboard() {
       </PageHeader>
 
       {/* System Status / Meta Row */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-505 dark:text-slate-450 border-b border-slate-200/60 dark:border-slate-800/60 pb-3 -mt-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200/60 dark:border-slate-800/60 pb-3 -mt-3">
         <span className="flex items-center gap-1.5 font-semibold">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           System Status: Active
@@ -231,7 +233,7 @@ export default async function RtiDashboard() {
                     <p className="mt-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
                       {c.label}
                     </p>
-                    <p className="mt-1 text-[10px] font-semibold text-slate-450 dark:text-slate-500">
+                    <p className="mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                       {c.helperText}
                     </p>
                   </div>
@@ -253,44 +255,38 @@ export default async function RtiDashboard() {
       {/* Recent Updates and Follow-ups */}
       <div className="grid gap-6 lg:grid-cols-2 mt-8">
         {/* Recently Updated */}
-        <Card className="shadow-sm border border-slate-200 dark:border-slate-800/80 rounded-xl bg-white dark:bg-slate-900 overflow-hidden">
-          <CardHeader className="flex-row items-center justify-between pb-3.5 pt-4.5 border-b border-slate-100 dark:border-slate-800/60">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4.5 w-4.5 text-slate-500 dark:text-slate-400" />
-              <CardTitle className="text-sm font-bold text-slate-850 dark:text-slate-200">
-                Recently updated RTIs
-              </CardTitle>
-            </div>
-            <Link
-              href="/rti/all"
-              className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-            >
-              View all <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
+        <Card className="shadow-sm rounded-xl overflow-hidden">
+          <SectionHeader
+            icon={FileText}
+            title="Recently updated RTIs"
+            actions={
+              <Link
+                href="/rti/all"
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                View all <ArrowRight className="h-3 w-3" />
+              </Link>
+            }
+          />
           <CardContent className="pb-4 pt-4">
             {recent.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <FileWarning className="h-10 w-10 text-slate-400 mb-2" />
-                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  No RTIs yet
-                </h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                  Create your first RTI or run seed scripts for sample data.
-                  </p>
-              </div>
+              <EmptyState
+                icon={FileWarning}
+                title="No RTIs yet"
+                description="Create your first RTI or run seed scripts for sample data."
+              />
             ) : (
               <div className="space-y-3">
                 {recent.map((r) => (
                   <div
                     key={r.id}
-                    className="flex items-center justify-between gap-4 p-3.5 rounded-lg border border-slate-150 bg-slate-50/30 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950/25 dark:hover:bg-slate-800/40 transition-all duration-150 group"
+                    className="flex items-center justify-between gap-4 p-3.5 rounded-lg border border-slate-100 bg-slate-50/30 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950/25 dark:hover:bg-slate-800/40 transition-all duration-150 group"
                   >
                     <Link href={`/rti/${r.id}`} className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-850 dark:text-slate-200 group-hover:text-primary transition-colors leading-normal">
+                      <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-primary transition-colors leading-normal">
                         {r.subject}
                       </p>
-                      <p className="truncate text-[11px] font-mono text-slate-400 dark:text-slate-550 mt-1">
+                      <p className="truncate text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-1">
                         {r.internal_ref ?? "—"}
                       </p>
                     </Link>
@@ -306,21 +302,19 @@ export default async function RtiDashboard() {
         </Card>
 
         {/* Follow-ups */}
-        <Card className="shadow-sm border border-slate-200 dark:border-slate-800/80 rounded-xl bg-white dark:bg-slate-900 overflow-hidden">
-          <CardHeader className="flex-row items-center justify-between pb-3.5 pt-4.5 border-b border-slate-100 dark:border-slate-800/60">
-            <div className="flex items-center gap-2">
-              <Bell className="h-4.5 w-4.5 text-slate-500 dark:text-slate-400" />
-              <CardTitle className="text-sm font-bold text-slate-855 dark:text-slate-200">
-                Upcoming follow-ups
-              </CardTitle>
-            </div>
-            <Link
-              href="/rti/calendar"
-              className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-            >
-              Calendar <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
+        <Card className="shadow-sm rounded-xl overflow-hidden">
+          <SectionHeader
+            icon={Bell}
+            title="Upcoming follow-ups"
+            actions={
+              <Link
+                href="/rti/calendar"
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                Calendar <ArrowRight className="h-3 w-3" />
+              </Link>
+            }
+          />
           <CardContent className="pb-4 pt-4">
             {reminders.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -339,21 +333,21 @@ export default async function RtiDashboard() {
                 {reminders.map((rm) => (
                   <div
                     key={rm.id}
-                    className="flex items-center justify-between gap-3 p-3.5 rounded-lg border border-slate-150 bg-slate-50/30 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950/25 dark:hover:bg-slate-800/40 transition-all duration-150 group"
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-lg border border-slate-100 bg-slate-50/30 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950/25 dark:hover:bg-slate-800/40 transition-all duration-150 group"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                        <p className="truncate text-sm font-semibold text-slate-805 dark:text-slate-200">
+                        <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">
                           {rm.title}
                         </p>
                       </div>
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-450 mt-1 pl-3.5">
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400 mt-1 pl-3.5">
                         {rm.description ?? ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs font-semibold text-slate-450 dark:text-slate-500">
+                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
                         {formatDate(rm.due_date)}
                       </span>
                       {rm.entity_id && (
@@ -361,7 +355,7 @@ export default async function RtiDashboard() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-foreground dark:text-slate-450 dark:hover:text-slate-200"
+                            className="h-7 w-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200"
                           >
                             <ArrowRight className="h-4 w-4" />
                           </Button>
