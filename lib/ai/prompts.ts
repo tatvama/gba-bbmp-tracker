@@ -34,12 +34,18 @@ function toneLine(tone?: LegalTone): string {
   }
 }
 
+// Real Kannada government/legal correspondence writes all figures in Arabic
+// numerals even in fully-Kannada prose — LLMs left to their own devices tend to
+// switch to Kannada-script digits (೦-೯), so this must be stated explicitly.
+const NUMERALS_KN =
+  "Even inside the Kannada text, write every number — dates, fees, RTI/appeal reference numbers, ward/division numbers — using Arabic numerals (0,1,2,3,4,5,6,7,8,9), exactly as official Kannada correspondence does. NEVER use Kannada-script digits (೦೧೨೩೪೫೬೭೮೯).";
+
 function languageLine(language?: DraftLanguage): string {
   switch (language) {
     case "Kannada":
-      return "Write the entire draft in formal Kannada (ಕನ್ನಡ).";
+      return `Write the entire draft in formal Kannada (ಕನ್ನಡ). ${NUMERALS_KN}`;
     case "Bilingual":
-      return "Write the draft in English first, then provide a formal Kannada (ಕನ್ನಡ) translation below it, separated by a line of dashes.";
+      return `Write the draft in English first, then provide a formal Kannada (ಕನ್ನಡ) translation below it, separated by a line of dashes. ${NUMERALS_KN}`;
     default:
       return "Write the draft in English.";
   }

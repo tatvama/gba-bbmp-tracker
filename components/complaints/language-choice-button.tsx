@@ -16,9 +16,9 @@ import type { DraftLanguage } from "@/lib/constants";
 /**
  * A drop-in replacement for an action button that generates a letter/draft.
  * Instead of firing immediately, clicking it opens a small menu asking the user
- * to draft in English or Kannada ("ask each time"), then calls onChoose with the
- * picked language. Only English / Kannada are offered — the two languages the
- * user works in for BBMP/GBA correspondence.
+ * to pick a language ("ask each time"), then calls onChoose with the pick.
+ * Matches the three DraftLanguage options the manual drafts panel already
+ * offers (English / Kannada / Bilingual).
  */
 export function LanguageChoiceButton({
   onChoose,
@@ -55,6 +55,7 @@ export function LanguageChoiceButton({
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => onChoose("Kannada")}>ಕನ್ನಡ (Kannada)</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onChoose("English")}>English</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onChoose("Bilingual")}>Bilingual (English + ಕನ್ನಡ)</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

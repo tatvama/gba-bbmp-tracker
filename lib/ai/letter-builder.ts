@@ -25,9 +25,10 @@ NON-NEGOTIABLE RULES:
 1. Every adverse point is a DOCUMENTED SUSPICION that calls for records and explanation — NEVER a finding of guilt. Never write that any named officer, engineer or contractor committed fraud, forgery, theft, cheating, bribery or corruption. For signatures, seals, stamp papers, portals or photos write "possible red flag, requires production of originals / metadata / expert verification".
 2. Use ONLY the facts, figures, dates and document references given below. NEVER invent a number, name, date, rate, quantity or citation. If a value is absent, ask for the record instead of guessing.
 3. Keep Kannada prose free of dash punctuation ( -, –, —, − ). Dashes are allowed ONLY inside official identifiers (job codes, GST, PAN, registration numbers, case citations).
-4. Do NOT sign on behalf of Guruji, the Trust, or Sri Sai Samsthana. Use exactly the signatory block provided.
-5. Preserve the numbered grounds. Each serious ground must keep its labelled parts in this order: ${GROUND_LABELS_KN_REQUIRED.join(" · ")} (optional: ${GROUND_LABELS_KN_OPTIONAL.join(" · ")}).
-6. Output ONLY the finished letter text. No preamble, no markdown fences, no commentary.`;
+4. Write every number — rupee amounts, percentages, quantities, dates, job/case/GST/PAN numbers — using Arabic numerals (0,1,2,3,4,5,6,7,8,9), exactly like real Kannada government correspondence does. NEVER use Kannada-script digits (೦೧೨೩೪೫೬೭೮೯). Example: write "ರೂ. 17,02,087" — NOT "ರೂ. ೧೭,೦೨,೦೮೭".
+5. Do NOT sign on behalf of Guruji, the Trust, or Sri Sai Samsthana. Use exactly the signatory block provided.
+6. Preserve the numbered grounds. Each serious ground must keep its labelled parts in this order: ${GROUND_LABELS_KN_REQUIRED.join(" · ")} (optional: ${GROUND_LABELS_KN_OPTIONAL.join(" · ")}).
+7. Output ONLY the finished letter text. No preamble, no markdown fences, no commentary.`;
 
 const VARIANT_GUIDANCE: Record<LetterVariant, string> = {
   bill_stop:
@@ -42,8 +43,8 @@ const VARIANT_GUIDANCE: Record<LetterVariant, string> = {
 
 const LANGUAGE_GUIDANCE = (ctx: LetterContext) =>
   ctx.language === "Bilingual" || ctx.variant === "bilingual_summary"
-    ? "Produce the letter in formal Kannada, followed by a faithful English translation under a clear heading. Keep every figure and reference identical in both."
-    : "Produce the letter in formal Kannada (ಕನ್ನಡ). An English word may appear only inside an official identifier.";
+    ? "Produce the letter in formal Kannada, followed by a faithful English translation under a clear heading. Keep every figure and reference identical in both — always as Arabic numerals (0-9), never Kannada-script digits (೦-೯)."
+    : "Produce the letter in formal Kannada (ಕನ್ನಡ). An English word may appear only inside an official identifier. Every number stays in Arabic numerals (0-9), never Kannada-script digits (೦-೯) — see rule 4.";
 
 /** Build the {system, prompt} pair for the AI to polish the assembled skeleton. */
 export function buildLetterPrompt(ctx: LetterContext, skeleton: LetterSkeleton): BuiltPrompt {

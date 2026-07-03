@@ -153,9 +153,15 @@ HARD RULES:
 - Be factual and respectful. Phrase every concern as "it appears" / "the records do not show" / "kindly verify / produce"; never as an accusation.
 Output ONLY the letter text in Markdown — no preamble, no explanation.`;
 
+// Real Kannada government/legal correspondence writes all figures in Arabic
+// numerals even in fully-Kannada prose — LLMs left to their own devices tend to
+// switch to Kannada-script digits (೦-೯), so this must be stated explicitly.
+const NUMERALS_KN =
+  "Even inside the Kannada text, write every number — amounts, dates, percentages, quantities, case/job numbers — using Arabic numerals (0,1,2,3,4,5,6,7,8,9), exactly as official Kannada correspondence does. NEVER use Kannada-script digits (೦೧೨೩೪೫೬೭೮೯). Example: write 'ರೂ. 17,02,087', NOT 'ರೂ. ೧೭,೦೨,೦೮೭'.";
+
 function languageLine(language?: DraftLanguage): string {
-  if (language === "Kannada") return "Write the entire draft in formal Kannada (ಕನ್ನಡ).";
-  if (language === "Bilingual") return "Write in English, then a formal Kannada (ಕನ್ನಡ) translation below, separated by a line of dashes.";
+  if (language === "Kannada") return `Write the entire draft in formal Kannada (ಕನ್ನಡ). ${NUMERALS_KN}`;
+  if (language === "Bilingual") return `Write in English, then a formal Kannada (ಕನ್ನಡ) translation below, separated by a line of dashes. ${NUMERALS_KN}`;
   return "Write the draft in English.";
 }
 function toneLine(tone?: LegalTone): string {

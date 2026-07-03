@@ -361,10 +361,16 @@ function partyLine(p: LetterParty): string {
   return [p.name, p.designation, p.office, p.address].filter(Boolean).join(", ");
 }
 
+// Real Kannada government/legal correspondence writes all figures in Arabic
+// numerals even in fully-Kannada prose — LLMs left to their own devices tend to
+// switch to Kannada-script digits (೦-೯), so this must be stated explicitly.
+const NUMERALS_KN =
+  "Even inside the Kannada text, write every number — dates, amounts, work-order/tender numbers, ward numbers — using Arabic numerals (0,1,2,3,4,5,6,7,8,9), exactly as official Kannada correspondence does. NEVER use Kannada-script digits (೦೧೨೩೪೫೬೭೮೯).";
+
 function languageLine(language: RoadWorkLanguage): string {
-  if (language === "Kannada") return "Write the ENTIRE letter in formal Kannada (ಕನ್ನಡ).";
+  if (language === "Kannada") return `Write the ENTIRE letter in formal Kannada (ಕನ್ನಡ). ${NUMERALS_KN}`;
   if (language === "Bilingual")
-    return "Write the letter in English first, then a full formal Kannada (ಕನ್ನಡ) translation below, separated by a line of dashes.";
+    return `Write the letter in English first, then a full formal Kannada (ಕನ್ನಡ) translation below, separated by a line of dashes. ${NUMERALS_KN}`;
   return "Write the letter in clear, formal English.";
 }
 
