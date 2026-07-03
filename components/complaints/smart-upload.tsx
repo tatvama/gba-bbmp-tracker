@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FileType2, ArrowRight, FileText } from "lucide-react";
+import { ChevronRight, X, FileText, FileType2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ForensicZipImport } from "@/components/forensic/forensic-zip-import";
@@ -10,18 +11,16 @@ import { ComplaintIntakeImport } from "@/components/complaints/complaint-intake-
 import { ImportQueue } from "@/components/import/import-queue";
 
 /**
- * One upload entry that AUTO-DIFFERENTIATES:
- *   • .zip files      → the chunked import QUEUE (resumable, live progress,
- *                       one complaint per job code — handles multi-GB files)
- *   • PDF / image(s)  → AI letter intake (recognise department/subject → one complaint)
- * ?import=<batchId> resumes a ZIP batch on its review screen (auto-commit off,
- * or older imports).
+ * Redesigned smart upload workspace controller.
+ * Auto-differentiates file drops/selections, routes ZIPs to chunked queue,
+ * and routes letters/PDFs to the AI Intake editor review screen.
  */
 export function SmartUpload() {
   const searchParams = useSearchParams();
   const reviewingBatch = Boolean(searchParams.get("import"));
   const [letterFiles, setLetterFiles] = React.useState<File[]>([]);
   const [letterStarted, setLetterStarted] = React.useState(false);
+  const [showGuidelines, setShowGuidelines] = React.useState(false);
 
   // Review screen for an analyzed batch (auto-commit off / legacy links).
   if (reviewingBatch) return <ForensicZipImport />;
@@ -29,64 +28,76 @@ export function SmartUpload() {
   if (letterStarted && letterFiles.length) return <ComplaintIntakeImport presetFiles={letterFiles} />;
 
   return (
-    <div className="space-y-5">
-      {/* ZIPs: the resumable queue (drop zone + live cards live inside). */}
-      <ImportQueue />
+    <div className="space-y-6">
+      {/* Page Header Area */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border/40 pb-5 no-print">
+        <div className="space-y-1.5">
+          {/* Breadcrumbs */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground/80 font-medium">
+            <Link href="/complaints" className="hover:text-foreground transition-colors">Complaints</Link>
+            <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/45" />
+            <span className="text-foreground font-semibold">Upload ZIP / Letter</span>
+          </nav>
+          <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl leading-none">
+            Upload Complaint Documents
+          </h1>
+          <p className="max-w-3xl text-xs sm:text-sm leading-relaxed text-muted-foreground/95 font-medium">
+            Upload forensic ZIP archives or individual letters for AI analysis. Documents are processed automatically in the background while you continue working.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" className="h-9 font-semibold hover:scale-[1.01] transition-all cursor-pointer" onClick={() => setShowGuidelines(true)}>
+            Upload Guidelines
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-9 font-semibold hover:scale-[1.01] transition-all cursor-pointer">
+            <Link href="/docs/ingestion" target="_blank">
+              Documentation
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-      {/* Letters: single complaint via AI intake. */}
-      <Card className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm rounded-xl">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex items-start gap-2.5 rounded-lg border border-emerald-100 bg-emerald-50/30 p-3.5 dark:border-slate-800 dark:bg-slate-950/30">
-            <FileType2 className="h-4.5 w-4.5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Got just a <span className="font-semibold">letter or acknowledgement</span> (PDF or photos) instead of a
-              ZIP? Drop it here — AI reads it, recognises the department and subject, and creates one complaint.
-            </p>
-          </div>
+      {/* Main Unified Ingestion Workspace */}
+      <ImportQueue
+        onLetterUpload={(files) => {
+          setLetterFiles(files);
+          setLetterStarted(true);
+        }}
+      />
 
-          <label
-            htmlFor="letter-upload-file"
-            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/40 px-4 py-6 text-center transition-colors hover:border-emerald-400/60 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50"
-          >
-            <FileType2 className="h-6 w-6 text-slate-400" />
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Choose a letter (PDF / photos)</span>
-            <span className="text-xs text-slate-400">JPEG, PNG, WebP or PDF · multiple pages allowed</span>
-            <input
-              id="letter-upload-file"
-              type="file"
-              accept="application/pdf,image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                setLetterFiles(Array.from(e.target.files ?? []));
-                e.target.value = "";
-              }}
-            />
-          </label>
-
-          {letterFiles.length > 0 && (
-            <>
-              <ul className="space-y-1.5">
-                {letterFiles.map((f, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
-                  >
-                    <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                    <span className="truncate">{f.name}</span>
-                    <span className="ml-auto shrink-0 text-slate-400">{(f.size / 1_048_576).toFixed(1)} MB</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex justify-end">
-                <Button type="button" onClick={() => setLetterStarted(true)} className="h-10 font-bold">
-                  Read the letter with AI <ArrowRight className="h-4 w-4 ml-1.5" />
-                </Button>
+      {/* Guidelines Modal dialog */}
+      {showGuidelines && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4 no-print animate-fade-in">
+          <Card className="max-w-lg w-full border border-border shadow-2xl bg-card overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Upload Guidelines &amp; Intake Rules</span>
+              <button onClick={() => setShowGuidelines(false)} className="text-slate-400 hover:text-slate-650 p-1.5 rounded-full hover:bg-muted transition-colors">
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+            <CardContent className="p-5 space-y-4 text-xs text-foreground/90 leading-relaxed">
+              <div className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px]">ZIP Forensic Archives</h4>
+                <p className="text-slate-500">
+                  Must be compressed in standard ZIP format. The archive should contain folders organized by job/case codes (e.g., <code>JOB-104</code>). The server decompresses the file and registers each folder as a separate child case automatically.
+                </p>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+              <div className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px]">Individual Letters &amp; PDFs</h4>
+                <p className="text-slate-500">
+                  Drop single-page or multi-page documents (PDFs, scans, or camera photos of letters). The AI scanning pipeline will automatically perform OCR transcription, identify department codes, extract subject text, and prepare draft complaint entries for review.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px]">File Slices &amp; Chunking</h4>
+                <p className="text-slate-500">
+                  Archives can be up to 4 GB. The client uploading engine automatically splits the file into 8 MB chunks. If your internet connection drops, you can reopen the page to resume from the last successful byte using IndexedDB handles.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

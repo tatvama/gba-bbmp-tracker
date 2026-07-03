@@ -14,20 +14,16 @@ export default async function ComplaintUploadPage() {
   if (!hasRole(user, COMPLAINT_FIELD_ROLES)) {
     return (
       <div>
-        <PageHeader title="Upload" />
+        <PageHeader title="Not Permitted" />
         <EmptyState title="Not permitted" description="Your role cannot upload or import complaints." />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader
-        title="Upload a ZIP or a letter"
-        description="Drop one or many forensic-audit ZIPs (one folder per job code — multi-GB is fine): they upload one by one with live progress, and each job becomes a complaint automatically. You can close this page any time; it resumes where it left off. Or drop a single letter/PDF for AI intake."
-      />
+    <div className="mx-auto max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8">
       {!isAiConfigured() && (
-        <p className="rounded-lg border border-amber-200/50 bg-amber-50/30 p-3 text-xs text-amber-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-amber-400">
+        <p className="rounded-lg border border-amber-200/50 bg-amber-50/30 p-3 text-xs text-amber-700 dark:border-slate-850 dark:bg-slate-950/35 dark:text-amber-400 no-print">
           AI is not configured on the server. ZIP folders that already contain the forensic JSON import fully; a letter
           (or a ZIP folder with no JSON) needs AI to read it — without a key, the case is created and you fill details manually.
         </p>
