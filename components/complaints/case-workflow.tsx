@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { ScanCapture } from "@/components/complaints/scan-capture";
 import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
 import { LetterDraftArea } from "@/components/complaints/letter-preview";
+import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
 import {
   setComplaintStatus,
   fileComplaint,
@@ -29,7 +30,7 @@ import {
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
-import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
+import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage } from "@/lib/constants";
 
 /**
  * Open a drafted letter as a REAL, server-rendered PDF in a new tab. This
@@ -529,12 +530,12 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
     setGap(r.data);
   }
 
-  async function generate() {
+  async function generate(language: DraftLanguage) {
     setGenerating(true);
     setError(null);
     setSavedMsg(null);
     setLintWarning(null);
-    const r = await generateComplaintDraft({ complaintId, kind: "counter_reply" });
+    const r = await generateComplaintDraft({ complaintId, kind: "counter_reply", language });
     setGenerating(false);
     if (!r.ok || !r.text) { setError(r.error ?? "Could not generate the counter-reply (is the AI key configured?)."); return; }
     setDraft(r.text);
@@ -593,9 +594,16 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
         <Button size="sm" variant="outline" disabled={!aiConfigured || analysing} onClick={analyse}>
           {analysing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Analyse what the reply left unaddressed
         </Button>
-        <Button size="sm" variant="outline" disabled={!aiConfigured || generating} onClick={generate}>
-          {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquareReply className="h-4 w-4" />} Generate counter-reply
-        </Button>
+        <LanguageChoiceButton
+          size="sm"
+          variant="outline"
+          busy={generating}
+          disabled={!aiConfigured}
+          icon={MessageSquareReply}
+          onChoose={generate}
+        >
+          Generate counter-reply
+        </LanguageChoiceButton>
       </div>
 
       {error && <p className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
@@ -734,12 +742,12 @@ function EscalatePanel({
     onEscalated();
   }
 
-  async function gen(k: ComplaintDraftKind, level: string) {
+  async function gen(k: ComplaintDraftKind, level: string, language: DraftLanguage) {
     setGenerating(k);
     setError(null);
     setSavedMsg(null);
     setLintWarning(null);
-    const r = await generateComplaintDraft({ complaintId, kind: k });
+    const r = await generateComplaintDraft({ complaintId, kind: k, language });
     setGenerating(null);
     if (!r.ok || !r.text) {
       setError(r.error ?? "Could not generate the draft (is the AI key configured?).");
@@ -784,10 +792,17 @@ function EscalatePanel({
       )}
       <div className="flex flex-wrap gap-2">
         {ESCALATION_OPTIONS.map((o) => (
-          <Button key={o.kind} size="sm" variant="outline" disabled={!aiConfigured || generating !== null} onClick={() => gen(o.kind, o.toLevel)}>
-            {generating === o.kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gavel className="h-4 w-4" />}
+          <LanguageChoiceButton
+            key={o.kind}
+            size="sm"
+            variant="outline"
+            busy={generating === o.kind}
+            disabled={!aiConfigured || generating !== null}
+            icon={Gavel}
+            onChoose={(language) => gen(o.kind, o.toLevel, language)}
+          >
             {COMPLAINT_DRAFT_KINDS[o.kind]}
-          </Button>
+          </LanguageChoiceButton>
         ))}
       </div>
 

@@ -48,16 +48,22 @@ export function AIInsightsPanel({
     return () => clearInterval(id);
   }, [refresh]);
 
-  // On mount: recover a missing or stale-stuck analysis. The backend
+  // On mount: recover a missing or stale-stuck analysis, OR convert a case whose
+  // narrative was generated before the advisor switched to Kannada. The backend
   // single-flight + context-hash gate make a redundant kick cheap, and it only
-  // reclaims a lock that's actually dead (see STALE_LOCK_MS in the engine).
+  // reclaims a lock that's actually dead (see STALE_LOCK_MS in the engine). The
+  // language check fires at most once per mount (kickedRef) and self-limits once
+  // the text is Kannada, so it can't loop.
   const kickedRef = React.useRef(false);
   React.useEffect(() => {
     if (kickedRef.current) return;
     const r = recommendation;
     const inFlight = r?.analysis_status === "queued" || r?.analysis_status === "running";
     const stale = !r?.updated_at || Date.now() - Date.parse(r.updated_at) > STALE_MS;
-    if (!r || (inFlight && stale)) {
+    // A stored narrative with NO Kannada characters (U+0C80–U+0CFF) predates the
+    // Kannada switch — re-run so this case shows in Kannada like the rest.
+    const looksEnglish = !!r?.current_situation && !/[ಀ-೿]/.test(r.current_situation);
+    if (!r || (inFlight && stale) || looksEnglish) {
       kickedRef.current = true;
       void triggerAdvisorAnalysis(complaintId).then(refresh);
     }

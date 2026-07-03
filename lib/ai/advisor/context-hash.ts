@@ -13,6 +13,10 @@ export function computeContextHash(ctx: AdvisorContext): string {
   const lastId = <T extends { id: string }>(rows: T[]): string | null => rows[rows.length - 1]?.id ?? null;
 
   const signal = {
+    // Bumped when the advisor's OUTPUT LANGUAGE changes so every cached
+    // (English) recommendation is treated as stale and re-generated in the new
+    // language on its next analysis. "kn" = advisor narrative is Kannada.
+    narrativeLang: "kn",
     status: complaint.status,
     priority: complaint.priority,
     nextFollowUpDate: complaint.next_follow_up_date,

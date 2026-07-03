@@ -15,6 +15,14 @@ const SCORE_COLOR: Record<string, string> = {
   Critical: "text-red-700 dark:text-red-500",
 };
 
+// The health badge only appears in the always-Kannada advisor card.
+const RISK_LABEL_KN: Record<string, string> = {
+  Low: "ಕಡಿಮೆ ಅಪಾಯ",
+  Medium: "ಮಧ್ಯಮ ಅಪಾಯ",
+  High: "ಹೆಚ್ಚು ಅಪಾಯ",
+  Critical: "ಗಂಭೀರ ಅಪಾಯ",
+};
+
 export function AIHealthScore({
   score,
   riskLevel,
@@ -31,7 +39,7 @@ export function AIHealthScore({
       </span>
       {!compact && <span className="text-xs text-muted-foreground">/100</span>}
       <Badge variant={RISK_VARIANT[riskLevel] ?? "muted"} className={compact ? "text-[9px]" : undefined}>
-        {riskLevel} risk
+        {RISK_LABEL_KN[riskLevel] ?? `${riskLevel} risk`}
       </Badge>
     </div>
   );

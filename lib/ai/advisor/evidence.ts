@@ -18,16 +18,17 @@ export function checkEvidenceCompleteness(ctx: AdvisorContext): string[] {
 
   // Only expect a before/after pair once work has actually been reported —
   // asking for "after" evidence before any action is taken would be noise.
+  // Kannada text: the advisor panel that surfaces these is shown in Kannada.
   if (actions.length > 0) {
-    if (!hasBefore) missing.push("No 'before work' site photo on record");
-    if (!hasAfter) missing.push("No 'after work' site photo on record — needed to verify the reported action");
+    if (!hasBefore) missing.push("'ಕೆಲಸಕ್ಕೆ ಮೊದಲು' ಸ್ಥಳದ ಫೋಟೋ ದಾಖಲೆಯಲ್ಲಿ ಇಲ್ಲ");
+    if (!hasAfter) missing.push("'ಕೆಲಸದ ನಂತರ' ಸ್ಥಳದ ಫೋಟೋ ದಾಖಲೆಯಲ್ಲಿ ಇಲ್ಲ — ವರದಿಯಾದ ಕ್ರಮವನ್ನು ಪರಿಶೀಲಿಸಲು ಅಗತ್ಯ");
   }
 
   const lowConfidenceScans = documents.filter(
     (d) => typeof d.ocr_confidence === "number" && d.ocr_confidence < 55,
   ).length;
   if (lowConfidenceScans > 0) {
-    missing.push(`${lowConfidenceScans} scan(s) have low OCR confidence — may need a clearer re-scan`);
+    missing.push(`${lowConfidenceScans} ಸ್ಕ್ಯಾನ್‌ಗಳಲ್ಲಿ OCR ವಿಶ್ವಾಸ ಕಡಿಮೆ ಇದೆ — ಸ್ಪಷ್ಟವಾಗಿ ಮರು-ಸ್ಕ್ಯಾನ್ ಮಾಡಬೇಕಾಗಬಹುದು`);
   }
 
   return missing;

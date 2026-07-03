@@ -4,7 +4,7 @@ import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants"
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import type { HealthScoreResult } from "./health-score";
 import type { ReminderSuggestion } from "./reminder-workflow";
-import { ACTION_LABELS } from "./narrative-agent";
+import { ACTION_LABELS, ACTION_LABELS_KN } from "./narrative-agent";
 import type {
   AdvisorContext,
   Commitment,
@@ -55,13 +55,13 @@ function fallback(
   return {
     currentSituation: healthScore.riskFactors.length
       ? healthScore.riskFactors.join("; ")
-      : "No AI narrative available (AI not configured or the request failed).",
+      : "AI ವಿವರಣೆ ಲಭ್ಯವಿಲ್ಲ (AI ಕಾನ್ಫಿಗರ್ ಆಗಿಲ್ಲ ಅಥವಾ ವಿನಂತಿ ವಿಫಲವಾಗಿದೆ).",
     reasoning: "",
     outstandingIssues: prev?.outstanding_issues ?? [],
     contradictions: prev?.contradictions ?? [],
     commitments: prev?.commitments ?? [],
     recommendedAction: action,
-    recommendationLabel: ACTION_LABELS[action],
+    recommendationLabel: ACTION_LABELS_KN[action],
     confidenceBand: "Low",
     confidenceScore: 0,
     expectedOutcome: "",
@@ -165,7 +165,9 @@ function buildCorrespondence(ctx: AdvisorContext, demands: string): { text: stri
 
 const SYSTEM =
   "You are the case-strategy advisor for a citizen holding BBMP/GBA (Bengaluru civic body) accountable on a public-works complaint. You are given the COMPLETE correspondence so far. Reason over ALL of it — never judge only the latest reply. Decide the single most useful next step and track what remains open. " +
-  "CAUTIOUS FRAMING (non-negotiable): treat every adverse point as a documented suspicion requiring records/explanation — never assert that a named officer or contractor committed fraud, theft, forgery or corruption. Do not invent dates, amounts, or facts not present in the correspondence. Output STRICT JSON only, no prose, no markdown.";
+  "CAUTIOUS FRAMING (non-negotiable): treat every adverse point as a documented suspicion requiring records/explanation — never assert that a named officer or contractor committed fraud, theft, forgery or corruption. Do not invent dates, amounts, or facts not present in the correspondence. " +
+  "LANGUAGE (non-negotiable): write every human-readable text value in formal Kannada (ಕನ್ನಡ) — currentSituation, reasoning, recommendationLabel, expectedOutcome, timelineSummary, and every string inside outstandingIssues[].issue, contradictions[].summary, contradictions[].conflictsWith, commitments[].commitment, detectedRisks[] and missingInformation[]. Do NOT translate the machine values: recommendedAction, confidenceBand (must stay exactly High/Medium/Low), the status tokens (open/answered/partial and pending/fulfilled/overdue/unmet) and all dates (YYYY-MM-DD) MUST remain the exact English/enum tokens listed. " +
+  "Output STRICT JSON only, no prose, no markdown.";
 
 export async function analyzeThread(input: {
   context: AdvisorContext;
@@ -226,7 +228,8 @@ Output STRICT JSON of EXACTLY this shape:
   "detectedRisks": ["short risk phrase beyond the given risk factors, if any"],
   "missingInformation": ["short phrase describing info still missing, if any"]
 }
-Use empty arrays / null where there is nothing. confidenceScore is an integer 0-100 that should agree with confidenceBand (High≈75-100, Medium≈45-74, Low≈0-44).`;
+Use empty arrays / null where there is nothing. confidenceScore is an integer 0-100 that should agree with confidenceBand (High≈75-100, Medium≈45-74, Low≈0-44).
+REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ); recommendedAction, confidenceBand, the status tokens and dates stay in English exactly as specified.`;
 
   const r = await extractJson<Partial<ThreadDecision>>({ system: SYSTEM, prompt, fallback: base, maxTokens: 3500 });
   if (!r.ok) return { ok: false, data: base, error: r.error };
@@ -250,7 +253,7 @@ Use empty arrays / null where there is nothing. confidenceScore is an integer 0-
       contradictions: Array.isArray(d.contradictions) ? d.contradictions : [],
       commitments: Array.isArray(d.commitments) ? d.commitments : [],
       recommendedAction: action,
-      recommendationLabel: d.recommendationLabel || ACTION_LABELS[action],
+      recommendationLabel: d.recommendationLabel || ACTION_LABELS_KN[action],
       confidenceBand: band,
       confidenceScore: score,
       expectedOutcome: d.expectedOutcome ?? "",
