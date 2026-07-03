@@ -261,7 +261,7 @@ export default async function ComplaintDashboard() {
               <Info className="h-4.5 w-4.5 text-primary" /> System Overview
             </h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              This municipal complaint tracker visualizes real-time performance across Bangalore's GBA administrative boundaries. Explore counts, print dispatch updates, and monitor resolution timelines.
+              This municipal complaint tracker visualizes real-time performance across Bangalore&apos;s GBA administrative boundaries. Explore counts, print dispatch updates, and monitor resolution timelines.
             </p>
           </Card>
         </div>

@@ -514,7 +514,7 @@ export function RtiTable({
               <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mr-1.5 select-none">Active Filters:</span>
               {globalFilter && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Search: "{globalFilter}"
+                  Search: &quot;{globalFilter}&quot;
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setGlobalFilter("")} />
                 </Badge>
               )}

@@ -719,7 +719,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
               <TrendingUp className="h-3.5 w-3.5 text-primary" /> Executive Compliance Summary
             </h2>
             <p className="text-sm text-foreground/80 leading-relaxed font-semibold">
-              The platform is monitoring <strong className="text-primary font-black">{totalRtisCount}</strong> statutory RTI filings across Bengaluru's municipal jurisdictions. 
+              The platform is monitoring <strong className="text-primary font-black">{totalRtisCount}</strong> statutory RTI filings across Bengaluru&apos;s municipal jurisdictions. 
               Currently, <strong className="text-rose-500 font-extrabold">{criticalCount}</strong> cases require immediate intervention due to SLA breaches, 
               while <strong className="text-purple-600 font-extrabold">{appealsCount}</strong> files are active in appeals before the FAA and Information Commission.
             </p>
@@ -1066,7 +1066,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
           )}
           {globalFilter && (
             <span className="flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-md max-w-xs truncate">
-              Query: "{globalFilter}"
+              Query: &quot;{globalFilter}&quot;
               <button onClick={() => setGlobalFilter("")} className="hover:text-rose-500 cursor-pointer">
                 <X className="h-3 w-3" />
               </button>

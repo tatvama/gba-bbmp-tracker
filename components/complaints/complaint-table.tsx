@@ -590,7 +590,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
       size: 70,
       enableSorting: false,
     },
-  ], [selectedIds, filtered]);
+  ], []);
 
   const table = useReactTable({
     data: filtered,
