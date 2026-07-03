@@ -218,13 +218,13 @@
   @apply transition-colors duration-150 ease-out;
 }
 .data-table tbody tr:hover {
-  @apply bg-primary/[0.025];
+  @apply bg-primary/[0.04];
 }
 .data-table tbody tr:nth-child(even) {
   @apply bg-muted/10;
 }
 .data-table tbody tr:nth-child(even):hover {
-  @apply bg-primary/[0.025];
+  @apply bg-primary/[0.04];
 }
 .data-table td, .data-table th {
   border-bottom: 1px solid hsl(var(--border) / 0.45);
