@@ -88,7 +88,7 @@ const STATUS_CONFIGS: Record<string, StatusConfig> = {
   },
   "Site Visit Done": {
     icon: Check,
-    colors: "bg-teal-50 text-teal-700 border-teal-205 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-900",
+    colors: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-900",
     isAttention: false,
   },
   "Work In Progress": {
@@ -98,7 +98,7 @@ const STATUS_CONFIGS: Record<string, StatusConfig> = {
   },
   "Reply Received": {
     icon: Mail,
-    colors: "bg-teal-50 text-teal-700 border-teal-205 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-900",
+    colors: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-900",
     isAttention: false,
   },
   "Action Taken Report Received": {

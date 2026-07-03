@@ -69,7 +69,7 @@ export function RtiHeaderActions({
             type="button"
             size="sm"
             variant="outline"
-            className="h-9 text-slate-700 dark:text-slate-350 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 cursor-pointer font-medium bg-white dark:bg-slate-900"
+            className="h-9 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 cursor-pointer font-medium bg-white dark:bg-slate-900"
             disabled={busy}
             onClick={() => run(() => reopenRtiCaseAction(rtiId))}
           >
@@ -84,8 +84,8 @@ export function RtiHeaderActions({
             className={cn(
               "h-9 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 cursor-pointer font-medium bg-white dark:bg-slate-900",
               canClose 
-                ? "border-rose-200 text-rose-600 dark:border-rose-900/50 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-955/20" 
-                : "border-slate-200 text-slate-400 dark:border-slate-850 dark:text-slate-600"
+                ? "border-rose-200 text-rose-600 dark:border-rose-900/50 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20" 
+                : "border-slate-200 text-slate-400 dark:border-slate-800 dark:text-slate-600"
             )}
             disabled={busy || !canClose}
             title={canClose ? "Close this RTI case" : "Upload a reply or an appeal order before closing this case."}
@@ -140,7 +140,7 @@ export function RtiHeaderActions({
                 }}
                 className={cn(
                   "cursor-pointer",
-                  canClose && "text-rose-600 dark:text-rose-455 focus:text-rose-600 dark:focus:text-rose-400"
+                  canClose && "text-rose-600 dark:text-rose-500 focus:text-rose-600 dark:focus:text-rose-400"
                 )}
               >
                 <span className="flex items-center gap-2 w-full">

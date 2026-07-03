@@ -661,7 +661,7 @@ export function ComplaintForm({
         </div>
       </Section>
 
-      <div className="flex gap-2">
+      <div className="sticky bottom-0 z-10 flex gap-2 rounded-lg border bg-card/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/85">
         <Button type="submit" disabled={pending}>{pending ? "Saving…" : initial ? "Save changes" : "Create complaint"}</Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
       </div>
@@ -685,7 +685,7 @@ function Field({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label className={cn(error && "text-destructive")}>
+      <Label variant="field" className={cn(error && "text-destructive")}>
         {label} {required && <span className="text-destructive">*</span>}
       </Label>
       {children}

@@ -16,11 +16,11 @@ export function WardsHeader() {
         />
       </div>
       {/* Mobile Header */}
-      <div className="block md:hidden bg-slate-55 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 mb-4 space-y-1.5">
-        <h1 className="text-xl font-bold tracking-tight text-slate-850 dark:text-slate-105">
+      <div className="block md:hidden bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 mb-4 space-y-1.5">
+        <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
           Master ward tracking
         </h1>
-        <div className="text-xs text-slate-550 dark:text-slate-400 leading-relaxed">
+        <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           {expanded ? (
             <p>
               All 225 notified BBMP wards with their lineage (old 198 → new 225 → derived GBA corporation), engineering sub-division, property count and verification status. The corporation column is derived from each ward&apos;s Assembly Constituency.

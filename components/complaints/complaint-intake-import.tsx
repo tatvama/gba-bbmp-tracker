@@ -106,7 +106,7 @@ export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } 
     return (
       <Card className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm rounded-xl">
         <CardContent className="p-6 space-y-4">
-          {error && <p className="rounded-lg border border-rose-250/30 bg-rose-50/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+          {error && <p className="rounded-lg border border-rose-200/30 bg-rose-50/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className={`rounded-full px-2 py-0.5 font-semibold ${ex.confidence === "High" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : ex.confidence === "Low" ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"}`}>
@@ -161,7 +161,7 @@ export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } 
             </div>
           )}
 
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-150 dark:border-slate-800/85 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100 dark:border-slate-800/85 pt-4">
             <Button type="button" variant="outline" onClick={() => { setPhase("idle"); setEx(null); setFiles([]); }} className="h-10">Start over</Button>
             <Button type="button" onClick={commit} disabled={!ex.subject.trim()} className="h-10 font-bold">
               <CheckCircle2 className="h-4 w-4 mr-1.5" /> Create complaint
@@ -175,7 +175,7 @@ export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } 
   return (
     <Card className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm rounded-xl">
       <CardContent className="p-6 space-y-5">
-        {error && <p className="rounded-lg border border-rose-250/30 bg-rose-50/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+        {error && <p className="rounded-lg border border-rose-200/30 bg-rose-50/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <div className="flex items-start gap-2.5 rounded-lg border border-amber-100 bg-amber-50/30 p-3.5 dark:border-slate-800 dark:bg-slate-950/30">
           <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -183,7 +183,7 @@ export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } 
             and type, and suggests next actions — review, then create the complaint and track it stage by stage.
           </p>
         </div>
-        <label htmlFor="intake-file" className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-250 bg-slate-50/40 px-4 py-10 text-center transition-colors hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50">
+        <label htmlFor="intake-file" className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/40 px-4 py-10 text-center transition-colors hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:bg-slate-900/50">
           <UploadCloud className="h-8 w-8 text-slate-400" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Choose a letter (PDF or images)</span>
           <span className="text-xs text-slate-400">PDF, JPEG, PNG or WebP</span>
@@ -192,7 +192,7 @@ export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } 
         {files.length > 0 && (
           <ul className="space-y-1.5">
             {files.map((f, i) => (
-              <li key={i} className="flex items-center gap-2 rounded-lg border border-slate-150 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+              <li key={i} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                 <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 <span className="truncate">{f.name}</span>
                 <span className="ml-auto shrink-0 text-slate-400">{(f.size / 1_048_576).toFixed(1)} MB</span>
@@ -200,7 +200,7 @@ export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } 
             ))}
           </ul>
         )}
-        <div className="flex justify-end border-t border-slate-150 dark:border-slate-800/85 pt-4">
+        <div className="flex justify-end border-t border-slate-100 dark:border-slate-800/85 pt-4">
           <Button type="button" onClick={() => analyze()} disabled={files.length === 0} className="h-10 font-bold">
             <Sparkles className="h-4 w-4 mr-1.5" /> Analyze letter
           </Button>

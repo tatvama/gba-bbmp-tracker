@@ -200,7 +200,7 @@ export function FilingDateEditor({
                   }
                 }}
               >
-                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-2 text-xs font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-850 dark:text-slate-200 shrink-0 w-[110px] justify-between">
+                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-2 text-xs font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0 w-[110px] justify-between">
                   <SelectValue>{calendarDate.toLocaleDateString("en-US", { month: "long" })}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-[250px] z-[1000]">
@@ -226,7 +226,7 @@ export function FilingDateEditor({
                   }
                 }}
               >
-                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-2 text-xs font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-850 dark:text-slate-200 shrink-0 w-[72px] justify-between">
+                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-2 text-xs font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0 w-[72px] justify-between">
                   <SelectValue>{year}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-[250px] z-[1000]">
@@ -246,7 +246,7 @@ export function FilingDateEditor({
                 variant="ghost"
                 size="icon"
                 onClick={prevMonth}
-                className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-lg cursor-pointer shrink-0"
+                className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer shrink-0"
                 aria-label="Previous month"
               >
                 <ChevronLeft className="h-4 w-4 text-slate-500" />
@@ -255,10 +255,10 @@ export function FilingDateEditor({
                 variant="ghost"
                 size="icon"
                 onClick={nextMonth}
-                className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-lg cursor-pointer shrink-0"
+                className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer shrink-0"
                 aria-label="Next month"
               >
-                <ChevronRight className="h-4 w-4 text-slate-550" />
+                <ChevronRight className="h-4 w-4 text-slate-500" />
               </Button>
             </div>
           </div>

@@ -49,14 +49,14 @@ export function RtiAcknowledgementCard({
   // Unified Status Colors Mapping
   const statusColorMap: Record<string, string> = {
     "Not Uploaded": "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
-    "Uploaded": "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-95/20 dark:text-blue-400 dark:border-blue-900/50",
-    "OCR Processing": "bg-blue-50 text-blue-700 animate-pulse border border-blue-200 dark:bg-blue-95/20 dark:text-blue-400 dark:border-blue-900/50",
-    "OCR Completed": "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-95/20 dark:text-blue-400 dark:border-blue-900/50",
-    "AI Processing": "bg-blue-50 text-blue-700 animate-pulse border border-blue-200 dark:bg-blue-95/20 dark:text-blue-400 dark:border-blue-900/50",
-    "Verified": "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-95/20 dark:text-emerald-400 dark:border-emerald-900/50",
-    "Manual Review Required": "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-95/20 dark:text-amber-400 dark:border-amber-900/50",
-    "Verification Failed": "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-95/20 dark:text-rose-400 dark:border-rose-900/50",
-    "Filed": "bg-emerald-600 text-white border border-emerald-700 dark:bg-emerald-700 dark:text-emerald-100 dark:border-emerald-650",
+    "Uploaded": "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-100/20 dark:text-blue-400 dark:border-blue-900/50",
+    "OCR Processing": "bg-blue-50 text-blue-700 animate-pulse border border-blue-200 dark:bg-blue-100/20 dark:text-blue-400 dark:border-blue-900/50",
+    "OCR Completed": "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-100/20 dark:text-blue-400 dark:border-blue-900/50",
+    "AI Processing": "bg-blue-50 text-blue-700 animate-pulse border border-blue-200 dark:bg-blue-100/20 dark:text-blue-400 dark:border-blue-900/50",
+    "Verified": "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-100/20 dark:text-emerald-400 dark:border-emerald-900/50",
+    "Manual Review Required": "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-100/20 dark:text-amber-400 dark:border-amber-900/50",
+    "Verification Failed": "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-100/20 dark:text-rose-400 dark:border-rose-900/50",
+    "Filed": "bg-emerald-600 text-white border border-emerald-700 dark:bg-emerald-700 dark:text-emerald-100 dark:border-emerald-600",
   };
 
   const statusLabelMap: Record<string, string> = {
@@ -205,7 +205,7 @@ export function RtiAcknowledgementCard({
       <CardContent className="p-6 space-y-6">
         {/* Error notification */}
         {errorMsg && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-3.5 text-sm flex items-start gap-2.5 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-450">
+          <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-3.5 text-sm flex items-start gap-2.5 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400">
             <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="font-semibold">Verification Alert</span>

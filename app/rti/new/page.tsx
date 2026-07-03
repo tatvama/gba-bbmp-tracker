@@ -43,9 +43,9 @@ export default async function NewRtiPage() {
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <Scale className="h-4.5 w-4.5 text-primary shrink-0" />
-                <h4 className="font-bold text-sm text-slate-850 dark:text-slate-100">RTI Lifecycle</h4>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">RTI Lifecycle</h4>
               </div>
-              <div className="relative pl-5 space-y-4 text-xs font-medium text-slate-600 dark:text-slate-405">
+              <div className="relative pl-5 space-y-4 text-xs font-medium text-slate-600 dark:text-slate-400">
                 {/* Timeline Line */}
                 <div className="absolute left-[7px] top-1.5 bottom-1.5 w-0.5 bg-slate-100 dark:bg-slate-800" />
 

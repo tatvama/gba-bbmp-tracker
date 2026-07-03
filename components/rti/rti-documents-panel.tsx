@@ -66,7 +66,7 @@ function DocTypeBadge({ type }: { type: string }) {
     return (
       <Badge
         variant="outline"
-        className="border-purple-250 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.1)] dark:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-[12px] px-3 py-1 font-semibold"
+        className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.1)] dark:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-[12px] px-3 py-1 font-semibold"
         dot
       >
         {type}

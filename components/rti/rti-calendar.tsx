@@ -202,7 +202,7 @@ export function RtiCalendar({
           <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {overdueCount}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-rose-650 dark:text-rose-400">
+          <span className="text-[9px] md:text-[9.5px] font-semibold text-rose-600 dark:text-rose-400">
             Action needed
           </span>
         </div>
@@ -216,7 +216,7 @@ export function RtiCalendar({
           <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {dueThisWeekCount}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-amber-600 dark:text-amber-455">
+          <span className="text-[9px] md:text-[9.5px] font-semibold text-amber-600 dark:text-amber-500">
             Requires attention
           </span>
         </div>
@@ -230,7 +230,7 @@ export function RtiCalendar({
           <span className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {upcomingCount}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-emerald-600 dark:text-emerald-455">
+          <span className="text-[9px] md:text-[9.5px] font-semibold text-emerald-600 dark:text-emerald-500">
             Within timeline
           </span>
         </div>
@@ -250,7 +250,7 @@ export function RtiCalendar({
         </div>
 
         {/* Second Appeals */}
-        <div className="p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-805 dark:bg-slate-900 shadow-xs flex flex-col justify-between h-20 md:h-24 border-t-2 border-t-purple-500 hover:shadow-sm hover:scale-[1.01] transition-all duration-150">
+        <div className="p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between h-20 md:h-24 border-t-2 border-t-purple-500 hover:shadow-sm hover:scale-[1.01] transition-all duration-150">
           <div className="flex items-center justify-between gap-1.5 text-purple-600">
             <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">2nd Appeals</span>
             <Building className="h-3.5 w-3.5 md:h-4.5 md:w-4.5" />
@@ -277,7 +277,7 @@ export function RtiCalendar({
               "inline-flex items-center gap-1.5 px-3 h-11 sm:h-8.5 text-xs font-semibold rounded-lg border transition-all duration-155 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-800 hover:scale-[1.01] active:scale-[0.99]",
               activeFilter === chip.id
                 ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900 shadow-sm"
-                : "bg-white border-slate-200 text-slate-655 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-850",
+                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800",
             )}
           >
             <span>{chip.label}</span>
@@ -286,7 +286,7 @@ export function RtiCalendar({
                 "text-[10px] px-1.5 py-0.5 rounded-md font-bold shrink-0",
                 activeFilter === chip.id
                   ? "bg-white/20 text-white dark:bg-slate-900/10 dark:text-slate-900"
-                  : "bg-slate-105 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
               )}
             >
               {chip.count}
@@ -299,12 +299,12 @@ export function RtiCalendar({
       <div className="grid gap-6 md:grid-cols-[320px_1fr] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-5 shadow-xs">
         
         {/* Left Column: Custom Grid Calendar */}
-        <div className="space-y-4 md:pr-4 md:border-r border-slate-150 dark:border-slate-800 select-none">
+        <div className="space-y-4 md:pr-4 md:border-r border-slate-100 dark:border-slate-800 select-none">
           
           {/* Calendar Header Controls */}
-          <div className="flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-850 pb-2">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-50 dark:border-slate-800 pb-2">
             {/* Mobile Title View: Combined Month + Year */}
-            <h3 className="md:hidden text-sm sm:text-base font-extrabold text-slate-850 dark:text-slate-200 pl-1 capitalize">
+            <h3 className="md:hidden text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-200 pl-1 capitalize">
               {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </h3>
 
@@ -321,7 +321,7 @@ export function RtiCalendar({
                   }
                 }}
               >
-                <SelectTrigger className="border-none bg-transparent hover:bg-slate-55 dark:hover:bg-slate-800 h-8 px-1.5 text-sm font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-850 dark:text-slate-200 shrink-0">
+                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-1.5 text-sm font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0">
                   <SelectValue>{currentDate.toLocaleDateString("en-US", { month: "long" })}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
@@ -348,7 +348,7 @@ export function RtiCalendar({
                   }
                 }}
               >
-                <SelectTrigger className="border-none bg-transparent hover:bg-slate-55 dark:hover:bg-slate-800 h-8 px-1 text-sm font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-850 dark:text-slate-200 shrink-0">
+                <SelectTrigger className="border-none bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 h-8 px-1 text-sm font-bold flex items-center gap-1 focus:ring-0 focus:ring-offset-0 cursor-pointer text-slate-800 dark:text-slate-200 shrink-0">
                   <SelectValue>{year}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
@@ -370,19 +370,19 @@ export function RtiCalendar({
                 variant="ghost"
                 size="icon"
                 onClick={prevMonth}
-                className="h-11 w-11 md:h-8 md:w-8 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-lg cursor-pointer"
+                className="h-11 w-11 md:h-8 md:w-8 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
                 aria-label="Previous month"
               >
-                <ChevronLeft className="h-4 w-4 text-slate-550 dark:text-slate-400" />
+                <ChevronLeft className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={nextMonth}
-                className="h-11 w-11 md:h-8 md:w-8 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-lg cursor-pointer"
+                className="h-11 w-11 md:h-8 md:w-8 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
                 aria-label="Next month"
               >
-                <ChevronRight className="h-4 w-4 text-slate-550 dark:text-slate-400" />
+                <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               </Button>
             </div>
           </div>
@@ -438,8 +438,8 @@ export function RtiCalendar({
                       dayIsSelected
                         ? "bg-blue-600 text-white dark:bg-blue-500 dark:text-slate-900 font-extrabold shadow-sm scale-105"
                         : hasDeadlines
-                        ? "border border-slate-350 text-slate-900 bg-slate-50/50 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 font-bold"
-                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850",
+                        ? "border border-slate-300 text-slate-900 bg-slate-50/50 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 font-bold"
+                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800",
                       isToday && !dayIsSelected && "ring-2 ring-primary ring-offset-1 dark:ring-offset-slate-900"
                     )}
                   >
@@ -471,7 +471,7 @@ export function RtiCalendar({
         {/* Right Column: Deadlines Timeline */}
         <div className="space-y-4 min-w-0">
           <div className="flex items-center justify-between border-b pb-2 dark:border-slate-800">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400 flex items-center gap-1.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <CalendarClock className="h-4 w-4 shrink-0" />
               {selectedDate ? (
                 <span>Deadlines for {formatDate(selectedDate.toISOString().slice(0, 10))}</span>
@@ -479,15 +479,15 @@ export function RtiCalendar({
                 <span>Deadlines in {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
               )}
             </h4>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border dark:border-slate-750">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border dark:border-slate-700">
               {finalDisplayItems.length} {finalDisplayItems.length === 1 ? "deadline" : "deadlines"}
             </span>
           </div>
 
           {finalDisplayItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/20 dark:bg-slate-900/10">
-              <CalendarClock className="h-10 w-10 text-slate-350 dark:text-slate-600 mb-3 animate-pulse" />
-              <h5 className="text-sm font-bold text-slate-805 dark:text-slate-200">
+              <CalendarClock className="h-10 w-10 text-slate-300 dark:text-slate-600 mb-3 animate-pulse" />
+              <h5 className="text-sm font-bold text-slate-800 dark:text-slate-200">
                 No Deadlines Scheduled
               </h5>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs leading-normal">
@@ -523,7 +523,7 @@ export function RtiCalendar({
 
                     {/* Group Date Header */}
                     <div className="flex flex-wrap items-baseline gap-2">
-                      <h3 className="text-xs font-bold text-slate-800 dark:text-slate-205">
+                      <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
                         {formatDate(date)}
                       </h3>
                       <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
@@ -547,23 +547,23 @@ export function RtiCalendar({
                           <Card
                             key={rti.id}
                             className={cn(
-                              "overflow-hidden border border-slate-200 bg-white shadow-xs rounded-xl hover:border-slate-350 dark:border-slate-805 dark:bg-slate-900 dark:hover:border-slate-700 transition-all duration-200 group hover:shadow-2xs",
+                              "overflow-hidden border border-slate-200 bg-white shadow-xs rounded-xl hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 transition-all duration-200 group hover:shadow-2xs",
                               borderCls,
                             )}
                           >
                             <CardContent className="p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                               {/* Document details */}
                               <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                <div className="mt-0.5 shrink-0 flex h-7.5 w-7.5 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400">
+                                <div className="mt-0.5 shrink-0 flex h-7.5 w-7.5 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                   <FileText className="h-4 w-4" />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <Link href={`/rti/${rti.id}`}>
-                                    <p className="font-bold text-sm text-slate-850 dark:text-slate-200 group-hover:text-primary transition-colors leading-snug line-clamp-2 cursor-pointer">
+                                    <p className="font-bold text-sm text-slate-800 dark:text-slate-200 group-hover:text-primary transition-colors leading-snug line-clamp-2 cursor-pointer">
                                       {rti.subject}
                                     </p>
                                   </Link>
-                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] font-medium text-slate-455 dark:text-slate-500">
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-500">
                                     <span className="font-mono">{rti.internal_ref ?? "—"}</span>
                                     {rti.ward && (
                                       <>
@@ -588,7 +588,7 @@ export function RtiCalendar({
                               </div>
 
                               {/* Status & Deadline Badges */}
-                              <div className="flex items-center justify-between lg:justify-end gap-2.5 pt-2 lg:pt-0 border-t border-slate-50 lg:border-t-0 dark:border-slate-850 mt-1 lg:mt-0 shrink-0">
+                              <div className="flex items-center justify-between lg:justify-end gap-2.5 pt-2 lg:pt-0 border-t border-slate-50 lg:border-t-0 dark:border-slate-800 mt-1 lg:mt-0 shrink-0">
                                 <div className="flex items-center gap-2">
                                   <RtiStatusBadge status={rti.status} />
                                   <DeadlineBadge rti={rti} rules={rules} />
@@ -597,7 +597,7 @@ export function RtiCalendar({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8.5 w-8.5 rounded-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity text-slate-400 hover:text-foreground dark:text-slate-455 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer"
+                                    className="h-8.5 w-8.5 rounded-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity text-slate-400 hover:text-foreground dark:text-slate-500 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer"
                                     aria-label="View RTI details"
                                   >
                                     <ArrowRight className="h-4 w-4" />

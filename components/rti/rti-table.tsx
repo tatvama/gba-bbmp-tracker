@@ -70,7 +70,7 @@ import {
 import type { DeadlineRules } from "@/lib/constants";
 
 const selectCls =
-  "h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 dark:focus:ring-slate-800 cursor-pointer";
+  "h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:focus:ring-slate-800 cursor-pointer";
 
 const DEADLINE_OPTIONS = [
   { value: "all", label: "Any deadline" },
@@ -99,7 +99,7 @@ function orDash(val: any, fallback: string = "Not Available") {
   return val ? (
     val
   ) : (
-    <span className="text-xs text-slate-450 dark:text-slate-500 italic font-medium">
+    <span className="text-xs text-slate-400 dark:text-slate-500 italic font-medium">
       {fallback}
     </span>
   );
@@ -161,7 +161,7 @@ function CategoryChip({ category }: { category: string | null }) {
       variant="outline"
       className="inline-flex items-center gap-1.5 px-2.5 py-0.5 h-6 rounded-md border-slate-200 bg-slate-50 text-slate-700 font-medium text-xs dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300"
     >
-      <Icon className="h-3.5 w-3.5 text-slate-405 shrink-0" />
+      <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
       {category}
     </Badge>
   );
@@ -283,7 +283,7 @@ export function RtiTable({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="font-bold text-sm text-slate-850 dark:text-slate-200 line-clamp-2 cursor-help max-w-md leading-relaxed">
+                  <span className="font-bold text-sm text-slate-800 dark:text-slate-200 line-clamp-2 cursor-help max-w-md leading-relaxed">
                     {row.original.subject}
                   </span>
                 </TooltipTrigger>
@@ -306,7 +306,7 @@ export function RtiTable({
         cell: ({ row }) => (
           <div className="flex flex-col items-start gap-1">
             <RtiStatusBadge status={row.original.status} />
-            <span className="text-[10px] font-bold text-slate-455 dark:text-slate-500 uppercase tracking-wider pl-0.5">
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider pl-0.5">
               {row.original.status === "Closed" ? "Case Closed" : `Next: ${getWorkflowStage(row.original.status)}`}
             </span>
           </div>
@@ -340,7 +340,7 @@ export function RtiTable({
                 {formatDate(row.original.updated_at)}
               </span>
               {rel && (
-                <span className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                   {rel}
                 </span>
               )}
@@ -431,10 +431,10 @@ export function RtiTable({
   return (
     <div className="space-y-4 md:space-y-6">
       {/* ── DESKTOP TOOLBAR (md and up) ── */}
-      <div className="hidden md:flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print bg-slate-55 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+      <div className="hidden md:flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-405 shrink-0" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 shrink-0" />
             <Input
               placeholder="Search ref, subject, authority…"
               value={globalFilter}
@@ -503,7 +503,7 @@ export function RtiTable({
               <X className="h-4 w-4 mr-1.5" /> Reset
             </Button>
           )}
-          <span className="text-xs text-slate-400 dark:text-slate-505 ml-2 font-medium">
+          <span className="text-xs text-slate-400 dark:text-slate-500 ml-2 font-medium">
             Showing {filtered.length} RTIs
           </span>
         </div>
@@ -559,7 +559,7 @@ export function RtiTable({
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={cn(
               "h-11 flex-1 text-xs font-bold rounded-lg border flex items-center justify-center gap-2 cursor-pointer transition-all bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800",
-              showMobileFilters && "bg-slate-100 border-slate-300 dark:bg-slate-850 dark:border-slate-700"
+              showMobileFilters && "bg-slate-100 border-slate-300 dark:bg-slate-800 dark:border-slate-700"
             )}
             aria-label="Toggle advanced filters"
           >
@@ -616,9 +616,9 @@ export function RtiTable({
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Status</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pl-0.5">Status</span>
                   <select
-                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 w-full cursor-pointer"
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     aria-label="Status filter option"
@@ -631,9 +631,9 @@ export function RtiTable({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Category</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pl-0.5">Category</span>
                   <select
-                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 w-full cursor-pointer"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     aria-label="Category filter option"
@@ -646,9 +646,9 @@ export function RtiTable({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Priority</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pl-0.5">Priority</span>
                   <select
-                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 w-full cursor-pointer"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value)}
                     aria-label="Priority filter option"
@@ -661,9 +661,9 @@ export function RtiTable({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wider pl-0.5">Deadline</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pl-0.5">Deadline</span>
                   <select
-                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-55 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 w-full cursor-pointer"
+                    className="h-11 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 w-full cursor-pointer"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
                     aria-label="Deadline filter option"
@@ -680,7 +680,7 @@ export function RtiTable({
                   variant="outline"
                   size="sm"
                   onClick={reset}
-                  className="h-10 mt-3 w-full text-xs font-bold text-slate-500 dark:border-slate-800 dark:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-250 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="h-10 mt-3 w-full text-xs font-bold text-slate-500 dark:border-slate-800 dark:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <X className="h-4 w-4" /> Reset Filters
                 </Button>
@@ -700,7 +700,7 @@ export function RtiTable({
                   {hg.headers.map((h) => (
                     <TableHead
                       key={h.id}
-                      className="text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400 py-3.5"
+                      className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 py-3.5"
                     >
                       {h.isPlaceholder
                         ? null
@@ -762,7 +762,7 @@ export function RtiTable({
 
                   {/* Row 2: Ref & Date */}
                   <div className="flex items-center justify-between text-xs border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                    <span className="font-mono font-bold text-slate-850 dark:text-slate-200">
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
                       {orDash(r.internal_ref, "Pending")}
                     </span>
                     <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">
@@ -771,7 +771,7 @@ export function RtiTable({
                   </div>
 
                   {/* Row 3: Subject Title */}
-                  <h3 className="font-bold text-[15px] sm:text-base text-slate-855 dark:text-slate-200 line-clamp-2 leading-relaxed">
+                  <h3 className="font-bold text-[15px] sm:text-base text-slate-900 dark:text-slate-200 line-clamp-2 leading-relaxed">
                     {r.subject}
                   </h3>
 
@@ -799,7 +799,7 @@ export function RtiTable({
       </div>
 
       {/* Desktop Pagination & Footer */}
-      <div className="hidden md:flex mt-3 items-center justify-between text-sm text-slate-500 dark:text-slate-455 no-print select-none">
+      <div className="hidden md:flex mt-3 items-center justify-between text-sm text-slate-500 dark:text-slate-500 no-print select-none">
         <span className="font-medium">
           Showing {fromRow}–{toRow} of {totalRows} RTIs
         </span>
@@ -813,7 +813,7 @@ export function RtiTable({
           >
             Previous
           </Button>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-750">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-700">
             Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
           </span>
           <Button
@@ -829,8 +829,8 @@ export function RtiTable({
       </div>
 
       {/* Mobile Pagination & Footer */}
-      <div className="flex md:hidden flex-col items-center gap-3 mt-4 text-sm text-slate-500 dark:text-slate-455 no-print select-none w-full border-t border-slate-100 dark:border-slate-800/80 pt-3">
-        <span className="font-semibold text-xs text-slate-400 dark:text-slate-505">
+      <div className="flex md:hidden flex-col items-center gap-3 mt-4 text-sm text-slate-500 dark:text-slate-500 no-print select-none w-full border-t border-slate-100 dark:border-slate-800/80 pt-3">
+        <span className="font-semibold text-xs text-slate-400 dark:text-slate-500">
           Showing {fromRow}–{toRow} of {totalRows} RTIs
         </span>
         {table.getPageCount() > 1 && (
@@ -844,7 +844,7 @@ export function RtiTable({
             >
               Previous
             </Button>
-            <span className="text-xs font-semibold px-3 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-750 shrink-0">
+            <span className="text-xs font-semibold px-3 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-700 shrink-0">
               {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
             </span>
             <Button

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataToolbar, DataToolbarSearch } from "@/components/ui/data-toolbar";
 import { formatDateTime } from "@/lib/format";
 import type { OcrJob } from "@/lib/types";
 
@@ -21,6 +22,7 @@ const VARIANT: Record<string, BadgeProps["variant"]> = {
 export function OcrQueue({ jobs }: { jobs: Row[] }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
 
   async function run(url: string, key: string) {
     setBusy(key);
@@ -29,15 +31,33 @@ export function OcrQueue({ jobs }: { jobs: Row[] }) {
 
   if (jobs.length === 0) return <EmptyState title="No OCR jobs" description="OCR jobs appear here as documents are processed." />;
 
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? jobs.filter((j) =>
+        (j.document?.title ?? "").toLowerCase().includes(q) ||
+        j.status.toLowerCase().includes(q) ||
+        (j.error_message ?? "").toLowerCase().includes(q),
+      )
+    : jobs;
+
   return (
-    <div className="rounded-lg border">
+    <div>
+      <DataToolbar>
+        <DataToolbarSearch value={search} onChange={setSearch} placeholder="Search document, status, error…" />
+        <span className="text-sm text-muted-foreground">
+          {filtered.length === jobs.length ? `${jobs.length} jobs` : `${filtered.length} of ${jobs.length} jobs`}
+        </span>
+      </DataToolbar>
+      {filtered.length === 0 ? (
+        <EmptyState compact title="No matching jobs" description="Try a different search term." />
+      ) : (
       <Table>
         <TableHeader><TableRow>
           <TableHead>Document</TableHead><TableHead>Status</TableHead><TableHead>Attempts</TableHead>
           <TableHead>Error</TableHead><TableHead>Updated</TableHead><TableHead className="text-right">Actions</TableHead>
         </TableRow></TableHeader>
         <TableBody>
-          {jobs.map((j) => {
+          {filtered.map((j) => {
             const docId = j.document?.id ?? j.document_id;
             return (
               <TableRow key={j.id}>
@@ -64,6 +84,7 @@ export function OcrQueue({ jobs }: { jobs: Row[] }) {
           })}
         </TableBody>
       </Table>
+      )}
     </div>
   );
 }

@@ -57,7 +57,7 @@ export default async function ContractorDossierPage({ params }: { params: Promis
       <section className="rounded-xl border bg-card p-4">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Jobs ({jobs.length})</h2>
         {jobs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No jobs found for this contractor.</p>
+          <EmptyState compact title="No jobs found" description="No imported jobs are linked to this contractor yet." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

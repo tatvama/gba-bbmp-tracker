@@ -266,7 +266,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
     let dot = "bg-slate-400";
     switch (status) {
       case "Draft":
-        bg = "bg-slate-50 dark:bg-slate-950/40 text-slate-600 dark:text-slate-450 border-slate-200 dark:border-slate-800/80";
+        bg = "bg-slate-50 dark:bg-slate-950/40 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800/80";
         dot = "bg-slate-400";
         break;
       case "Filed":
@@ -291,11 +291,11 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         break;
       case "First Appeal Drafted":
       case "First Appeal Filed":
-        bg = "bg-purple-50/50 dark:bg-purple-950/20 text-purple-750 dark:text-purple-400 border-purple-100 dark:border-purple-900/50";
+        bg = "bg-purple-50/50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-100 dark:border-purple-900/50";
         dot = "bg-purple-500";
         break;
       case "Closed":
-        bg = "bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-750";
+        bg = "bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
         dot = "bg-slate-500";
         break;
     }
@@ -330,7 +330,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-850 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                   onClick={handleViewDetails}
                   aria-label="View Details"
                 >
@@ -375,7 +375,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
       return <DeadlineBadge rti={row.raw} rules={rules} />;
     }
 
-    return <span className="text-sm text-slate-750 dark:text-slate-300">{val ?? "—"}</span>;
+    return <span className="text-sm text-slate-700 dark:text-slate-300">{val ?? "—"}</span>;
   };
 
   const renderReportTable = (
@@ -468,12 +468,12 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         <button
           type="button"
           onClick={() => setExpandedSection(isExpanded ? null : id)}
-          className="w-full flex items-center justify-between p-3.5 text-left md:hidden cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-850"
+          className="w-full flex items-center justify-between p-3.5 text-left md:hidden cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800"
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="shrink-0 scale-90">{icon}</div>
-            <span className="font-bold text-sm text-slate-850 dark:text-slate-200 truncate">{title}</span>
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border dark:border-slate-750 shrink-0">
+            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">{title}</span>
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border dark:border-slate-700 shrink-0">
               {count}
             </span>
           </div>
@@ -493,7 +493,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle className="text-lg font-semibold text-foreground dark:text-slate-100">{title}</CardTitle>
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border dark:border-slate-750">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border dark:border-slate-700">
                   {count}
                 </span>
               </div>
@@ -507,7 +507,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
                   variant="outline"
                   size="sm"
                   disabled={rows.length === 0}
-                  className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350 dark:hover:bg-slate-855 rounded-lg cursor-pointer gap-1"
+                  className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 rounded-lg cursor-pointer gap-1"
                 >
                   <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3 opacity-60" />
                 </Button>
@@ -536,13 +536,13 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
           isExpanded ? "block" : "hidden md:block"
         )}>
           {/* Mobile Description Helper inside expanded accordion */}
-          <p className="md:hidden text-xs text-slate-550 dark:text-slate-400 mb-4 pb-2 border-b border-slate-100 dark:border-slate-850/60 leading-relaxed">
+          <p className="md:hidden text-xs text-slate-500 dark:text-slate-400 mb-4 pb-2 border-b border-slate-100 dark:border-slate-800/60 leading-relaxed">
             {description}
           </p>
 
           {/* Mobile Dropdown Options inside content */}
-          <div className="md:hidden flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-850/60">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-455">Reports Actions:</span>
+          <div className="md:hidden flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800/60">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500">Reports Actions:</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -578,17 +578,17 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 mb-2">
                   <Check className="h-5 w-5" />
                 </div>
-                <h4 className="text-sm font-bold text-slate-805 dark:text-slate-200">
+                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
                   ✓ No records found
                 </h4>
-                <p className="text-xs text-slate-550 dark:text-slate-400 mt-1 max-w-sm">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
                   All cases are currently within statutory timelines.
                 </p>
               </div>
 
               {/* Mobile Compact Inline Empty State */}
-              <div className="md:hidden flex items-center justify-center gap-2 py-3 text-slate-550 dark:text-slate-455 text-xs">
-                <Check className="h-4 w-4 text-emerald-555 shrink-0" />
+              <div className="md:hidden flex items-center justify-center gap-2 py-3 text-slate-500 dark:text-slate-500 text-xs">
+                <Check className="h-4 w-4 text-emerald-600 shrink-0" />
                 <span>No records found in this category.</span>
               </div>
             </div>
@@ -616,10 +616,10 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         {/* Overdue */}
         <button
           onClick={() => scrollToSection("report-overdue")}
-          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-rose-450 dark:hover:border-rose-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-rose-500"
+          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-rose-400 dark:hover:border-rose-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-rose-500"
         >
           <div className="flex items-center justify-between gap-1.5 w-full">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">Overdue</span>
+            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Overdue</span>
             <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0">
               <AlertTriangle className="h-3.5 w-3.5" />
             </div>
@@ -635,18 +635,18 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         {/* Due in 7 Days */}
         <button
           onClick={() => scrollToSection("report-due-7-days")}
-          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-amber-450 dark:hover:border-amber-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-amber-500"
+          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-amber-400 dark:hover:border-amber-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-amber-500"
         >
           <div className="flex items-center justify-between gap-1.5 w-full">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">Due Soon</span>
-            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-450 shrink-0">
+            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Due Soon</span>
+            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
               <Clock className="h-3.5 w-3.5" />
             </div>
           </div>
           <span className="text-xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {dueIn7.length}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-amber-600 dark:text-amber-455/90 leading-none">
+          <span className="text-[9px] md:text-[9.5px] font-semibold text-amber-600 dark:text-amber-500/90 leading-none">
             7 Days Pending
           </span>
         </button>
@@ -654,10 +654,10 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         {/* No Reply */}
         <button
           onClick={() => scrollToSection("report-no-reply")}
-          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-blue-450 dark:hover:border-blue-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-blue-500"
+          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-blue-400 dark:hover:border-blue-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-blue-500"
         >
           <div className="flex items-center justify-between gap-1.5 w-full">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">No Reply</span>
+            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">No Reply</span>
             <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
               <MailWarning className="h-3.5 w-3.5" />
             </div>
@@ -673,18 +673,18 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         {/* Incomplete */}
         <button
           onClick={() => scrollToSection("report-incomplete-reply")}
-          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-orange-450 dark:hover:border-orange-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-orange-500"
+          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-orange-400 dark:hover:border-orange-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-orange-500"
         >
           <div className="flex items-center justify-between gap-1.5 w-full">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">Incomplete</span>
-            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-455 shrink-0">
+            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Incomplete</span>
+            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-500 shrink-0">
               <MessageSquareWarning className="h-3.5 w-3.5" />
             </div>
           </div>
           <span className="text-xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {incompleteReply.length}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-orange-600 dark:text-orange-455/90 leading-none">
+          <span className="text-[9px] md:text-[9.5px] font-semibold text-orange-600 dark:text-orange-500/90 leading-none">
             Partial Replies
           </span>
         </button>
@@ -692,11 +692,11 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         {/* First Appeal */}
         <button
           onClick={() => scrollToSection("report-first-appeals")}
-          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-purple-455 dark:hover:border-purple-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-purple-500"
+          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-purple-500 dark:hover:border-purple-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-purple-500"
         >
           <div className="flex items-center justify-between gap-1.5 w-full">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">1st Appeal</span>
-            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-purple-500/10 text-purple-655 dark:text-purple-400 shrink-0">
+            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">1st Appeal</span>
+            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 shrink-0">
               <Scale className="h-3.5 w-3.5" />
             </div>
           </div>
@@ -711,11 +711,11 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         {/* Second Appeal */}
         <button
           onClick={() => scrollToSection("report-second-appeals")}
-          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-purple-455 dark:hover:border-purple-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-purple-500"
+          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-purple-500 dark:hover:border-purple-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-purple-500"
         >
           <div className="flex items-center justify-between gap-1.5 w-full">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">2nd Appeal</span>
-            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-purple-500/10 text-purple-655 dark:text-purple-400 shrink-0">
+            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">2nd Appeal</span>
+            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 shrink-0">
               <Building className="h-3.5 w-3.5" />
             </div>
           </div>
@@ -730,18 +730,18 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         {/* Closed */}
         <button
           onClick={() => scrollToSection("report-closed")}
-          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-emerald-450 dark:hover:border-emerald-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-emerald-500"
+          className="text-left p-3 md:p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-emerald-400 dark:hover:border-emerald-800 hover:shadow-xs dark:hover:shadow-md transition-all duration-200 flex flex-col justify-between h-20 md:h-29 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none relative overflow-hidden border-t-2 border-t-emerald-500"
         >
           <div className="flex items-center justify-between gap-1.5 w-full">
-            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">Closed</span>
-            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 shrink-0">
+            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Closed</span>
+            <div className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 shrink-0">
               <CheckCircle2 className="h-3.5 w-3.5" />
             </div>
           </div>
           <span className="text-xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
             {closedThisMonth.length}
           </span>
-          <span className="text-[9px] md:text-[9.5px] font-semibold text-emerald-600 dark:text-emerald-450/90 leading-none">
+          <span className="text-[9px] md:text-[9.5px] font-semibold text-emerald-600 dark:text-emerald-400/90 leading-none">
             This Month
           </span>
         </button>
@@ -762,7 +762,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
             variant="ghost"
             size="sm"
             onClick={() => setGlobalFilter("")}
-            className="h-10 md:h-9 px-2.5 text-xs text-slate-550 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+            className="h-10 md:h-9 px-2.5 text-xs text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
           >
             Clear
           </Button>
@@ -772,13 +772,13 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
       {/* 3. REPORT CARDS */}
       {isDashboardEmpty ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/20 dark:bg-slate-900/10">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-505 dark:text-emerald-450 mb-3 animate-pulse">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 mb-3 animate-pulse">
             <ShieldCheck className="h-6 w-6" />
           </div>
-          <h4 className="text-base font-bold text-slate-850 dark:text-slate-100">
+          <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">
             All Systems Nominal — No Actions Pending
           </h4>
-          <p className="text-xs text-slate-505 dark:text-slate-400 mt-1 max-w-md leading-normal">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md leading-normal">
             No report categories contain matching records. All RTI applications, first appeals, and second appeals are currently matching and fully compliant.
           </p>
           <Button
@@ -788,7 +788,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
               setGlobalFilter("");
               router.refresh();
             }}
-            className="mt-4 h-9 text-xs font-semibold cursor-pointer border-slate-205 dark:border-slate-805"
+            className="mt-4 h-9 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-800"
           >
             Clear Active Filter
           </Button>
@@ -910,7 +910,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
         }}
       >
         <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col rounded-xl overflow-hidden p-0 dark:border-slate-800 dark:bg-slate-900">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b border-slate-150 dark:border-slate-800/80 flex flex-row items-center justify-between">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800/80 flex flex-row items-center justify-between">
             <DialogTitle className="text-base font-bold text-foreground dark:text-slate-100">
               {activeDialogSection?.title} — Complete Listing
             </DialogTitle>
@@ -918,13 +918,13 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {activeDialogSection && (
               <Table className="w-full text-left border-collapse">
-                <TableHeader className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-850 sticky top-0 z-10">
+                <TableHeader className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
                   <TableRow className="hover:bg-transparent border-none">
                     {activeDialogSection.columns.map((c) => (
                       <TableHead
                         key={c.key}
                         className={cn(
-                          "text-xs font-semibold uppercase tracking-wider text-slate-505 dark:text-slate-400 py-3",
+                          "text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 py-3",
                           c.key === "actions" && "text-right pr-6",
                         )}
                       >
@@ -956,7 +956,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
               </Table>
             )}
           </div>
-          <div className="px-6 py-3 border-t border-slate-150 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950 flex justify-between items-center text-xs text-slate-500">
+          <div className="px-6 py-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950 flex justify-between items-center text-xs text-slate-500">
             <span className="dark:text-slate-400">Showing {activeDialogSection?.rows.length} total records</span>
             <div className="flex gap-2">
               <Button

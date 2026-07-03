@@ -89,7 +89,7 @@ export function DocumentSummaryCard({
               <Badge
                 key={idx}
                 variant="secondary"
-                className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border border-slate-200/50 dark:border-slate-700/50 transition-all hover:bg-slate-200/60 dark:hover:bg-slate-750"
+                className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border border-slate-200/50 dark:border-slate-700/50 transition-all hover:bg-slate-200/60 dark:hover:bg-slate-700"
               >
                 {topic}
               </Badge>
@@ -192,7 +192,7 @@ export function DocumentSummaryCard({
           </CardContent>
         </Card>
       ) : (
-        <div className="w-full bg-slate-50/50 dark:bg-slate-900/10 p-5 rounded-xl border border-slate-100 dark:border-slate-850 space-y-6">
+        <div className="w-full bg-slate-50/50 dark:bg-slate-900/10 p-5 rounded-xl border border-slate-100 dark:border-slate-800 space-y-6">
           {contentMarkup}
           {viewDetailsButton}
         </div>

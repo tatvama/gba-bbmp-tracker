@@ -39,7 +39,7 @@ export function RtiQuickCreateForm() {
       <CardContent className="p-6">
         <form action={formAction} className="space-y-6">
           {state?.error && (
-            <p className="rounded-lg border border-rose-250/30 bg-rose-50/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
+            <p className="rounded-lg border border-rose-200/30 bg-rose-50/10 p-3.5 text-sm text-rose-600 dark:text-rose-400">
               {state.error}
             </p>
           )}
@@ -53,7 +53,7 @@ export function RtiQuickCreateForm() {
               <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
                 RTI-2026-XXXXX
               </span>
-              <span className="text-[10px] text-slate-400 dark:text-slate-550 italic">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">
                 Generated automatically after saving
               </span>
             </div>
@@ -61,7 +61,7 @@ export function RtiQuickCreateForm() {
 
           {/* SECTION 1: REQUEST DETAILS */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
               1. Request Details
             </h3>
 
@@ -69,9 +69,9 @@ export function RtiQuickCreateForm() {
             <div className="space-y-1.5">
               <Label
                 htmlFor="priority"
-                className="flex items-center gap-1.5 text-xs font-semibold text-slate-750 dark:text-slate-300"
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300"
               >
-                <AlertTriangle className="h-3.5 w-3.5 text-slate-405" />
+                <AlertTriangle className="h-3.5 w-3.5 text-slate-400" />
                 Priority
               </Label>
               <select
@@ -101,7 +101,7 @@ export function RtiQuickCreateForm() {
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
               After creating this RTI, you will upload:
             </p>
-            <ul className="text-xs text-slate-650 dark:text-slate-400 space-y-1 pl-1 font-semibold">
+            <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 pl-1 font-semibold">
               <li className="flex items-center gap-1.5">
                 <span className="text-blue-500 font-bold text-xs">✔</span> RTI Application
               </li>
@@ -109,7 +109,7 @@ export function RtiQuickCreateForm() {
                 <span className="text-blue-500 font-bold text-xs">✔</span> Filing Acknowledgement
               </li>
             </ul>
-            <p className="text-[10px] text-slate-450 dark:text-slate-500 leading-normal italic pt-2 border-t border-blue-100/40 dark:border-slate-800/40">
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal italic pt-2 border-t border-blue-100/40 dark:border-slate-800/40">
               The 30-day statutory reply countdown begins only after acknowledgement confirmation.
             </p>
           </div>
@@ -118,9 +118,9 @@ export function RtiQuickCreateForm() {
           <input type="hidden" name="wardType" value="BBMP" />
 
           {/* 8. FOOTER PANEL / CTA SECTION */}
-          <div className="border-t border-slate-150 dark:border-slate-800/85 pt-5 mt-6 space-y-4">
+          <div className="border-t border-slate-100 dark:border-slate-800/85 pt-5 mt-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="text-xs text-slate-500 dark:text-slate-405 max-w-md">
+              <div className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
                 <p className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
                   RTI Creation
                 </p>

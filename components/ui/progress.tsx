@@ -23,7 +23,7 @@ export function Progress({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={indeterminate ? undefined : Math.round(pct)}
-      className={cn("relative h-2 w-full overflow-hidden rounded-full bg-slate-150 dark:bg-slate-800", className)}
+      className={cn("relative h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800", className)}
     >
       {indeterminate ? (
         <div className={cn("absolute inset-y-0 w-1/3 animate-progress-slide rounded-full bg-primary/70", barClassName)} />

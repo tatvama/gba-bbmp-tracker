@@ -4,12 +4,14 @@ import {
   ArrowRight, Sparkles, LayoutGrid, Printer,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { StatCard, StatCardRow, StatCardIcon, StatCardValue, StatCardLabel } from "@/components/ui/stat-card";
+import { SectionHeader } from "@/components/section-header";
 import { EmptyState } from "@/components/empty-state";
 import { OrgTreemap, type OrgTreemapRow } from "@/components/complaints/org-treemap";
 import { complaintDashboardStats, listComplaints, listAiAdvisorWorklist, countPrintPendingLetters } from "@/lib/queries";
-import { formatNumber, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Complaint dashboard" };
@@ -138,53 +140,48 @@ export default async function ComplaintDashboard() {
         {cards.map((c, idx) => {
           const Icon = c.icon;
           return (
-            <Link key={c.label} href={c.href} className={`group block animate-fade-in stagger-${(idx % 4) + 1}`}>
-              <div className="stat-card h-full rounded-xl border bg-card p-4 shadow-2xs group-hover:border-primary/30 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">{formatNumber(c.value)}</p>
-                    <p className="mt-2 text-xs font-semibold text-foreground/80 break-words leading-tight">{c.label}</p>
-                  </div>
-                  <div className={`shrink-0 rounded-lg p-2 ${c.bg}`}>
-                    <Icon className={`h-4 w-4 ${c.cls}`} />
-                  </div>
+            <StatCard
+              key={c.label}
+              href={c.href}
+              className={`animate-fade-in stagger-${(idx % 4) + 1}`}
+            >
+              <StatCardRow>
+                <div className="min-w-0">
+                  <StatCardValue value={c.value} />
+                  <StatCardLabel>{c.label}</StatCardLabel>
                 </div>
-              </div>
-            </Link>
+                <StatCardIcon icon={Icon} className={c.cls} bgClassName={c.bg} />
+              </StatCardRow>
+            </StatCard>
           );
         })}
       </div>
 
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         {/* treemap: where the complaints are */}
-        <Card className="shadow-2xs rounded-xl border lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-            <CardTitle className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
-              <LayoutGrid className="h-3.5 w-3.5 text-primary" /> Complaints by area
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 pt-0 px-4">
+        <Card className="shadow-2xs rounded-xl border overflow-hidden lg:col-span-2">
+          <SectionHeader icon={LayoutGrid} title="Complaints by area" />
+          <CardContent className="pb-4 pt-4 px-4">
             <OrgTreemap rows={treemapRows} />
           </CardContent>
         </Card>
 
         {/* needs attention */}
-        <Card className="shadow-2xs rounded-xl border">
-          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
-            <CardTitle className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-405">
-              <Sparkles className="h-3.5 w-3.5 text-primary" /> Needs attention
-            </CardTitle>
-            <Link href="/complaints?flag=overdue" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
-              All <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent className="pb-4 pt-0 px-4">
+        <Card className="shadow-2xs rounded-xl border overflow-hidden">
+          <SectionHeader
+            icon={Sparkles}
+            title="Needs attention"
+            actions={
+              <Link href="/complaints?flag=overdue" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+                All <ArrowRight className="h-3 w-3" />
+              </Link>
+            }
+          />
+          <CardContent className="pb-4 pt-4 px-4">
             {attention.length === 0 ? (
-              <div className="py-6 text-center">
-                <EmptyState title="All clear" description="Nothing overdue, nothing flagged." />
-              </div>
+              <EmptyState title="All clear" description="Nothing overdue, nothing flagged." />
             ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-850">
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {attention.map((a) => (
                   <li key={a.id} className="flex items-center justify-between gap-3 py-3">
                     <Link href={a.href} className="min-w-0 flex-1 group">

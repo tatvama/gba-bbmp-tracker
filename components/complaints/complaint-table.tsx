@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import type { ComplaintWithRelations } from "@/lib/types";
 
 const selectCls =
-  "h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-855 dark:focus:ring-slate-800 cursor-pointer";
+  "h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:focus:ring-slate-800 cursor-pointer";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -103,9 +103,9 @@ function TypeChip({ type }: { type: string | null }) {
   return (
     <Badge
       variant="outline"
-      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 h-6 rounded-md border-slate-200 bg-slate-55 text-slate-700 font-medium text-xs dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300"
+      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 h-6 rounded-md border-slate-200 bg-slate-50 text-slate-700 font-medium text-xs dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300"
     >
-      <Icon className="h-3.5 w-3.5 text-slate-405 shrink-0" />
+      <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
       {type}
     </Badge>
   );
@@ -121,17 +121,17 @@ function PriorityChip({ priority }: { priority: string | null }) {
     case "Urgent":
       Icon = AlertTriangle;
       cls =
-        "border-rose-200 bg-rose-50/70 text-rose-800 dark:bg-rose-955/20 dark:border-rose-900 dark:text-rose-450";
+        "border-rose-200 bg-rose-50/70 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400";
       break;
     case "High":
       Icon = ArrowUp;
       cls =
-        "border-amber-200 bg-amber-50/70 text-amber-800 dark:bg-amber-955/20 dark:border-amber-900 dark:text-amber-400";
+        "border-amber-200 bg-amber-50/70 text-amber-800 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-400";
       break;
     case "Medium":
       Icon = Minus;
       cls =
-        "border-blue-200 bg-blue-50/70 text-blue-800 dark:bg-blue-955/20 dark:border-blue-900 dark:text-blue-400";
+        "border-blue-200 bg-blue-50/70 text-blue-800 dark:bg-blue-950/20 dark:border-blue-900 dark:text-blue-400";
       break;
     case "Low":
       Icon = ArrowDown;
@@ -162,7 +162,7 @@ function FollowUpDeadlineBadge({
 }) {
   if (status === "Closed" || status === "Resolved") {
     return (
-      <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-55/40 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400">
+      <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400">
         <CheckCircle2 className="h-3.5 w-3.5" />
         Closed
       </div>
@@ -202,9 +202,9 @@ function FollowUpDeadlineBadge({
         variant === "warning" &&
           "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/20 dark:bg-amber-950/30 dark:text-amber-400",
         variant === "destructive" &&
-          "border-rose-200 bg-rose-55 text-rose-800 dark:border-rose-900/20 dark:bg-rose-955/30 dark:text-rose-400",
+          "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/20 dark:bg-rose-950/30 dark:text-rose-400",
         variant === "info" &&
-          "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/20 dark:bg-blue-955/30 dark:text-blue-450",
+          "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/20 dark:bg-blue-950/30 dark:text-blue-400",
       )}
     >
       {isOverdue && (
@@ -234,10 +234,10 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
         {/* Header: Complaint ID & Badges */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col">
-            <span className="font-mono text-xs font-bold text-slate-850 dark:text-slate-200">
+            <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
               {c.internal_case_number || "Pending"}
             </span>
-            <span className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
               {formatDate(c.date_submitted)}
             </span>
           </div>
@@ -249,14 +249,14 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
 
         {/* Title */}
         <div className="space-y-1">
-          <h3 className="font-bold text-sm text-slate-850 dark:text-slate-200 line-clamp-2 leading-relaxed">
+          <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 line-clamp-2 leading-relaxed">
             {c.title}
           </h3>
         </div>
 
         {/* Secondary Details (Collapsible on Mobile) */}
         {expanded && (
-          <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-850 text-xs text-slate-655 dark:text-slate-400">
+          <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-400">
             <div>
               <span className="font-semibold text-slate-500 mr-1.5">Ward:</span>
               <span>{c.ward ? `Ward ${c.ward.new_no} · ${c.ward.new_name}` : "—"}</span>
@@ -284,7 +284,7 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="text-xs font-semibold text-slate-550 hover:text-slate-700 flex items-center gap-1 cursor-pointer h-9 px-2 border border-slate-200 dark:border-slate-800 rounded-md bg-slate-50/50 dark:bg-slate-900"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1 cursor-pointer h-9 px-2 border border-slate-200 dark:border-slate-800 rounded-md bg-slate-50/50 dark:bg-slate-900"
             >
               {expanded ? "Less" : "Details"}
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -422,7 +422,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
 
         return (
           <div className="flex flex-col py-1">
-            <span className="font-bold text-sm text-slate-850 dark:text-slate-200 line-clamp-2 max-w-md leading-relaxed">
+            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 line-clamp-2 max-w-md leading-relaxed">
               {c.title}
             </span>
             <div className="flex items-center gap-2 mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
@@ -438,7 +438,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
       cell: ({ row }) => (
         <div className="flex flex-col items-start gap-1">
           <StatusBadge status={row.original.status} date={row.original.updated_at} />
-          <span className="text-[10px] font-bold text-slate-455 dark:text-slate-500 uppercase tracking-wider pl-0.5">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider pl-0.5">
             {getNextActionForStatus(row.original.status)}
           </span>
         </div>
@@ -473,7 +473,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
               {formatDate(row.original.updated_at)}
             </span>
             {rel && (
-              <span className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                 {rel}
               </span>
             )}
@@ -551,15 +551,15 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
       {/* Responsive Toolbar */}
       
       {/* 1. Desktop & Tablet Toolbar Layout (Unchanged) */}
-      <div className="hidden md:flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print bg-slate-55 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+      <div className="hidden md:flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-405 shrink-0" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 shrink-0" />
             <Input
               placeholder="Search case no, title, OCR…"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="h-9 w-64 text-sm pl-9 bg-white dark:bg-slate-955/40 border-slate-200 dark:border-slate-800"
+              className="h-9 w-64 text-sm pl-9 bg-white dark:bg-slate-950/40 border-slate-200 dark:border-slate-800"
             />
           </div>
           <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status filter">
@@ -606,7 +606,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
               <X className="h-4 w-4 mr-1.5" /> Reset
             </Button>
           )}
-          <span className="text-xs text-slate-400 dark:text-slate-550 ml-2 font-medium">
+          <span className="text-xs text-slate-400 dark:text-slate-500 ml-2 font-medium">
             Showing {filtered.length} complaints
           </span>
         </div>
@@ -660,7 +660,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
               className="flex-1 h-11 text-xs font-semibold gap-1.5 cursor-pointer justify-center rounded-lg border-slate-200 dark:border-slate-800 dark:bg-slate-900"
             >
               <span>Advanced Filters</span>
-              {hasFilters && <span className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-450 shrink-0" />}
+              {hasFilters && <span className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" />}
             </Button>
             <Button
               type="button"
@@ -678,7 +678,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
         {showMobileFilters && (
           <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-accordion-down">
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Status</span>
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Status</span>
               <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="all">Any Status</option>
                 {COMPLAINT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -686,7 +686,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
             </div>
             
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Category</span>
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Category</span>
               <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={type} onChange={(e) => setType(e.target.value)}>
                 <option value="all">Any Category</option>
                 {COMPLAINT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -694,7 +694,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Priority</span>
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Priority</span>
               <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={priority} onChange={(e) => setPriority(e.target.value)}>
                 <option value="all">Any Priority</option>
                 {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -702,7 +702,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Quick Flag</span>
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Quick Flag</span>
               <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={flag} onChange={(e) => setFlag(e.target.value)}>
                 <option value="all">All Flags</option>
                 <option value="open">Open (not resolved)</option>
@@ -716,7 +716,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
 
             {divisionOpts.length > 0 && (
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Division</span>
+                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Division</span>
                 <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={division} onChange={(e) => setDivision(e.target.value)}>
                   <option value="all">Any Division</option>
                   {divisionOpts.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -726,7 +726,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
 
             {subDivisionOpts.length > 0 && (
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Sub-division</span>
+                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Sub-division</span>
                 <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={subDivision} onChange={(e) => setSubDivision(e.target.value)}>
                   <option value="all">Any Sub-division</option>
                   {subDivisionOpts.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -736,7 +736,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
 
             {wardOpts.length > 0 && (
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-slate-455 dark:text-slate-400 uppercase tracking-wider pl-0.5">Ward</span>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-0.5">Ward</span>
                 <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={ward} onChange={(e) => setWard(e.target.value)}>
                   <option value="all">Any Ward</option>
                   {wardOpts.map((w) => <option key={w} value={w}>Ward {w}</option>)}
@@ -745,7 +745,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
             )}
 
             <div className="flex items-end justify-between gap-3 pt-3 sm:col-span-2 border-t border-slate-200/50 dark:border-slate-800/80">
-              <span className="text-xs text-slate-450 dark:text-slate-500 font-semibold self-center">
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold self-center">
                 Showing {filtered.length} complaints
               </span>
               <div className="flex gap-2">
@@ -773,7 +773,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
                   {hg.headers.map((h) => (
                     <TableHead
                       key={h.id}
-                      className="text-[10px] font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400 py-3.5 px-4"
+                      className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 py-3.5 px-4"
                     >
                       {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                     </TableHead>
@@ -810,7 +810,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
       {/* Mobile Card Layout */}
       <div className="block md:hidden space-y-3.5">
         {filtered.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-455 dark:bg-slate-900/40 dark:border-slate-800">
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:bg-slate-900/40 dark:border-slate-800">
             No complaints match these filters.
           </div>
         ) : (
@@ -821,7 +821,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
       </div>
 
       {/* Pagination & Footer */}
-      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-slate-505 dark:text-slate-455 no-print border-t border-slate-100 dark:border-slate-850 pt-4">
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-slate-500 dark:text-slate-500 no-print border-t border-slate-100 dark:border-slate-800 pt-4">
         <span className="font-semibold text-center sm:text-left text-xs">
           Showing {fromRow}–{toRow} of {totalRows} complaints
         </span>
@@ -835,7 +835,7 @@ export function ComplaintTable({ data }: { data: ComplaintWithRelations[] }) {
           >
             Previous
           </Button>
-          <span className="text-xs font-bold px-3 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-750">
+          <span className="text-xs font-bold px-3 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-700">
             Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
           </span>
           <Button

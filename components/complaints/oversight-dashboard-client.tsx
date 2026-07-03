@@ -71,11 +71,11 @@ export function OversightDashboardClient({
   return (
     <div className="space-y-4 md:space-y-6">
       {/* MOBILE PAGE HEADER */}
-      <div className="block md:hidden space-y-1.5 bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-xl border dark:border-slate-850">
-        <h1 className="text-xl font-bold tracking-tight text-slate-850 dark:text-slate-105">
+      <div className="block md:hidden space-y-1.5 bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-xl border dark:border-slate-800">
+        <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
           Forensic oversight dashboard
         </h1>
-        <div className="text-xs text-slate-550 dark:text-slate-400 leading-relaxed">
+        <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           {descExpanded ? (
             <p>
               Platform-wide accountability view. All exposure figures are possible amounts requiring verification; risk bands and patterns are documented suspicions for enquiry, not findings of guilt.
@@ -98,47 +98,47 @@ export function OversightDashboardClient({
 
       {/* MOBILE KPI GRID - 2 columns, height reduced by another 15-20% (h-15) */}
       <div className="grid grid-cols-2 gap-2 md:hidden">
-        <Card className="h-[68px] shadow-2xs hover:border-slate-350 transition-all duration-200">
+        <Card className="h-[68px] shadow-2xs hover:border-slate-300 transition-all duration-200">
           <CardContent className="p-2.5 flex flex-col justify-center h-full">
             <span className="text-lg font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
               {inr(stats.totalExposure)}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450 mt-1 flex items-center gap-1 leading-none">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1 flex items-center gap-1 leading-none">
               <IndianRupee className="h-3 w-3 shrink-0 text-slate-400" /> Exposure
             </span>
           </CardContent>
         </Card>
 
-        <Card className="h-[68px] shadow-2xs hover:border-slate-350 transition-all duration-200">
+        <Card className="h-[68px] shadow-2xs hover:border-slate-300 transition-all duration-200">
           <CardContent className="p-2.5 flex flex-col justify-center h-full">
             <span className="text-lg font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
               {stats.jobsAudited}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450 mt-1 flex items-center gap-1 leading-none">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1 flex items-center gap-1 leading-none">
               <ShieldAlert className="h-3 w-3 shrink-0 text-slate-400" /> Audited
             </span>
           </CardContent>
         </Card>
 
         <Link href="/complaints/duplicate-photos" className="block">
-          <Card className="h-[68px] shadow-2xs hover:border-slate-350 transition-all duration-200 cursor-pointer border border-transparent hover:border-slate-200">
+          <Card className="h-[68px] shadow-2xs hover:border-slate-300 transition-all duration-200 cursor-pointer border border-transparent hover:border-slate-200">
             <CardContent className="p-2.5 flex flex-col justify-center h-full">
               <span className="text-lg font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
                 {dupClustersCount}
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450 mt-1 flex items-center gap-1 leading-none">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1 flex items-center gap-1 leading-none">
                 <Copy className="h-3 w-3 shrink-0 text-slate-400" /> Duplicates
               </span>
             </CardContent>
           </Card>
         </Link>
 
-        <Card className="h-[68px] shadow-2xs hover:border-slate-350 transition-all duration-200">
+        <Card className="h-[68px] shadow-2xs hover:border-slate-300 transition-all duration-200">
           <CardContent className="p-2.5 flex flex-col justify-center h-full">
             <span className="text-lg font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
               {overdue.complaintsOverdue} · {overdue.rtiDue}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450 mt-1 flex items-center gap-1 leading-none">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1 flex items-center gap-1 leading-none">
               <Clock className="h-3 w-3 shrink-0 text-slate-400" /> Overdue
             </span>
           </CardContent>
@@ -190,7 +190,7 @@ export function OversightDashboardClient({
 
       {/* JOBS BY RISK BAND - Proportional Progress Indicator */}
       <section className="rounded-xl border bg-card p-4 shadow-xs">
-        <h2 className="mb-3 text-xs md:text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">
+        <h2 className="mb-3 text-xs md:text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Jobs by risk band
         </h2>
         {stats.jobsAudited === 0 ? (
@@ -206,7 +206,7 @@ export function OversightDashboardClient({
                 return (
                   <div key={band} className="space-y-1">
                     <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-850 dark:text-slate-300 flex items-center gap-1.5">
+                      <span className="text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
                         {isHighRisk && <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
                         {BAND_LABEL[band] ?? band}
                       </span>
@@ -247,7 +247,7 @@ export function OversightDashboardClient({
       <div className="grid gap-4 md:grid-cols-2">
         {/* CONTRACTORS LEADERBOARD */}
         <section className="rounded-xl border bg-card p-4 shadow-xs">
-          <h2 className="mb-3 flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">
+          <h2 className="mb-3 flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <Users className="h-4 w-4 text-slate-400" /> Top contractors by exposure
           </h2>
 
@@ -273,17 +273,17 @@ export function OversightDashboardClient({
                   href={`/complaints/contractors/${encodeURIComponent(c.contractor)}`}
                   className="block w-full"
                 >
-                  <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 rounded-xl hover:border-blue-200 dark:hover:border-blue-800 transition-colors cursor-pointer group active:bg-slate-50/50 dark:active:bg-slate-850">
+                  <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 rounded-xl hover:border-blue-200 dark:hover:border-blue-800 transition-colors cursor-pointer group active:bg-slate-50/50 dark:active:bg-slate-800">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
                       <div className="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 mt-0.5">
                         <Users className="h-4 w-4 text-slate-500" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="font-bold text-slate-850 dark:text-slate-250 text-sm block break-words line-clamp-2 leading-snug group-hover:text-blue-650">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm block break-words line-clamp-2 leading-snug group-hover:text-blue-600">
                           {c.contractor}
                         </span>
                         <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-slate-400">
-                          <span className="font-bold text-slate-600 dark:text-slate-355 whitespace-nowrap">{inr(c.totalExposure)} Exposure</span>
+                          <span className="font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">{inr(c.totalExposure)} Exposure</span>
                           <span className="text-slate-300 dark:text-slate-700">•</span>
                           <span className="whitespace-nowrap">{c.jobCount} {c.jobCount === 1 ? "Job" : "Jobs"}</span>
                           <span className="text-slate-300 dark:text-slate-700">•</span>
@@ -307,7 +307,7 @@ export function OversightDashboardClient({
 
         {/* DIVISIONS LEADERBOARD */}
         <section className="rounded-xl border bg-card p-4 shadow-xs">
-          <h2 className="mb-3 flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wider text-slate-550 dark:text-slate-400">
+          <h2 className="mb-3 flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <Building2 className="h-4 w-4 text-slate-400" /> Top divisions by exposure
           </h2>
 
@@ -334,11 +334,11 @@ export function OversightDashboardClient({
                       <Building2 className="h-4 w-4 text-slate-500" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <span className="font-bold text-slate-850 dark:text-slate-250 text-sm block break-words line-clamp-2 leading-snug">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-sm block break-words line-clamp-2 leading-snug">
                         {d.division}
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-slate-400">
-                        <span className="font-bold text-slate-600 dark:text-slate-355 whitespace-nowrap">{inr(d.totalExposure)} Exposure</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">{inr(d.totalExposure)} Exposure</span>
                         <span className="text-slate-300 dark:text-slate-700">•</span>
                         <span className="whitespace-nowrap">{d.jobCount} {d.jobCount === 1 ? "Job" : "Jobs"}</span>
                         <span className="text-slate-300 dark:text-slate-700">•</span>

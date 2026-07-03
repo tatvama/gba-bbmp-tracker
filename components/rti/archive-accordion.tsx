@@ -66,7 +66,7 @@ export function ArchiveAccordion({
           return (
             <div
               key={idx}
-              className="bg-white dark:bg-slate-900/40 rounded-xl border border-slate-150 dark:border-slate-800/85 overflow-hidden shadow-sm transition-all duration-200"
+              className="bg-white dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/85 overflow-hidden shadow-sm transition-all duration-200"
             >
               {/* Accordion Trigger Header */}
               <div
@@ -83,7 +83,7 @@ export function ArchiveAccordion({
                   </span>
                   <Badge
                     variant="outline"
-                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-750"
+                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                   >
                     {archStatus}
                   </Badge>

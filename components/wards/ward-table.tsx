@@ -49,12 +49,12 @@ function WardCard({ w, router }: { w: WardWithRelations; router: any }) {
   return (
     <Card
       onClick={() => router.push(`/wards/${w.new_no}`)}
-      className="border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden hover:border-blue-200 dark:bg-slate-900/40 dark:border-slate-800 transition-all duration-205 group cursor-pointer active:bg-slate-50/50 dark:active:bg-slate-850"
+      className="border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden hover:border-blue-200 dark:bg-slate-900/40 dark:border-slate-800 transition-all duration-205 group cursor-pointer active:bg-slate-50/50 dark:active:bg-slate-800"
     >
       <CardContent className="p-3.5 space-y-3">
         {/* Header: Ward Number & Status */}
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border dark:border-slate-750 font-mono">
+          <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border dark:border-slate-700 font-mono">
             Ward {w.new_no}
           </span>
           <VerificationBadge status={w.verification_status} />
@@ -62,7 +62,7 @@ function WardCard({ w, router }: { w: WardWithRelations; router: any }) {
 
         {/* Ward Name */}
         <div>
-          <h3 className="font-bold text-sm text-slate-850 dark:text-slate-200 truncate group-hover:text-blue-650">
+          <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600">
             {w.new_name}
           </h3>
           {o.length > 0 && (
@@ -73,19 +73,19 @@ function WardCard({ w, router }: { w: WardWithRelations; router: any }) {
         </div>
 
         {/* Corporation details & Derived Badge */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-105 dark:border-slate-850/60 mt-1">
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/60 mt-1">
           {w.derived_corporation ? (
             <>
               <CorpPill code={w.derived_corporation.code} name={w.derived_corporation.name} derived />
               <DerivedBadge />
             </>
           ) : (
-            <span className="text-[10px] italic text-slate-450">not resolved</span>
+            <span className="text-[10px] italic text-slate-400">not resolved</span>
           )}
         </div>
 
         {/* Footer Action */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-105 dark:border-slate-850/60 text-[11px] text-slate-500">
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/60 text-[11px] text-slate-500">
           <span className="font-medium">Properties: {formatNumber(w.property_count)}</span>
           <span className="text-blue-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
             View Details →
@@ -344,7 +344,7 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className="h-11 px-3 text-xs font-semibold gap-1.5 rounded-lg border-slate-200 dark:border-slate-800"
           >
-            Filters {hasFilters && <span className="h-2 w-2 rounded-full bg-blue-650 shrink-0" />}
+            Filters {hasFilters && <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />}
           </Button>
 
           <DropdownMenu>
@@ -352,7 +352,7 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 px-3 text-xs font-semibold gap-1.5 rounded-lg border-slate-205 dark:border-slate-800"
+                className="h-11 px-3 text-xs font-semibold gap-1.5 rounded-lg border-slate-200 dark:border-slate-800"
               >
                 <Download className="h-4 w-4" /> Export
               </Button>
@@ -365,46 +365,46 @@ export function WardTable({ data }: { data: WardWithRelations[] }) {
         </div>
 
         {showMobileFilters && (
-          <div className="p-3.5 border border-slate-205 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40 grid grid-cols-1 gap-3">
+          <div className="p-3.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40 grid grid-cols-1 gap-3">
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Zone</span>
-              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={zone} onChange={(e) => setZone(e.target.value)}>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Zone</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={zone} onChange={(e) => setZone(e.target.value)}>
                 <option value="all">All Zones</option>
                 {zones.map((z) => <option key={z} value={z}>{z}</option>)}
               </select>
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Corporation</span>
-              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={corp} onChange={(e) => setCorp(e.target.value)}>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Corporation</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={corp} onChange={(e) => setCorp(e.target.value)}>
                 <option value="all">All Corporations</option>
                 {corps.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
               </select>
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Assembly Constituency</span>
-              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={ac} onChange={(e) => setAc(e.target.value)}>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Assembly Constituency</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={ac} onChange={(e) => setAc(e.target.value)}>
                 <option value="all">All constituencies</option>
                 {assemblyConstituencies.map((val) => <option key={val} value={val}>{val}</option>)}
               </select>
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider pl-0.5">Verification Status</span>
-              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350" value={verification} onChange={(e) => setVerification(e.target.value)}>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-0.5">Verification Status</span>
+              <select className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" value={verification} onChange={(e) => setVerification(e.target.value)}>
                 <option value="all">All statuses</option>
                 {verificationStatuses.map((val) => <option key={val} value={val}>{val}</option>)}
               </select>
             </div>
 
-            <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-200 dark:border-slate-850">
+            <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-200 dark:border-slate-800">
               <span className="text-[10.5px] text-slate-500 font-semibold">
                 {table.getFilteredRowModel().rows.length} Wards Match
               </span>
               <div className="flex gap-2">
                 {hasFilters && (
-                  <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-xs font-bold text-slate-500 hover:text-slate-750">
+                  <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-xs font-bold text-slate-500 hover:text-slate-700">
                     Reset
                   </Button>
                 )}
