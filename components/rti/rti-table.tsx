@@ -691,7 +691,7 @@ export function RtiTable({
       </div>
 
       {/* Desktop & Tablet Table Layout */}
-      <div className="hidden md:block rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+      <div className="hidden md:block rounded-xl border border-border/80 bg-gradient-to-br from-card via-card to-muted/30 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/60 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
         <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
           <Table className="w-full text-left border-collapse">
             <TableHeader className="sticky top-0 bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-md border-b-2 border-slate-200/80 dark:border-slate-800 z-10 shadow-2xs">

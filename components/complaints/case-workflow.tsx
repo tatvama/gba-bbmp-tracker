@@ -24,7 +24,6 @@ import {
   fileCounterReplyAction,
   fileEscalationAction,
   listComplaintReplyFilesAction,
-  listComplaintEscalationFilesAction,
   type ReplyFile,
 } from "@/lib/actions/complaints";
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
@@ -714,21 +713,6 @@ function EscalatePanel({
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
 
-  const [escalationFiles, setEscalationFiles] = React.useState<ReplyFile[]>([]);
-  const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
-  const [refreshKey, setRefreshKey] = React.useState(0);
-
-  const loadFiles = React.useCallback(async () => {
-    const r = await listComplaintEscalationFilesAction(complaintId);
-    setEscalationFiles(r.files);
-  }, [complaintId]);
-
-  React.useEffect(() => { void loadFiles(); }, [loadFiles, refreshKey]);
-  React.useEffect(() => {
-    const id = setInterval(() => void loadFiles(), 5000);
-    return () => clearInterval(id);
-  }, [loadFiles]);
-
   async function fileEscalation() {
     if (!kind || !draft.trim()) return;
     setFiling(true);
@@ -738,7 +722,6 @@ function EscalatePanel({
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file the escalation."); return; }
     setSavedMsg("Escalation filed as a PDF — view it from the Correspondence tab.");
-    setRefreshKey((prev) => prev + 1);
     onEscalated();
   }
 
@@ -776,7 +759,6 @@ function EscalatePanel({
     const r = await addComplaintEscalation(complaintId, {}, fd);
     if (r.error) { setError(r.error); return; }
     setSavedMsg(`Escalation to ${toLevel} recorded.`);
-    setRefreshKey((prev) => prev + 1);
     onEscalated();
   }
 
@@ -850,51 +832,6 @@ function EscalatePanel({
           {savedMsg && <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> {savedMsg}</p>}
         </div>
       )}
-
-      <div className="mt-4 border-t pt-4">
-        <h4 className="text-xs font-semibold mb-1">Upload filed escalation copy</h4>
-        <p className="text-[11px] text-muted-foreground mb-3">If you manually filed/submitted the escalation, photograph or scan the acknowledged copy here.</p>
-        <ScanCapture
-          complaintId={complaintId}
-          docTypes={[
-            "Escalation letter",
-            "Records-preservation request",
-            "Lokayukta complaint",
-            "Chief Secretary / UDD letter",
-            "Other escalation document"
-          ]}
-          defaultDocType="Escalation letter"
-          onDone={() => setRefreshKey((prev) => prev + 1)}
-        />
-      </div>
-
-      {escalationFiles.length > 0 && (
-        <div className="mt-4 space-y-2 rounded-md border bg-muted/20 p-3">
-          <p className="text-xs font-semibold text-muted-foreground">Recent escalation files</p>
-          <ul className="space-y-1.5">
-            {escalationFiles.map((f) => (
-              <li key={f.id} className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                  Filed
-                </span>
-                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="font-medium truncate max-w-[200px]" title={f.title}>{f.title}</span>
-                <span className="text-[11px] text-muted-foreground">({f.documentType})</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="ml-auto h-7"
-                  onClick={() => setViewTarget({ documentId: f.id, title: f.title, mimeType: f.mimeType, fileName: f.fileName })}
-                >
-                  <Eye className="h-3.5 w-3.5" /> View
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
     </StepPanel>
   );
 }

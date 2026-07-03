@@ -1063,32 +1063,6 @@ export async function listComplaintReplyFilesAction(complaintId: string): Promis
   return { files };
 }
 
-export async function listComplaintEscalationFilesAction(complaintId: string): Promise<{ files: ReplyFile[]; error?: string }> {
-  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
-  if ("error" in a) return { files: [], error: a.error };
-  const { admin } = a;
-  const { data } = await admin
-    .from("complaint_documents")
-    .select("id, title, original_file_name, document_type, mime_type, uploaded_at")
-    .eq("complaint_id", complaintId)
-    .or("document_type.ilike.%escalation%,document_type.ilike.%preservation%,document_type.ilike.%lokayukta%,document_type.ilike.%secretary%,document_type.ilike.%udd%")
-    .order("uploaded_at", { ascending: false })
-    .limit(8);
-  const files: ReplyFile[] = ((data as Record<string, unknown>[]) ?? []).map((d) => {
-    const dt = (d.document_type as string) ?? "";
-    return {
-      id: d.id as string,
-      title: (d.title as string) || (d.original_file_name as string) || dt || "Document",
-      documentType: dt,
-      direction: "out",
-      uploadedAt: (d.uploaded_at as string) ?? "",
-      mimeType: (d.mime_type as string) ?? null,
-      fileName: (d.original_file_name as string) ?? null,
-    };
-  });
-  return { files };
-}
-
 export async function getCorporationsAction() {
   const user = await getSessionUser();
   if (!user) throw new Error("Not authorized");
