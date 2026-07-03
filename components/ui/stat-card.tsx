@@ -1,10 +1,20 @@
-"use client";
-
 import * as React from "react";
 import Link from "next/link";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatNumber } from "@/lib/format";
+import { StatCardValue } from "./stat-card-value";
+
+/**
+ * Everything defined in THIS file is a plain (server-compatible) component —
+ * no hooks, no browser APIs — so a Server Component page can pass an icon
+ * component REFERENCE (e.g. Building2 from lucide-react) straight through as a
+ * prop. Only StatCardValue needs client interactivity (its mount-count-up
+ * animation), so it lives in its own "use client" module (./stat-card-value)
+ * and is re-exported below. Keeping it in this file would force every export
+ * here to be a Client Component, and a raw icon reference isn't serializable
+ * across that boundary — see the "Only plain objects can be passed to Client
+ * Components" RSC error this file was split to fix.
+ */
 
 function StatCard({
   href,
@@ -54,38 +64,6 @@ function StatCardIcon({
     <div className={cn("shrink-0 rounded-lg p-2", bgClassName)}>
       <Icon className={cn("h-4 w-4", className)} />
     </div>
-  );
-}
-
-/** Animates 0 → value on mount (ease-out, ~500ms); skipped for non-numeric values or reduced-motion. */
-function StatCardValue({ value, animate = true }: { value: number | string; animate?: boolean }) {
-  const numeric = typeof value === "number";
-  const [display, setDisplay] = React.useState<number | string>(numeric && animate ? 0 : value);
-
-  React.useEffect(() => {
-    if (!numeric) return;
-    if (!animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setDisplay(value);
-      return;
-    }
-    const target = value as number;
-    const duration = 500;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(target * eased));
-      if (progress < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value, numeric, animate]);
-
-  return (
-    <p className="text-2xl font-bold tabular-nums leading-none tracking-tight text-foreground">
-      {typeof display === "number" ? formatNumber(display) : display}
-    </p>
   );
 }
 
