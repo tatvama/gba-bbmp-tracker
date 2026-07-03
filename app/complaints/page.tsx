@@ -20,7 +20,7 @@ export default async function ComplaintsPage() {
       >
         <ComplaintsHeaderActions canEdit={canEdit} />
       </PageHeader>
-      <ComplaintTable data={complaints} />
+      <ComplaintTable data={complaints} canEdit={canEdit} />
     </div>
   );
 }
