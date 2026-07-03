@@ -231,7 +231,13 @@ Output STRICT JSON of EXACTLY this shape:
 Use empty arrays / null where there is nothing. confidenceScore is an integer 0-100 that should agree with confidenceBand (High≈75-100, Medium≈45-74, Low≈0-44).
 REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ); recommendedAction, confidenceBand, the status tokens and dates stay in English exactly as specified.`;
 
-  const r = await extractJson<Partial<ThreadDecision>>({ system: SYSTEM, prompt, fallback: base, maxTokens: 3500 });
+  // Kannada is far more token-dense than English (a Kannada character can be
+  // several tokens): a full Kannada response for this schema measured ~7,900
+  // output tokens, vs the old 3500 cap that truncated mid-object and failed to
+  // parse — silently dropping back to the English fallback. 10k gives headroom
+  // for complaints with longer histories. Hitting the cap = English fallback, so
+  // over-provision rather than risk truncation.
+  const r = await extractJson<Partial<ThreadDecision>>({ system: SYSTEM, prompt, fallback: base, maxTokens: 10_000 });
   if (!r.ok) return { ok: false, data: base, error: r.error };
 
   const d = r.data;

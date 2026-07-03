@@ -153,7 +153,11 @@ export async function runAdvisorAnalysis(admin: SupabaseClient, complaintId: str
         commitments: decision.data.commitments,
         analyzed_correspondence_count: decision.data.analyzedCount,
         timeline_summary: decision.data.timelineSummary,
-        context_hash: newHash,
+        // Only cache the context hash on a SUCCESSFUL AI pass. Caching it after a
+        // failed generation (e.g. a truncated/unparseable response) would make the
+        // hash gate skip every future run, freezing the case on the English
+        // fallback. Null lets the next trigger retry.
+        context_hash: decision.ok ? newHash : null,
         last_analyzed_at: new Date().toISOString(),
         analysis_status: "done",
         analysis_error: decision.ok ? null : decision.error ?? null,

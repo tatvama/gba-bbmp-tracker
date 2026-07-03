@@ -25,6 +25,18 @@ export async function extractJson<T>(args: {
   try {
     return { ok: true, data: JSON.parse(cleaned) as T };
   } catch {
+    // Be forgiving: some responses (especially non-English ones) prepend a stray
+    // line or wrap the object oddly. Retry on the outermost { … } substring
+    // before giving up, so a single stray character doesn't waste the whole call.
+    const first = cleaned.indexOf("{");
+    const last = cleaned.lastIndexOf("}");
+    if (first !== -1 && last > first) {
+      try {
+        return { ok: true, data: JSON.parse(cleaned.slice(first, last + 1)) as T };
+      } catch {
+        /* fall through to failure */
+      }
+    }
     return { ok: false, error: "Could not parse AI output", data: args.fallback };
   }
 }
