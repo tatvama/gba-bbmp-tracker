@@ -9,6 +9,17 @@ import { AITimelineInsight } from "./AITimelineInsight";
 /** A 'running'/'queued' row older than this is treated as a dead lock to recover. */
 const STALE_MS = 120_000;
 
+/** Flatten every human-readable text field on a recommendation row into one string. */
+function allText(r: RecommendationRow): string {
+  return [
+    r.current_situation, r.reasoning, r.expected_outcome, r.timeline_summary, r.recommendation,
+    ...r.missing_information, ...r.detected_risks,
+    ...r.outstanding_issues.map((o) => o.issue),
+    ...r.contradictions.flatMap((c) => [c.summary, c.conflictsWith]),
+    ...r.commitments.map((m) => m.commitment),
+  ].filter(Boolean).join(" ");
+}
+
 /**
  * Sticky AI insights panel for the complaint detail page. Receives the
  * server-fetched initial recommendation as a prop (no extra round-trip on first
@@ -49,21 +60,26 @@ export function AIInsightsPanel({
   }, [refresh]);
 
   // On mount: recover a missing or stale-stuck analysis, OR convert a case whose
-  // narrative was generated before the advisor switched to Kannada. The backend
-  // single-flight + context-hash gate make a redundant kick cheap, and it only
-  // reclaims a lock that's actually dead (see STALE_LOCK_MS in the engine). The
-  // language check fires at most once per mount (kickedRef) and self-limits once
-  // the text is Kannada, so it can't loop.
+  // narrative predates a Kannada-quality fix. The backend single-flight +
+  // context-hash gate make a redundant kick cheap, and it only reclaims a lock
+  // that's actually dead (see STALE_LOCK_MS in the engine). These checks fire at
+  // most once per mount (kickedRef) and self-limit once the text passes, so they
+  // can't loop.
   const kickedRef = React.useRef(false);
   React.useEffect(() => {
     if (kickedRef.current) return;
     const r = recommendation;
     const inFlight = r?.analysis_status === "queued" || r?.analysis_status === "running";
     const stale = !r?.updated_at || Date.now() - Date.parse(r.updated_at) > STALE_MS;
+    const text = r ? allText(r) : "";
     // A stored narrative with NO Kannada characters (U+0C80–U+0CFF) predates the
     // Kannada switch — re-run so this case shows in Kannada like the rest.
-    const looksEnglish = !!r?.current_situation && !/[ಀ-೿]/.test(r.current_situation);
-    if (!r || (inFlight && stale) || looksEnglish) {
+    const looksEnglish = !!text && !/[ಀ-೿]/.test(text);
+    // A stored narrative using Kannada-SCRIPT digits (೦-೯) predates the numeral
+    // fix — official Kannada correspondence uses Arabic numerals (0-9) even in
+    // Kannada text, so this also needs a re-run.
+    const hasKannadaDigits = /[೦-೯]/.test(text);
+    if (!r || (inFlight && stale) || looksEnglish || hasKannadaDigits) {
       kickedRef.current = true;
       void triggerAdvisorAnalysis(complaintId).then(refresh);
     }

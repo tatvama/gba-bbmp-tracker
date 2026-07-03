@@ -15,10 +15,12 @@ export function computeContextHash(ctx: AdvisorContext): string {
   const signal = {
     // Bumped when the advisor's OUTPUT LANGUAGE (or the generation params that
     // affect whether it succeeds) change, so every cached recommendation is
-    // treated as stale and re-generated on its next analysis. "kn2" = Kannada
-    // narrative with the raised token budget (kn1 truncated & fell back to
-    // English; those rows must re-run, hence the bump).
-    narrativeLang: "kn2",
+    // treated as stale and re-generated on its next analysis. History: "kn" =
+    // first Kannada switch; "kn2" = raised token budget (kn1 truncated & fell
+    // back to English); "kn3" = Arabic numerals enforced inside Kannada text
+    // (kn2 rows used Kannada-script digits ೦-೯, which official Kannada
+    // correspondence never does — those rows must re-run, hence the bump).
+    narrativeLang: "kn3",
     status: complaint.status,
     priority: complaint.priority,
     nextFollowUpDate: complaint.next_follow_up_date,

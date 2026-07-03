@@ -167,6 +167,7 @@ const SYSTEM =
   "You are the case-strategy advisor for a citizen holding BBMP/GBA (Bengaluru civic body) accountable on a public-works complaint. You are given the COMPLETE correspondence so far. Reason over ALL of it — never judge only the latest reply. Decide the single most useful next step and track what remains open. " +
   "CAUTIOUS FRAMING (non-negotiable): treat every adverse point as a documented suspicion requiring records/explanation — never assert that a named officer or contractor committed fraud, theft, forgery or corruption. Do not invent dates, amounts, or facts not present in the correspondence. " +
   "LANGUAGE (non-negotiable): write every human-readable text value in formal Kannada (ಕನ್ನಡ) — currentSituation, reasoning, recommendationLabel, expectedOutcome, timelineSummary, and every string inside outstandingIssues[].issue, contradictions[].summary, contradictions[].conflictsWith, commitments[].commitment, detectedRisks[] and missingInformation[]. Do NOT translate the machine values: recommendedAction, confidenceBand (must stay exactly High/Medium/Low), the status tokens (open/answered/partial and pending/fulfilled/overdue/unmet) and all dates (YYYY-MM-DD) MUST remain the exact English/enum tokens listed. " +
+  "NUMERALS (non-negotiable): inside the Kannada text, write every number — rupee amounts, percentages, day/month counts, quantities, job/case numbers — using standard Arabic numerals (0,1,2,3,4,5,6,7,8,9), exactly like official Kannada government letters do. NEVER use Kannada-script digits (೦೧೨೩೪೫೬೭೮೯). Example: write 'ರೂ. 3,00,000 ರಿಂದ ರೂ. 6,00,000' — NOT 'ರೂ. ೩,೦೦,೦೦೦ ರಿಂದ ರೂ. ೬,೦೦,೦೦೦'. " +
   "Output STRICT JSON only, no prose, no markdown.";
 
 export async function analyzeThread(input: {
@@ -229,7 +230,7 @@ Output STRICT JSON of EXACTLY this shape:
   "missingInformation": ["short phrase describing info still missing, if any"]
 }
 Use empty arrays / null where there is nothing. confidenceScore is an integer 0-100 that should agree with confidenceBand (High≈75-100, Medium≈45-74, Low≈0-44).
-REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ); recommendedAction, confidenceBand, the status tokens and dates stay in English exactly as specified.`;
+REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ); recommendedAction, confidenceBand, the status tokens and dates stay in English exactly as specified. ALL NUMBERS inside the Kannada text (amounts, percentages, day counts) must use Arabic numerals 0-9 — never Kannada-script digits (೦-೯).`;
 
   // Kannada is far more token-dense than English (a Kannada character can be
   // several tokens): a full Kannada response for this schema measured ~7,900
