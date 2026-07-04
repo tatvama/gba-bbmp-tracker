@@ -106,26 +106,26 @@ function NodeCard({
   const lifted = active || hovered;
   
   const boxShadow = active
-    ? `0 0 0 4px rgba(37,99,235,.2), 0 8px 28px ${toRgba(tint, 0.25)}`
+    ? `0 0 0 3px rgba(37,99,235,.15), 0 4px 12px ${toRgba(tint, 0.15)}`
     : isMatched
-    ? `0 0 0 4px rgba(245,158,11,.3), 0 8px 28px ${toRgba(tint, 0.2)}`
+    ? `0 0 0 3px rgba(245,158,11,.2), 0 4px 12px ${toRgba(tint, 0.1)}`
     : hovered
-    ? `0 4px 16px ${toRgba(tint, 0.15)}, 0 0 0 1.5px ${toRgba(tint, 0.5)}`
-    : `0 1px 4px rgba(0,0,0,0.06), 0 0 0 1.5px ${toRgba(tint, 0.15)}`;
+    ? `0 2px 8px ${toRgba(tint, 0.15)}, 0 0 0 1px ${toRgba(tint, 0.5)}`
+    : `0 1px 3px rgba(0,0,0,0.04), 0 0 0 1.5px ${toRgba(tint, 0.15)}`;
 
   const bg = active
     ? "#ffffff"
     : isMatched
     ? "#fffdf5"
-    : `${toRgba(tint, hovered ? 0.08 : 0.04)}`;
+    : `${toRgba(tint, hovered ? 0.06 : 0.03)}`;
 
   const borderStyle = active
-    ? "2px solid #2563EB"
+    ? "1.5px solid #2563EB"
     : isMatched
-    ? "2px solid #F59E0B"
+    ? "1.5px solid #F59E0B"
     : hovered
-    ? `1.5px solid ${toRgba(tint, 0.8)}`
-    : `1.5px solid ${toRgba(tint, 0.35)}`;
+    ? `1px solid ${toRgba(tint, 0.7)}`
+    : `1px solid ${toRgba(tint, 0.25)}`;
 
   return (
     <button
@@ -135,46 +135,39 @@ function NodeCard({
       onMouseEnter={() => onHover?.(true)}
       onMouseLeave={() => onHover?.(false)}
       className={cn(
-        "flex flex-col rounded-2xl transition-all duration-250 focus-visible:outline-none select-none cursor-pointer text-left",
-        size === "lg" ? "w-[260px] p-5" : size === "md" ? "w-[220px] p-4" : "w-[180px] p-3.5",
+        "flex flex-col rounded-xl transition-all duration-200 focus-visible:outline-none select-none cursor-pointer text-left",
+        size === "lg" ? "w-[190px] p-3" : size === "md" ? "w-[160px] p-2.5" : "w-[140px] p-2",
         className
       )}
       style={{
         backgroundColor: bg,
         boxShadow,
         border: borderStyle,
-        transform: lifted ? "translateY(-4px) scale(1.02)" : undefined,
+        transform: lifted ? "translateY(-2px) scale(1.01)" : undefined,
       }}
     >
-      <div className="flex items-start justify-between w-full gap-2">
+      <div className="flex items-center justify-between w-full gap-1.5">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-1 text-slate-500">
-            {Icon && <Icon className="h-4 w-4 shrink-0" style={{ color: tint }} />}
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="flex items-center gap-1.5 mb-0.5 text-slate-500">
+            {Icon && <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: tint }} />}
+            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
               {countUnit || "node"}
             </span>
           </div>
-          <h4 className="font-extrabold text-slate-800 leading-tight truncate text-sm">
+          <h4 className="font-extrabold text-slate-800 leading-tight truncate text-xs">
             {label}
           </h4>
         </div>
 
         {count !== undefined && (
-          <span 
-            className="text-lg font-black tabular-nums leading-none ml-2 shrink-0 text-slate-700"
-            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
-          >
+          <span className="text-sm font-black tabular-nums leading-none ml-1.5 shrink-0 text-slate-700">
             {count}
           </span>
         )}
       </div>
 
       {progress !== undefined && (
-        <div className="w-full mt-3">
-          <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 mb-1 leading-none">
-            <span>COMPLETION</span>
-            <span>{progress}%</span>
-          </div>
+        <div className="w-full mt-2">
           <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
             <div
               className="h-full bg-emerald-500 rounded-full transition-all duration-300"
@@ -185,7 +178,7 @@ function NodeCard({
       )}
 
       {sublabel && (
-        <p className="text-[10px] text-slate-450 font-bold mt-2 truncate w-full border-t pt-2 border-slate-100">
+        <p className="text-[9px] text-slate-450 font-bold mt-1.5 truncate w-full border-t pt-1.5 border-slate-150">
           {sublabel}
         </p>
       )}
@@ -193,9 +186,9 @@ function NodeCard({
       {onToggleExpand && (
         <div 
           onClick={onToggleExpand}
-          className="flex items-center gap-1 text-[9px] font-bold text-slate-400 hover:text-primary transition-colors cursor-pointer mt-2.5 leading-none w-full justify-end border-t pt-2 border-slate-50"
+          className="flex items-center gap-0.5 text-[8.5px] font-bold text-slate-400 hover:text-primary transition-colors cursor-pointer mt-2 leading-none w-full justify-end border-t pt-1.5 border-slate-50"
         >
-          {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+          {isExpanded ? <ChevronDown className="h-2.5 w-2.5 shrink-0" /> : <ChevronRight className="h-2.5 w-2.5 shrink-0" />}
           <span>{isExpanded ? "Collapse" : "Expand"}</span>
         </div>
       )}
@@ -833,7 +826,7 @@ export function OrgTreemap({
       } else {
         setActiveCorp(code); setActiveDiv(null); setActiveSub(null); setActiveWard(null); setActiveEng(null);
       }
-      setInspectorNode(corps.find(c => c.code === code) ?? null);
+      setInspectorNode(null);
     },
     div(name: string) {
       if (activeDiv === name) {
@@ -841,7 +834,7 @@ export function OrgTreemap({
       } else {
         setActiveDiv(name); setActiveSub(null); setActiveWard(null); setActiveEng(null);
       }
-      setInspectorNode(corp?.children.find(d => d.name === name) ?? null);
+      setInspectorNode(null);
     },
     sub(name: string) {
       if (activeSub === name) {
@@ -849,15 +842,17 @@ export function OrgTreemap({
       } else {
         setActiveSub(name); setActiveWard(null); setActiveEng(null);
       }
-      setInspectorNode(div?.children.find(s => s.name === name) ?? null);
+      setInspectorNode(null);
     },
     ward(id: string) {
       if (activeWard === id) {
         setActiveWard(null); setActiveEng(null);
+        setInspectorNode(null);
       } else {
         setActiveWard(id); setActiveEng(null);
+        const wNode = sub?.children.find(w => w.id === id) ?? null;
+        if (wNode) setInspectorNode(wNode);
       }
-      setInspectorNode(sub?.children.find(w => w.id === id) ?? null);
     },
     eng(id: string) {
       if (activeEng === id) {
@@ -865,7 +860,7 @@ export function OrgTreemap({
       } else {
         setActiveEng(id);
       }
-      setInspectorNode(wardNode?.children.find(e => e.id === id) ?? null);
+      setInspectorNode(null);
     }
   };
 
@@ -1035,7 +1030,7 @@ export function OrgTreemap({
                                                             {eng.children.map(off => (
                                                               <div
                                                                 key={off.id}
-                                                                onClick={() => setInspectorNode(off)}
+                                                                onClick={() => setActiveOff(off.id)}
                                                                 className="px-2 py-1 text-[9px] font-medium text-slate-550 hover:text-primary cursor-pointer flex items-center gap-1.5"
                                                               >
                                                                 <UserRound className="h-3.5 w-3.5 text-slate-400" />
@@ -1219,26 +1214,19 @@ export function OrgTreemap({
           {/* 🏛️ Level 1: Root Node */}
           <div 
             ref={reg<HTMLDivElement>("root")} 
-            onClick={() => setInspectorNode({
-              id: "root",
-              type: "root",
-              label: mode === "gba" ? "GBA" : "BBMP",
-              complaintsCount: rootLabel.count,
-              complaintsList: complaints.filter(c => mode === "gba" ? (c.ward_type === "GBA" || !!c.gba_ward_id) : (c.ward_type !== "GBA" && !c.gba_ward_id))
-            })}
-            className="flex flex-col items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-10 py-5.5 shadow-xl text-white w-[320px] select-none hover:scale-102 hover:-translate-y-1 transition-all duration-250 cursor-pointer"
+            className="flex flex-col items-center gap-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 shadow-md text-white w-[220px] select-none hover:scale-101 hover:-translate-y-0.5 transition-all duration-200"
           >
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-blue-200" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-blue-200">
+            <div className="flex items-center gap-1.5">
+              <Building2 className="h-4 w-4 text-blue-200" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-blue-200">
                 {rootLabel.title}
               </span>
             </div>
-            <span className="text-4xl font-black tabular-nums leading-none">
+            <span className="text-2xl font-black tabular-nums leading-none mt-0.5">
               {rootLabel.count}
             </span>
-            <span className="text-[11px] font-bold text-blue-100">
-              {rootLabel.meta}
+            <span className="text-[10px] font-semibold text-blue-100 opacity-90 mt-0.5">
+              complaints · {mode === "gba" ? "369 wards" : "225 wards"}
             </span>
           </div>
 
@@ -1255,7 +1243,6 @@ export function OrgTreemap({
                   icon={Building}
                   count={c.complaintCount}
                   countUnit="complaints"
-                  sublabel={`${c.activeCount} act · ${c.closedCount} clsd · ${c.divisionCount} divisions`}
                   tint={CORP_TINT[c.code] ?? "#888"}
                   active={activeCorp === c.code}
                   isExpanded={activeCorp === c.code}
@@ -1286,7 +1273,6 @@ export function OrgTreemap({
                     icon={MapPinned}
                     count={d.complaintCount}
                     countUnit="complaints"
-                    sublabel={`${d.activeCount} act · ${d.closedCount} clsd`}
                     tint={CORP_TINT[activeCorp!] ?? "#888"}
                     active={activeDiv === d.name}
                     isExpanded={activeDiv === d.name}
@@ -1317,7 +1303,6 @@ export function OrgTreemap({
                     icon={Navigation}
                     count={s.complaintCount}
                     countUnit="complaints"
-                    sublabel={`${s.activeCount} active · ${s.closedCount} closed`}
                     tint={CORP_TINT[activeCorp!] ?? "#888"}
                     active={activeSub === s.name}
                     isExpanded={activeSub === s.name}
@@ -1433,7 +1418,6 @@ export function OrgTreemap({
                       ref={reg(off.id)}
                       onClick={() => {
                         setActiveOff(off.id);
-                        setInspectorNode(off);
                       }}
                       className={cn(
                         "flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 select-none hover:shadow-sm w-[160px]",
