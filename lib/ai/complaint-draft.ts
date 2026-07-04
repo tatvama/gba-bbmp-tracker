@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildComplaintDraftPrompt } from "@/lib/ai/complaint-document-analyzer";
-import { generateText } from "@/lib/ai/provider";
+import { generateTextStream } from "@/lib/ai/provider";
 import { applySafeLanguage, lintLetter } from "@/lib/letters/safe-language";
 import { LETTER_SIGNATORIES, type ComplaintDraftKind, type DraftLanguage, type LegalTone } from "@/lib/constants";
 
@@ -18,6 +18,17 @@ export interface ComplaintDraftInput {
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
+}
+
+/** Real pipeline stages a caller can surface as a live status (e.g. a
+ *  background job persisting each update for the client to poll). */
+export type DraftStage = "loading_case" | "building_history" | "drafting" | "safety_check";
+
+export interface DraftProgress {
+  stage: DraftStage;
+  label: string;
+  /** Present only once "drafting" starts streaming — the accumulated text so far. */
+  partialText?: string;
 }
 
 function complaintContext(
@@ -106,7 +117,9 @@ async function buildCaseHistory(admin: SupabaseClient, complaintId: string, jobN
 export async function runComplaintDraft(
   admin: SupabaseClient,
   input: ComplaintDraftInput,
+  onProgress?: (p: DraftProgress) => void,
 ): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string }> {
+  onProgress?.({ stage: "loading_case", label: "Loading case file…" });
   const { data: c } = await admin
     .from("complaints")
     .select("*, ward:wards!ward_id(new_no,new_name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name), assigned_engineer:contacts!assigned_engineer_id(full_name,designation,office_address,phone,email)")
@@ -122,6 +135,7 @@ export async function runComplaintDraft(
   const signatory = sigs[(ld?.signatory_key as string) || "raghav_gowda"] ?? sigs.raghav_gowda ?? null;
 
   // Ground EVERY letter/reply in the real chronology + forensic findings.
+  onProgress?.({ stage: "building_history", label: "Reviewing correspondence history…" });
   const history = await buildCaseHistory(admin, input.complaintId, (c as { job_number?: string | null }).job_number ?? null);
   const context = `${complaintContext(c as Record<string, any>, { signatory, today: todayISO() })}\n\n=== CASE HISTORY (draw the body from this) ===\n${history}`;
 
@@ -131,12 +145,16 @@ export async function runComplaintDraft(
     tone: input.tone,
     language: input.language,
   });
-  const r = await generateText({ system, prompt });
+  onProgress?.({ stage: "drafting", label: "Drafting with Claude…" });
+  const r = await generateTextStream({ system, prompt }, (partialText) => {
+    onProgress?.({ stage: "drafting", label: "Drafting with Claude…", partialText });
+  });
   if (!r.ok || !r.text) return { ok: r.ok, text: r.text, error: r.error };
 
   // Safe-language gate on EVERY kind: rewrite accusatory wording into documented-
   // suspicion phrasing, then flag anything still prohibited (warn, don't block).
   // We do NOT strip dashes here — that would wreck the Markdown the preview renders.
+  onProgress?.({ stage: "safety_check", label: "Reviewing safe-language guardrails…" });
   const text = applySafeLanguage(r.text);
   const lint = lintLetter(text);
   return { ok: true, text, lintWarning: lint.ok ? undefined : lint.errors.map((e) => e.reason).join("; ") };
