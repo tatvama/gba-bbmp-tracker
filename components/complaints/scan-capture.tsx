@@ -274,13 +274,7 @@ export function ScanCapture({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Document type</Label>
-          <select className={selectCls} value={docType} onChange={(e) => setDocType(e.target.value)}>
-            {docTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Title (optional)</Label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ack receipt 29-Jun" className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 placeholder:font-normal" />
