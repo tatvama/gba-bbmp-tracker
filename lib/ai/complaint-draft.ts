@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildComplaintDraftPrompt } from "@/lib/ai/complaint-document-analyzer";
 import { generateText } from "@/lib/ai/provider";
-import { applySafeLanguage, lintLetter } from "@/lib/letters/safe-language";
+import { sanitizeDraft } from "@/lib/letters/safe-language";
 import { LETTER_SIGNATORIES, type ComplaintDraftKind, type DraftLanguage, type LegalTone } from "@/lib/constants";
 
 /**
@@ -106,7 +106,7 @@ async function buildCaseHistory(admin: SupabaseClient, complaintId: string, jobN
 export async function runComplaintDraft(
   admin: SupabaseClient,
   input: ComplaintDraftInput,
-): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string }> {
+): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean }> {
   const { data: c } = await admin
     .from("complaints")
     .select("*, ward:wards!ward_id(new_no,new_name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name), assigned_engineer:contacts!assigned_engineer_id(full_name,designation,office_address,phone,email)")
@@ -131,13 +131,23 @@ export async function runComplaintDraft(
     tone: input.tone,
     language: input.language,
   });
-  const r = await generateText({ system, prompt });
+  // Kannada is far more token-dense than English, and these letters argue a full
+  // case history point-by-point (see buildCaseHistory above) — a prior 2500-token
+  // default was truncating long Kannada letters mid-sentence with no error, since
+  // a truncated-but-nonempty response still passes the ok/text check below.
+  // 10k mirrors the cap thread-decision-agent.ts already proved sufficient.
+  const r = await generateText({ system, prompt, maxTokens: 10_000 });
   if (!r.ok || !r.text) return { ok: r.ok, text: r.text, error: r.error };
 
   // Safe-language gate on EVERY kind: rewrite accusatory wording into documented-
-  // suspicion phrasing, then flag anything still prohibited (warn, don't block).
-  // We do NOT strip dashes here — that would wreck the Markdown the preview renders.
-  const text = applySafeLanguage(r.text);
-  const lint = lintLetter(text);
-  return { ok: true, text, lintWarning: lint.ok ? undefined : lint.errors.map((e) => e.reason).join("; ") };
+  // suspicion phrasing, strip dash punctuation from the prose (official IDs and
+  // markdown bullets are preserved — see stripKannadaDashes), then flag anything
+  // still prohibited (warn, don't block).
+  const { text, lint } = sanitizeDraft(r.text);
+  return {
+    ok: true,
+    text,
+    lintWarning: lint.ok ? undefined : lint.errors.map((e) => e.reason).join("; "),
+    truncated: r.truncated,
+  };
 }

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight,
-  FileText, Eye, Search, Printer, CircleCheck, RotateCcw,
+  FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,8 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ScanCapture } from "@/components/complaints/scan-capture";
 import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
-import { LetterDraftArea } from "@/components/complaints/letter-preview";
+import { LetterPreview } from "@/components/complaints/letter-preview";
+import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
+import { openDraftPdf } from "@/lib/print-letter";
+import { formatDateTime } from "@/lib/format";
 import {
   setComplaintStatus,
   fileComplaint,
@@ -31,33 +34,6 @@ import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage } from "@/lib/constants";
-
-/**
- * Open a drafted letter as a REAL, server-rendered PDF in a new tab. This
- * replaces window.print() of the on-screen preview, which printed blank pages
- * depending on the browser / whether the editor was in edit mode. Reuses the
- * same government-format renderer as the filed counter-reply and RTI PDFs.
- * Returns null on success, or an error message.
- */
-async function openDraftPdf(title: string, text: string): Promise<string | null> {
-  try {
-    const res = await fetch("/api/pdf/draft", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, text }),
-    });
-    if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { error?: string };
-      return d.error || `Could not generate the PDF (HTTP ${res.status}).`;
-    }
-    const url = URL.createObjectURL(await res.blob());
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    return null;
-  } catch (e) {
-    return e instanceof Error ? e.message : "Could not generate the PDF.";
-  }
-}
 
 export interface WorkflowLetter {
   letterId: string | null;
@@ -519,8 +495,12 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
   const [draft, setDraft] = React.useState("");
   const [pastedReply, setPastedReply] = React.useState("");
   const [lintWarning, setLintWarning] = React.useState<string | null>(null);
+  const [truncated, setTruncated] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [savedMsg, setSavedMsg] = React.useState<string | null>(null);
+  const [savedAt, setSavedAt] = React.useState<string | null>(null);
+  const [savingDraft, setSavingDraft] = React.useState(false);
+  const [editorOpen, setEditorOpen] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [replyFiles, setReplyFiles] = React.useState<ReplyFile[]>([]);
@@ -556,19 +536,30 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
     setError(null);
     setSavedMsg(null);
     setLintWarning(null);
+    setTruncated(false);
+    setSavedAt(null);
     const r = await generateComplaintDraft({ complaintId, kind: "counter_reply", language });
     setGenerating(false);
     if (!r.ok || !r.text) { setError(r.error ?? "Could not generate the counter-reply (is the AI key configured?)."); return; }
     setDraft(r.text);
     setLintWarning(r.lintWarning ?? null);
+    setTruncated(!!r.truncated);
+    setEditorOpen(true);
+    // Auto-save the as-generated version immediately so it's never lost, without
+    // the timeline note / advisor re-run a deliberate Save triggers below.
+    void saveComplaintAiDraft({ complaintId, kind: "counter_reply", content: r.text, language, silent: true })
+      .then((sr) => { if (sr.ok) setSavedAt(formatDateTime(new Date().toISOString())); });
   }
 
   async function save() {
     if (!draft.trim()) return;
+    setSavingDraft(true);
     setError(null);
     const r = await saveComplaintAiDraft({ complaintId, kind: "counter_reply", title: COMPLAINT_DRAFT_KINDS.counter_reply, content: draft });
+    setSavingDraft(false);
     if (!r.ok) { setError(r.error ?? "Could not save."); return; }
     setSavedMsg("Counter-reply saved to the case (AI drafts).");
+    setSavedAt(formatDateTime(new Date().toISOString()));
   }
 
   async function fileCounter() {
@@ -646,13 +637,19 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
 
       {draft && (
         <div className="space-y-2">
+          {truncated && (
+            <p className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5" /> This letter hit the AI&apos;s length limit and may be cut off mid-sentence — check the ending and regenerate if incomplete.
+            </p>
+          )}
           {lintWarning && (
             <p className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-700">
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <LetterDraftArea value={draft} onChange={setDraft} />
+          <LetterPreview markdown={draft} />
           <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditorOpen(true)}><Pencil className="h-4 w-4" /> Edit in full editor</Button>
             <Button size="sm" onClick={fileCounter} disabled={filing}>
               {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File counter-reply
             </Button>
@@ -673,6 +670,17 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
             </Button>
           </div>
           {savedMsg && <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> {savedMsg}</p>}
+          {savedAt && !savedMsg && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-emerald-600" /> Auto-saved {savedAt}</p>}
+          <LetterEditorModal
+            open={editorOpen}
+            onOpenChange={setEditorOpen}
+            title="Counter-Reply Letter"
+            value={draft}
+            onChange={setDraft}
+            onSave={save}
+            saving={savingDraft}
+            savedAt={savedAt}
+          />
         </div>
       )}
 
@@ -729,9 +737,13 @@ function EscalatePanel({
   const [kind, setKind] = React.useState<ComplaintDraftKind | null>(null);
   const [draft, setDraft] = React.useState("");
   const [lintWarning, setLintWarning] = React.useState<string | null>(null);
+  const [truncated, setTruncated] = React.useState(false);
   const [toLevel, setToLevel] = React.useState("EE");
   const [error, setError] = React.useState<string | null>(null);
   const [savedMsg, setSavedMsg] = React.useState<string | null>(null);
+  const [savedAt, setSavedAt] = React.useState<string | null>(null);
+  const [savingDraft, setSavingDraft] = React.useState(false);
+  const [editorOpen, setEditorOpen] = React.useState(false);
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
 
@@ -752,6 +764,8 @@ function EscalatePanel({
     setError(null);
     setSavedMsg(null);
     setLintWarning(null);
+    setTruncated(false);
+    setSavedAt(null);
     const r = await generateComplaintDraft({ complaintId, kind: k, language });
     setGenerating(null);
     if (!r.ok || !r.text) {
@@ -762,14 +776,23 @@ function EscalatePanel({
     setDraft(r.text);
     setToLevel(level);
     setLintWarning(r.lintWarning ?? null);
+    setTruncated(!!r.truncated);
+    setEditorOpen(true);
+    // Auto-save the as-generated version immediately so it's never lost, without
+    // the timeline note / advisor re-run a deliberate Save triggers below.
+    void saveComplaintAiDraft({ complaintId, kind: k, content: r.text, language, silent: true })
+      .then((sr) => { if (sr.ok) setSavedAt(formatDateTime(new Date().toISOString())); });
   }
 
   async function save() {
     if (!kind || !draft.trim()) return;
+    setSavingDraft(true);
     setError(null);
     const r = await saveComplaintAiDraft({ complaintId, kind, title: COMPLAINT_DRAFT_KINDS[kind], content: draft });
+    setSavingDraft(false);
     if (!r.ok) { setError(r.error ?? "Could not save."); return; }
     setSavedMsg("Draft saved to the case (AI drafts).");
+    setSavedAt(formatDateTime(new Date().toISOString()));
   }
 
   async function recordEscalation() {
@@ -814,13 +837,19 @@ function EscalatePanel({
 
       {draft && (
         <div className="space-y-2">
+          {truncated && (
+            <p className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5" /> This letter hit the AI&apos;s length limit and may be cut off mid-sentence — check the ending and regenerate if incomplete.
+            </p>
+          )}
           {lintWarning && (
             <p className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-700">
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <LetterDraftArea value={draft} onChange={setDraft} />
+          <LetterPreview markdown={draft} />
           <div className="flex flex-wrap items-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditorOpen(true)}><Pencil className="h-4 w-4" /> Edit in full editor</Button>
             <Button size="sm" onClick={fileEscalation} disabled={filing}>
               {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File escalation
             </Button>
@@ -852,6 +881,17 @@ function EscalatePanel({
             </div>
           </div>
           {savedMsg && <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> {savedMsg}</p>}
+          {savedAt && !savedMsg && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-emerald-600" /> Auto-saved {savedAt}</p>}
+          <LetterEditorModal
+            open={editorOpen}
+            onOpenChange={setEditorOpen}
+            title={kind ? COMPLAINT_DRAFT_KINDS[kind] : "Escalation Letter"}
+            value={draft}
+            onChange={setDraft}
+            onSave={save}
+            saving={savingDraft}
+            savedAt={savedAt}
+          />
         </div>
       )}
     </StepPanel>

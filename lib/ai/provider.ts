@@ -27,6 +27,8 @@ export interface GenerateResult {
   error?: string;
   provider?: string;
   model?: string;
+  /** True when the model hit max_tokens — `text` is a real but incomplete prefix. */
+  truncated?: boolean;
 }
 
 export function aiProvider(): string {
@@ -73,7 +75,7 @@ export async function generateText(params: GenerateParams): Promise<GenerateResu
         .map((b) => b.text ?? "")
         .join("\n")
         .trim();
-      return { ok: true, text, provider, model };
+      return { ok: true, text, provider, model, truncated: msg.stop_reason === "max_tokens" };
     }
 
     // Other providers can be added by installing their SDK and adding a branch.
@@ -128,7 +130,7 @@ export async function generateVision(params: {
       .map((b) => b.text ?? "")
       .join("\n")
       .trim();
-    return { ok: true, text, provider, model };
+    return { ok: true, text, provider, model, truncated: msg.stop_reason === "max_tokens" };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Vision request failed" };
   }

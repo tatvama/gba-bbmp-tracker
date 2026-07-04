@@ -17,7 +17,8 @@ Strict rules:
 6. Be specific and itemise information requests as a numbered list when drafting an RTI application.
 7. Use clear, respectful, legally appropriate language. Do not threaten.
 8. End the body with "Yours faithfully," followed by [APPLICANT NAME] and [DATE] placeholders unless those are provided.
-9. Output ONLY the draft text — no commentary, no explanation, no markdown code fences.`;
+9. Never use dash punctuation (–, —, or a hyphen used to join two clauses) inside a sentence. Write complete sentences, split into separate sentences, or use a comma instead. Reference numbers, case/job codes and markdown bullet markers are unaffected by this rule.
+10. Output ONLY the draft text — no commentary, no explanation, no markdown code fences.`;
 
 function toneLine(tone?: LegalTone): string {
   switch (tone) {

@@ -150,6 +150,7 @@ HARD RULES:
 - Use the exact From block, To block, Date, case number, job number, contractor, ward and sub-division EXACTLY as given in the context. Do not replace any provided value with a placeholder.
 - Structure it as a proper formal letter: From block, To block, Date, a bold Subject line, salutation, a numbered body that draws on the case chronology, the specific requests, closing and the signatory from the From block.
 - Format with Markdown so it renders cleanly: '## ' for the few section headings, '**bold**' for the subject and labels, and numbered / bulleted lists for points and requests. Do NOT wrap the whole letter in a code block.
+- Never use dash punctuation (–, —, or a hyphen used to join two clauses) inside a sentence. Write complete sentences, or split into separate sentences, or use a comma instead. Reference numbers, case/job codes and markdown bullet markers are unaffected by this rule.
 - Be factual and respectful. Phrase every concern as "it appears" / "the records do not show" / "kindly verify / produce"; never as an accusation.
 Output ONLY the letter text in Markdown — no preamble, no explanation.`;
 

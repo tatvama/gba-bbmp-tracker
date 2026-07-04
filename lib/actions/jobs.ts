@@ -84,7 +84,7 @@ export async function startAiDraftJob(input: {
       }
       // Persist the finished draft so it survives navigation (shows in Saved drafts).
       await a.from("ai_drafts").insert({ entity_type: "complaint", entity_id: input.complaintId, kind: input.kind, content: r.text, language: input.language ?? null, created_by: userId });
-      await a.from("background_jobs").update({ status: "done", progress: 100, result: { text: r.text, lintWarning: r.lintWarning ?? null }, finished_at: nowISO() }).eq("id", jobId);
+      await a.from("background_jobs").update({ status: "done", progress: 100, result: { text: r.text, lintWarning: r.lintWarning ?? null, truncated: r.truncated ?? false }, finished_at: nowISO() }).eq("id", jobId);
       await notifyUser(a, userId, { type: "job_done", title: `Draft ready — ${title}`, body: "Open the complaint to review, edit and print it.", link, entityType: "complaint", entityId: input.complaintId });
       // The generated letter is fresh correspondence — re-run the advisor so its
       // next-step reasoning reflects what we just sent. We're already inside an

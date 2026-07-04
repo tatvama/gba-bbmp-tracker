@@ -753,7 +753,7 @@ export async function generateComplaintDraft(input: {
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
-}): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string }> {
+}): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
   // Shared generation core (also used by the background-job runner in jobs.ts).
@@ -831,6 +831,9 @@ export async function saveComplaintAiDraft(input: {
   title?: string;
   content: string;
   language?: string;
+  /** Background auto-save of an in-progress draft: skip the timeline note and
+   *  advisor re-run, which are only meaningful for a deliberate, reviewed save. */
+  silent?: boolean;
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
@@ -844,6 +847,10 @@ export async function saveComplaintAiDraft(input: {
     created_by: user.id,
   }).select("id").single();
   if (error) return { ok: false, error: error.message };
+  if (input.silent) {
+    revalidatePath(`/complaints/${input.complaintId}`);
+    return { ok: true, id: data.id };
+  }
   await addTimeline(admin, { complaintId: input.complaintId, eventType: "Note", title: `AI draft saved: ${input.title ?? input.kind}`, createdBy: user.id });
   revalidatePath(`/complaints/${input.complaintId}`);
   // A saved counter-reply/letter is fresh correspondence — re-run the advisor

@@ -4,6 +4,7 @@ import { requireRole, AuthorizationError } from "@/lib/auth";
 import { RTI_WRITE_ROLES, COMPLAINT_WRITE_ROLES, type UserRole } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { generateText, aiProvider, aiModel } from "@/lib/ai/provider";
+import { stripKannadaDashes } from "@/lib/letters/safe-language";
 import {
   buildRtiApplicationPrompt,
   buildFirstAppealPrompt,
@@ -29,6 +30,8 @@ export interface AiResult {
   ok: boolean;
   text?: string;
   error?: string;
+  /** True when the AI response hit its length limit — text is a real but incomplete prefix. */
+  truncated?: boolean;
 }
 
 async function gate(roles: UserRole[] = RTI_WRITE_ROLES): Promise<AiResult | null> {
@@ -40,28 +43,35 @@ async function gate(roles: UserRole[] = RTI_WRITE_ROLES): Promise<AiResult | nul
   }
 }
 
+/** Dash punctuation stripped from prose on every letter (official IDs/bullets untouched). */
+function clean(text?: string): string | undefined {
+  return text ? stripKannadaDashes(text) : text;
+}
+
 export async function generateRtiDraft(input: RtiDraftInput): Promise<AiResult> {
   const denied = await gate();
   if (denied) return denied;
   const { system, prompt } = buildRtiApplicationPrompt(input);
-  const r = await generateText({ system, prompt });
-  return { ok: r.ok, text: r.text, error: r.error };
+  // Kannada is far more token-dense than English; the bare 2500 default was
+  // truncating long Kannada letters mid-sentence (see runComplaintDraft).
+  const r = await generateText({ system, prompt, maxTokens: 8000 });
+  return { ok: r.ok, text: clean(r.text), error: r.error, truncated: r.truncated };
 }
 
 export async function generateFirstAppealDraft(input: FirstAppealInput): Promise<AiResult> {
   const denied = await gate();
   if (denied) return denied;
   const { system, prompt } = buildFirstAppealPrompt(input);
-  const r = await generateText({ system, prompt });
-  return { ok: r.ok, text: r.text, error: r.error };
+  const r = await generateText({ system, prompt, maxTokens: 8000 });
+  return { ok: r.ok, text: clean(r.text), error: r.error, truncated: r.truncated };
 }
 
 export async function generateSecondAppealDraft(input: SecondAppealInput): Promise<AiResult> {
   const denied = await gate();
   if (denied) return denied;
   const { system, prompt } = buildSecondAppealPrompt(input);
-  const r = await generateText({ system, prompt });
-  return { ok: r.ok, text: r.text, error: r.error };
+  const r = await generateText({ system, prompt, maxTokens: 8000 });
+  return { ok: r.ok, text: clean(r.text), error: r.error, truncated: r.truncated };
 }
 
 /**
@@ -78,7 +88,7 @@ export async function generateRoadWorkLetter(input: RoadWorkLetterInput): Promis
   }
   const { system, prompt } = buildRoadWorkLetterPrompt(input);
   const r = await generateText({ system, prompt, maxTokens: 4000 });
-  return { ok: r.ok, text: r.text, error: r.error };
+  return { ok: r.ok, text: clean(r.text), error: r.error, truncated: r.truncated };
 }
 
 export interface SuspicionSuggestResult { ok: boolean; codes?: string[]; error?: string }
@@ -169,7 +179,7 @@ export async function generateRoadWorkEscalation(input: RoadWorkEscalationInput)
   if (denied) return denied;
   const { system, prompt } = buildRoadWorkEscalationPrompt(input);
   const r = await generateText({ system, prompt, maxTokens: 4000 });
-  return { ok: r.ok, text: r.text, error: r.error };
+  return { ok: r.ok, text: clean(r.text), error: r.error, truncated: r.truncated };
 }
 
 export async function transformDraft(
@@ -180,8 +190,8 @@ export async function transformDraft(
   if (denied) return denied;
   if (!currentDraft.trim()) return { ok: false, error: "Nothing to transform yet." };
   const { system, prompt } = buildTransformPrompt(currentDraft, instruction);
-  const r = await generateText({ system, prompt });
-  return { ok: r.ok, text: r.text, error: r.error };
+  const r = await generateText({ system, prompt, maxTokens: 8000 });
+  return { ok: r.ok, text: clean(r.text), error: r.error, truncated: r.truncated };
 }
 
 export interface ReplyAnalysisItem {

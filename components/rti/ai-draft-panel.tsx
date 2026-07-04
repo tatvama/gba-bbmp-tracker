@@ -4,17 +4,23 @@ import * as React from "react";
 import {
   Sparkles,
   Copy,
-  Printer,
   Save,
   Loader2,
   AlertTriangle,
   Check,
   FileCheck,
   FileDown,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { LetterPreview } from "@/components/complaints/letter-preview";
+import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { transformDraft, saveAiDraft, type AiResult } from "@/lib/actions/ai";
+import { formatDateTime } from "@/lib/format";
+
+function humanizeKind(kind: string): string {
+  return kind.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const TRANSFORMS: { label: string; instruction: string }[] = [
   { label: "Make stronger", instruction: "Make the tone stronger and more assertive while staying factual and respectful." },
@@ -32,6 +38,7 @@ export function AiDraftPanel({
   entityType,
   entityId,
   kind,
+  title,
   language,
   inputs,
   onApprove,
@@ -43,6 +50,8 @@ export function AiDraftPanel({
   entityType?: string;
   entityId?: string;
   kind: string;
+  /** Editor modal heading; defaults to a humanized `kind` (e.g. "First Appeal"). */
+  title?: string;
   language?: string;
   /** Left-column summary of what will be sent to the model. */
   inputs?: React.ReactNode;
@@ -55,9 +64,13 @@ export function AiDraftPanel({
   const [busy, setBusy] = React.useState(false);
   const [approving, setApproving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [truncated, setTruncated] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [savedAt, setSavedAt] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [downloadingPdf, setDownloadingPdf] = React.useState(false);
+  const [editorOpen, setEditorOpen] = React.useState(false);
 
   async function onApproveClick() {
     if (!onApprove || !draft.trim()) return;
@@ -75,10 +88,18 @@ export function AiDraftPanel({
     setBusy(true);
     setError(null);
     setSaved(false);
+    setTruncated(false);
+    setSavedAt(null);
     try {
       const r = await fn();
-      if (r.ok && r.text) setDraft(r.text);
-      else setError(r.error ?? "AI request failed.");
+      if (r.ok && r.text) {
+        setDraft(r.text);
+        setTruncated(!!r.truncated);
+        setEditorOpen(true);
+        // Auto-save the as-generated version immediately so it's never lost.
+        const sr = await saveAiDraft({ entityType, entityId, kind, content: r.text, language });
+        if (sr.ok) setSavedAt(formatDateTime(new Date().toISOString()));
+      } else setError(r.error ?? "AI request failed.");
     } finally {
       setBusy(false);
     }
@@ -86,9 +107,12 @@ export function AiDraftPanel({
 
   async function onSave() {
     if (!draft.trim()) return;
+    setSaving(true);
     const r = await saveAiDraft({ entityType, entityId, kind, content: draft, language });
+    setSaving(false);
     if (r.ok) {
       setSaved(true);
+      setSavedAt(formatDateTime(new Date().toISOString()));
       setTimeout(() => setSaved(false), 2500);
     } else setError(r.error ?? "Could not save draft.");
   }
@@ -175,13 +199,21 @@ export function AiDraftPanel({
             {error}
           </div>
         )}
-        <Textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={20}
-          placeholder="The generated draft appears here and is fully editable…"
-          className="font-mono text-sm"
-        />
+        {truncated && (
+          <div className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+            <AlertTriangle className="h-3.5 w-3.5" /> This draft hit the AI&apos;s length limit and may be cut off mid-sentence — check the ending and regenerate if incomplete.
+          </div>
+        )}
+        {draft ? (
+          <LetterPreview markdown={draft} />
+        ) : (
+          <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            The generated draft appears here — click Edit to write one manually.
+          </p>
+        )}
+        <Button variant="outline" size="sm" onClick={() => setEditorOpen(true)} className="w-fit">
+          <Pencil className="h-4 w-4" /> Edit in full editor
+        </Button>
         {aiConfigured && draft && (
           <div className="flex flex-wrap gap-1.5">
             {TRANSFORMS.map((t) => (
@@ -206,10 +238,11 @@ export function AiDraftPanel({
             {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
             {downloadingPdf ? "Generating PDF…" : "Download PDF"}
           </Button>
-          <Button variant="outline" size="sm" onClick={onSave} disabled={!draft}>
-            {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {saved ? "Saved" : "Save draft"}
+          <Button variant="outline" size="sm" onClick={onSave} disabled={!draft || saving}>
+            {saved ? <Check className="h-4 w-4" /> : saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saved ? "Saved" : saving ? "Saving…" : "Save draft"}
           </Button>
+          {savedAt && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-emerald-600" /> Saved {savedAt}</span>}
           {onApprove && (
             <Button
               size="sm"
@@ -223,6 +256,17 @@ export function AiDraftPanel({
           )}
         </div>
       </div>
+
+      <LetterEditorModal
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        title={title ?? humanizeKind(kind)}
+        value={draft}
+        onChange={setDraft}
+        onSave={onSave}
+        saving={saving}
+        savedAt={savedAt}
+      />
     </div>
   );
 }
