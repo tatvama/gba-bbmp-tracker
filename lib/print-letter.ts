@@ -25,12 +25,16 @@ export function printLetter(): void {
  * same government-format renderer as the filed counter-reply and RTI PDFs.
  * Returns null on success, or an error message.
  */
-export async function openDraftPdf(title: string, text: string): Promise<string | null> {
+export async function openDraftPdf(
+  title: string,
+  text: string,
+  opts?: { reference?: string | null },
+): Promise<string | null> {
   try {
     const res = await fetch("/api/pdf/draft", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, text }),
+      body: JSON.stringify({ title, text, reference: opts?.reference ?? undefined }),
     });
     if (!res.ok) {
       const d = (await res.json().catch(() => ({}))) as { error?: string };

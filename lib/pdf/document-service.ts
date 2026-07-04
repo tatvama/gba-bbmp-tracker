@@ -7,6 +7,7 @@ import { documentRegistry } from "./document-registry";
 import { GovernmentDocumentView } from "@/components/rti/government-document-view";
 import { PuppeteerPDFProvider } from "./puppeteer-pdf-provider";
 import { PDFProvider } from "./pdf-provider";
+import { referenceHeaderForCase } from "./letter-reference";
 
 const defaultProvider: PDFProvider = new PuppeteerPDFProvider();
 
@@ -114,7 +115,8 @@ export async function generateSecondAppealPdfService(
 export async function generateDraftPdfService(
   title: string,
   text: string,
-  provider: PDFProvider = defaultProvider
+  provider: PDFProvider = defaultProvider,
+  opts?: { reference?: string | null }
 ): Promise<{ buffer: Buffer; fileName: string }> {
   // Render markdown directly to HTML, matching the preview styling exactly
   const element = React.createElement(
@@ -148,7 +150,11 @@ export async function generateDraftPdfService(
   const renderToStaticMarkup = await getRenderToStaticMarkup();
   const html = renderToStaticMarkup(element);
 
-  const buffer = await provider.generatePdf(html, {
+  // Phase 2: stamp the complaint's internal reference (text + QR) at the top so a
+  // returning acknowledgment can be matched back automatically.
+  const finalHtml = opts?.reference ? (await referenceHeaderForCase(opts.reference)) + html : html;
+
+  const buffer = await provider.generatePdf(finalHtml, {
     title: title || "Draft Letter",
   });
 

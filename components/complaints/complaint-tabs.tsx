@@ -312,7 +312,7 @@ export function ComplaintTabs({
       </TabsContent>
 
       <TabsContent value="ai">
-        <ComplaintAiDrafts complaintId={c.id} aiConfigured={flags.aiConfigured} saved={aiDrafts} />
+        <ComplaintAiDrafts complaintId={c.id} aiConfigured={flags.aiConfigured} saved={aiDrafts} caseNumber={c.internal_case_number} />
       </TabsContent>
 
       <TabsContent value="audit">
