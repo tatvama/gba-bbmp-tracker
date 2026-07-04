@@ -15,7 +15,7 @@ import { getComplaintSettings } from "@/lib/settings";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { detectComplaintLetters } from "@/lib/ai/complaint-letter-detector";
 import {
-  analyzeComplaintIntake,
+  analyzeComplaintIntakeFromImages,
   COMPLAINT_TYPE_VALUES,
   type ComplaintIntakeExtraction,
 } from "@/lib/ai/complaint-intake-analyzer";
@@ -102,7 +102,11 @@ export async function analyzeComplaintIntakeAction(formData: FormData): Promise<
     const complaints: DetectedComplaint[] = [];
     for (const l of letters) {
       const ocrText = sliceOcr(perPage, l.startPage, l.endPage);
-      const { extraction } = await analyzeComplaintIntake(ocrText);
+      // Extract each letter's fields from ITS OWN page images (vision) — reliable on
+      // scans/Kannada where OCR text is too poor to fill fields. Falls back to OCR
+      // text when AI is off.
+      const letterImages = pageImages.slice(l.startPage - 1, l.endPage);
+      const { extraction } = await analyzeComplaintIntakeFromImages({ pageImages: letterImages, ocrText });
       // Seed display fields from the detector when the per-section extractor left
       // them blank (e.g. very short OCR), so every card shows a subject/dept.
       if (!extraction.subject && l.subject) extraction.subject = l.subject;

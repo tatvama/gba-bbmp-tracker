@@ -1,5 +1,6 @@
 import "server-only";
 import { extractJson, extractorSystem } from "@/lib/ai/json-extract";
+import { generateVision, isAiConfigured } from "@/lib/ai/provider";
 
 /**
  * AI intake for "create a complaint from a letter / PDF" (no ZIP, no job code).
@@ -64,17 +65,8 @@ function findJobCode(text: string): string {
   return m ? m[0] : "";
 }
 
-export async function analyzeComplaintIntake(ocrText: string): Promise<{ ok: boolean; extraction: ComplaintIntakeExtraction; error?: string }> {
-  const base = fallback();
-  base.jobNumber = findJobCode(ocrText || "");
-  const text = (ocrText || "").trim();
-  if (!text) return { ok: false, extraction: base, error: "No text to analyse." };
-
-  const system = extractorSystem(
-    "Read a citizen's civic complaint letter / acknowledgement (BBMP/GBA, Bengaluru) and recognise its department, subject, type and the action requested.",
-  );
-  const prompt = `From the document text below, output STRICT JSON of EXACTLY this shape:
-{
+/** The exact JSON shape both the text and vision extractors ask the model for. */
+const INTAKE_JSON_SHAPE = `{
   "subject": "short subject/title of the complaint",
   "complaintType": one of ${JSON.stringify(COMPLAINT_TYPE_VALUES)},
   "department": "the department/office addressed (free text)",
@@ -92,17 +84,104 @@ export async function analyzeComplaintIntake(ocrText: string): Promise<{ ok: boo
   "recommendedEscalation": "if unresolved, the next forum (e.g. RTI, Lokayukta)",
   "confidence": "High | Medium | Low",
   "needsManualReview": false
+}`;
+
+async function getSharp() {
+  const s = await import("sharp");
+  return s.default || s;
 }
+
+/** Downscale a rendered page to a vision-friendly JPEG (keeps the request small). */
+async function downscaleForVision(buf: Buffer): Promise<{ buffer: Buffer; mimeType: string }> {
+  try {
+    const sharp = await getSharp();
+    const out = await sharp(buf)
+      .resize({ width: 1400, height: 1400, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 72 })
+      .toBuffer();
+    return { buffer: out, mimeType: "image/jpeg" };
+  } catch {
+    return { buffer: buf, mimeType: "image/jpeg" };
+  }
+}
+
+/** Coerce an AI extraction object into a clean, fully-typed ComplaintIntakeExtraction. */
+function finalizeExtraction(base: ComplaintIntakeExtraction, data: Partial<ComplaintIntakeExtraction>): ComplaintIntakeExtraction {
+  const ex = sanitize({ ...base, ...data });
+  if (!COMPLAINT_TYPE_VALUES.includes(ex.complaintType as (typeof COMPLAINT_TYPE_VALUES)[number])) ex.complaintType = "Other";
+  if (!ex.jobNumber) ex.jobNumber = base.jobNumber;
+  return ex;
+}
+
+export async function analyzeComplaintIntake(ocrText: string): Promise<{ ok: boolean; extraction: ComplaintIntakeExtraction; error?: string }> {
+  const base = fallback();
+  base.jobNumber = findJobCode(ocrText || "");
+  const text = (ocrText || "").trim();
+  if (!text) return { ok: false, extraction: base, error: "No text to analyse." };
+
+  const system = extractorSystem(
+    "Read a citizen's civic complaint letter / acknowledgement (BBMP/GBA, Bengaluru) and recognise its department, subject, type and the action requested.",
+  );
+  const prompt = `From the document text below, output STRICT JSON of EXACTLY this shape:
+${INTAKE_JSON_SHAPE}
 Use only what is visible; leave fields empty/[] when not present. Do not invent names or numbers.
 
 DOCUMENT:
 ${text.slice(0, 20_000)}`;
 
   const r = await extractJson<ComplaintIntakeExtraction>({ system, prompt, fallback: base, maxTokens: 1800 });
-  const ex = sanitize({ ...base, ...r.data });
-  if (!COMPLAINT_TYPE_VALUES.includes(ex.complaintType as (typeof COMPLAINT_TYPE_VALUES)[number])) ex.complaintType = "Other";
-  if (!ex.jobNumber) ex.jobNumber = base.jobNumber;
-  return { ok: r.ok, extraction: ex, error: r.ok ? undefined : r.error };
+  return { ok: r.ok, extraction: finalizeExtraction(base, r.data), error: r.ok ? undefined : r.error };
+}
+
+/**
+ * VISION-based per-letter extraction. Detection of letter boundaries is already
+ * vision-based, but scanned/handwritten/Kannada letters OCR poorly — so reading
+ * the fields from OCR text alone leaves them blank. This reads the fields from the
+ * letter's OWN page IMAGES (OCR passed only as a hint), so every detected letter
+ * gets its subject/department/type/reporter/etc. filled in automatically. Falls
+ * back to the text extractor when AI is off or no images are available, so it
+ * never regresses below today's behaviour.
+ */
+export async function analyzeComplaintIntakeFromImages(params: {
+  pageImages: { buffer: Buffer; mimeType: string }[];
+  ocrText: string;
+}): Promise<{ ok: boolean; extraction: ComplaintIntakeExtraction; error?: string }> {
+  const imgs = (params.pageImages || []).slice(0, 6); // a single letter is rarely more
+  if (!isAiConfigured() || imgs.length === 0) {
+    return analyzeComplaintIntake(params.ocrText || "");
+  }
+
+  const base = fallback();
+  base.jobNumber = findJobCode(params.ocrText || "");
+
+  const downscaled = await Promise.all(imgs.map((p) => downscaleForVision(p.buffer)));
+  const images = downscaled.map((d) => ({ mediaType: d.mimeType, dataBase64: d.buffer.toString("base64") }));
+
+  const system =
+    "You read ONE citizen's civic complaint letter / acknowledgement (BBMP / GBA, Bengaluru) from its page IMAGES — the images are authoritative; any OCR text is a NOISY hint (especially for Kannada/handwriting). Extract its fields using ONLY what is visible in THESE pages. Do not invent names or numbers; leave a field empty/[] when it is genuinely absent. Output STRICT JSON only — no markdown, no commentary.";
+  const hint = (params.ocrText || "").trim()
+    ? `OCR hint (noisy):\n"""\n${params.ocrText.slice(0, 8000)}\n"""`
+    : "(No reliable OCR — read the images.)";
+  const prompt = `${hint}
+
+Output STRICT JSON of EXACTLY this shape:
+${INTAKE_JSON_SHAPE}`;
+
+  const res = await generateVision({ system, prompt, images, temperature: 0, maxTokens: 1800 });
+  if (!res.ok || !res.text) {
+    // Vision failed → fall back to OCR-text extraction so we never regress.
+    return analyzeComplaintIntake(params.ocrText || "");
+  }
+
+  const cleaned = res.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  let data: Partial<ComplaintIntakeExtraction>;
+  try {
+    data = JSON.parse(cleaned) as Partial<ComplaintIntakeExtraction>;
+  } catch {
+    console.warn("[analyzeComplaintIntakeFromImages] JSON parse failed; falling back to OCR text");
+    return analyzeComplaintIntake(params.ocrText || "");
+  }
+  return { ok: true, extraction: finalizeExtraction(base, data) };
 }
 
 /**
