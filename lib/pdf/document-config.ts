@@ -45,7 +45,8 @@ export const GOV_DOC_CONFIG: GovDocConfig = {
     right: "25mm",
   },
   typography: {
-    fontFamily: '"Times New Roman", Times, serif',
+    fontFamily:
+      '"Times New Roman", "Liberation Serif", Times, "Noto Serif Kannada", "Noto Sans Kannada", "Tunga", "Nirmala UI", "Gubbi", serif',
     bodySize: "12pt",
     headingSize: "14pt",
     titleSize: "16pt",

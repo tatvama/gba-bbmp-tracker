@@ -77,7 +77,12 @@ html:has(.gov-doc-print-mode) main {
    ============================================================= */
 
 .gov-doc-container {
-  font-family: "Times New Roman", Times, serif;
+  /* Per-glyph fallback: Latin serif first (Times New Roman locally, Liberation
+     Serif in the Docker/Chromium that renders server-side PDFs), then Kannada
+     fonts so Kannada characters never fall back to tofu boxes in production. */
+  font-family: "Times New Roman", "Liberation Serif", Times,
+    "Noto Serif Kannada", "Noto Sans Kannada", "Tunga", "Nirmala UI", "Gubbi",
+    serif;
   font-size: 12pt;
   line-height: 1.5;
   color: black;

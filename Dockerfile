@@ -1,9 +1,24 @@
 FROM node:22-bookworm-slim
 
-# Install Chromium and its system dependencies (for puppeteer PDF generation)
+# Install Chromium and its system dependencies (for puppeteer PDF generation).
+# Fonts are REQUIRED: the slim base image ships almost no glyphs, so without these
+# headless Chromium renders Kannada (and any non-Latin script) as tofu boxes (□□□)
+# in every server-side PDF — counter-replies, escalations, RTI/appeal letters.
+#   fonts-liberation  → metric-compatible substitute for "Times New Roman"/serif
+#   fonts-noto-core   → Noto Sans/Serif Kannada (+ most other scripts)
+#   fonts-lohit-knda  → Lohit Kannada (authentic Kannada letterforms)
+#   fonts-gubbi       → Gubbi Kannada (extra fallback)
+# fc-cache rebuilds the fontconfig cache so Chromium sees the new fonts.
 RUN apt-get update && apt-get install -y \
     chromium \
+    fonts-liberation \
+    fonts-noto-core \
+    fonts-noto-ui-core \
+    fonts-lohit-knda \
+    fonts-gubbi \
+    fontconfig \
     --no-install-recommends \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
 # Tell puppeteer to skip its own Chrome download and use system Chromium instead
