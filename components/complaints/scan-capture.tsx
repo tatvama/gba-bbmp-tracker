@@ -40,11 +40,14 @@ export function ScanCapture({
   docTypes,
   defaultDocType,
   onDone,
+  onUploaded,
 }: {
   complaintId: string;
   docTypes: string[];
   defaultDocType?: string;
   onDone?: () => void;
+  /** Fires as soon as a set finishes uploading (before the user clicks "Done") with the AI's read on it, so a caller can react immediately — e.g. suggest which status to apply. */
+  onUploaded?: (info: { documentId: string; docType: string; suggestedStatus?: string; confidence?: string }) => void;
 }) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -59,7 +62,7 @@ export function ScanCapture({
   const [cameraOn, setCameraOn] = React.useState(false);
   const [scanMode, setScanMode] = React.useState(true); // process captures like a scan
   const [flash, setFlash] = React.useState(false);
-  const [uploaded, setUploaded] = React.useState<{ documentId: string; pageCount: number; docType: string; firstPageUrl: string | null; aiSummary?: string; ocrStatus?: string } | null>(null);
+  const [uploaded, setUploaded] = React.useState<{ documentId: string; pageCount: number; docType: string; firstPageUrl: string | null; aiSummary?: string; ocrStatus?: string; suggestedStatus?: string; confidence?: string } | null>(null);
   const [openingDoc, setOpeningDoc] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
@@ -185,7 +188,10 @@ export function ScanCapture({
         firstPageUrl,
         aiSummary: res.aiSummary,
         ocrStatus: res.ocrStatus,
+        suggestedStatus: res.suggestedStatus,
+        confidence: res.confidence,
       });
+      onUploaded?.({ documentId: res.documentId ?? "", docType, suggestedStatus: res.suggestedStatus, confidence: res.confidence });
       setPages([]);
       setTitle("");
       router.refresh();
@@ -245,6 +251,12 @@ export function ScanCapture({
                 <span className="font-semibold block mb-1 text-emerald-800 dark:text-emerald-200">Extracted AI Summary:</span>
                 <p className="leading-relaxed">{uploaded.aiSummary}</p>
               </div>
+            )}
+            {uploaded.suggestedStatus && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                <Sparkles className="h-3 w-3" /> AI suggests: {uploaded.suggestedStatus}
+                {uploaded.confidence ? ` (${uploaded.confidence} confidence)` : ""}
+              </p>
             )}
           </div>
         </div>

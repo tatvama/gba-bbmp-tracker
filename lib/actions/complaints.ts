@@ -659,7 +659,7 @@ function docTypeToEvent(docType: string): string {
 export async function uploadComplaintScanAction(
   complaintId: string,
   formData: FormData,
-): Promise<{ ok: boolean; documentId?: string; ocrStatus?: string; aiSummary?: string; error?: string }> {
+): Promise<{ ok: boolean; documentId?: string; ocrStatus?: string; aiSummary?: string; suggestedStatus?: string; confidence?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
   const { user, admin } = a;
@@ -723,18 +723,22 @@ export async function uploadComplaintScanAction(
   // OCR (PDF-capable) + AI summary. Never blocks the upload.
   let ocrStatus = "Processing";
   let aiSummary: string | undefined = undefined;
+  let suggestedStatus: string | undefined = undefined;
+  let confidence: string | undefined = undefined;
   try {
     const r = await processDocumentOcr(documentId, { buffer: merged.pdf, analyze: settings.aiAutoSummary });
     ocrStatus = r.status;
     if (r.status !== "Failed") {
       const { data: updatedDoc } = await admin
         .from("complaint_documents")
-        .select("ai_summary")
+        .select("ai_summary,ai_suggested_status,ai_confidence")
         .eq("id", documentId)
         .single();
       if (updatedDoc?.ai_summary) {
         aiSummary = updatedDoc.ai_summary;
       }
+      suggestedStatus = updatedDoc?.ai_suggested_status ?? undefined;
+      confidence = updatedDoc?.ai_confidence ?? undefined;
     }
   } catch (e) {
     console.error("[complaint-scan] OCR failed (upload preserved)", e);
@@ -743,7 +747,7 @@ export async function uploadComplaintScanAction(
 
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
-  return { ok: true, documentId, ocrStatus, aiSummary };
+  return { ok: true, documentId, ocrStatus, aiSummary, suggestedStatus, confidence };
 }
 
 // ── AI drafts ───────────────────────────────────────────────────────────────
