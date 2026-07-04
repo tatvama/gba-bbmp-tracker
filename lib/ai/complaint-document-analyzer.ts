@@ -3,6 +3,7 @@ import { generateText, isAiConfigured } from "@/lib/ai/provider";
 import type { ComplaintExtraction } from "@/lib/types";
 import {
   COMPLAINT_DRAFT_KINDS,
+  COMPLAINT_STATUSES,
   type ComplaintDraftKind,
   type DraftLanguage,
   type LegalTone,
@@ -26,7 +27,8 @@ Rules:
 4. If dates are uncertain, leave them empty and add a note in summary asking the user to verify.
 5. Do not make unsupported allegations.
 6. Set confidence to "Low" and needsManualReview to true whenever the OCR text is short, garbled, or ambiguous.
-7. Output STRICT JSON only — no prose, no markdown fences.`;
+7. For suggestedComplaintStatus, when the document is the department/engineer's response, bifurcate carefully between "Reply Received" and "Action Taken Report Received": use "Action Taken Report Received" ONLY if the document itself states specific corrective work was actually CARRIED OUT (e.g. repair completed, site visited, contractor deployed, drain/garbage cleared) — not merely promised, scheduled, or "under process". Use "Reply Received" for any other written response, explanation or update, even a reassuring one. If the document reads as both, or you cannot tell which applies, set confidence to "Low" and needsManualReview to true so a human decides.
+8. Output STRICT JSON only — no prose, no markdown fences.`;
 
 function buildAnalysisPrompt(input: {
   ocrText: string;
@@ -64,7 +66,9 @@ Return JSON of EXACTLY this shape (use "" or [] when unknown):
   "recommendedEscalation": "",
   "confidence": "High | Medium | Low",
   "needsManualReview": true
-}`;
+}
+
+"suggestedComplaintStatus" must be EXACTLY one of these strings, or "" if none fit: ${COMPLAINT_STATUSES.join(", ")}`;
 }
 
 export interface AnalyzeResult {
