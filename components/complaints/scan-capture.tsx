@@ -40,11 +40,14 @@ export function ScanCapture({
   docTypes,
   defaultDocType,
   onDone,
+  onUploaded,
 }: {
   complaintId: string;
   docTypes: string[];
   defaultDocType?: string;
   onDone?: () => void;
+  /** Fires as soon as a set finishes uploading (before the user clicks "Done") with the AI's read on it, so a caller can react immediately — e.g. suggest which status to apply. */
+  onUploaded?: (info: { documentId: string; docType: string; suggestedStatus?: string; confidence?: string }) => void;
 }) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -59,7 +62,7 @@ export function ScanCapture({
   const [cameraOn, setCameraOn] = React.useState(false);
   const [scanMode, setScanMode] = React.useState(true); // process captures like a scan
   const [flash, setFlash] = React.useState(false);
-  const [uploaded, setUploaded] = React.useState<{ documentId: string; pageCount: number; docType: string; firstPageUrl: string | null; aiSummary?: string; ocrStatus?: string } | null>(null);
+  const [uploaded, setUploaded] = React.useState<{ documentId: string; pageCount: number; docType: string; firstPageUrl: string | null; aiSummary?: string; ocrStatus?: string; suggestedStatus?: string; confidence?: string } | null>(null);
   const [openingDoc, setOpeningDoc] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
@@ -185,7 +188,10 @@ export function ScanCapture({
         firstPageUrl,
         aiSummary: res.aiSummary,
         ocrStatus: res.ocrStatus,
+        suggestedStatus: res.suggestedStatus,
+        confidence: res.confidence,
       });
+      onUploaded?.({ documentId: res.documentId ?? "", docType, suggestedStatus: res.suggestedStatus, confidence: res.confidence });
       setPages([]);
       setTitle("");
       router.refresh();
@@ -246,6 +252,12 @@ export function ScanCapture({
                 <p className="leading-relaxed">{uploaded.aiSummary}</p>
               </div>
             )}
+            {uploaded.suggestedStatus && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                <Sparkles className="h-3 w-3" /> AI suggests: {uploaded.suggestedStatus}
+                {uploaded.confidence ? ` (${uploaded.confidence} confidence)` : ""}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -274,13 +286,7 @@ export function ScanCapture({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Document type</Label>
-          <select className={selectCls} value={docType} onChange={(e) => setDocType(e.target.value)}>
-            {docTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Title (optional)</Label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ack receipt 29-Jun" className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 placeholder:font-normal" />

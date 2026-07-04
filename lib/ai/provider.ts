@@ -88,6 +88,56 @@ export async function generateText(params: GenerateParams): Promise<GenerateResu
   }
 }
 
+/**
+ * Streaming variant of generateText — calls onDelta with the accumulated text
+ * after every chunk so a caller can surface live progress (e.g. a background
+ * job persisting partial text for the client to poll). Falls back to a single
+ * non-streaming call (one final onDelta) for providers without a stream API.
+ */
+export async function generateTextStream(
+  params: GenerateParams,
+  onDelta: (accumulatedText: string) => void,
+): Promise<GenerateResult> {
+  if (!isAiConfigured()) return { ok: false, error: AI_NOT_CONFIGURED };
+
+  const provider = aiProvider();
+  const model = aiModel();
+  const temperature = params.temperature ?? Number(process.env.AI_TEMPERATURE ?? "0.4");
+  const maxTokens = params.maxTokens ?? 2500;
+
+  if (provider !== "anthropic") {
+    const r = await generateText(params);
+    if (r.ok && r.text) onDelta(r.text);
+    return r;
+  }
+
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const stream = client.messages.stream({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      system: params.system,
+      messages: [{ role: "user", content: params.prompt }],
+    });
+    let acc = "";
+    stream.on("text", (delta) => {
+      acc += delta;
+      onDelta(acc);
+    });
+    const msg = await stream.finalMessage();
+    const text = (msg.content as { type: string; text?: string }[])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text ?? "")
+      .join("\n")
+      .trim();
+    return { ok: true, text, provider, model, truncated: msg.stop_reason === "max_tokens" };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "AI request failed" };
+  }
+}
+
 export interface VisionImage {
   /** image/jpeg | image/png | image/webp | image/gif */
   mediaType: string;

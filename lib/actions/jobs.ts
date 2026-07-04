@@ -4,12 +4,21 @@ import { after } from "next/server";
 import { requireRole, getSessionUser, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
-import { runComplaintDraft } from "@/lib/ai/complaint-draft";
+import { runComplaintDraft, type DraftProgress } from "@/lib/ai/complaint-draft";
 import { runAdvisorAnalysis } from "@/lib/ai/advisor/recommendation-engine";
 import { notifyUser } from "@/lib/notifications";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 
 const nowISO = () => new Date().toISOString();
+
+/** Rough progress % per real pipeline stage — "drafting" then ramps toward 90
+ *  as streamed text accumulates (see onDraftProgress below). Purely cosmetic. */
+const STAGE_PROGRESS: Record<DraftProgress["stage"], number> = {
+  loading_case: 8,
+  building_history: 20,
+  drafting: 35,
+  safety_check: 95,
+};
 
 export interface BackgroundJob {
   id: string;
@@ -75,8 +84,35 @@ export async function startAiDraftJob(input: {
 
   after(async () => {
     const a = createAdminClient();
+
+    // Live status: written to the SAME job row the client already polls, under
+    // result.partial so it's unambiguous vs. the final { text, lintWarning }
+    // shape. Stage changes always write immediately; same-stage text deltas
+    // (streamed tokens) are throttled so we don't hammer the DB per-token.
+    // Writes are chained (not fire-and-forget) so a slow in-flight write can
+    // never land AFTER the final done/failed update and resurrect "partial".
+    let writeChain: Promise<unknown> = Promise.resolve();
+    let lastStage: DraftProgress["stage"] | null = null;
+    let lastWriteAt = 0;
+    const onDraftProgress = (p: DraftProgress) => {
+      const now = Date.now();
+      const stageChanged = p.stage !== lastStage;
+      if (!stageChanged && now - lastWriteAt < 500) return;
+      lastStage = p.stage;
+      lastWriteAt = now;
+      const progress = p.stage === "drafting" && p.partialText
+        ? Math.min(90, 35 + Math.floor(p.partialText.length / 25))
+        : STAGE_PROGRESS[p.stage];
+      writeChain = writeChain.then(() =>
+        a.from("background_jobs")
+          .update({ progress, result: { partial: true, stage: p.stage, stageLabel: p.label, text: p.partialText ?? null } })
+          .eq("id", jobId),
+      ).catch(() => {});
+    };
+
     try {
-      const r = await runComplaintDraft(a, input);
+      const r = await runComplaintDraft(a, input, onDraftProgress);
+      await writeChain;
       if (!r.ok || !r.text) {
         await a.from("background_jobs").update({ status: "failed", error: r.error ?? "Generation failed", finished_at: nowISO() }).eq("id", jobId);
         await notifyUser(a, userId, { type: "job_failed", title: `Draft failed — ${title}`, body: r.error ?? undefined, link, entityType: "complaint", entityId: input.complaintId });
@@ -92,6 +128,7 @@ export async function startAiDraftJob(input: {
       // triggerAdvisorAnalysis, whose own after() wouldn't fire here).
       await runAdvisorAnalysis(a, input.complaintId).catch(() => {});
     } catch (e) {
+      await writeChain;
       const msg = e instanceof Error ? e.message : "Generation failed";
       await a.from("background_jobs").update({ status: "failed", error: msg, finished_at: nowISO() }).eq("id", jobId).then(() => {}, () => {});
       await notifyUser(a, userId, { type: "job_failed", title: `Draft failed — ${title}`, body: msg, link, entityType: "complaint", entityId: input.complaintId });

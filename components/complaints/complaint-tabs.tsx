@@ -16,6 +16,8 @@ import { JobEvidenceList } from "@/components/complaints/job-evidence-list";
 import type { JobEvidenceDoc } from "@/lib/queries";
 import { ReplyForm, ActionForm, CommunicationForm, EscalationForm } from "@/components/complaints/complaint-forms";
 import { ComplaintAiDrafts } from "@/components/complaints/complaint-ai-drafts";
+import { HistoryTimeline } from "@/components/complaints/history-timeline";
+import { buildComplaintHistory } from "@/lib/complaint-history";
 import { completeComplaintReminder } from "@/lib/actions/complaints";
 import { formatDate, formatDateTime, orDash } from "@/lib/format";
 import { Folder, MapPin, Activity, Clock, FileText } from "lucide-react";
@@ -48,6 +50,7 @@ export function ComplaintTabs({
   const initialTab = searchParams.get("tab") ?? "overview"; // deep-linkable (e.g. ?tab=documents)
   const docOpts = documents.map((d) => ({ id: d.id, title: d.title }));
   const c = complaint;
+  const historyEvents = React.useMemo(() => buildComplaintHistory(timeline, documents), [timeline, documents]);
 
   async function completeReminder(id: string) {
     await completeComplaintReminder(id, c.id);
@@ -228,25 +231,7 @@ export function ComplaintTabs({
       </TabsContent>
 
       <TabsContent value="timeline">
-        {timeline.length === 0 ? <EmptyState title="No timeline yet" /> : (
-          <ol className="relative space-y-4 pl-6">
-            <div className="absolute left-[7px] top-1.5 bottom-1.5 w-0.5 bg-slate-100 dark:bg-slate-800 timeline-connector" />
-            {timeline.map((t, idx) => {
-              const staggerClass = `stagger-${(idx % 4) + 1}`;
-              return (
-                <li key={t.id} className={cn("relative timeline-event", staggerClass)}>
-                  <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full border border-background bg-primary timeline-node" />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{t.event_type}</Badge>
-                    <span className="font-medium">{t.title}</span>
-                    <span className="text-xs text-muted-foreground">{formatDateTime(t.event_date)}</span>
-                  </div>
-                  {t.summary && <p className="mt-0.5 text-sm text-muted-foreground">{t.summary}</p>}
-                </li>
-              );
-            })}
-          </ol>
-        )}
+        <HistoryTimeline events={historyEvents} />
       </TabsContent>
 
       <TabsContent value="replies">

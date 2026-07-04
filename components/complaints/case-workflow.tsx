@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight,
-  FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil,
+  FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -138,6 +138,10 @@ export function CaseWorkflow({
   // Bumped when a reply/report is uploaded so the counter-reply panel's
   // "recent reply files" list re-fetches (the upload happens in a sibling).
   const [replyFilesKey, setReplyFilesKey] = React.useState(0);
+  // AI's read on the most recently uploaded reply/report — drives which of
+  // "Reply Received" / "Action Taken Report Received" the confirm button
+  // applies. null until an upload comes back with a confident classification.
+  const [replySuggestion, setReplySuggestion] = React.useState<{ status: string; confidence?: string } | null>(null);
 
   // Auto-advance the active tab only when the case's status actually changes —
   // not on mount (which would clobber a ?step= deep link).
@@ -151,6 +155,7 @@ export function CaseWorkflow({
     setBusy(true);
     await setComplaintStatus(complaintId, next);
     setBusy(false);
+    setReplySuggestion(null);
     router.refresh();
   }
 
@@ -182,13 +187,10 @@ export function CaseWorkflow({
                     onClick={() => setActive(s.key)}
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 relative focus:outline-none",
-                      done
-                        ? cn(
-                            "border-emerald-500 bg-emerald-500 text-white",
-                            isActive && "scale-110 ring-4 ring-emerald-500/20 shadow-md"
-                          )
-                        : isActive
+                      isActive
                         ? "border-primary bg-primary text-primary-foreground shadow-md scale-110 ring-4 ring-primary/20"
+                        : done
+                        ? "border-emerald-500 bg-emerald-500 text-white"
                         : locked
                         ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-600"
                         : "border-slate-300 bg-white text-slate-600 hover:border-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-350 cursor-pointer"
@@ -247,14 +249,48 @@ export function CaseWorkflow({
               docTypes={["Department reply", "Engineer reply", "Action Taken Report", "Site inspection note"]}
               defaultDocType="Department reply"
               onDone={() => setReplyFilesKey((k) => k + 1)}
+              onUploaded={(info) => {
+                setReplyFilesKey((k) => k + 1);
+                const status = info.suggestedStatus;
+                const isConfident = info.confidence === "High" || info.confidence === "Medium";
+                if (isConfident && (status === "Reply Received" || status === "Action Taken Report Received")) {
+                  setReplySuggestion({ status, confidence: info.confidence });
+                } else {
+                  setReplySuggestion(null);
+                }
+              }}
             />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Reply Received")}>
-                <MessageSquareReply className="h-4 w-4" /> Mark reply received
-              </Button>
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Action Taken Report Received")}>
-                <FileCheck2 className="h-4 w-4" /> Mark ATR received
-              </Button>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {replySuggestion ? (
+                <>
+                  <Button size="sm" disabled={busy} onClick={() => mark(replySuggestion.status)}>
+                    {replySuggestion.status === "Action Taken Report Received"
+                      ? <FileCheck2 className="h-4 w-4" />
+                      : <MessageSquareReply className="h-4 w-4" />}
+                    Confirm: {replySuggestion.status === "Action Taken Report Received" ? "mark ATR received" : "mark reply received"}
+                  </Button>
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Sparkles className="h-3 w-3" /> AI read this as {replySuggestion.status === "Action Taken Report Received" ? "an Action Taken Report" : "a reply"}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => mark(replySuggestion.status === "Action Taken Report Received" ? "Reply Received" : "Action Taken Report Received")}
+                  >
+                    Not quite — mark as {replySuggestion.status === "Action Taken Report Received" ? "reply" : "ATR"} instead
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Reply Received")}>
+                    <MessageSquareReply className="h-4 w-4" /> Mark reply received
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Action Taken Report Received")}>
+                    <FileCheck2 className="h-4 w-4" /> Mark ATR received
+                  </Button>
+                </>
+              )}
             </div>
 
             <div className="mt-4 border-t pt-4">
