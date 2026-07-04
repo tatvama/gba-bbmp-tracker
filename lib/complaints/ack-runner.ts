@@ -8,9 +8,10 @@ import "server-only";
  * Pipeline, windowed so memory stays bounded on a 300+ page scan:
  *   for each window of pages → carve a sub-PDF → render → per page: thumbnail→R2,
  *   OCR → detect acknowledgment boundaries in the window → offset to global pages.
- * Then for each detected section: extract identifiers (analyzeComplaintIntake),
- * match against the complaint pool (scoreAckMatch), and persist an ack_import_items
- * row. Finally flip the batch to `review`.
+ * Then for each detected section: extract its fields from the section's OWN page
+ * IMAGES via vision (analyzeComplaintIntakeFromImages — reliable on poor scans
+ * where OCR text is too weak to fill fields), match against the complaint pool
+ * (scoreAckMatch), and persist an ack_import_items row. Finally flip to `review`.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { downloadFromR2, uploadToR2 } from "@/lib/storage/r2-upload";
@@ -18,7 +19,7 @@ import { extractPdfPages } from "@/lib/pdf/merge";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { detectAckSections, MAX_DETECT_PAGES } from "@/lib/ai/ack-section-detector";
-import { analyzeComplaintIntake } from "@/lib/ai/complaint-intake-analyzer";
+import { analyzeComplaintIntakeFromImages } from "@/lib/ai/complaint-intake-analyzer";
 import { scoreAckMatch, loadComplaintPool, type PoolComplaint } from "@/lib/complaints/ack-matcher";
 import { ackThumbKey } from "@/lib/complaints/ack-reconcile";
 import { decodeQrFromImage } from "@/lib/pdf/qr-decode";
@@ -52,6 +53,22 @@ async function thumbnail(buf: Buffer): Promise<Buffer> {
       .toBuffer();
   } catch {
     return buf;
+  }
+}
+
+/** Vision-friendly downscale (bigger than the thumbnail — must stay legible for
+ *  reading fields). Computed once per page and reused for boundary detection AND
+ *  per-section field extraction. */
+async function downscaleForVision(buf: Buffer): Promise<{ buffer: Buffer; mimeType: string }> {
+  try {
+    const sharp = await getSharp();
+    const out = await sharp(buf)
+      .resize({ width: 1400, height: 1400, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 72 })
+      .toBuffer();
+    return { buffer: out, mimeType: "image/jpeg" };
+  } catch {
+    return { buffer: buf, mimeType: "image/jpeg" };
   }
 }
 
@@ -94,6 +111,9 @@ export async function processAckBatch(batchId: string): Promise<void> {
 
     const perPageOcr: Record<number, string> = {};
     const thumbKeyByPage: Record<number, string> = {};
+    // Downscaled page image kept per page so each detected section's fields can be
+    // read from its OWN images afterwards (bounded: ≤600 small JPEGs).
+    const visionByPage: Record<number, { buffer: Buffer; mimeType: string }> = {};
     // Reference decoded from a QR we stamped on the outgoing letter (Phase 2) — a
     // certain match when present.
     const qrRefByPage: Record<number, string> = {};
@@ -125,13 +145,16 @@ export async function processAckBatch(batchId: string): Promise<void> {
           console.warn("[ack-runner] OCR failed", globalPage, e);
           perPageOcr[globalPage] = "";
         }
-        // Reference QR (if this acknowledgment is a photocopy of a letter we stamped).
+        // Reference QR (if this acknowledgment is a photocopy of a letter we stamped) — full-res for a reliable decode.
         try {
           const qr = await decodeQrFromImage(page.buffer);
           const ref = parseAckReference(qr);
           if (ref) qrRefByPage[globalPage] = ref;
         } catch { /* best-effort */ }
-        visionImages.push({ buffer: page.buffer, mimeType: page.mimeType });
+        // Downscale once; reuse for the window's boundary detection and later extraction.
+        const vis = await downscaleForVision(page.buffer);
+        visionByPage[globalPage] = vis;
+        visionImages.push(vis);
         processed++;
       }
       await setProgress(admin, batchId, { processed_pages: processed, message: `Read ${processed}/${capped} pages…` });
@@ -156,7 +179,13 @@ export async function processAckBatch(batchId: string): Promise<void> {
     let order = 0;
     for (const s of sections) {
       const ocrText = sliceOcr(perPageOcr, s.start, s.end);
-      const { extraction } = await analyzeComplaintIntake(ocrText);
+      // Read this section's fields from ITS OWN page images (vision), not just OCR
+      // text — reliable on poor scans. Falls back to OCR text internally if AI is off.
+      const sectionImages: { buffer: Buffer; mimeType: string }[] = [];
+      for (let p = s.start; p <= s.end && sectionImages.length < 6; p++) {
+        if (visionByPage[p]) sectionImages.push(visionByPage[p]!);
+      }
+      const { extraction } = await analyzeComplaintIntakeFromImages({ pageImages: sectionImages, ocrText });
       // Seed from the detector when the per-section extractor came up blank.
       if (!extraction.subject && s.seedSubject) extraction.subject = s.seedSubject;
       if (!extraction.department && s.seedDept) extraction.department = s.seedDept;
