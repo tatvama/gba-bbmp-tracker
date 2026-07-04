@@ -19,7 +19,7 @@ const COMMITMENT_STATUS_KN: Record<string, string> = {
   unmet: "ಈಡೇರಿಸಿಲ್ಲ",
 };
 
-export function AITimelineInsight({ recommendation }: { recommendation: RecommendationRow | null }) {
+export function AITimelineInsight({ recommendation, className = "" }: { recommendation: RecommendationRow | null; className?: string }) {
   if (!recommendation) return null;
   const { timeline_summary, detected_risks, missing_information, contradictions, commitments } = recommendation;
 
@@ -33,7 +33,7 @@ export function AITimelineInsight({ recommendation }: { recommendation: Recommen
     return null;
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-150 bg-slate-50/15 p-5 text-xs dark:border-slate-850 shadow-2xs">
+    <div className={`space-y-4 rounded-xl border border-slate-150 bg-slate-50/15 p-5 text-xs dark:border-slate-850 shadow-2xs ${className}`}>
       {timeline_summary && (
         <div className="space-y-1">
           <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-450">ಕಾಲಾನುಕ್ರಮ ಸಾರಾಂಶ (Timeline Summary)</p>

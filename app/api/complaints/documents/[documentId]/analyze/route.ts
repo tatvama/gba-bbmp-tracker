@@ -13,7 +13,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ do
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
   try {
-    const r = await analyzeDocumentById(documentId);
+    // Explicit "Re-run AI" → force regeneration and OCR-if-needed.
+    const r = await analyzeDocumentById(documentId, { force: true, ensureOcr: true });
     return NextResponse.json(r);
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Analysis failed" }, { status: 500 });

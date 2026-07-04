@@ -15,6 +15,7 @@ export interface ViewerTarget {
   fallbackText?: string | null;
   /** Which table the id belongs to: complaint_documents (default) or job_documents. */
   source?: "complaint" | "job";
+  customUrl?: string | null;
 }
 
 function kindOf(t: ViewerTarget): "pdf" | "image" | "other" {
@@ -39,9 +40,19 @@ export function DocumentViewer({ target, onClose }: { target: ViewerTarget | nul
   React.useEffect(() => {
     let cancelled = false;
     if (!target) { setUrl(null); setError(null); return; }
-    // Text-only target (letter draft with no stored file) — nothing to fetch;
-    // the fallbackText renders directly.
-    if (!target.documentId) { setUrl(null); setError(null); setLoading(false); return; }
+    // Custom URL provided directly (e.g. dynamic client-side PDF blobs)
+    if (!target.documentId) {
+      if (target.customUrl) {
+        setUrl(target.customUrl);
+        setError(null);
+        setLoading(false);
+      } else {
+        setUrl(null);
+        setError(null);
+        setLoading(false);
+      }
+      return;
+    }
     setLoading(true);
     setError(null);
     setUrl(null);

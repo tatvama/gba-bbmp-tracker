@@ -1030,6 +1030,7 @@ export interface PrintQueueLetter {
   riskBand: string | null;
   pdfDocId: string | null;
   docxDocId: string | null;
+  content: string | null;
 }
 
 /**
@@ -1043,9 +1044,9 @@ export async function listPrintQueueLetters(): Promise<PrintQueueLetter[]> {
   const { data, error } = await supabase
     .from("letter_drafts")
     .select(
-      "id, complaint_id, job_number, variant, language, file_name, print_status, printed_at, created_at, band, printed_by_profile:profiles!printed_by(name), complaint:complaints!complaint_id(id, internal_case_number, title, status, complaint_mode, date_submitted)",
+      "id, complaint_id, job_number, variant, language, file_name, print_status, printed_at, created_at, band, content, printed_by_profile:profiles!printed_by(name), complaint:complaints!complaint_id(id, internal_case_number, title, status, complaint_mode, date_submitted)",
     )
-    .in("print_status", ["pending", "printed"])
+    .eq("print_status", "pending")
     .order("created_at", { ascending: true })
     .limit(200);
   logErr("listPrintQueueLetters", error);
@@ -1088,12 +1089,9 @@ export async function listPrintQueueLetters(): Promise<PrintQueueLetter[]> {
       riskBand: r.band ?? null,
       pdfDocId: r.complaint_id ? (docsByComplaint.get(r.complaint_id)?.pdfDocId ?? null) : null,
       docxDocId: r.complaint_id ? (docsByComplaint.get(r.complaint_id)?.docxDocId ?? null) : null,
+      content: r.content ?? null,
     }))
-    // A PRINTED letter drops out of the queue once its complaint has actually
-    // been submitted (fileComplaint moves status off 'Draft') — the cycle has
-    // moved on. A never-printed letter always stays visible regardless of
-    // complaint status (it still needs printing before anything else).
-    .filter((l) => l.printStatus === "pending" || l.complaintStatus === "Draft" || !l.complaintId);
+    .filter((l) => l.printStatus === "pending");
 }
 
 /** Count of letters still waiting to print (dashboard banner) — excludes

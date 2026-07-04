@@ -99,8 +99,36 @@ DOCUMENT:
 ${text.slice(0, 20_000)}`;
 
   const r = await extractJson<ComplaintIntakeExtraction>({ system, prompt, fallback: base, maxTokens: 1800 });
-  const ex = { ...base, ...r.data };
+  const ex = sanitize({ ...base, ...r.data });
   if (!COMPLAINT_TYPE_VALUES.includes(ex.complaintType as (typeof COMPLAINT_TYPE_VALUES)[number])) ex.complaintType = "Other";
   if (!ex.jobNumber) ex.jobNumber = base.jobNumber;
   return { ok: r.ok, extraction: ex, error: r.ok ? undefined : r.error };
+}
+
+/**
+ * The extraction prompt (via extractorSystem's shared rule) explicitly permits the
+ * model to answer a field with JSON null when "not clearly present". Spread directly
+ * into a typed object that feeds controlled <Input value={...}> fields, a null here
+ * becomes `value={null}` and React warns/treats the input as uncontrolled. Coerce
+ * every string/array field back to the type's own empty value.
+ */
+function sanitize(ex: ComplaintIntakeExtraction): ComplaintIntakeExtraction {
+  return {
+    ...ex,
+    subject: ex.subject ?? "",
+    complaintType: ex.complaintType ?? "",
+    department: ex.department ?? "",
+    areaOrWard: ex.areaOrWard ?? "",
+    officerNames: ex.officerNames ?? [],
+    reporterName: ex.reporterName ?? "",
+    requestedAction: ex.requestedAction ?? "",
+    summary: ex.summary ?? "",
+    documentType: ex.documentType ?? "",
+    referenceNumber: ex.referenceNumber ?? "",
+    jobNumber: ex.jobNumber ?? "",
+    importantDates: ex.importantDates ?? [],
+    suggestedStatus: ex.suggestedStatus ?? "",
+    suggestedNextActions: ex.suggestedNextActions ?? [],
+    recommendedEscalation: ex.recommendedEscalation ?? "",
+  };
 }

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight,
-  FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil, Sparkles,
+  FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil, Sparkles, FileSearch, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { DocumentViewer, type ViewerTarget } from "@/components/complaints/docum
 import { LetterPreview } from "@/components/complaints/letter-preview";
 import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
+import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import { openDraftPdf } from "@/lib/print-letter";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -24,15 +25,19 @@ import {
   fileComplaint,
   generateComplaintDraft,
   saveComplaintAiDraft,
+  getLatestComplaintAiDraft,
   addComplaintEscalation,
   fileCounterReplyAction,
   fileEscalationAction,
   listComplaintReplyFilesAction,
+  generateDocumentSummaryAction,
+  getDocumentViewUrl,
   type ReplyFile,
 } from "@/lib/actions/complaints";
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
+import type { ComplaintDocument } from "@/lib/types";
 import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage } from "@/lib/constants";
 
 export interface WorkflowLetter {
@@ -115,6 +120,7 @@ export function CaseWorkflow({
   caseNumber,
   aiConfigured,
   letter,
+  documents = [],
 }: {
   complaintId: string;
   status: string;
@@ -122,6 +128,7 @@ export function CaseWorkflow({
   caseNumber: string | null;
   aiConfigured: boolean;
   letter?: WorkflowLetter | null;
+  documents?: ComplaintDocument[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -143,6 +150,28 @@ export function CaseWorkflow({
   // applies. null until an upload comes back with a confident classification.
   const [replySuggestion, setReplySuggestion] = React.useState<{ status: string; confidence?: string } | null>(null);
 
+  const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
+  const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
+  const [busyId, setBusyId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!summaryDoc) return;
+    const fresh = documents.find((d) => d.id === summaryDoc.id);
+    if (fresh && fresh !== summaryDoc) setSummaryDoc(fresh);
+  }, [documents, summaryDoc]);
+
+  async function generateSummary(id: string, force: boolean) {
+    setBusyId(id);
+    await generateDocumentSummaryAction(id, complaintId, { force });
+    setBusyId(null);
+    router.refresh();
+  }
+
+  async function downloadDoc(d: ComplaintDocument) {
+    const r = await getDocumentViewUrl(d.id, "original");
+    if (r.url) window.open(r.url, "_blank");
+  }
+
   // Auto-advance the active tab only when the case's status actually changes —
   // not on mount (which would clobber a ?step= deep link).
   const firstRun = React.useRef(true);
@@ -159,17 +188,28 @@ export function CaseWorkflow({
     router.refresh();
   }
 
+  const ACK_DOC_TYPES = ["Complaint acknowledgement", "Postal receipt", "Email printout", "Portal screenshot"];
+  const ackDocs = documents.filter((d) => ACK_DOC_TYPES.includes(d.document_type || ""));
+
   return (
     <Card className="no-print border border-slate-150 dark:border-slate-850 shadow-xs rounded-xl overflow-hidden mb-6">
       <CardContent className="p-6">
         {/* Progress Tracker (Timeline Style) */}
         <div className="mb-6 px-4 py-6 select-none bg-slate-50/45 dark:bg-slate-950/20 rounded-xl border border-slate-150 dark:border-slate-850">
-          <div className="relative flex flex-col md:flex-row items-start justify-between gap-6 md:gap-0">
+          <div className="relative flex flex-col md:flex-row items-stretch md:items-start justify-between gap-6 md:gap-0">
             {/* Horizontal connection line for desktop */}
             <div className="absolute top-[18px] left-[10%] right-[10%] hidden md:block h-0.5 bg-slate-200 dark:bg-slate-800 z-0">
               <div 
                 className="h-full bg-primary transition-all duration-500" 
                 style={{ width: `${Math.min(100, (reached / (STEPS.length - 1)) * 100)}%` }}
+              />
+            </div>
+
+            {/* Vertical connection line for mobile */}
+            <div className="absolute left-[18px] top-[18px] bottom-[18px] block md:hidden w-0.5 bg-slate-200 dark:bg-slate-800 z-0">
+              <div 
+                className="w-full bg-primary transition-all duration-500" 
+                style={{ height: `${Math.min(100, (reached / (STEPS.length - 1)) * 100)}%` }}
               />
             </div>
             
@@ -180,13 +220,13 @@ export function CaseWorkflow({
               const locked = s.key === "escalate" || s.key === "close" ? reached < 1 : i > reached;
 
               return (
-                <div key={s.key} className="relative z-10 flex flex-col items-center flex-1 text-center group">
+                <div key={s.key} className="relative z-10 flex flex-row md:flex-col items-center flex-1 w-full md:w-auto gap-4 md:gap-0 group">
                   <button
                     type="button"
                     disabled={locked}
                     onClick={() => setActive(s.key)}
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 relative focus:outline-none",
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 relative focus:outline-none",
                       isActive
                         ? "border-primary bg-primary text-primary-foreground shadow-md scale-110 ring-4 ring-primary/20"
                         : done
@@ -199,7 +239,7 @@ export function CaseWorkflow({
                   >
                     {done ? <Check className="h-4.5 w-4.5 stroke-[3.5]" /> : <Icon className="h-4 w-4" />}
                   </button>
-                  <div className="mt-4 space-y-0.5">
+                  <div className="md:mt-4 space-y-0.5 text-left md:text-center">
                     <p className={cn(
                       "text-xs font-black tracking-wide uppercase",
                       isActive ? "text-primary" : done ? "text-emerald-600" : "text-slate-500"
@@ -224,6 +264,11 @@ export function CaseWorkflow({
             letter={letter ?? null}
             filed={reached >= 1}
             onFiled={() => router.refresh()}
+            documents={documents}
+            setViewTarget={setViewTarget}
+            setSummaryDoc={setSummaryDoc}
+            generateSummary={generateSummary}
+            busyId={busyId}
           />
         )}
 
@@ -234,6 +279,62 @@ export function CaseWorkflow({
               docTypes={["Complaint acknowledgement", "Postal receipt", "Email printout", "Portal screenshot"]}
               defaultDocType="Complaint acknowledgement"
             />
+            {ackDocs.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 select-none">Uploaded Acknowledgements</p>
+                <div className="space-y-3">
+                  {ackDocs.map((doc) => {
+                    const isBusy = busyId === doc.id;
+                    return (
+                      <div key={doc.id} className="rounded-xl border bg-muted/20 p-4 border-slate-200 dark:border-slate-800">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-semibold text-foreground">{doc.title || doc.original_file_name || "Acknowledgement Document"}</span>
+                            <Badge variant="outline" className="text-[10px] bg-slate-50 dark:bg-slate-900 font-bold">{doc.document_type}</Badge>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Badge className="text-[10px] font-bold">OCR: {doc.ocr_status}</Badge>
+                            <Badge className="text-[10px] font-bold">{doc.verification_status}</Badge>
+                          </div>
+                        </div>
+                        {doc.ai_summary && (
+                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-semibold mb-3">{doc.ai_summary}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1 cursor-pointer" onClick={() => setViewTarget({ documentId: doc.id, title: doc.title || doc.original_file_name, mimeType: doc.mime_type, fileName: doc.original_file_name, fallbackText: doc.ocr_clean_text || doc.ocr_raw_text })}>
+                            <Eye className="h-3.5 w-3.5" /> View document
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1 cursor-pointer" onClick={() => downloadDoc(doc)}>
+                            <Download className="h-3.5 w-3.5" /> Download
+                          </Button>
+                          {doc.ai_summary_status === "ready" && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1 cursor-pointer" onClick={() => setSummaryDoc(doc)}>
+                              <FileSearch className="h-3.5 w-3.5" /> View Summary
+                            </Button>
+                          )}
+                          {doc.ai_summary_status === "generating" && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1" disabled>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating Summary…
+                            </Button>
+                          )}
+                          {doc.ai_summary_status === "failed" && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1 cursor-pointer" onClick={() => generateSummary(doc.id, true)} disabled={isBusy}>
+                              {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Retry Summary
+                            </Button>
+                          )}
+                          {doc.ai_summary_status === "none" && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1 cursor-pointer" onClick={() => generateSummary(doc.id, false)} disabled={isBusy}>
+                              {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Generate Summary
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="mt-3">
               <Button size="sm" variant="outline" disabled={busy || reached > 1 || status.toLowerCase() === "acknowledged"} onClick={() => mark("Acknowledged")}>
                 <FileCheck2 className="h-4 w-4" /> Mark acknowledged
@@ -307,6 +408,8 @@ export function CaseWorkflow({
           <ClosePanel complaintId={complaintId} status={status} onChanged={() => router.refresh()} />
         )}
       </CardContent>
+      <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
+      <DocumentSummaryModal doc={summaryDoc} onClose={() => setSummaryDoc(null)} />
     </Card>
   );
 }
@@ -334,14 +437,23 @@ function SubmitPanel({
   letter,
   filed,
   onFiled,
+  documents,
+  setViewTarget,
+  setSummaryDoc,
+  generateSummary,
+  busyId,
 }: {
   complaintId: string;
   jobNumber: string | null;
   letter: WorkflowLetter | null;
   filed: boolean;
   onFiled: () => void;
+  documents: ComplaintDocument[];
+  setViewTarget: (t: ViewerTarget | null) => void;
+  setSummaryDoc: (d: ComplaintDocument | null) => void;
+  generateSummary: (id: string, force: boolean) => Promise<void>;
+  busyId: string | null;
 }) {
-  const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [submittedDate, setSubmittedDate] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [channel, setChannel] = React.useState<string>(SUBMIT_CHANNELS[0]);
   const [referenceNo, setReferenceNo] = React.useState("");
@@ -355,6 +467,7 @@ function SubmitPanel({
   const [printedByName, setPrintedByName] = React.useState(letter?.printedByName ?? null);
 
   const hasLetter = Boolean(letter && (letter.text || letter.pdfDocId || letter.docxDocId));
+  const letterDoc = documents.find((d) => d.id === letter?.pdfDocId || d.id === letter?.docxDocId);
   // Only bill_stop / forensic-imported letters go through the print queue
   // (letterId present + printStatus tracked); manually drafted letters skip
   // straight to submission — nothing to gate there.
@@ -428,6 +541,32 @@ function SubmitPanel({
               <Button size="sm" variant="outline" onClick={() => setViewTarget({ documentId: "", title: "Complaint letter", fallbackText: letter.text })}>
                 <ScrollText className="h-4 w-4" /> Read letter text
               </Button>
+            )}
+
+            {/* AI Document Summary buttons for the drafted letter */}
+            {letterDoc && (
+              <>
+                {letterDoc.ai_summary_status === "ready" && (
+                  <Button size="sm" variant="outline" onClick={() => setSummaryDoc(letterDoc)}>
+                    <FileSearch className="h-4 w-4" /> View Summary
+                  </Button>
+                )}
+                {letterDoc.ai_summary_status === "generating" && (
+                  <Button size="sm" variant="outline" disabled>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Generating Summary…
+                  </Button>
+                )}
+                {letterDoc.ai_summary_status === "failed" && (
+                  <Button size="sm" variant="outline" onClick={() => generateSummary(letterDoc.id, true)} disabled={busyId === letterDoc.id}>
+                    <RotateCcw className="h-4 w-4" /> Retry Summary
+                  </Button>
+                )}
+                {letterDoc.ai_summary_status === "none" && (
+                  <Button size="sm" variant="outline" onClick={() => generateSummary(letterDoc.id, false)} disabled={busyId === letterDoc.id}>
+                    <Sparkles className="h-4 w-4" /> Generate Summary
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -512,8 +651,6 @@ function SubmitPanel({
           </Button>
         </div>
       )}
-
-      <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
     </StepPanel>
   );
 }
@@ -529,7 +666,6 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
   const [analysing, setAnalysing] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
   const [draft, setDraft] = React.useState("");
-  const [pastedReply, setPastedReply] = React.useState("");
   const [lintWarning, setLintWarning] = React.useState<string | null>(null);
   const [truncated, setTruncated] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -541,6 +677,18 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [replyFiles, setReplyFiles] = React.useState<ReplyFile[]>([]);
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
+
+  // Load existing draft if any on mount
+  React.useEffect(() => {
+    async function loadSavedDraft() {
+      const res = await getLatestComplaintAiDraft(complaintId, "counter_reply");
+      if (res.ok && res.draft) {
+        setDraft(res.draft.content);
+        setSavedAt(formatDateTime(res.draft.created_at));
+      }
+    }
+    void loadSavedDraft();
+  }, [complaintId]);
 
   const loadFiles = React.useCallback(async () => {
     const r = await listComplaintReplyFilesAction(complaintId);
@@ -560,8 +708,7 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
     setAnalysing(true);
     setError(null);
     setSavedMsg(null);
-    // Uses pasted text if given, else the latest uploaded/OCR'd reply on the case.
-    const r = await analyzeReplyGapAction({ complaintId, replyText: pastedReply.trim() || undefined });
+    const r = await analyzeReplyGapAction({ complaintId });
     setAnalysing(false);
     if (!r.ok || !r.data) { setError(r.error ?? "Could not analyse the reply."); return; }
     setGap(r.data);
@@ -628,16 +775,6 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
           <AlertTriangle className="h-3.5 w-3.5" /> AI is not configured — set ANTHROPIC_API_KEY to analyse replies and draft counter-replies.
         </p>
       )}
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Paste the officer&apos;s reply (optional — otherwise the latest uploaded reply is used)</Label>
-        <textarea
-          value={pastedReply}
-          onChange={(e) => setPastedReply(e.target.value)}
-          rows={3}
-          placeholder="Paste the reply text here to analyse it directly…"
-          className="w-full rounded-md border border-input bg-background p-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      </div>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" disabled={!aiConfigured || analysing} onClick={analyse}>
           {analysing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Analyse what the reply left unaddressed
@@ -683,27 +820,29 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <LetterPreview markdown={draft} />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setEditorOpen(true)}><Pencil className="h-4 w-4" /> Edit in full editor</Button>
-            <Button size="sm" onClick={fileCounter} disabled={filing}>
-              {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File counter-reply
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
+            <Button size="sm" onClick={() => setEditorOpen(true)}>
+              <FileCheck2 className="h-4 w-4" /> View / Edit Counter-reply Letter
             </Button>
-            <Button size="sm" variant="outline" onClick={save}><Save className="h-4 w-4" /> Save draft</Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pdfBusy}
-              onClick={async () => {
-                setPdfBusy(true);
-                setError(null);
-                const err = await openDraftPdf("Counter-reply", draft);
-                setPdfBusy(false);
-                if (err) setError(err);
-              }}
-            >
-              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Print / PDF
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={fileCounter} disabled={filing}>
+                {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File counter-reply
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pdfBusy}
+                onClick={async () => {
+                  setPdfBusy(true);
+                  setError(null);
+                  const err = await openDraftPdf("Counter-reply", draft);
+                  setPdfBusy(false);
+                  if (err) setError(err);
+                }}
+              >
+                {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Print / PDF
+              </Button>
+            </div>
           </div>
           {savedMsg && <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> {savedMsg}</p>}
           {savedAt && !savedMsg && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-emerald-600" /> Auto-saved {savedAt}</p>}
@@ -782,6 +921,19 @@ function EscalatePanel({
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
+
+  // Load existing escalation draft if any on mount
+  React.useEffect(() => {
+    async function loadSavedDraft() {
+      const res = await getLatestComplaintAiDraft(complaintId, "escalation");
+      if (res.ok && res.draft) {
+        setDraft(res.draft.content);
+        if (res.draft.kind) setKind(res.draft.kind as ComplaintDraftKind);
+        setSavedAt(formatDateTime(res.draft.created_at));
+      }
+    }
+    void loadSavedDraft();
+  }, [complaintId]);
 
   async function fileEscalation() {
     if (!kind || !draft.trim()) return;
@@ -883,36 +1035,38 @@ function EscalatePanel({
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <LetterPreview markdown={draft} />
-          <div className="flex flex-wrap items-end gap-2">
-            <Button size="sm" variant="outline" onClick={() => setEditorOpen(true)}><Pencil className="h-4 w-4" /> Edit in full editor</Button>
-            <Button size="sm" onClick={fileEscalation} disabled={filing}>
-              {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File escalation
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
+            <Button size="sm" onClick={() => setEditorOpen(true)}>
+              <FileCheck2 className="h-4 w-4" /> View / Edit Escalation Letter
             </Button>
-            <Button size="sm" variant="outline" onClick={save}><Save className="h-4 w-4" /> Save draft</Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pdfBusy}
-              onClick={async () => {
-                setPdfBusy(true);
-                setError(null);
-                const err = await openDraftPdf(kind ? COMPLAINT_DRAFT_KINDS[kind] : "Escalation letter", draft);
-                setPdfBusy(false);
-                if (err) setError(err);
-              }}
-            >
-              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Print / PDF
-            </Button>
-            <div className="space-y-1">
-              <Label className="text-xs">Record escalation to</Label>
-              <div className="flex gap-2">
-                <select className={selectCls} value={toLevel} onChange={(e) => setToLevel(e.target.value)}>
-                  {["AEE", "EE", "SE", "CE", "Commissioner", "Lokayukta", "Chief Secretary", "ACB", "Legal"].map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
-                <Button size="sm" onClick={recordEscalation}><Gavel className="h-4 w-4" /> Record</Button>
+            <div className="flex flex-wrap items-end gap-2">
+              <Button size="sm" variant="outline" onClick={fileEscalation} disabled={filing}>
+                {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File escalation
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pdfBusy}
+                onClick={async () => {
+                  setPdfBusy(true);
+                  setError(null);
+                  const err = await openDraftPdf(kind ? COMPLAINT_DRAFT_KINDS[kind] : "Escalation letter", draft);
+                  setPdfBusy(false);
+                  if (err) setError(err);
+                }}
+              >
+                {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Print / PDF
+              </Button>
+              <div className="space-y-1">
+                <Label className="text-xs">Record escalation to</Label>
+                <div className="flex gap-2">
+                  <select className={selectCls} value={toLevel} onChange={(e) => setToLevel(e.target.value)}>
+                    {["AEE", "EE", "SE", "CE", "Commissioner", "Lokayukta", "Chief Secretary", "ACB", "Legal"].map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" onClick={recordEscalation}><Gavel className="h-4 w-4" /> Record</Button>
+                </div>
               </div>
             </div>
           </div>

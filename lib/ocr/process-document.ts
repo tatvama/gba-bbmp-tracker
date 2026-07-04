@@ -5,6 +5,7 @@ import { runOcr } from "@/lib/ocr/ocr-service";
 import { ocrAnyDocument } from "@/lib/ocr/process-job-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { analyzeComplaintDocument } from "@/lib/ai/complaint-document-analyzer";
+import { isAiConfigured } from "@/lib/ai/provider";
 import { getComplaintSettings } from "@/lib/settings";
 import { STORAGE_BUCKETS } from "@/lib/constants";
 import type { ComplaintExtraction } from "@/lib/types";
@@ -91,18 +92,65 @@ export async function processDocumentOcr(
   await finishJob(admin, jobId, res.status === "Failed" ? "Failed" : "Completed", res.error ?? null);
 
   if (opts?.analyze && res.cleanText && res.status !== "Failed") {
-    await analyzeDocumentById(documentId).catch((e) => console.warn("[ai] analyze after ocr failed", e));
+    // Fresh OCR text → force a (re)generation; ensureOcr:false, OCR just ran.
+    await analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) => console.warn("[ai] analyze after ocr failed", e));
   }
   return { ok: res.status !== "Failed", status: res.status, error: res.error };
 }
 
-/** Re-run AI analysis on a document's stored OCR text. */
+// verification_status values that reflect a human/forensic decision and must
+// NOT be silently reset when a summary is (re)generated.
+const PROTECTED_VERIFICATION = new Set(["Verified", "Duplicate", "Rejected", "Needs Correction"]);
+
+/**
+ * Generate (or regenerate) the AI summary for one complaint document and store it
+ * permanently, managing the ai_summary_status lifecycle so the UI can show
+ * Generating… / Retry / View Summary. This is the SINGLE place summaries are
+ * produced — every upload path funnels through it (fire-and-forget), and the
+ * "Re-run AI" / "Regenerate" buttons call it with force.
+ *
+ *  - force:     regenerate even if a summary already exists (default false →
+ *               idempotent, so auto-generation never duplicates work).
+ *  - ensureOcr: if there's no OCR text yet and the file is an image/PDF, run OCR
+ *               first so images/PDFs uploaded without inline OCR still summarise.
+ */
 export async function analyzeDocumentById(
   documentId: string,
+  opts?: { force?: boolean; ensureOcr?: boolean },
 ): Promise<{ ok: boolean; extraction?: ComplaintExtraction; error?: string }> {
   const admin = createAdminClient();
-  const { data: doc } = await admin.from("complaint_documents").select("*").eq("id", documentId).single();
+  let { data: doc } = await admin.from("complaint_documents").select("*").eq("id", documentId).single();
   if (!doc) return { ok: false, error: "Document not found" };
+
+  // Idempotent: a stored summary is generated once and kept unless forced.
+  if (!opts?.force && doc.ai_summary_status === "ready") {
+    return { ok: true, extraction: (doc.ai_extracted_json as ComplaintExtraction) ?? undefined };
+  }
+
+  const fail = async (error: string): Promise<{ ok: false; error: string }> => {
+    await admin.from("complaint_documents").update({ ai_summary_status: "failed", ai_summary_error: error }).eq("id", documentId);
+    return { ok: false, error };
+  };
+
+  if (!isAiConfigured()) return fail("AI not configured");
+
+  await admin.from("complaint_documents").update({ ai_summary_status: "generating", ai_summary_error: null }).eq("id", documentId);
+
+  // Make sure we have text to summarise. Letters we filed (counter-reply /
+  // escalation) already carry their text in ocr_clean_text; images/PDFs may need
+  // OCR run first.
+  let text = doc.ocr_clean_text || doc.ocr_raw_text || "";
+  if (!text.trim() && opts?.ensureOcr) {
+    const mime = doc.mime_type ?? "";
+    const isOcrable = mime.startsWith("image/") || mime === "application/pdf";
+    if (isOcrable && doc.ocr_status !== "Completed") {
+      await processDocumentOcr(documentId).catch((e) => console.warn("[ai] ensureOcr before summary failed", e));
+      const { data: reloaded } = await admin.from("complaint_documents").select("*").eq("id", documentId).single();
+      if (reloaded) doc = reloaded;
+      text = doc.ocr_clean_text || doc.ocr_raw_text || "";
+    }
+  }
+  if (!text.trim()) return fail("No document text available to summarise.");
 
   const { data: c } = await admin
     .from("complaints")
@@ -120,13 +168,23 @@ export async function analyzeDocumentById(
     : "";
 
   const result = await analyzeComplaintDocument({
-    ocrText: doc.ocr_clean_text || doc.ocr_raw_text || "",
+    ocrText: text,
     documentType: doc.document_type,
     complaintContext: context,
     userNotes: doc.internal_notes ?? undefined,
   });
 
+  if (!result.ok) {
+    return fail(result.error ?? "AI summary generation failed.");
+  }
+
   const ex = result.extraction;
+  // Only move verification along the AI axis when a human/forensic verdict hasn't
+  // already been recorded (don't reset Duplicate/Verified on regeneration).
+  const verificationUpdate = PROTECTED_VERIFICATION.has(doc.verification_status)
+    ? {}
+    : { verification_status: ex.needsManualReview ? "Low Confidence" : "Pending Review" };
+
   await admin.from("complaint_documents").update({
     ai_summary: ex.summary || null,
     ai_extracted_json: ex,
@@ -134,7 +192,10 @@ export async function analyzeDocumentById(
     ai_suggested_next_action: ex.suggestedNextAction || null,
     ai_suggested_follow_up_date: isDate(ex.suggestedFollowUpDate) ? ex.suggestedFollowUpDate : null,
     ai_confidence: ex.confidence || null,
-    verification_status: ex.needsManualReview ? "Low Confidence" : "Pending Review",
+    ai_summary_status: "ready",
+    ai_summary_error: null,
+    ai_summary_generated_at: new Date().toISOString(),
+    ...verificationUpdate,
   }).eq("id", documentId);
 
   return { ok: result.ok, extraction: ex, error: result.error };

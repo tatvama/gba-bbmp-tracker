@@ -229,6 +229,17 @@ export interface ComplaintDocument {
   ai_suggested_next_action: string | null;
   ai_suggested_follow_up_date: string | null;
   ai_confidence: string | null;
+  // Per-document AI-summary lifecycle (0028). Content lives in ai_summary /
+  // ai_extracted_json above; these track generation state for the UI.
+  ai_summary_status: "none" | "generating" | "ready" | "failed";
+  ai_summary_error: string | null;
+  ai_summary_generated_at: string | null;
+  // Multi-complaint split provenance (0029): which pages of the original combined
+  // upload this document covers, and a pointer to that preserved original.
+  source_page_start: number | null;
+  source_page_end: number | null;
+  source_original_path: string | null;
+  source_original_name: string | null;
   verification_status: string;
   verified_by: string | null;
   verified_at: string | null;

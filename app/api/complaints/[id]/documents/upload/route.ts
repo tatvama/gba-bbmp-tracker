@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/supabase-upload";
-import { processDocumentOcr } from "@/lib/ocr/process-document";
+import { processDocumentOcr, analyzeDocumentById } from "@/lib/ocr/process-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { findPhotoMatches, deriveStage } from "@/lib/dedupe-photos";
 import { geofencePhoto } from "@/lib/geo";
@@ -186,11 +186,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  // 4) OCR inline (best-effort). Failure NEVER breaks the upload.
+  // 4) OCR inline (best-effort). Failure NEVER breaks the upload. Summary is
+  // generated separately below (analyze:false here) so it happens for PDFs and
+  // OCR-disabled images too, via a single code path.
   let ocrStatus = initialOcr;
   if (wantsOcr && settings.ocrAutoRun) {
     try {
-      const r = await processDocumentOcr(documentId, { buffer, analyze: settings.aiAutoSummary });
+      const r = await processDocumentOcr(documentId, { buffer, analyze: false });
       ocrStatus = r.status;
     } catch (e) {
       console.error("[upload] OCR failed (upload preserved)", e);
@@ -198,11 +200,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
+  // 5) AI summary — generate ONCE now, store permanently. Runs in the background
+  // (OCR'ing the file first if needed) so the upload returns immediately; the
+  // document list shows "Generating…" then "View Summary". Skipped for pure
+  // site/evidence photos (no text to summarise — their AI is image verification),
+  // and when no AI key is configured. Photos can still be summarised on demand.
+  let summaryStatus: "none" | "generating" = "none";
+  if (isAiConfigured() && !isSitePhoto && !asEvidence) {
+    summaryStatus = "generating";
+    await admin.from("complaint_documents").update({ ai_summary_status: "generating" }).eq("id", documentId);
+    void analyzeDocumentById(documentId, { ensureOcr: true }).catch((e) => console.error("[upload] summary generation failed", e));
+  }
+
   return NextResponse.json({
     ok: true,
     documentId,
     bucket: R2_STORAGE_SENTINEL,
     ocrStatus,
+    summaryStatus,
     aiConfigured: isAiConfigured(),
     duplicateWarning,
   });

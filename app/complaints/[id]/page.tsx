@@ -77,7 +77,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
 
   return (
     <div className="mx-auto max-w-7xl grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8 items-start px-4 md:px-6">
-      <div className="min-w-0 max-w-5xl xl:max-w-none space-y-6">
+      <div className="order-last xl:order-none min-w-0 max-w-5xl xl:max-w-none space-y-6">
         {/* Sticky Action Toolbar & Breadcrumbs */}
         <div className="no-print sticky top-0 z-30 flex flex-wrap items-center justify-between gap-4 border-b border-slate-150 bg-background/95 py-3.5 backdrop-blur dark:border-slate-850">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 select-none">
@@ -161,6 +161,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
             caseNumber={complaint.internal_case_number ?? null}
             aiConfigured={flags.aiConfigured}
             letter={letter}
+            documents={documents}
           />
         )}
 
@@ -180,8 +181,8 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           flags={flags}
         />
       </div>
-      <aside className="xl:sticky xl:top-6 space-y-4">
-        <AIInsightsPanel complaintId={id} initialRecommendation={aiRecommendation} aiConfigured={flags.aiConfigured} />
+      <aside className="order-first xl:order-none xl:sticky xl:top-6 space-y-4">
+        <AIInsightsPanel complaintId={id} initialRecommendation={aiRecommendation} aiConfigured={flags.aiConfigured} priority={complaint.priority ?? null} />
       </aside>
     </div>
   );

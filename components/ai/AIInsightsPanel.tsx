@@ -36,10 +36,12 @@ export function AIInsightsPanel({
   complaintId,
   initialRecommendation,
   aiConfigured,
+  priority,
 }: {
   complaintId: string;
   initialRecommendation: RecommendationRow | null;
   aiConfigured: boolean;
+  priority?: string | null;
 }) {
   const [recommendation, setRecommendation] = React.useState(initialRecommendation);
   const activeRef = React.useRef(true);
@@ -84,12 +86,12 @@ export function AIInsightsPanel({
       void triggerAdvisorAnalysis(complaintId).then(refresh);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }, []);
 
   return (
     <div className="space-y-3">
-      <AIRecommendationCard complaintId={complaintId} recommendation={recommendation} aiConfigured={aiConfigured} />
-      <AITimelineInsight recommendation={recommendation} />
+      <AIRecommendationCard complaintId={complaintId} recommendation={recommendation} aiConfigured={aiConfigured} priority={priority} />
+      <AITimelineInsight recommendation={recommendation} className="lg:block hidden" />
     </div>
   );
 }

@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError, type SessionUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSignedUrl, uploadBuffer, buildPath, validateUpload } from "@/lib/storage/supabase-upload";
-import { getR2SignedUrl, uploadToR2 } from "@/lib/storage/r2-upload";
+import { getR2SignedUrl, uploadToR2, deleteFromR2 } from "@/lib/storage/r2-upload";
 import { buildMergedPdf } from "@/lib/pdf/merge";
-import { processDocumentOcr } from "@/lib/ocr/process-document";
+import { processDocumentOcr, analyzeDocumentById } from "@/lib/ocr/process-document";
+import { isAiConfigured } from "@/lib/ai/provider";
 import { writeAudit, diffFields } from "@/lib/audit";
 import {
   complaintSchema,
@@ -30,6 +31,7 @@ import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
 import { generateDraftPdfService } from "@/lib/pdf/document-service";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
+import type { ComplaintExtraction } from "@/lib/types";
 
 export interface ActionState {
   error?: string;
@@ -635,6 +637,118 @@ export async function setDocumentVerification(documentId: string, complaintId: s
   return { success: true, id: complaintId };
 }
 
+// ── Per-document AI summary (view stored / generate / retry / regenerate) ─────
+
+/**
+ * Kick off (or retry / regenerate) a document's AI summary. Sets the status to
+ * "generating" synchronously so the UI shows a spinner immediately, then runs
+ * generation in the background — the document list polls until it flips to
+ * "ready"/"failed". `force` is used for explicit Retry / Regenerate; the initial
+ * on-upload generation is idempotent (force omitted).
+ */
+export async function generateDocumentSummaryAction(
+  documentId: string,
+  complaintId: string,
+  opts?: { force?: boolean },
+): Promise<{ ok: boolean; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  if (!isAiConfigured()) return { ok: false, error: "AI is not configured on the server." };
+  const { admin } = a;
+  await admin.from("complaint_documents").update({ ai_summary_status: "generating", ai_summary_error: null }).eq("id", documentId);
+  void analyzeDocumentById(documentId, { force: opts?.force ?? true, ensureOcr: true })
+    .catch((e) => console.error("[summary] manual generation failed", e))
+    .finally(() => { revalidatePath(`/complaints/${complaintId}`); });
+  revalidatePath(`/complaints/${complaintId}`);
+  return { ok: true };
+}
+
+/** Read a document's STORED summary (never regenerates) for surfaces that only
+ *  hold a document id (e.g. the reply-files list, correspondence thread). */
+export async function getDocumentSummaryAction(documentId: string): Promise<{
+  ok: boolean;
+  error?: string;
+  summary?: {
+    title: string | null;
+    documentType: string | null;
+    uploadedAt: string | null;
+    documentDate: string | null;
+    status: string;
+    error: string | null;
+    generatedAt: string | null;
+    aiSummary: string | null;
+    confidence: string | null;
+    extraction: ComplaintExtraction | null;
+  };
+}> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const { admin } = a;
+  const { data: d } = await admin
+    .from("complaint_documents")
+    .select("title, document_type, uploaded_at, document_date, ai_summary_status, ai_summary_error, ai_summary_generated_at, ai_summary, ai_confidence, ai_extracted_json")
+    .eq("id", documentId)
+    .maybeSingle();
+  if (!d) return { ok: false, error: "Document not found." };
+  return {
+    ok: true,
+    summary: {
+      title: d.title,
+      documentType: d.document_type,
+      uploadedAt: d.uploaded_at,
+      documentDate: d.document_date,
+      status: d.ai_summary_status ?? "none",
+      error: d.ai_summary_error,
+      generatedAt: d.ai_summary_generated_at,
+      aiSummary: d.ai_summary,
+      confidence: d.ai_confidence,
+      extraction: (d.ai_extracted_json as ComplaintExtraction) ?? null,
+    },
+  };
+}
+
+/**
+ * Delete a complaint document: removes the DB row, best-effort deletes the stored
+ * file(s), logs the timeline + audit. Verify-level roles only.
+ */
+export async function deleteComplaintDocument(documentId: string, complaintId: string): Promise<ActionState> {
+  const a = await authed(COMPLAINT_VERIFY_ROLES);
+  if ("error" in a) return { error: a.error };
+  const { user, admin } = a;
+  const { data: doc } = await admin
+    .from("complaint_documents")
+    .select("storage_bucket, storage_path, processed_storage_path, thumbnail_storage_path, document_type, title, original_file_name")
+    .eq("id", documentId)
+    .maybeSingle();
+  if (!doc) return { error: "Document not found." };
+
+  const { error } = await admin.from("complaint_documents").delete().eq("id", documentId);
+  if (error) return { error: error.message };
+
+  // Best-effort storage cleanup — a failed delete never blocks the row removal.
+  try {
+    if (doc.storage_bucket === R2_STORAGE_SENTINEL) {
+      await deleteFromR2(doc.storage_path).catch(() => {});
+    }
+    const supabaseFiles = [doc.processed_storage_path, doc.thumbnail_storage_path].filter((p): p is string => !!p);
+    if (supabaseFiles.length) {
+      await admin.storage.from(STORAGE_BUCKETS.processed).remove(supabaseFiles).catch(() => {});
+    }
+  } catch (e) {
+    console.warn("[deleteComplaintDocument] storage cleanup failed (row already removed)", e);
+  }
+
+  await addTimeline(admin, {
+    complaintId,
+    eventType: "Note",
+    title: `Document deleted: ${doc.document_type ?? doc.title ?? doc.original_file_name ?? "file"}`,
+    createdBy: user.id,
+  });
+  await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "document_deleted", oldValue: doc.title ?? doc.original_file_name ?? null, newValue: null }] });
+  revalidatePath(`/complaints/${complaintId}`);
+  return { success: true, id: complaintId };
+}
+
 // ── Capture-first scan upload (live photos / PDF → one optimised PDF) ─────────
 
 function slugify(s: string): string {
@@ -720,15 +834,19 @@ export async function uploadComplaintScanAction(
   await addTimeline(admin, { complaintId, eventType: docTypeToEvent(docType), title: `Uploaded: ${docType}`, createdBy: user.id, relatedDocumentId: documentId });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "scan_uploaded", oldValue: null, newValue: docType }] });
 
-  // OCR (PDF-capable) + AI summary. Never blocks the upload.
+  // OCR (PDF-capable), then a permanent AI summary. Never blocks the upload.
   let ocrStatus = "Processing";
   let aiSummary: string | undefined = undefined;
   let suggestedStatus: string | undefined = undefined;
   let confidence: string | undefined = undefined;
   try {
-    const r = await processDocumentOcr(documentId, { buffer: merged.pdf, analyze: settings.aiAutoSummary });
+    const r = await processDocumentOcr(documentId, { buffer: merged.pdf, analyze: false });
     ocrStatus = r.status;
-    if (r.status !== "Failed") {
+    if (r.status !== "Failed" && isAiConfigured()) {
+      // Generate + store the summary once (OCR text is already present).
+      await analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) =>
+        console.error("[complaint-scan] summary generation failed", e),
+      );
       const { data: updatedDoc } = await admin
         .from("complaint_documents")
         .select("ai_summary,ai_suggested_status,ai_confidence")
@@ -863,6 +981,36 @@ export async function saveComplaintAiDraft(input: {
   return { ok: true, id: data.id };
 }
 
+export async function getLatestComplaintAiDraft(
+  complaintId: string,
+  kind: string,
+): Promise<{ ok: boolean; draft?: { content: string; kind?: string; language?: string; created_at: string }; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const { admin } = a;
+
+  let query = admin
+    .from("ai_drafts")
+    .select("content, kind, language, created_at")
+    .eq("entity_type", "complaint")
+    .eq("entity_id", complaintId);
+
+  if (kind === "counter_reply") {
+    query = query.eq("kind", "counter_reply");
+  } else {
+    query = query.neq("kind", "counter_reply");
+  }
+
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: true };
+  return { ok: true, draft: { content: data.content, kind: data.kind ?? undefined, language: data.language ?? undefined, created_at: data.created_at } };
+}
+
 /**
  * FILE a generated counter-reply as an actual document, so it sits next to the
  * department's reply as a downloadable file (not just editable text). Renders
@@ -916,13 +1064,21 @@ export async function fileCounterReplyAction(
       document_date: todayISO(),
       ocr_status: "Skipped",
       ocr_clean_text: content, // we already have the text — viewable/searchable
-      ai_summary: content.slice(0, 300),
+      ai_summary_status: isAiConfigured() ? "generating" : "none",
       uploaded_by: user.id,
     })
     .select("id")
     .single();
   if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the counter-reply document." };
   const documentId = doc.id as string;
+
+  // Structured AI summary from the letter text (background; the text is already
+  // stored, so no OCR needed). Replaces the old first-300-chars placeholder.
+  if (isAiConfigured()) {
+    void analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) =>
+      console.error("[counter-reply] summary generation failed", e),
+    );
+  }
 
   // Keep the AI advisor's view of OUR outgoing letters complete.
   await admin.from("ai_drafts").insert({
@@ -999,13 +1155,20 @@ export async function fileEscalationAction(
       document_date: todayISO(),
       ocr_status: "Skipped",
       ocr_clean_text: content,
-      ai_summary: content.slice(0, 300),
+      ai_summary_status: isAiConfigured() ? "generating" : "none",
       uploaded_by: user.id,
     })
     .select("id")
     .single();
   if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the escalation document." };
   const documentId = doc.id as string;
+
+  // Structured AI summary from the letter text (background; text already stored).
+  if (isAiConfigured()) {
+    void analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) =>
+      console.error("[escalation] summary generation failed", e),
+    );
+  }
 
   await admin.from("ai_drafts").insert({
     entity_type: "complaint",

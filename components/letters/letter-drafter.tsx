@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Sparkles, Save, Copy, Check, Printer, FileDown, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
+import { Loader2, Sparkles, Save, Copy, Check, Printer, FileDown, ShieldCheck, ShieldAlert, AlertTriangle, FileText, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -30,6 +30,7 @@ export function LetterDrafter({ jobNumber, aiConfigured, hasAudit, savedDrafts =
 
   const [draft, setDraft] = React.useState("");
   const [draftId, setDraftId] = React.useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [lint, setLint] = React.useState<LintResult | null>(null);
@@ -40,7 +41,10 @@ export function LetterDrafter({ jobNumber, aiConfigured, hasAudit, savedDrafts =
   function apply(r: LetterResult) {
     if (!r.ok) { setError(r.error ?? "Could not draft the letter."); return; }
     setError(null);
-    if (typeof r.content === "string") setDraft(r.content);
+    if (typeof r.content === "string") {
+      setDraft(r.content);
+      setEditorOpen(true);
+    }
     if (r.draftId) setDraftId(r.draftId);
     if (r.lint) setLint(r.lint);
     setMeta({ aiUsed: r.aiUsed, aiDiscarded: r.aiDiscarded });
@@ -53,12 +57,18 @@ export function LetterDrafter({ jobNumber, aiConfigured, hasAudit, savedDrafts =
     } finally { setBusy(false); }
   }
 
-  async function onSave() {
-    if (!draftId || !draft.trim()) return;
+  async function onSave(newText?: string) {
+    const textToSave = typeof newText === "string" ? newText : draft;
+    if (!draftId || !textToSave.trim()) return;
     setBusy(true);
     try {
-      const r = await saveLetterEdit(draftId, draft);
-      if (r.ok) { setSaved(true); if (r.lint) setLint(r.lint); setTimeout(() => setSaved(false), 2500); }
+      const r = await saveLetterEdit(draftId, textToSave);
+      if (r.ok) {
+        setDraft(textToSave);
+        setSaved(true);
+        if (r.lint) setLint(r.lint);
+        setTimeout(() => setSaved(false), 2500);
+      }
       else setError(r.error ?? "Could not save.");
     } finally { setBusy(false); }
   }
@@ -78,6 +88,7 @@ export function LetterDrafter({ jobNumber, aiConfigured, hasAudit, savedDrafts =
     setMeta(null);
     const r = await lintLetterAction(s.content ?? ""); // reflect lint of the reopened text
     setLint(r.lint);
+    setEditorOpen(true);
   }
 
   async function onCopy() {
@@ -188,24 +199,37 @@ export function LetterDrafter({ jobNumber, aiConfigured, hasAudit, savedDrafts =
           )
         )}
 
-        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={22} placeholder="The generated Kannada letter appears here and is fully editable…" className="font-mono text-sm" />
-
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={onCheck} disabled={!draft}><ShieldCheck className="h-4 w-4" /> Check safe-language</Button>
-          <Button variant="outline" size="sm" onClick={onSave} disabled={!draft || !draftId || busy}>
-            {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}{saved ? "Saved" : "Save edits"}
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-4 dark:bg-slate-900/10">
+          <Button size="sm" onClick={() => setEditorOpen(true)}>
+            <FileCheck className="h-4 w-4" /> Open Draft Workspace
           </Button>
-          <Button variant="outline" size="sm" onClick={onCopy} disabled={!draft}>
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Copied" : "Copy"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!draft}><Printer className="h-4 w-4" /> Print</Button>
-          {draftId && (
-            <>
-              <Button asChild variant="outline" size="sm"><a href={dl()} download><FileDown className="h-4 w-4" /> Word (.docx)</a></Button>
-              <Button asChild variant="outline" size="sm"><a href={dl("csv")} download><FileDown className="h-4 w-4" /> Evidence CSV</a></Button>
-            </>
+          {draft ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={onCheck}><ShieldCheck className="h-4 w-4" /> Check safe-language</Button>
+              {draftId && (
+                <>
+                  <Button asChild variant="outline" size="sm"><a href={dl()} download><FileDown className="h-4 w-4" /> Word (.docx)</a></Button>
+                  <Button asChild variant="outline" size="sm"><a href={dl("csv")} download><FileDown className="h-4 w-4" /> Evidence CSV</a></Button>
+                </>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              No draft generated yet. Click generate on the left or open workspace to write manually.
+            </span>
           )}
         </div>
+
+        <LetterEditorModal
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          title="Edit Generated Letter"
+          value={draft}
+          onChange={setDraft}
+          onSave={onSave}
+          saving={busy}
+          savedAt={saved ? "Just now" : null}
+        />
       </div>
     </div>
   );

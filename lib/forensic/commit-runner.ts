@@ -455,6 +455,11 @@ export async function commitForensicJobs(
             mime_type: lf.mime,
             file_size: lf.size,
             ocr_status: "Skipped",
+            // Store the generated letter text so a summary can be produced later.
+            // A bulk import can attach many letters at once, so we do NOT fire AI
+            // summaries during the commit (avoids rate-limit storms) — these land
+            // as ai_summary_status 'none' and get a "Generate Summary" button.
+            ocr_clean_text: job.letterText || null,
             uploaded_by: userId,
           });
         }

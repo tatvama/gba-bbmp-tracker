@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, RefreshCw, Sparkles, ClipboardCheck, FileText, CheckCircle2, ScanEye, MapPin } from "lucide-react";
+import { Eye, RefreshCw, Sparkles, ClipboardCheck, FileText, CheckCircle2, ScanEye, MapPin, FileSearch, Loader2, RotateCcw, Download, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { EmptyState } from "@/components/empty-state";
 import { DocumentReview } from "@/components/complaints/document-review";
 import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
-import { setDocumentVerification } from "@/lib/actions/complaints";
+import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
+import { setDocumentVerification, generateDocumentSummaryAction, deleteComplaintDocument, getDocumentViewUrl } from "@/lib/actions/complaints";
 import { formatDate } from "@/lib/format";
 import type { ComplaintDocument } from "@/lib/types";
 
@@ -44,6 +45,24 @@ export function DocumentList({
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [reviewDoc, setReviewDoc] = React.useState<ComplaintDocument | null>(null);
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
+  const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
+
+  // Poll while any document's summary is still generating so "Generating…" flips
+  // to "View Summary" on its own without the user refreshing.
+  const anyGenerating = documents.some((d) => d.ai_summary_status === "generating");
+  React.useEffect(() => {
+    if (!anyGenerating) return;
+    const t = setInterval(() => router.refresh(), 4000);
+    return () => clearInterval(t);
+  }, [anyGenerating, router]);
+
+  // Keep the open summary modal in sync with refreshed data (e.g. after a
+  // regenerate completes while it's open).
+  React.useEffect(() => {
+    if (!summaryDoc) return;
+    const fresh = documents.find((d) => d.id === summaryDoc.id);
+    if (fresh && fresh !== summaryDoc) setSummaryDoc(fresh);
+  }, [documents, summaryDoc]);
 
   function view(d: ComplaintDocument) {
     setViewTarget({
@@ -69,6 +88,27 @@ export function DocumentList({
     setBusyId(id);
     await setDocumentVerification(id, complaintId, status);
     setBusyId(null);
+    router.refresh();
+  }
+
+  async function generateSummary(id: string, force: boolean) {
+    setBusyId(id);
+    await generateDocumentSummaryAction(id, complaintId, { force });
+    setBusyId(null);
+    router.refresh();
+  }
+
+  async function download(d: ComplaintDocument) {
+    const r = await getDocumentViewUrl(d.id, "original");
+    if (r.url) window.open(r.url, "_blank");
+  }
+
+  async function remove(d: ComplaintDocument) {
+    if (!window.confirm(`Delete "${d.title || d.original_file_name || "this document"}"? This cannot be undone.`)) return;
+    setBusyId(d.id);
+    await deleteComplaintDocument(d.id, complaintId);
+    setBusyId(null);
+    if (summaryDoc?.id === d.id) setSummaryDoc(null);
     router.refresh();
   }
 
@@ -126,13 +166,41 @@ export function DocumentList({
                 <Button size="sm" variant="outline" onClick={() => view(d)}>
                   <Eye className="h-4 w-4" /> View
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => download(d)}>
+                  <Download className="h-4 w-4" /> Download
+                </Button>
+
+                {/* Summary state — View (stored, no AI call) / Generating / Retry / Generate */}
+                {d.ai_summary_status === "ready" && (
+                  <Button size="sm" variant="outline" onClick={() => setSummaryDoc(d)}>
+                    <FileSearch className="h-4 w-4" /> View Summary
+                  </Button>
+                )}
+                {d.ai_summary_status === "generating" && (
+                  <Button size="sm" variant="outline" disabled>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Generating Summary…
+                  </Button>
+                )}
+                {d.ai_summary_status === "failed" && canVerify && (
+                  <Button size="sm" variant="outline" onClick={() => generateSummary(d.id, true)} disabled={busy} title={d.ai_summary_error ?? undefined}>
+                    <RotateCcw className="h-4 w-4" /> Retry Summary
+                  </Button>
+                )}
+                {d.ai_summary_status === "none" && canVerify && (
+                  <Button size="sm" variant="outline" onClick={() => generateSummary(d.id, false)} disabled={busy}>
+                    <Sparkles className="h-4 w-4" /> Generate Summary
+                  </Button>
+                )}
+
                 {canVerify && (
                   <>
+                    {d.ai_summary_status === "ready" && (
+                      <Button size="sm" variant="ghost" onClick={() => generateSummary(d.id, true)} disabled={busy}>
+                        <RotateCcw className="h-4 w-4" /> Regenerate
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => post(`/api/complaints/documents/${d.id}/run-ocr`, d.id)} disabled={busy}>
                       <RefreshCw className="h-4 w-4" /> Re-run OCR
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => post(`/api/complaints/documents/${d.id}/analyze`, d.id)} disabled={busy}>
-                      <Sparkles className="h-4 w-4" /> Re-run AI
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => post(`/api/complaints/documents/${d.id}/vision`, d.id)} disabled={busy}>
                       <ScanEye className="h-4 w-4" /> Verify image
@@ -145,6 +213,9 @@ export function DocumentList({
                         <CheckCircle2 className="h-4 w-4" /> Mark verified
                       </Button>
                     )}
+                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(d)} disabled={busy}>
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </Button>
                   </>
                 )}
               </div>
@@ -163,6 +234,8 @@ export function DocumentList({
       </Dialog>
 
       <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
+
+      <DocumentSummaryModal doc={summaryDoc} onClose={() => setSummaryDoc(null)} />
     </>
   );
 }

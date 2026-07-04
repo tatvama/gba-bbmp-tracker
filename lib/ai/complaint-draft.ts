@@ -148,10 +148,12 @@ export async function runComplaintDraft(
   // Kannada is far more token-dense than English, and these letters argue a full
   // case history point-by-point (see buildCaseHistory above) — a prior 2500-token
   // default was truncating long Kannada letters mid-sentence with no error, since
-  // a truncated-but-nonempty response still passes the ok/text check below.
-  // 10k mirrors the cap thread-decision-agent.ts already proved sufficient.
+  // a truncated-but-nonempty response still passes the ok/text check below. A
+  // follow-up 10k cap (mirroring thread-decision-agent.ts) still cut off the
+  // longest case-history-heavy Kannada letters; 20k gives real headroom while
+  // staying well under this model class's output ceiling.
   onProgress?.({ stage: "drafting", label: "Drafting with Claude…" });
-  const r = await generateTextStream({ system, prompt, maxTokens: 10_000 }, (partialText) => {
+  const r = await generateTextStream({ system, prompt, maxTokens: 20_000 }, (partialText) => {
     onProgress?.({ stage: "drafting", label: "Drafting with Claude…", partialText });
   });
   if (!r.ok || !r.text) return { ok: r.ok, text: r.text, error: r.error };

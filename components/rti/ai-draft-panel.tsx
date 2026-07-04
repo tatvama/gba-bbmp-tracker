@@ -204,57 +204,38 @@ export function AiDraftPanel({
             <AlertTriangle className="h-3.5 w-3.5" /> This draft hit the AI&apos;s length limit and may be cut off mid-sentence — check the ending and regenerate if incomplete.
           </div>
         )}
-        {draft ? (
-          <LetterPreview markdown={draft} />
-        ) : (
-          <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            The generated draft appears here — click Edit to write one manually.
-          </p>
-        )}
-        <Button variant="outline" size="sm" onClick={() => setEditorOpen(true)} className="w-fit">
-          <Pencil className="h-4 w-4" /> Edit in full editor
-        </Button>
-        {aiConfigured && draft && (
-          <div className="flex flex-wrap gap-1.5">
-            {TRANSFORMS.map((t) => (
-              <Button
-                key={t.label}
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => run(() => transformDraft(draft, t.instruction))}
-              >
-                {t.label}
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-4 dark:bg-slate-900/10">
+          <Button size="sm" onClick={() => setEditorOpen(true)}>
+            <FileCheck className="h-4 w-4" /> Open Draft Workspace
+          </Button>
+          {draft ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={onCopy}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied ? "Copied" : "Copy"}
               </Button>
-            ))}
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={onCopy} disabled={!draft}>
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={onDownloadPdf} disabled={!draft || downloadingPdf}>
-            {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            {downloadingPdf ? "Generating PDF…" : "Download PDF"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={onSave} disabled={!draft || saving}>
-            {saved ? <Check className="h-4 w-4" /> : saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saved ? "Saved" : saving ? "Saving…" : "Save draft"}
-          </Button>
-          {savedAt && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-emerald-600" /> Saved {savedAt}</span>}
-          {onApprove && (
-            <Button
-              size="sm"
-              onClick={onApproveClick}
-              disabled={!draft || approving}
-              className="ml-auto"
-            >
-              {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
-              {approving ? "Creating…" : approveLabel}
-            </Button>
+              <Button variant="outline" size="sm" onClick={onDownloadPdf} disabled={downloadingPdf}>
+                {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                {downloadingPdf ? "Generating PDF…" : "Download PDF"}
+              </Button>
+              {onApprove && (
+                <Button
+                  size="sm"
+                  onClick={onApproveClick}
+                  disabled={approving}
+                >
+                  {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
+                  {approving ? "Creating…" : approveLabel}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              No draft generated yet. Click generate on the left or open workspace to write manually.
+            </span>
           )}
         </div>
+        {savedAt && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" /> Saved {savedAt}</p>}
       </div>
 
       <LetterEditorModal

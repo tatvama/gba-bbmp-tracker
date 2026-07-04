@@ -152,7 +152,7 @@ HARD RULES:
 - Produce a COMPLETE, ready-to-send letter. It stays an editable draft for human review — never claim it has been sent.
 - Use ONLY the facts in the context below. If a specific detail (an address line, a date, a name) is NOT provided, simply OMIT that line. NEVER output a bracketed placeholder such as [NAME], [DATE], [ADDRESS] or [OFFICE ADDRESS PLACEHOLDER], and never invent facts.
 - Use the exact From block, To block, Date, case number, job number, contractor, ward and sub-division EXACTLY as given in the context. Do not replace any provided value with a placeholder.
-- Structure it as a proper formal letter: From block, To block, Date, a bold Subject line, salutation, a numbered body that draws on the case chronology, the specific requests, closing and the signatory from the From block.
+- Structure it as a proper formal letter: place the TO (recipient) block verbatim at the very top of the letter, followed by the Date, a bold Subject line, salutation, a numbered body that draws on the case chronology, the specific requests, and place the closing and the FROM (sender / signatory) block verbatim at the very bottom (in the signature block). Do NOT place the FROM address at the top of the letter.
 - Format with Markdown so it renders cleanly: '## ' for the few section headings, '**bold**' for the subject and labels, and numbered / bulleted lists for points and requests. Do NOT wrap the whole letter in a code block.
 - Never use dash punctuation (–, —, or a hyphen used to join two clauses) inside a sentence. Write complete sentences, or split into separate sentences, or use a comma instead. Reference numbers, case/job codes and markdown bullet markers are unaffected by this rule.
 - Be factual and respectful. Phrase every concern as "it appears" / "the records do not show" / "kindly verify / produce"; never as an accusation.
@@ -205,6 +205,7 @@ export function buildComplaintDraftPrompt(input: {
       CAUTION,
     counter_reply:
       "Respond POINT-BY-POINT to the department's latest reply in the case history. For each original demand, state whether the reply addressed it; list the specific demands and records that remain UNADDRESSED; demand the specific records named in the forensic findings; and reserve escalation if a complete response is not received within a stated period. " +
+      "Place the TO (recipient) address block verbatim at the very top of the letter, and place the FROM (sender / signatory) address block verbatim at the bottom of the letter (in the signature block). Do NOT place the FROM address block at the top. " +
       CAUTION,
     clarification_request:
       "Write a short, courteous letter asking the department to CLARIFY specific points that its reply left ambiguous or incomplete — where the response was given but is unclear, internally inconsistent, or does not squarely answer what was asked. List each point needing clarification as a numbered, specific question tied to the case history; do NOT re-argue settled points or make new demands. This is a request for clarity, not an escalation. " +
