@@ -169,11 +169,14 @@ export async function analyzeComplaintIntakeFromImages(params: {
 Output STRICT JSON of EXACTLY this shape:
 ${INTAKE_JSON_SHAPE}`;
 
-  const res = await generateVision({ system, prompt, images, temperature: 0, maxTokens: 1800 });
+  // Kannada is token-heavy — a long multi-ward complaint needs generous headroom
+  // or the JSON response truncates mid-value and fails to parse.
+  const res = await generateVision({ system, prompt, images, temperature: 0, maxTokens: 4000 });
   if (!res.ok || !res.text) {
     console.warn(`[intake-vision] vision call failed (${res.error ?? "no text"}); falling back to OCR text`);
     return analyzeComplaintIntake(params.ocrText || "");
   }
+  if (res.truncated) console.warn("[intake-vision] response hit max_tokens — salvaging the complete fields");
 
   const data = looseParseJson<ComplaintIntakeExtraction>(res.text);
   if (!data) {
@@ -187,8 +190,9 @@ ${INTAKE_JSON_SHAPE}`;
   return { ok: true, extraction };
 }
 
-/** Parse JSON from a model response that may be fenced or wrapped in prose:
- *  try as-is, then strip ```fences```, then the first `{` … last `}` slice. */
+/** Parse JSON from a model response that may be fenced, wrapped in prose, or
+ *  TRUNCATED (hit max_tokens): try as-is, then de-fenced, then first`{`…last`}`,
+ *  then a truncation repair that keeps every complete field and closes the object. */
 function looseParseJson<T>(text: string): Partial<T> | null {
   const candidates: string[] = [];
   const trimmed = text.trim();
@@ -197,6 +201,8 @@ function looseParseJson<T>(text: string): Partial<T> | null {
   const first = trimmed.indexOf("{");
   const last = trimmed.lastIndexOf("}");
   if (first >= 0 && last > first) candidates.push(trimmed.slice(first, last + 1));
+  const repaired = repairTruncatedJson(trimmed);
+  if (repaired) candidates.push(repaired);
   for (const c of candidates) {
     try {
       return JSON.parse(c) as Partial<T>;
@@ -205,6 +211,27 @@ function looseParseJson<T>(text: string): Partial<T> | null {
     }
   }
   return null;
+}
+
+/** Salvage a truncated JSON object: keep everything up to the last COMPLETE
+ *  top-level field (last depth-1 comma outside a string) and close the braces,
+ *  discarding only the incomplete trailing field. Returns null if unsalvageable. */
+function repairTruncatedJson(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0, inStr = false, esc = false, lastSafeComma = -1;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]!;
+    if (esc) { esc = false; continue; }
+    if (ch === "\\") { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === "{" || ch === "[") depth++;
+    else if (ch === "}" || ch === "]") depth--;
+    else if (ch === "," && depth === 1) lastSafeComma = i;
+  }
+  if (lastSafeComma < 0) return null;
+  return text.slice(start, lastSafeComma) + "}";
 }
 
 /**
