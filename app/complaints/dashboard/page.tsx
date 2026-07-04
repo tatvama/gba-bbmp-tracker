@@ -1,6 +1,5 @@
-import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { getGbaTree, getBbmpTree, listComplaints } from "@/lib/queries";
+import { getGbaTree, getBbmpTree, listComplaints, countPrintPendingLetters } from "@/lib/queries";
 import { OrgTreemap } from "@/components/complaints/org-treemap";
 import { getSessionUser, hasRole } from "@/lib/auth";
 
@@ -15,31 +14,39 @@ export default async function ComplaintDashboard() {
   if (!hasRole(user, ["ADMIN", "COMPLAINT_MANAGER", "FIELD_OFFICER"])) {
     return (
       <div className="mx-auto max-w-5xl px-3 md:px-4 lg:px-6">
-        <PageHeader title="Complaint dashboard" />
         <EmptyState title="Access restricted" description="You do not have the required permissions to view this dashboard." />
       </div>
     );
   }
 
-  const [gbaCorps, bbmpCorps, complaints] = await Promise.all([
+  const [gbaCorps, bbmpCorps, complaints, printPending] = await Promise.all([
     getGbaTree(),
     getBbmpTree(),
     listComplaints(),
+    countPrintPendingLetters(),
   ]);
 
   return (
-    <div>
-      <PageHeader
-        title="Complaint dashboard"
-        description="Interactive hierarchy explorer for complaints — switch between GBA (369 wards) and BBMP-225 (225 wards). Click any node to drill down."
-      />
+    <div className="max-w-[1600px] mx-auto px-6 py-8 bg-[#F8FAFC] min-h-screen">
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Complaint Dashboard</h1>
+        <p className="text-sm text-slate-500 mt-1.5 font-semibold">
+          Premium enterprise analytics visualizer. Toggle GBA/BBMP layers to trace complaints across corporations, divisions, sub-divisions, wards, and assigned field officers.
+        </p>
+      </div>
+
       {gbaCorps.length === 0 ? (
         <EmptyState
           title="No GBA data loaded"
           description="Run npm run db:seed-gba to load the 369-ward breakdown, then refresh."
         />
       ) : (
-        <OrgTreemap gbaCorps={gbaCorps} bbmpCorps={bbmpCorps} complaints={complaints} />
+        <OrgTreemap
+          gbaCorps={gbaCorps}
+          bbmpCorps={bbmpCorps}
+          complaints={complaints}
+          printPending={printPending}
+        />
       )}
     </div>
   );
