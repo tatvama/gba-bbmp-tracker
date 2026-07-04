@@ -25,6 +25,7 @@ import {
   Search,
   Eye,
   LucideIcon,
+  FileSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,8 @@ import {
 } from "@/components/ui/select";
 import { getDocumentViewUrl } from "@/lib/actions/complaints";
 import type { ComplaintHistoryEvent, ComplaintHistoryType } from "@/lib/complaint-history";
+import type { ComplaintDocument } from "@/lib/types";
+import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 
 // ── Event Style Map ──────────────────────────────────────────────────────────
 
@@ -204,7 +207,15 @@ function ActivityDescription({ text }: { text: string }) {
   );
 }
 
-const ActivityItem = React.memo(function ActivityItem({ event }: { event: ComplaintHistoryEvent }) {
+const ActivityItem = React.memo(function ActivityItem({
+  event,
+  doc,
+  onViewSummary,
+}: {
+  event: ComplaintHistoryEvent;
+  doc: ComplaintDocument | null;
+  onViewSummary: (doc: ComplaintDocument) => void;
+}) {
   const [expanded, setExpanded] = React.useState(false);
   const style = event.isAiCorrespondence ? AI_STYLE : (STYLES[event.type] || STYLES.Note);
   const hasDetail = !!event.documentId;
@@ -235,6 +246,11 @@ const ActivityItem = React.memo(function ActivityItem({ event }: { event: Compla
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span className="text-[14px] sm:text-[15px] font-bold text-slate-800 dark:text-slate-200">{event.title}</span>
+              {event.createdByProfile && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 select-none">
+                  by {event.createdByProfile.name} ({event.createdByProfile.role})
+                </span>
+              )}
             </div>
             {event.summary && (
               <div className="mt-1">
@@ -263,7 +279,23 @@ const ActivityItem = React.memo(function ActivityItem({ event }: { event: Compla
             className="overflow-hidden mt-2.5 pl-11"
             onClick={(e) => e.stopPropagation()}
           >
-            <ActivityAttachment event={event} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ActivityAttachment event={event} />
+              {doc && doc.ai_summary_status === "ready" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewSummary(doc);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-left hover:border-slate-300 dark:hover:border-slate-700 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 shadow-3xs text-[11px] font-bold text-slate-700 dark:text-slate-305 cursor-pointer"
+                  aria-label="View AI summary"
+                >
+                  <FileSearch className="h-3.5 w-3.5 text-primary shrink-0" />
+                  View Summary
+                </button>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -291,10 +323,17 @@ const FILTERS: { value: string; label: string; test: (e: ComplaintHistoryEvent) 
   { value: "reminders", label: "Reminders", test: (e) => ["Follow-up", "Reminder"].includes(e.type) },
 ];
 
-function ActivityFeed({ events }: { events: ComplaintHistoryEvent[] }) {
+function ActivityFeed({
+  events,
+  documents,
+}: {
+  events: ComplaintHistoryEvent[];
+  documents: ComplaintDocument[];
+}) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterType, setFilterType] = React.useState<string>("all");
   const [sortOrder, setSortOrder] = React.useState<"newest" | "oldest">("newest");
+  const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
 
   const filteredEvents = React.useMemo(() => {
     const bucket = FILTERS.find((f) => f.value === filterType) ?? FILTERS[0]!;
@@ -355,16 +394,33 @@ function ActivityFeed({ events }: { events: ComplaintHistoryEvent[] }) {
         <div className="space-y-4">
           {grouped.map(({ label, items }) => (
             <ActivityGroup key={label} label={label}>
-              {items.map((e) => <ActivityItem key={e.id} event={e} />)}
+              {items.map((e) => {
+                const doc = e.documentId ? documents.find((d) => d.id === e.documentId) : null;
+                return (
+                  <ActivityItem
+                    key={e.id}
+                    event={e}
+                    doc={doc ?? null}
+                    onViewSummary={(d) => setSummaryDoc(d)}
+                  />
+                );
+              })}
             </ActivityGroup>
           ))}
         </div>
       )}
+      <DocumentSummaryModal doc={summaryDoc} onClose={() => setSummaryDoc(null)} />
     </div>
   );
 }
 
-export function HistoryTimeline({ events }: { events: ComplaintHistoryEvent[] }) {
+export function HistoryTimeline({
+  events,
+  documents,
+}: {
+  events: ComplaintHistoryEvent[];
+  documents: ComplaintDocument[];
+}) {
   if (events.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-12 text-center border-slate-200 dark:border-slate-800">
@@ -374,5 +430,5 @@ export function HistoryTimeline({ events }: { events: ComplaintHistoryEvent[] })
       </div>
     );
   }
-  return <ActivityFeed events={events} />;
+  return <ActivityFeed events={events} documents={documents} />;
 }

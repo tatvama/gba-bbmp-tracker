@@ -69,6 +69,7 @@ export interface AckReviewItem {
   /** Resolved summaries so the UI can render without a second round-trip. */
   proposed: ComplaintSummary | null;
   assigned: ComplaintSummary | null;
+  ocrText?: string | null;
 }
 
 /** The whole batch as the review page sees it. */

@@ -21,7 +21,13 @@ const COMPLAINT_TYPES = [
 
 type Phase = "idle" | "analyzing" | "review" | "committing" | "done";
 
-export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } = {}) {
+export function ComplaintIntakeImport({
+  presetFiles,
+  onReset,
+}: {
+  presetFiles?: File[];
+  onReset?: () => void;
+} = {}) {
   const router = useRouter();
   const [files, setFiles] = React.useState<File[]>([]);
   const [phase, setPhase] = React.useState<Phase>("idle");
@@ -116,6 +122,7 @@ export function ComplaintIntakeImport({ presetFiles }: { presetFiles?: File[] } 
     setCreated([]);
     setFiles([]);
     setError(null);
+    if (onReset) onReset();
   }
 
   if (phase === "analyzing" || phase === "committing") {

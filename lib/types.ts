@@ -212,6 +212,7 @@ export interface ComplaintDocument {
   file_size: number | null;
   page_count: number | null;
   uploaded_by: string | null;
+  uploaded_by_profile?: { name: string; role: string } | null;
   uploaded_at: string;
   captured_date: string | null;
   document_date: string | null;
@@ -298,6 +299,7 @@ export interface ComplaintTimelineEntry {
   related_document_id: string | null;
   related_officer_id: string | null;
   created_by: string | null;
+  created_by_profile?: { name: string; role: string } | null;
   created_at: string;
 }
 
@@ -662,6 +664,7 @@ export interface AiDraft {
   prompt: string | null;
   content: string | null;
   created_by: string | null;
+  created_by_profile?: { name: string; role: string } | null;
   created_at: string;
 }
 

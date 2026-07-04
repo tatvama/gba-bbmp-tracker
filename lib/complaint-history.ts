@@ -15,6 +15,7 @@ export interface ComplaintHistoryEvent {
   documentName?: string | null;
   docType?: string | null;
   pageCount?: number | null;
+  createdByProfile?: { name: string; role: string } | null;
 }
 
 const AI_TITLE_MARKERS = ["ai draft saved", "counter-reply filed"];
@@ -50,6 +51,7 @@ export function buildComplaintHistory(
       documentName: doc?.original_file_name ?? null,
       docType: doc?.document_type ?? null,
       pageCount: doc?.page_count ?? null,
+      createdByProfile: t.created_by_profile ?? null,
     };
   });
 

@@ -1140,7 +1140,7 @@ export async function listComplaintDocuments(complaintId: string): Promise<Compl
   const supabase = await sb();
   const { data, error } = await supabase
     .from("complaint_documents")
-    .select("*")
+    .select("*, uploaded_by_profile:profiles!uploaded_by(name, role)")
     .eq("complaint_id", complaintId)
     .order("uploaded_at", { ascending: false });
   logErr("listComplaintDocuments", error);
@@ -1151,7 +1151,7 @@ export async function getComplaintDocument(id: string): Promise<ComplaintDocumen
   const supabase = await sb();
   const { data, error } = await supabase
     .from("complaint_documents")
-    .select("*")
+    .select("*, uploaded_by_profile:profiles!uploaded_by(name, role)")
     .eq("id", id)
     .maybeSingle();
   logErr("getComplaintDocument", error);
@@ -1162,7 +1162,7 @@ export async function listComplaintTimeline(complaintId: string): Promise<Compla
   const supabase = await sb();
   const { data, error } = await supabase
     .from("complaint_timeline")
-    .select("*")
+    .select("*, created_by_profile:profiles!created_by(name, role)")
     .eq("complaint_id", complaintId)
     .order("event_date", { ascending: false });
   logErr("listComplaintTimeline", error);
@@ -1219,19 +1219,19 @@ export async function listComplaintEscalations(complaintId: string) {
   const supabase = await sb();
   const { data, error } = await supabase
     .from("escalation_logs")
-    .select("*")
+    .select("*, created_by_profile:profiles!created_by(name, role)")
     .eq("entity_type", "complaint")
     .eq("entity_id", complaintId)
     .order("created_at", { ascending: false });
   logErr("listComplaintEscalations", error);
-  return (data as Record<string, unknown>[]) ?? [];
+  return (data as Record<string, any>[]) ?? [];
 }
 
 export async function listComplaintAiDrafts(complaintId: string): Promise<AiDraft[]> {
   const supabase = await sb();
   const { data, error } = await supabase
     .from("ai_drafts")
-    .select("*")
+    .select("*, created_by_profile:profiles!created_by(name, role)")
     .eq("entity_type", "complaint")
     .eq("entity_id", complaintId)
     .order("created_at", { ascending: false });

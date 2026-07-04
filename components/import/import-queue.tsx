@@ -720,9 +720,6 @@ export function ImportQueue({
                   Upload a ZIP archive or complaint letter to begin AI processing. Track upload speeds, parsing nodes, and resolution drafts right here.
                 </p>
               </div>
-              <Button type="button" size="sm" onClick={browse} className="h-9 font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs">
-                <Plus className="h-4 w-4 mr-1" /> Upload Document
-              </Button>
             </CardContent>
           </Card>
         ) : (

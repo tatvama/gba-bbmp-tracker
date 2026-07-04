@@ -25,7 +25,17 @@ export function SmartUpload() {
   // Review screen for an analyzed batch (auto-commit off / legacy links).
   if (reviewingBatch) return <ForensicZipImport />;
 
-  if (letterStarted && letterFiles.length) return <ComplaintIntakeImport presetFiles={letterFiles} />;
+  if (letterStarted && letterFiles.length) {
+    return (
+      <ComplaintIntakeImport
+        presetFiles={letterFiles}
+        onReset={() => {
+          setLetterFiles([]);
+          setLetterStarted(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

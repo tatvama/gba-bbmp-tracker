@@ -169,6 +169,7 @@ export async function getAckBatchAction(batchId: string): Promise<{ batch: AckBa
         attachedDocumentId: it.attached_document_id,
         proposed: it.proposed_complaint_id ? summaryMap.get(it.proposed_complaint_id) ?? null : null,
         assigned: it.assigned_complaint_id ? summaryMap.get(it.assigned_complaint_id) ?? null : null,
+        ocrText: it.ocr_text,
       };
     }),
   );

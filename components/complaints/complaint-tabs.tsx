@@ -20,7 +20,8 @@ import { HistoryTimeline } from "@/components/complaints/history-timeline";
 import { buildComplaintHistory } from "@/lib/complaint-history";
 import { completeComplaintReminder } from "@/lib/actions/complaints";
 import { formatDate, formatDateTime, orDash } from "@/lib/format";
-import { Folder, MapPin, Activity, Clock, FileText } from "lucide-react";
+import { Folder, MapPin, Activity, Clock, FileText, FileSearch } from "lucide-react";
+import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import type {
   ComplaintWithRelations, ComplaintDocument, ComplaintTimelineEntry,
   ComplaintReply, ComplaintActionTaken, CommunicationLog, Reminder, AiDraft, AuditLog,
@@ -47,6 +48,7 @@ export function ComplaintTabs({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
   const initialTab = searchParams.get("tab") ?? "overview"; // deep-linkable (e.g. ?tab=documents)
   const docOpts = documents.map((d) => ({ id: d.id, title: d.title }));
   const c = complaint;
@@ -58,7 +60,8 @@ export function ComplaintTabs({
   }
 
   return (
-    <Tabs defaultValue={initialTab} className="space-y-6">
+    <>
+      <Tabs defaultValue={initialTab} className="space-y-6">
       {/* Sticky Tab Navigation Bar */}
       <div className="sticky top-[62px] z-25 bg-background/95 backdrop-blur py-3 border-b border-slate-150/85 -mx-4 md:-mx-6 px-4 md:px-6 no-print">
         <div className="overflow-x-auto scrollbar-none">
@@ -68,8 +71,6 @@ export function ComplaintTabs({
             <TabsTrigger value="documents" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Documents &amp; OCR ({documents.length + jobDocuments.length})</TabsTrigger>
             <TabsTrigger value="timeline" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Timeline</TabsTrigger>
             <TabsTrigger value="replies" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Replies ({replies.length})</TabsTrigger>
-            <TabsTrigger value="actions" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Action Taken ({actions.length})</TabsTrigger>
-            <TabsTrigger value="comms" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Communications ({communications.length})</TabsTrigger>
             <TabsTrigger value="followups" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Follow-ups ({reminders.filter((r) => r.status === "Pending").length})</TabsTrigger>
             <TabsTrigger value="escalations" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Escalations ({escalations.length})</TabsTrigger>
             <TabsTrigger value="ai" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">AI Drafts</TabsTrigger>
@@ -231,50 +232,29 @@ export function ComplaintTabs({
       </TabsContent>
 
       <TabsContent value="timeline">
-        <HistoryTimeline events={historyEvents} />
+        <HistoryTimeline events={historyEvents} documents={documents} />
       </TabsContent>
 
       <TabsContent value="replies">
         <div className="space-y-4">
-          {flags.canEdit && <ReplyForm complaintId={c.id} documents={docOpts} />}
-          {replies.length === 0 ? <EmptyState title="No replies recorded" /> : replies.map((r) => (
-            <Card key={r.id}><CardContent className="pt-6">
-              <div className="flex items-center justify-between"><span className="font-medium">{orDash(r.replied_by_name)} {r.replied_by_designation ? `(${r.replied_by_designation})` : ""}</span><span className="text-xs text-muted-foreground">{formatDate(r.reply_date)}</span></div>
-              <p className="mt-1 text-sm">{orDash(r.reply_summary)}</p>
-              {r.issues_remaining && <p className="mt-1 text-xs text-amber-dark">Issues remaining: {r.issues_remaining}</p>}
-              {r.is_satisfactory != null && <Badge className="mt-2" variant={r.is_satisfactory ? "success" : "warning"}>{r.is_satisfactory ? "Satisfactory" : "Not satisfactory"}</Badge>}
-            </CardContent></Card>
-          ))}
-        </div>
-      </TabsContent>
-
-      <TabsContent value="actions">
-        <div className="space-y-4">
-          {flags.canEdit && <ActionForm complaintId={c.id} documents={docOpts} />}
-          {actions.length === 0 ? <EmptyState title="No action-taken records" /> : actions.map((a) => (
-            <Card key={a.id}><CardContent className="pt-6">
-              <div className="flex items-center justify-between"><span className="font-medium">{orDash(a.action_taken_by_name)} {a.action_taken_by_designation ? `(${a.action_taken_by_designation})` : ""}</span><span className="text-xs text-muted-foreground">{formatDate(a.action_taken_date)}</span></div>
-              <p className="mt-1 text-sm">{orDash(a.action_summary)}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {a.work_completed && <Badge variant="success">Work completed</Badge>}
-                {a.site_visited && <Badge variant="outline">Site visited</Badge>}
-                {a.pending_work && <Badge variant="warning">Pending work</Badge>}
-              </div>
-            </CardContent></Card>
-          ))}
-        </div>
-      </TabsContent>
-
-      <TabsContent value="comms">
-        <div className="space-y-4">
-          {flags.canField && <CommunicationForm complaintId={c.id} officers={officers} />}
-          {communications.length === 0 ? <EmptyState title="No communications logged" /> : communications.map((m) => (
-            <Card key={m.id}><CardContent className="pt-6">
-              <div className="flex items-center justify-between"><span className="font-medium">{m.comm_type}{m.contact_person ? ` · ${m.contact_person}` : ""}</span><span className="text-xs text-muted-foreground">{formatDateTime(m.occurred_at)}</span></div>
-              {m.summary && <p className="mt-1 text-sm">{m.summary}</p>}
-              {m.next_action && <p className="mt-1 text-xs text-muted-foreground">Next: {m.next_action}{m.next_action_date ? ` (${formatDate(m.next_action_date)})` : ""}</p>}
-            </CardContent></Card>
-          ))}
+          {replies.length === 0 ? <EmptyState title="No replies recorded" /> : replies.map((r) => {
+            const doc = r.document_id ? documents.find((d) => d.id === r.document_id) : null;
+            return (
+              <Card key={r.id}><CardContent className="pt-6">
+                <div className="flex items-center justify-between"><span className="font-medium">{orDash(r.replied_by_name)} {r.replied_by_designation ? `(${r.replied_by_designation})` : ""}</span><span className="text-xs text-muted-foreground">{formatDate(r.reply_date)}</span></div>
+                <p className="mt-1 text-sm">{orDash(r.reply_summary)}</p>
+                {r.issues_remaining && <p className="mt-1 text-xs text-amber-dark">Issues remaining: {r.issues_remaining}</p>}
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {r.is_satisfactory != null && <Badge variant={r.is_satisfactory ? "success" : "warning"}>{r.is_satisfactory ? "Satisfactory" : "Not satisfactory"}</Badge>}
+                  {doc && doc.ai_summary_status === "ready" && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs font-bold" onClick={() => setSummaryDoc(doc)}>
+                      <FileSearch className="h-3.5 w-3.5 mr-1" /> View Summary
+                    </Button>
+                  )}
+                </div>
+              </CardContent></Card>
+            );
+          })}
         </div>
       </TabsContent>
 
@@ -301,7 +281,6 @@ export function ComplaintTabs({
 
       <TabsContent value="escalations">
         <div className="space-y-4">
-          {flags.canEdit && <EscalationForm complaintId={c.id} />}
           {escalations.length === 0 ? <EmptyState title="No escalations" /> : escalations.map((e) => (
             <Card key={String(e.id)}><CardContent className="pt-6">
               <div className="flex items-center justify-between"><span className="font-medium">To {orDash(e.to_level as string)}{e.to_officer ? ` · ${e.to_officer}` : ""}</span><span className="text-xs text-muted-foreground">{formatDate(e.escalated_on as string)}</span></div>
@@ -328,5 +307,7 @@ export function ComplaintTabs({
         )}
       </TabsContent>
     </Tabs>
-  );
+    <DocumentSummaryModal doc={summaryDoc} onClose={() => setSummaryDoc(null)} />
+  </>
+);
 }

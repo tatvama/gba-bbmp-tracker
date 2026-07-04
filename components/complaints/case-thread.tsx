@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUpRight, ArrowDownLeft, FileText, Gavel, Eye, ScrollText, MessageSquareReply } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, FileText, Gavel, Eye, ScrollText, MessageSquareReply, FileSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
+import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import { COMPLAINT_DRAFT_KINDS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import type { ComplaintDocument, AiDraft } from "@/lib/types";
@@ -26,6 +27,7 @@ type ThreadEntry = {
   title: string;
   subtitle?: string | null;
   viewer?: ViewerTarget;
+  createdByProfile?: { name: string; role: string } | null;
 };
 
 const isCounterReplyDoc = (t: string | null | undefined) => !!t && /counter[- ]?reply/i.test(t);
@@ -54,6 +56,7 @@ export function CaseThread({
   aiDrafts: AiDraft[];
 }) {
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
+  const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
 
   const entries: ThreadEntry[] = [];
 
@@ -69,17 +72,17 @@ export function CaseThread({
     // Order matters: "Counter-reply" / "Escalation letter" also match the
     // reply regex, so classify them (outbound, ours) BEFORE isReplyDoc.
     if (isCounterReplyDoc(t)) {
-      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Counter-reply", title: d.title || "Counter-reply", subtitle: d.ai_summary, viewer: target });
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Counter-reply", title: d.title || "Counter-reply", subtitle: d.ai_summary, viewer: target, createdByProfile: d.uploaded_by_profile });
     } else if (isEscalationDoc(t)) {
-      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Escalation", title: d.title || "Escalation letter", subtitle: d.ai_summary, viewer: target });
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Escalation", title: d.title || "Escalation letter", subtitle: d.ai_summary, viewer: target, createdByProfile: d.uploaded_by_profile });
     } else if (isLetterDoc(t)) {
-      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Complaint letter", title: d.title || "Drafted complaint letter", subtitle: d.document_type, viewer: target });
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "out", kind: "Complaint letter", title: d.title || "Drafted complaint letter", subtitle: d.document_type, viewer: target, createdByProfile: d.uploaded_by_profile });
     } else if (isAckDoc(t)) {
-      entries.push({ id: d.id, date: d.uploaded_at, dir: "in", kind: "Acknowledgement", title: d.title || d.document_type || "Acknowledgement", subtitle: d.ai_summary, viewer: target });
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "in", kind: "Acknowledgement", title: d.title || d.document_type || "Acknowledgement", subtitle: d.ai_summary, viewer: target, createdByProfile: d.uploaded_by_profile });
     } else if (isReplyDoc(t)) {
-      entries.push({ id: d.id, date: d.uploaded_at, dir: "in", kind: "Reply / report", title: d.title || d.document_type || "Department reply", subtitle: d.ai_summary, viewer: target });
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "in", kind: "Reply / report", title: d.title || d.document_type || "Department reply", subtitle: d.ai_summary, viewer: target, createdByProfile: d.uploaded_by_profile });
     } else {
-      entries.push({ id: d.id, date: d.uploaded_at, dir: "note", kind: "Document", title: d.title || d.original_file_name || "Document", subtitle: d.document_type, viewer: target });
+      entries.push({ id: d.id, date: d.uploaded_at, dir: "note", kind: "Document", title: d.title || d.original_file_name || "Document", subtitle: d.document_type, viewer: target, createdByProfile: d.uploaded_by_profile });
     }
   }
 
@@ -97,6 +100,7 @@ export function CaseThread({
       title: kindLabel,
       subtitle: (dr.content ?? "").slice(0, 120),
       viewer: dr.content ? { documentId: "", title: kindLabel, fallbackText: dr.content } : undefined,
+      createdByProfile: dr.created_by_profile,
     });
   }
 
@@ -108,6 +112,7 @@ export function CaseThread({
       kind: "Escalation",
       title: `Escalated to ${(e.to_level as string) ?? "next authority"}${e.to_officer ? ` · ${e.to_officer}` : ""}`,
       subtitle: (e.reason as string) ?? null,
+      createdByProfile: e.created_by_profile as { name: string; role: string } | null,
     });
   }
 
@@ -146,14 +151,31 @@ export function CaseThread({
                 </span>
                 <Badge variant="outline" className="gap-1"><Icon className="h-3 w-3" />{e.kind}</Badge>
                 <span className="text-sm font-medium">{e.title}</span>
+                {e.createdByProfile && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 select-none">
+                    by {e.createdByProfile.name} ({e.createdByProfile.role})
+                  </span>
+                )}
                 <span className="ml-auto text-xs text-muted-foreground">{e.date ? formatDate(e.date) : "—"}</span>
               </div>
               {e.subtitle && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{e.subtitle}</p>}
               {e.viewer && (
-                <div className="mt-2">
+                <div className="mt-2 flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={() => setViewTarget(e.viewer!)}>
-                    <Eye className="h-4 w-4" /> {e.kind === "Draft" ? "Read" : "View"}
+                    <Eye className="h-4 w-4 mr-1" /> {e.kind === "Draft" ? "Read" : "View"}
                   </Button>
+                  {(() => {
+                    const docId = e.viewer?.documentId;
+                    const doc = docId ? documents.find((d) => d.id === docId) : null;
+                    if (doc && doc.ai_summary_status === "ready") {
+                      return (
+                        <Button size="sm" variant="outline" onClick={() => setSummaryDoc(doc)}>
+                          <FileSearch className="h-4 w-4 mr-1" /> View Summary
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </li>
@@ -162,6 +184,7 @@ export function CaseThread({
       </ol>
 
       <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
+      <DocumentSummaryModal doc={summaryDoc} onClose={() => setSummaryDoc(null)} />
     </>
   );
 }
