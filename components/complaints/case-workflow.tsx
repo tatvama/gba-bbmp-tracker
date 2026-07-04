@@ -206,13 +206,10 @@ export function CaseWorkflow({
                     onClick={() => setActive(s.key)}
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 relative focus:outline-none",
-                      done
-                        ? cn(
-                            "border-emerald-500 bg-emerald-500 text-white",
-                            isActive && "scale-110 ring-4 ring-emerald-500/20 shadow-md"
-                          )
-                        : isActive
+                      isActive
                         ? "border-primary bg-primary text-primary-foreground shadow-md scale-110 ring-4 ring-primary/20"
+                        : done
+                        ? "border-emerald-500 bg-emerald-500 text-white"
                         : locked
                         ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-600"
                         : "border-slate-300 bg-white text-slate-600 hover:border-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-350 cursor-pointer"
