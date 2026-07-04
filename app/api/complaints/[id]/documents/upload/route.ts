@@ -1,10 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/supabase-upload";
 import { processDocumentOcr, analyzeDocumentById } from "@/lib/ocr/process-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { findPhotoMatches, deriveStage } from "@/lib/dedupe-photos";
+import { scanDivisionVisualDuplicates } from "@/lib/forensic/job-photo-dedupe";
 import { geofencePhoto } from "@/lib/geo";
 import { getComplaintSettings, getForensicsRules } from "@/lib/settings";
 import { isAiConfigured } from "@/lib/ai/provider";
@@ -198,6 +199,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       console.error("[upload] OCR failed (upload preserved)", e);
       ocrStatus = "Failed";
     }
+  }
+
+  // 4b) VISUAL duplicate scan (print→scan reuse the hashes above can't catch).
+  // Runs AFTER the response is sent — the vision compare is slow AI work. Only
+  // for images on complaints linked to a job case (cross-JOB detection needs a
+  // job code + division); the pair cache keeps repeat scans cheap.
+  if (mime.startsWith("image/") && isAiConfigured()) {
+    after(async () => {
+      try {
+        const { data: jc } = await admin
+          .from("job_cases")
+          .select("division")
+          .eq("complaint_id", id)
+          .maybeSingle();
+        const division = (jc?.division as string | null) ?? null;
+        if (!division) return;
+        const res = await scanDivisionVisualDuplicates(division);
+        const mine = res.matches.filter((m) => m.a.documentId === documentId || m.b.documentId === documentId);
+        if (mine.length) {
+          await admin.from("complaint_timeline").insert({
+            complaint_id: id,
+            event_type: "Note",
+            title: `⚠ Visual duplicate suspicion — this photo appears under ${mine.length} other job code(s)`,
+            summary: mine
+              .slice(0, 5)
+              .map((m) => {
+                const other = m.a.documentId === documentId ? m.b : m.a;
+                return `${other.jobNumber} (${m.confidence})`;
+              })
+              .join("; "),
+            related_document_id: documentId,
+            created_by: user.id,
+          });
+        }
+      } catch (e) {
+        console.warn("[upload] visual duplicate scan failed (upload preserved)", e);
+      }
+    });
   }
 
   // 5) AI summary — generate ONCE now, store permanently. Runs in the background

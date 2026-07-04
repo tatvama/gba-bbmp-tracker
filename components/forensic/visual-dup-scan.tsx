@@ -3,8 +3,33 @@
 import * as React from "react";
 import { Loader2, Eye, ArrowLeftRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { scanDivisionVisualDuplicatesAction } from "@/lib/actions/job-photo-dedupe";
-import type { VisualScanResult } from "@/lib/forensic/job-photo-dedupe";
+import type { DupPhoto, VisualScanResult } from "@/lib/forensic/job-photo-dedupe";
+
+function photoHref(p: DupPhoto): string {
+  return p.source === "complaint" && p.complaintId
+    ? `/complaints/${p.complaintId}`
+    : `/complaints/job/${encodeURIComponent(p.jobNumber)}/dossier`;
+}
+
+function MatchPhoto({ p }: { p: DupPhoto }) {
+  return (
+    <Link href={photoHref(p)} className="group relative shrink-0" title={p.fileName ?? p.jobNumber}>
+      {p.url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.url} alt={p.jobNumber} className="h-28 w-28 rounded-md border object-cover transition group-hover:opacity-90" />
+      ) : (
+        <div className="flex h-28 w-28 items-center justify-center rounded-md border bg-muted text-[10px] text-muted-foreground">
+          no preview
+        </div>
+      )}
+      <span className="absolute inset-x-0 bottom-0 truncate rounded-b-md bg-black/60 px-1 py-0.5 text-center font-mono text-[9px] text-white">
+        {p.jobNumber}
+      </span>
+    </Link>
+  );
+}
 
 /**
  * On-demand VISUAL duplicate scan (the print→scan case hashes miss). Pick a
@@ -83,7 +108,12 @@ export function VisualDupScan({ divisions }: { divisions: string[] }) {
                         {m.confidence}
                       </span>
                     </div>
-                    {m.sharedDetails && <p className="mt-1 text-xs text-muted-foreground">{m.sharedDetails}</p>}
+                    <div className="mt-2 flex items-center gap-3">
+                      <MatchPhoto p={m.a} />
+                      <ArrowLeftRight className="h-4 w-4 shrink-0 text-rose-400" />
+                      <MatchPhoto p={m.b} />
+                    </div>
+                    {m.sharedDetails && <p className="mt-1.5 text-xs text-muted-foreground">{m.sharedDetails}</p>}
                   </li>
                 ))}
                 {result.matches.length === 0 && <li className="text-xs text-muted-foreground">No visual duplicates found in this division.</li>}
