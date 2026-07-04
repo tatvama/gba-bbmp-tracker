@@ -13,13 +13,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, text } = body;
+    const { title, text, reference } = body as { title?: string; text?: string; reference?: string };
 
     if (!text) {
       return NextResponse.json({ error: "Missing text in request body." }, { status: 400 });
     }
 
-    const { buffer, fileName } = await generateDraftPdfService(title || "Draft", text);
+    const { buffer, fileName } = await generateDraftPdfService(title || "Draft", text, undefined, {
+      reference: typeof reference === "string" && reference.trim() ? reference.trim() : null,
+    });
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {

@@ -64,6 +64,7 @@ export function LetterEditorModal({
   onSave,
   saving = false,
   savedAt,
+  reference,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -73,6 +74,8 @@ export function LetterEditorModal({
   onSave: () => void | Promise<void>;
   saving?: boolean;
   savedAt?: string | null;
+  /** Complaint internal case number — stamped (text + QR) on the printed PDF. */
+  reference?: string | null;
 }) {
   const [mode, setMode] = React.useState<"edit" | "preview">("edit");
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -135,7 +138,7 @@ export function LetterEditorModal({
   async function handlePrint() {
     setPdfBusy(true);
     setPdfError(null);
-    const err = await openDraftPdf(title, value);
+    const err = await openDraftPdf(title, value, { reference });
     setPdfBusy(false);
     if (err) setPdfError(err);
   }

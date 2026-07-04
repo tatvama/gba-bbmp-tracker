@@ -19,10 +19,14 @@ export function ComplaintAiDrafts({
   complaintId,
   aiConfigured,
   saved,
+  caseNumber,
 }: {
   complaintId: string;
   aiConfigured: boolean;
   saved: AiDraft[];
+  /** Internal case number — stamped (text + QR) on printed letters for later
+   *  acknowledgment auto-matching. */
+  caseNumber?: string | null;
 }) {
   const [kind, setKind] = React.useState<ComplaintDraftKind>("followup_letter");
   const [tone, setTone] = React.useState<LegalTone>("Formal");
@@ -213,7 +217,7 @@ export function ComplaintAiDrafts({
           disabled={!draft || pdfBusy}
           onClick={async () => {
             setPdfBusy(true); setError(null);
-            const err = await openDraftPdf(COMPLAINT_DRAFT_KINDS[kind], draft);
+            const err = await openDraftPdf(COMPLAINT_DRAFT_KINDS[kind], draft, { reference: caseNumber });
             setPdfBusy(false);
             if (err) setError(err);
           }}
@@ -234,6 +238,7 @@ export function ComplaintAiDrafts({
         onSave={save}
         saving={saving}
         savedAt={savedAt}
+        reference={caseNumber}
       />
 
       {saved.length > 0 && (
