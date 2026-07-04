@@ -158,10 +158,12 @@ export async function analyzeComplaintIntakeFromImages(params: {
   const images = downscaled.map((d) => ({ mediaType: d.mimeType, dataBase64: d.buffer.toString("base64") }));
 
   const system =
-    "You read ONE citizen's civic complaint letter / acknowledgement (BBMP / GBA, Bengaluru) from its page IMAGES — the images are authoritative; any OCR text is a NOISY hint (especially for Kannada/handwriting). Extract its fields using ONLY what is visible in THESE pages. Do not invent names or numbers; leave a field empty/[] when it is genuinely absent. Output STRICT JSON only — no markdown, no commentary.";
+    "You read ONE citizen's civic complaint letter / acknowledgement (BBMP / GBA, Bengaluru) from its page IMAGES — the images are authoritative; any OCR text is a NOISY hint (especially for Kannada/handwriting). These are real Bengaluru civic documents in Kannada and/or English — READ THE KANNADA. " +
+    "A complaint letter ALWAYS has a matter/subject and asks for something, so you MUST fill `subject` and `summary` even if there is no explicit 'Subject:' line — infer them from the body (you may write them in English and/or keep Kannada terms). Also fill `department`, `areaOrWard`, `reporterName`, `requestedAction` and dates whenever they are legible. Only structured identifiers you genuinely cannot see (a reference/job number, an officer's exact name) may be left empty — never invent those. " +
+    "Output STRICT JSON only — no markdown fences, no commentary before or after.";
   const hint = (params.ocrText || "").trim()
-    ? `OCR hint (noisy):\n"""\n${params.ocrText.slice(0, 8000)}\n"""`
-    : "(No reliable OCR — read the images.)";
+    ? `OCR hint (noisy — trust the images over this):\n"""\n${params.ocrText.slice(0, 8000)}\n"""`
+    : "(No reliable OCR — read the images directly.)";
   const prompt = `${hint}
 
 Output STRICT JSON of EXACTLY this shape:
@@ -169,19 +171,40 @@ ${INTAKE_JSON_SHAPE}`;
 
   const res = await generateVision({ system, prompt, images, temperature: 0, maxTokens: 1800 });
   if (!res.ok || !res.text) {
-    // Vision failed → fall back to OCR-text extraction so we never regress.
+    console.warn(`[intake-vision] vision call failed (${res.error ?? "no text"}); falling back to OCR text`);
     return analyzeComplaintIntake(params.ocrText || "");
   }
 
-  const cleaned = res.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  let data: Partial<ComplaintIntakeExtraction>;
-  try {
-    data = JSON.parse(cleaned) as Partial<ComplaintIntakeExtraction>;
-  } catch {
-    console.warn("[analyzeComplaintIntakeFromImages] JSON parse failed; falling back to OCR text");
+  const data = looseParseJson<ComplaintIntakeExtraction>(res.text);
+  if (!data) {
+    console.warn("[intake-vision] could not parse JSON from vision response; head:", res.text.slice(0, 200));
     return analyzeComplaintIntake(params.ocrText || "");
   }
-  return { ok: true, extraction: finalizeExtraction(base, data) };
+  const extraction = finalizeExtraction(base, data);
+  console.log(
+    `[intake-vision] ok — subject:${extraction.subject ? "yes" : "EMPTY"} dept:${extraction.department ? "yes" : "no"} conf:${extraction.confidence}`,
+  );
+  return { ok: true, extraction };
+}
+
+/** Parse JSON from a model response that may be fenced or wrapped in prose:
+ *  try as-is, then strip ```fences```, then the first `{` … last `}` slice. */
+function looseParseJson<T>(text: string): Partial<T> | null {
+  const candidates: string[] = [];
+  const trimmed = text.trim();
+  candidates.push(trimmed);
+  candidates.push(trimmed.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim());
+  const first = trimmed.indexOf("{");
+  const last = trimmed.lastIndexOf("}");
+  if (first >= 0 && last > first) candidates.push(trimmed.slice(first, last + 1));
+  for (const c of candidates) {
+    try {
+      return JSON.parse(c) as Partial<T>;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
 }
 
 /**
