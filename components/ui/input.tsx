@@ -28,6 +28,15 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       "July", "August", "September", "October", "November", "December"
     ];
 
+    const years = React.useMemo(() => {
+      const currentYear = new Date().getFullYear();
+      const list: number[] = [];
+      for (let y = currentYear - 25; y <= currentYear + 15; y++) {
+        list.push(y);
+      }
+      return list;
+    }, []);
+
     // Detect click outside to close
     React.useEffect(() => {
       if (!showCalendar) return;
@@ -183,9 +192,26 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <span className="font-extrabold text-slate-800 text-xs">
-                  {months[month]}, {year}
-                </span>
+                <div className="flex items-center gap-0.5">
+                  <select
+                    value={month}
+                    onChange={(e) => setCurrentDate(new Date(year, parseInt(e.target.value), 1))}
+                    className="bg-transparent font-extrabold border-none outline-none text-slate-800 cursor-pointer text-xs focus:ring-0 p-0 pr-1 hover:text-primary transition-colors"
+                  >
+                    {months.map((m, idx) => (
+                      <option key={m} value={idx}>{m}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={year}
+                    onChange={(e) => setCurrentDate(new Date(parseInt(e.target.value), month, 1))}
+                    className="bg-transparent font-extrabold border-none outline-none text-slate-800 cursor-pointer text-xs focus:ring-0 p-0 hover:text-primary transition-colors"
+                  >
+                    {years.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   type="button"
                   onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
