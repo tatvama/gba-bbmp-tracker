@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Loader2, Copy, Printer, Save, Check, AlertTriangle, Download, Pencil, Eye } from "lucide-react";
+import { Sparkles, Loader2, Copy, Printer, Save, Check, AlertTriangle, Download, Pencil, Eye, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -33,32 +33,57 @@ export function ComplaintAiDrafts({
   const [savedMsg, setSavedMsg] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [view, setView] = React.useState<"preview" | "edit">("preview");
+  // Live status while a generation job is running — see the "Live" block below.
+  const [liveText, setLiveText] = React.useState("");
+  const [stageLabel, setStageLabel] = React.useState<string | null>(null);
+  const [progress, setProgress] = React.useState<number | null>(null);
+  const [elapsed, setElapsed] = React.useState(0);
+  const startedAtRef = React.useRef(0);
   const activeRef = React.useRef(true);
   React.useEffect(() => () => { activeRef.current = false; }, []);
+  React.useEffect(() => {
+    if (!busy) return;
+    setElapsed(0);
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [busy]);
 
   // Generation runs as a BACKGROUND job: it keeps running (and saves + alerts on
   // finish) even if you navigate away. We poll here for the in-place result; if
   // this panel unmounts, the job still completes and shows in Saved drafts + the
-  // notifications bell.
+  // notifications bell. While it runs, the job row also carries a live status
+  // (current pipeline stage + streamed partial text) that we poll quickly to
+  // show real-time progress — see onDraftProgress in lib/actions/jobs.ts.
   async function generate() {
-    setBusy(true); setError(null); setSavedMsg(false);
+    setBusy(true); setError(null); setSavedMsg(false); setLiveText("");
+    setStageLabel("Connecting to Claude…"); setProgress(5);
+    startedAtRef.current = Date.now();
     const start = await startAiDraftJob({ complaintId, kind, tone, language });
-    if (!start.ok || !start.jobId) { setError(start.error ?? "Could not start generation."); setBusy(false); return; }
+    if (!start.ok || !start.jobId) {
+      setError(start.error ?? "Could not start generation."); setBusy(false); setStageLabel(null); setProgress(null);
+      return;
+    }
     const jid = start.jobId;
     const poll = async () => {
       if (!activeRef.current) return;
       const r = await getJobAction(jid);
-      const st = r.job?.status;
-      if (st === "done") {
-        const text = (r.job?.result as { text?: string } | null)?.text;
-        if (text) { setDraft(text); setView("preview"); }
-        setBusy(false);
+      const job = r.job;
+      if (!job) { setError(r.error ?? "Job not found."); setBusy(false); setStageLabel(null); setProgress(null); return; }
+      const result = job.result as { text?: string; partial?: boolean; stageLabel?: string; lintWarning?: string } | null;
+      if (job.status === "done") {
+        if (result?.text) { setDraft(result.text); setView("preview"); }
+        setBusy(false); setStageLabel(null); setProgress(null); setLiveText("");
         return;
       }
-      if (st === "failed") { setError(r.job?.error ?? "Generation failed."); setBusy(false); return; }
-      setTimeout(poll, 2500);
+      if (job.status === "failed") { setError(job.error ?? "Generation failed."); setBusy(false); setStageLabel(null); setProgress(null); return; }
+      if (result?.partial) {
+        if (typeof result.text === "string") setLiveText(result.text);
+        if (result.stageLabel) setStageLabel(result.stageLabel);
+      }
+      if (typeof job.progress === "number") setProgress(job.progress);
+      setTimeout(poll, 800);
     };
-    setTimeout(poll, 1500);
+    setTimeout(poll, 500);
   }
   async function save() {
     if (!draft.trim()) return;
@@ -122,7 +147,38 @@ export function ComplaintAiDrafts({
       </div>
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">{error}</div>}
 
-      {draft && (
+      {busy && (
+        <div className="space-y-2.5 rounded-md border border-primary/30 bg-primary/5 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              LIVE
+              <Activity className="h-3.5 w-3.5" />
+              <span className="font-normal text-primary/90">{stageLabel ?? "Working…"}</span>
+            </div>
+            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+              {liveText ? `${liveText.length.toLocaleString()} chars · ` : ""}{elapsed}s
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary/10">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+              style={{ width: `${Math.max(6, progress ?? 8)}%` }}
+            />
+          </div>
+          {liveText && (
+            <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded border bg-background/70 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
+              {liveText}
+              <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 animate-pulse bg-primary/70 align-middle" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {!busy && draft && (
         <div className="no-print flex items-center gap-1 rounded-md border bg-muted/40 p-0.5 text-xs w-fit">
           <button type="button" onClick={() => setView("preview")} className={`flex items-center gap-1 rounded px-2.5 py-1 font-medium transition-colors ${view === "preview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
             <Eye className="h-3.5 w-3.5" /> Preview
@@ -133,10 +189,12 @@ export function ComplaintAiDrafts({
         </div>
       )}
 
-      {draft && view === "preview" ? (
-        <LetterPreview markdown={draft} />
-      ) : (
-        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={16} placeholder="Generated draft appears here and is fully editable…" className="font-mono text-sm" />
+      {!busy && (
+        draft && view === "preview" ? (
+          <LetterPreview markdown={draft} />
+        ) : (
+          <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={16} placeholder="Generated draft appears here and is fully editable…" className="font-mono text-sm" />
+        )
       )}
 
       <div className="no-print flex flex-wrap gap-2">
