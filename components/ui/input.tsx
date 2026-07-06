@@ -66,6 +66,16 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           const evChange = new Event("change", { bubbles: true });
           resolvedRef.current.dispatchEvent(evChange);
         }
+        if (onChange) {
+          const synthEvent = {
+            target: resolvedRef.current,
+            currentTarget: resolvedRef.current,
+            preventDefault: () => {},
+            stopPropagation: () => {},
+            bubble: true,
+          } as unknown as React.ChangeEvent<HTMLInputElement>;
+          onChange(synthEvent);
+        }
       }
       setShowCalendar(false);
     };
@@ -82,6 +92,16 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           resolvedRef.current.dispatchEvent(evInput);
           const evChange = new Event("change", { bubbles: true });
           resolvedRef.current.dispatchEvent(evChange);
+        }
+        if (onChange) {
+          const synthEvent = {
+            target: resolvedRef.current,
+            currentTarget: resolvedRef.current,
+            preventDefault: () => {},
+            stopPropagation: () => {},
+            bubble: true,
+          } as unknown as React.ChangeEvent<HTMLInputElement>;
+          onChange(synthEvent);
         }
       }
       setShowCalendar(false);
@@ -103,6 +123,16 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           resolvedRef.current.dispatchEvent(evInput);
           const evChange = new Event("change", { bubbles: true });
           resolvedRef.current.dispatchEvent(evChange);
+        }
+        if (onChange) {
+          const synthEvent = {
+            target: resolvedRef.current,
+            currentTarget: resolvedRef.current,
+            preventDefault: () => {},
+            stopPropagation: () => {},
+            bubble: true,
+          } as unknown as React.ChangeEvent<HTMLInputElement>;
+          onChange(synthEvent);
         }
       }
       setShowCalendar(false);
