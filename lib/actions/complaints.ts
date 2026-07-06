@@ -1429,7 +1429,7 @@ export async function listComplaintReplyFilesAction(complaintId: string): Promis
     .from("complaint_documents")
     .select("id, title, original_file_name, document_type, mime_type, uploaded_at")
     .eq("complaint_id", complaintId)
-    .or("document_type.ilike.%reply%,document_type.ilike.%action taken%,document_type.ilike.%atr%,document_type.ilike.%report%")
+    .or("document_type.ilike.%reply%,document_type.ilike.%action taken%,document_type.ilike.%atr%,document_type.ilike.%report%,document_type.ilike.%reminder%,document_type.ilike.%notice%")
     .order("uploaded_at", { ascending: false })
     .limit(8);
   const files: ReplyFile[] = ((data as Record<string, unknown>[]) ?? []).map((d) => {
@@ -1438,7 +1438,7 @@ export async function listComplaintReplyFilesAction(complaintId: string): Promis
       id: d.id as string,
       title: (d.title as string) || (d.original_file_name as string) || dt || "Document",
       documentType: dt,
-      direction: /counter/i.test(dt) ? "out" : "in",
+      direction: /counter|reminder|notice/i.test(dt) ? "out" : "in",
       uploadedAt: (d.uploaded_at as string) ?? "",
       mimeType: (d.mime_type as string) ?? null,
       fileName: (d.original_file_name as string) ?? null,
