@@ -667,10 +667,6 @@ function SubmitPanel({
               <Label className="text-xs">Acknowledgement / reference no.</Label>
               <input type="text" value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="Inward / RPAD / portal no." className={selectCls} />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Follow up after (days)</Label>
-              <input type="number" min={1} value={followUpDays} onChange={(e) => setFollowUpDays(e.target.value)} className={selectCls} />
-            </div>
           </div>
           {error && <p className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
           <Button size="sm" disabled={busy} onClick={submit}>
