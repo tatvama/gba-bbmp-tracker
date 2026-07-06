@@ -282,7 +282,7 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CARD 1: General Configuration */}
         <Card className="border border-slate-200 dark:border-slate-800 shadow-2xs rounded-xl hover:shadow-xs transition-all duration-200">
           <div className="p-5 border-b dark:border-slate-800 flex items-center gap-3 bg-slate-50/50 dark:bg-slate-900/20 rounded-t-xl">

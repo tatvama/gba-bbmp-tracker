@@ -377,7 +377,7 @@ const ActivityItem = React.memo(function ActivityItem({
       </div>
 
       {/* COLUMN 3: Activity Details Card (Right) */}
-      <div className="pb-8 min-w-0">
+      <div className="pb-6 min-w-0">
         <div
           onClick={() => hasDetail && setExpanded(!expanded)}
           onKeyDown={handleKeyDown}
