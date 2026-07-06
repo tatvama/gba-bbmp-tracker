@@ -24,6 +24,7 @@ import {
   COMPLAINT_VERIFY_ROLES,
   STORAGE_BUCKETS,
   R2_STORAGE_SENTINEL,
+  COMPLAINT_DRAFT_KINDS,
   type UserRole,
 } from "@/lib/constants";
 import { getComplaintSettings } from "@/lib/settings";
@@ -1178,6 +1179,126 @@ export async function fileCounterReplyAction(
     stage: "awaiting_reply",
     event: "counter_reply_filed",
     complaint_document_id: documentId,
+  });
+
+  revalidatePath(`/complaints/${complaintId}`);
+  void triggerAdvisorAnalysis(complaintId);
+  return { ok: true, documentId };
+}
+
+export async function fileCommunicationDraftAction(
+  complaintId: string,
+  content: string,
+  kind: ComplaintDraftKind,
+): Promise<{ ok: boolean; documentId?: string; error?: string }> {
+  if (kind === "counter_reply") {
+    return fileCounterReplyAction(complaintId, content);
+  }
+
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const { user, admin } = a;
+  if (!content.trim()) return { ok: false, error: `Nothing to file — generate the ${COMPLAINT_DRAFT_KINDS[kind]} first.` };
+
+  const { data: compCase } = await admin
+    .from("complaints")
+    .select("internal_case_number, escalation_round")
+    .eq("id", complaintId)
+    .single();
+
+  const label = COMPLAINT_DRAFT_KINDS[kind];
+  let pdf: Buffer;
+  let fileName: string;
+  try {
+    const r = await generateDraftPdfService(label, content, undefined, {
+      reference: compCase?.internal_case_number ?? null,
+    });
+    pdf = r.buffer;
+    fileName = `${kind}-${Date.now()}.pdf`;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? `Could not render the PDF: ${e.message}` : "Could not render the PDF." };
+  }
+
+  const key = `complaints/${complaintId}/${fileName}`;
+  try {
+    await uploadToR2({ key, body: pdf, contentType: "application/pdf" });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
+  }
+
+  const { data: doc, error } = await admin
+    .from("complaint_documents")
+    .insert({
+      complaint_id: complaintId,
+      document_type: kind === "reminder_letter" ? "Reminder letter" : "Legal notice",
+      title: label,
+      original_file_name: fileName,
+      storage_bucket: R2_STORAGE_SENTINEL,
+      storage_path: key,
+      mime_type: "application/pdf",
+      file_size: pdf.byteLength,
+      document_date: todayISO(),
+      ocr_status: "Skipped",
+      ocr_clean_text: content,
+      ai_summary_status: isAiConfigured() ? "generating" : "none",
+      uploaded_by: user.id,
+    })
+    .select("id")
+    .single();
+  if (error || !doc) return { ok: false, error: error?.message ?? `Could not save the document.` };
+  const documentId = doc.id as string;
+
+  if (isAiConfigured()) {
+    void analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) =>
+      console.error(`[${kind}] summary generation failed`, e),
+    );
+  }
+
+  await admin.from("ai_drafts").insert({
+    entity_type: "complaint",
+    entity_id: complaintId,
+    kind,
+    content,
+    created_by: user.id,
+  });
+
+  const nextStage = kind === "reminder_letter" ? "reminder_sent" : "legal_notice_sent";
+  
+  const { data: config } = await admin
+    .from("escalation_flow_configs")
+    .select("stage_key, sla_days, sla_unit")
+    .eq("stage_key", nextStage)
+    .maybeSingle();
+
+  const now = new Date();
+  const deadline = config ? computeStageDeadline(now, config) : null;
+  const currentRound = compCase?.escalation_round ?? 1;
+
+  await admin
+    .from("complaints")
+    .update({
+      escalation_stage: nextStage,
+      escalation_stage_entered_at: now.toISOString(),
+      escalation_stage_deadline: deadline ? deadline.toISOString() : null,
+      updated_by: user.id,
+    })
+    .eq("id", complaintId);
+
+  await admin.from("complaint_cycle_events").insert({
+    complaint_id: complaintId,
+    round: currentRound,
+    stage: nextStage,
+    event: nextStage,
+    complaint_document_id: documentId,
+  });
+
+  await addTimeline(admin, {
+    complaintId,
+    eventType: "Escalation",
+    title: `${label} generated`,
+    summary: `${label} rendered to PDF and filed to the case timeline.`,
+    relatedDocumentId: documentId,
+    createdBy: user.id,
   });
 
   revalidatePath(`/complaints/${complaintId}`);

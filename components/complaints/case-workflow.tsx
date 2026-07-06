@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight,
+  Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight, Bell,
   FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil, Sparkles, FileSearch, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { ScanCapture } from "@/components/complaints/scan-capture";
 import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
 import { LetterPreview } from "@/components/complaints/letter-preview";
@@ -31,6 +32,7 @@ import {
   addComplaintEscalation,
   fileCounterReplyAction,
   fileEscalationAction,
+  fileCommunicationDraftAction,
   listComplaintReplyFilesAction,
   generateDocumentSummaryAction,
   getDocumentViewUrl,
@@ -406,7 +408,15 @@ export function CaseWorkflow({
             </div>
 
             <div className="mt-4 border-t pt-4">
-              <CounterReplyPanel complaintId={complaintId} aiConfigured={aiConfigured} refreshKey={replyFilesKey} />
+              <CounterReplyPanel
+                complaintId={complaintId}
+                aiConfigured={aiConfigured}
+                refreshKey={replyFilesKey}
+                status={status}
+                reached={reached}
+                escalationStage={escalationStage}
+                escalationStageDeadline={escalationStageDeadline}
+              />
             </div>
           </StepPanel>
         )}
@@ -671,7 +681,23 @@ function SubmitPanel({
  * the reply left unaddressed and draft a counter-reply / cross-question letter
  * from it (reuses the counter_reply AI draft kind + the reply-gap analyser).
  */
-function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { complaintId: string; aiConfigured: boolean; refreshKey?: number }) {
+function CounterReplyPanel({
+  complaintId,
+  aiConfigured,
+  refreshKey = 0,
+  status,
+  reached,
+  escalationStage,
+  escalationStageDeadline,
+}: {
+  complaintId: string;
+  aiConfigured: boolean;
+  refreshKey?: number;
+  status: string;
+  reached: number;
+  escalationStage?: string;
+  escalationStageDeadline?: string | null;
+}) {
   const router = useRouter();
   const [gap, setGap] = React.useState<ReplyGap | null>(null);
   const [analysing, setAnalysing] = React.useState(false);
@@ -688,18 +714,22 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [replyFiles, setReplyFiles] = React.useState<ReplyFile[]>([]);
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
+  const [selectedKind, setSelectedKind] = React.useState<ComplaintDraftKind>("counter_reply");
 
-  // Load existing draft if any on mount
+  // Load existing draft if any on mount or when selectedKind changes
   React.useEffect(() => {
     async function loadSavedDraft() {
-      const res = await getLatestComplaintAiDraft(complaintId, "counter_reply");
+      const res = await getLatestComplaintAiDraft(complaintId, selectedKind);
       if (res.ok && res.draft) {
         setDraft(res.draft.content);
         setSavedAt(formatDateTime(res.draft.created_at));
+      } else {
+        setDraft("");
+        setSavedAt(null);
       }
     }
     void loadSavedDraft();
-  }, [complaintId]);
+  }, [complaintId, selectedKind]);
 
   const loadFiles = React.useCallback(async () => {
     const r = await listComplaintReplyFilesAction(complaintId);
@@ -725,23 +755,24 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
     setGap(r.data);
   }
 
-  async function generate(language: DraftLanguage) {
+  async function generate(kind: ComplaintDraftKind, language: DraftLanguage) {
+    setSelectedKind(kind);
     setGenerating(true);
     setError(null);
     setSavedMsg(null);
     setLintWarning(null);
     setTruncated(false);
     setSavedAt(null);
-    const r = await generateComplaintDraft({ complaintId, kind: "counter_reply", language });
+    const r = await generateComplaintDraft({ complaintId, kind, language });
     setGenerating(false);
-    if (!r.ok || !r.text) { setError(r.error ?? "Could not generate the counter-reply (is the AI key configured?)."); return; }
+    if (!r.ok || !r.text) { setError(r.error ?? `Could not generate the letter (is the AI key configured?).`); return; }
     setDraft(r.text);
     setLintWarning(r.lintWarning ?? null);
     setTruncated(!!r.truncated);
     setEditorOpen(true);
     // Auto-save the as-generated version immediately so it's never lost, without
     // the timeline note / advisor re-run a deliberate Save triggers below.
-    void saveComplaintAiDraft({ complaintId, kind: "counter_reply", content: r.text, language, silent: true })
+    void saveComplaintAiDraft({ complaintId, kind, content: r.text, language, silent: true })
       .then((sr) => { if (sr.ok) setSavedAt(formatDateTime(new Date().toISOString())); });
   }
 
@@ -749,10 +780,10 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
     if (!draft.trim()) return;
     setSavingDraft(true);
     setError(null);
-    const r = await saveComplaintAiDraft({ complaintId, kind: "counter_reply", title: COMPLAINT_DRAFT_KINDS.counter_reply, content: draft });
+    const r = await saveComplaintAiDraft({ complaintId, kind: selectedKind, title: COMPLAINT_DRAFT_KINDS[selectedKind], content: draft });
     setSavingDraft(false);
     if (!r.ok) { setError(r.error ?? "Could not save."); return; }
-    setSavedMsg("Counter-reply saved to the case (AI drafts).");
+    setSavedMsg("Draft saved to the case (AI drafts).");
     setSavedAt(formatDateTime(new Date().toISOString()));
   }
 
@@ -761,12 +792,106 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
     setFiling(true);
     setError(null);
     setSavedMsg(null);
-    const r = await fileCounterReplyAction(complaintId, draft);
+    const r = selectedKind === "counter_reply"
+      ? await fileCounterReplyAction(complaintId, draft)
+      : await fileCommunicationDraftAction(complaintId, draft, selectedKind);
     setFiling(false);
-    if (!r.ok) { setError(r.error ?? "Could not file the counter-reply."); return; }
-    setSavedMsg("Counter-reply filed as a PDF — it now sits with the department's reply below.");
+    if (!r.ok) { setError(r.error ?? "Could not file."); return; }
+    setSavedMsg(`${COMPLAINT_DRAFT_KINDS[selectedKind]} filed as a PDF and logged to timeline.`);
     await loadFiles();
     router.refresh();
+  }
+
+  const deadlineDate = escalationStageDeadline ? new Date(escalationStageDeadline) : null;
+  const today = new Date();
+  const diffMs = deadlineDate ? deadlineDate.getTime() - today.getTime() : 0;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  // Determine Counter Reply Button State
+  const hasInboundReply = reached >= 3;
+  const hasCounterReplyDoc = replyFiles.some((f) => f.direction === "out" && f.documentType === "Counter-reply");
+
+  let counterState: "locked" | "active" | "completed" = "locked";
+  if (hasInboundReply) {
+    counterState = hasCounterReplyDoc ? "completed" : "active";
+  }
+
+  // Determine Reminder Letter Button State
+  const hasAcknowledge = reached >= 2;
+  const hasReminderSent =
+    escalationStage === "reminder_sent" ||
+    escalationStage === "legal_notice_sent" ||
+    escalationStage === "escalated" ||
+    replyFiles.some((f) => f.documentType === "Reminder letter");
+
+  let reminderState: "locked" | "waiting" | "active" | "completed" = "locked";
+  if (hasReminderSent) {
+    reminderState = "completed";
+  } else if (hasAcknowledge && !hasInboundReply) {
+    if (escalationStage === "awaiting_reply") {
+      reminderState = diffDays <= 0 ? "active" : "waiting";
+    } else {
+      reminderState = "locked";
+    }
+  }
+
+  // Determine Legal Notice Button State
+  const hasLegalNoticeSent =
+    escalationStage === "legal_notice_sent" ||
+    escalationStage === "escalated" ||
+    replyFiles.some((f) => f.documentType === "Legal notice");
+
+  let legalState: "locked" | "waiting" | "active" | "completed" = "locked";
+  if (hasLegalNoticeSent) {
+    legalState = "completed";
+  } else if (escalationStage === "reminder_sent" && !hasInboundReply) {
+    legalState = diffDays <= 0 ? "active" : "waiting";
+  }
+
+  // Tooltip content & label builders
+  let counterTooltip = "";
+  let counterLabel = "Counter Reply";
+  if (counterState === "locked") {
+    counterTooltip = "Counter Reply becomes available after a department reply is received and AI completes its analysis. Waiting for Department Reply";
+    counterLabel = "Counter Reply 🔒";
+  } else if (counterState === "active") {
+    counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response.";
+    counterLabel = "Counter Reply 🔵";
+  } else if (counterState === "completed") {
+    counterTooltip = "Counter-reply has been drafted and filed to the case.";
+    counterLabel = "Counter Reply ✓";
+  }
+
+  let reminderTooltip = "";
+  let reminderLabel = "Reminder Letter";
+  if (reminderState === "locked") {
+    reminderTooltip = "Reminder Letter will become available after the configured reply waiting period expires if no department reply is received.";
+    reminderLabel = "Reminder Letter 🔒";
+  } else if (reminderState === "waiting") {
+    reminderTooltip = `Reminder Letter will become available after the configured reply waiting period expires if no department reply is received. Available in ${diffDays > 0 ? diffDays : 0} Days.`;
+    reminderLabel = "Reminder Letter ⏳";
+  } else if (reminderState === "active") {
+    reminderTooltip = "Generate a reminder letter requesting the department to respond to the complaint.";
+    reminderLabel = "Reminder Letter 🔵";
+  } else if (reminderState === "completed") {
+    reminderTooltip = "Reminder letter has already been generated.";
+    reminderLabel = "Reminder Letter ✓";
+  }
+
+  let legalTooltip = "";
+  let legalLabel = "Legal Notice";
+  if (legalState === "locked") {
+    legalTooltip = "Legal Notice will become available after the reminder waiting period expires if no department reply is received.";
+    legalLabel = "Legal Notice 🔒";
+  } else if (legalState === "waiting") {
+    legalTooltip = `Legal Notice will become available after the reminder waiting period expires if no department reply is received. Available in ${diffDays > 0 ? diffDays : 0} Working Days.`;
+    legalLabel = "Legal Notice ⏳";
+  } else if (legalState === "active") {
+    legalTooltip = "Generate a formal legal notice before escalating the complaint.";
+    legalLabel = "Legal Notice 🔵";
+  } else if (legalState === "completed") {
+    legalTooltip = "Legal Notice has already been generated.";
+    legalLabel = "Legal Notice ✓";
   }
 
   const gapStyle: Record<string, string> = {
@@ -786,17 +911,71 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
           <AlertTriangle className="h-3.5 w-3.5" /> AI is not configured — set ANTHROPIC_API_KEY to analyse replies and draft counter-replies.
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <LanguageChoiceButton
-          size="sm"
-          variant="outline"
-          busy={generating}
-          disabled={!aiConfigured}
-          icon={MessageSquareReply}
-          onChoose={generate}
-        >
-          Generate counter-reply
-        </LanguageChoiceButton>
+      <div className="flex flex-wrap gap-2 items-center select-none pt-2">
+        <TooltipProvider>
+          {/* Button 1: Counter Reply */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <LanguageChoiceButton
+                  size="sm"
+                  variant={counterState === "active" ? "default" : "outline"}
+                  busy={generating && selectedKind === "counter_reply"}
+                  disabled={counterState !== "active" || !aiConfigured}
+                  icon={MessageSquareReply}
+                  onChoose={(lang) => generate("counter_reply", lang)}
+                >
+                  {counterLabel}
+                </LanguageChoiceButton>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
+              {counterTooltip}
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Button 2: Reminder Letter */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <LanguageChoiceButton
+                  size="sm"
+                  variant={reminderState === "active" ? "default" : "outline"}
+                  busy={generating && selectedKind === "reminder_letter"}
+                  disabled={reminderState !== "active" || !aiConfigured}
+                  icon={Bell}
+                  onChoose={(lang) => generate("reminder_letter", lang)}
+                >
+                  {reminderLabel}
+                </LanguageChoiceButton>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
+              {reminderTooltip}
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Button 3: Legal Notice */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <LanguageChoiceButton
+                  size="sm"
+                  variant={legalState === "active" ? "default" : "outline"}
+                  busy={generating && selectedKind === "legal_notice"}
+                  disabled={legalState !== "active" || !aiConfigured}
+                  icon={Gavel}
+                  onChoose={(lang) => generate("legal_notice", lang)}
+                >
+                  {legalLabel}
+                </LanguageChoiceButton>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
+              {legalTooltip}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {error && <p className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
@@ -830,11 +1009,11 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
           )}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
-              <FileCheck2 className="h-4 w-4" /> View / Edit Counter-reply Letter
+              <FileCheck2 className="h-4 w-4" /> View / Edit {COMPLAINT_DRAFT_KINDS[selectedKind]}
             </Button>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={fileCounter} disabled={filing}>
-                {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File counter-reply
+                {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />} File {selectedKind === "counter_reply" ? "counter-reply" : "letter"}
               </Button>
               <Button
                 size="sm"
@@ -843,7 +1022,7 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
                 onClick={async () => {
                   setPdfBusy(true);
                   setError(null);
-                  const err = await openDraftPdf("Counter-reply", draft);
+                  const err = await openDraftPdf(COMPLAINT_DRAFT_KINDS[selectedKind], draft);
                   setPdfBusy(false);
                   if (err) setError(err);
                 }}
@@ -857,7 +1036,7 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
           <LetterEditorModal
             open={editorOpen}
             onOpenChange={setEditorOpen}
-            title="Counter-Reply Letter"
+            title={COMPLAINT_DRAFT_KINDS[selectedKind]}
             value={draft}
             onChange={setDraft}
             onSave={save}
