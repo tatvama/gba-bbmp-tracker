@@ -231,7 +231,7 @@ export function TaskCenter() {
             )}
           </div>
 
-          <p className="border-t px-4 py-2 text-[10px] text-muted-foreground">Safe to navigate away — tasks keep running and you'll get a notification when each finishes.</p>
+          <p className="border-t px-4 py-2 text-[10px] text-muted-foreground">Safe to navigate away — tasks keep running and you&apos;ll get a notification when each finishes.</p>
         </SheetContent>
       </Sheet>
 

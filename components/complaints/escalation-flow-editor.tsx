@@ -205,7 +205,7 @@ function StageEditPanel({
           ))}
         </select>
         {isTerminalStage && (
-          <p className="text-[10px] text-muted-foreground">Leave as "Multiple" to auto-draft all three escalation letters and let a human choose which to send.</p>
+          <p className="text-[10px] text-muted-foreground">Leave as &quot;Multiple&quot; to auto-draft all three escalation letters and let a human choose which to send.</p>
         )}
       </div>
 
@@ -270,7 +270,7 @@ export function EscalationFlowEditor({
         {selectedConfig && <StageEditPanel config={selectedConfig} onClose={() => setSelectedStage(null)} />}
       </div>
       <p className="text-xs text-muted-foreground">
-        A department reply at any stage halts the ladder immediately. Filing our counter-reply restarts it from "Awaiting reply" for the next round.
+        A department reply at any stage halts the ladder immediately. Filing our counter-reply restarts it from &quot;Awaiting reply&quot; for the next round.
         Drag a stage to reposition it; click a stage to edit its SLA or which letter it auto-drafts.
       </p>
     </div>
