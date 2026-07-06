@@ -737,7 +737,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
               </Button>
 
               <Button asChild size="sm" className="h-9 font-semibold hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm">
-                <Link href="/complaints/new">
+                <Link href="/complaints/import">
                   <Plus className="h-4 w-4 mr-1" /> New Complaint
                 </Link>
               </Button>
