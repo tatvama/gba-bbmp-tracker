@@ -127,6 +127,7 @@ export function CaseWorkflow({
   documents = [],
   escalationStage,
   escalationStageDeadline,
+  acknowledgmentDate,
 }: {
   complaintId: string;
   status: string;
@@ -137,6 +138,7 @@ export function CaseWorkflow({
   documents?: ComplaintDocument[];
   escalationStage?: string;
   escalationStageDeadline?: string | null;
+  acknowledgmentDate?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -416,6 +418,7 @@ export function CaseWorkflow({
                 reached={reached}
                 escalationStage={escalationStage}
                 escalationStageDeadline={escalationStageDeadline}
+                acknowledgmentDate={acknowledgmentDate}
               />
             </div>
           </StepPanel>
@@ -689,6 +692,7 @@ function CounterReplyPanel({
   reached,
   escalationStage,
   escalationStageDeadline,
+  acknowledgmentDate,
 }: {
   complaintId: string;
   aiConfigured: boolean;
@@ -697,6 +701,7 @@ function CounterReplyPanel({
   reached: number;
   escalationStage?: string;
   escalationStageDeadline?: string | null;
+  acknowledgmentDate?: string | null;
 }) {
   const router = useRouter();
   const [gap, setGap] = React.useState<ReplyGap | null>(null);
@@ -802,10 +807,21 @@ function CounterReplyPanel({
     router.refresh();
   }
 
-  const deadlineDate = escalationStageDeadline ? new Date(escalationStageDeadline) : null;
+  const effectiveStage = escalationStage || (reached === 2 ? "awaiting_reply" : "awaiting_ack");
+
+  let deadlineDate = escalationStageDeadline ? new Date(escalationStageDeadline) : null;
+  if (!deadlineDate && acknowledgmentDate) {
+    const start = new Date(acknowledgmentDate);
+    if (effectiveStage === "awaiting_reply") {
+      deadlineDate = new Date(start.getTime() + 14 * 24 * 60 * 60 * 1000);
+    } else if (effectiveStage === "reminder_sent") {
+      deadlineDate = new Date(start.getTime() + (14 + 7) * 24 * 60 * 60 * 1000);
+    }
+  }
+
   const today = new Date();
   const diffMs = deadlineDate ? deadlineDate.getTime() - today.getTime() : 0;
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = deadlineDate ? Math.ceil(diffMs / (1000 * 60 * 60 * 24)) : 14;
 
   // Determine Counter Reply Button State
   const hasInboundReply = reached >= 3;
@@ -828,7 +844,7 @@ function CounterReplyPanel({
   if (hasReminderSent) {
     reminderState = "completed";
   } else if (hasAcknowledge && !hasInboundReply) {
-    if (escalationStage === "awaiting_reply") {
+    if (effectiveStage === "awaiting_reply") {
       reminderState = diffDays <= 0 ? "active" : "waiting";
     } else {
       reminderState = "locked";
@@ -844,7 +860,7 @@ function CounterReplyPanel({
   let legalState: "locked" | "waiting" | "active" | "completed" = "locked";
   if (hasLegalNoticeSent) {
     legalState = "completed";
-  } else if (escalationStage === "reminder_sent" && !hasInboundReply) {
+  } else if (effectiveStage === "reminder_sent" && !hasInboundReply) {
     legalState = diffDays <= 0 ? "active" : "waiting";
   }
 
@@ -855,7 +871,7 @@ function CounterReplyPanel({
     if (!hasAcknowledge) {
       counterTooltip = "Counter Reply becomes available after a department reply is received. Waiting for case acknowledgement first. It takes 14 days minimum for a reply timeline to run.";
       counterLabel = "Counter Reply (in 14d+)";
-    } else if (escalationStage === "awaiting_reply") {
+    } else if (effectiveStage === "awaiting_reply") {
       counterTooltip = `Counter Reply becomes available after a department reply is received. The department has ${diffDays > 0 ? diffDays : 0} days remaining to respond.`;
       counterLabel = `Counter Reply (in ${diffDays > 0 ? diffDays : 0}d)`;
     } else {
@@ -897,7 +913,7 @@ function CounterReplyPanel({
     if (!hasAcknowledge) {
       legalTooltip = "Legal Notice will become available after the complaint is acknowledged, reminder is sent, and waiting periods expire. It will take 21 days total (14 days reply + 7 days reminder waiting) to activate from the date of acknowledgement.";
       legalLabel = "Legal Notice (in 21d+)";
-    } else if (escalationStage === "awaiting_reply") {
+    } else if (effectiveStage === "awaiting_reply") {
       legalTooltip = `Legal Notice will become available after the reminder waiting period expires. Requires reminder letter to be generated first (reminder becomes available in ${diffDays > 0 ? diffDays : 0} days; legal notice takes ${diffDays > 0 ? diffDays + 7 : 7} days to activate).`;
       legalLabel = `Legal Notice (in ${diffDays > 0 ? diffDays + 7 : 7}d)`;
     } else {
