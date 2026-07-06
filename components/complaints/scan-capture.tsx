@@ -42,6 +42,8 @@ export function ScanCapture({
   onDone,
   onUploaded,
   dateLabel,
+  docDate,
+  hideDateInput,
 }: {
   complaintId: string;
   docTypes: string[];
@@ -50,13 +52,16 @@ export function ScanCapture({
   /** Fires as soon as a set finishes uploading (before the user clicks "Done") with the AI's read on it, so a caller can react immediately — e.g. suggest which status to apply. */
   onUploaded?: (info: { documentId: string; docType: string; suggestedStatus?: string; confidence?: string }) => void;
   dateLabel?: string;
+  docDate?: string;
+  hideDateInput?: boolean;
 }) {
   const router = useRouter();
   const isMobile = useIsMobile();
   const idRef = React.useRef(0);
   const [docType, setDocType] = React.useState(defaultDocType ?? docTypes[0] ?? "Other evidence");
   const [title, setTitle] = React.useState("");
-  const [docDate, setDocDate] = React.useState(todayLocal());
+  const [internalDocDate, setInternalDocDate] = React.useState(todayLocal());
+  const activeDocDate = docDate !== undefined ? docDate : internalDocDate;
   const [pages, setPages] = React.useState<Page[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [statusMsg, setStatusMsg] = React.useState("");
@@ -164,7 +169,7 @@ export function ScanCapture({
     const fd = new FormData();
     fd.set("documentType", docType);
     if (title.trim()) fd.set("title", title.trim());
-    if (docDate) fd.set("documentDate", docDate);
+    if (activeDocDate) fd.set("documentDate", activeDocDate);
     pages.forEach((p) => fd.append("files", p.file));
 
     const interval = setInterval(() => {
@@ -288,16 +293,23 @@ export function ScanCapture({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+      {hideDateInput ? (
         <div className="space-y-2">
-          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-450 dark:text-slate-500">Title (optional)</Label>
+          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-550">Title (optional)</Label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ack receipt 29-Jun" className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 placeholder:font-normal" />
         </div>
-        <div className="space-y-2">
-          <Label className="text-[11px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-500">{dateLabel || "Document date"}</Label>
-          <Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200" />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label className="text-[11px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-550">Title (optional)</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ack receipt 29-Jun" className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 placeholder:font-normal" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-[11px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-550">{dateLabel || "Document date"}</Label>
+            <Input type="date" value={internalDocDate} onChange={(e) => setInternalDocDate(e.target.value)} className="h-11 rounded-lg border border-slate-200 dark:border-slate-800 focus-visible:ring-primary font-semibold text-slate-800 dark:text-slate-200" />
+          </div>
         </div>
-      </div>
+      )}
 
       {cameraOn ? (
         <div className="space-y-3 rounded-xl border bg-slate-950 p-3">
