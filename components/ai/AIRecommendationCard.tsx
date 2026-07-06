@@ -165,9 +165,9 @@ export function AIRecommendationCard({
         )}
       </div>
 
-      {/* 2. Metadata (Mobile/Tablet Only) */}
+      {/* 2. Metadata (Common) */}
       {recommendation && (
-        <div className="flex flex-wrap items-center gap-2 pt-1 lg:hidden text-xs select-none">
+        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs select-none">
           {recommendation.confidence && (
             <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-bold border-primary/20 bg-primary/5 text-primary">
               {CONFIDENCE_KN[recommendation.confidence] ?? recommendation.confidence} ವಿಶ್ವಾಸ (Confidence)
@@ -203,90 +203,9 @@ export function AIRecommendationCard({
         <p className="text-xs text-slate-455 dark:text-slate-500 font-semibold leading-relaxed">ಇನ್ನೂ ವಿಶ್ಲೇಷಿಸಿಲ್ಲ. ಈ ದೂರನ್ನು ಮುಂದಿನ ನವೀಕರಣದಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತದೆ.</p>
       )}
 
-      {/* 4. Desktop-only full inline view (>= 1024px) */}
-      <div className="space-y-4 lg:block hidden">
-        {recommendation?.current_situation && (
-          <div className="space-y-1 pt-1">
-            <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">ಪ್ರಸ್ತುತ ಸ್ಥಿತಿ (Current situation)</p>
-            <p className="text-xs font-semibold text-slate-855 dark:text-slate-205 leading-relaxed">{recommendation.current_situation}</p>
-          </div>
-        )}
-
-        {recommendation?.recommendation && (
-          <div className="space-y-2 rounded-xl bg-primary/5 p-4.5 border border-primary/10">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-black uppercase tracking-wider text-primary">ಶಿಫಾರಸು (Recommendation)</p>
-              {recommendation.confidence && (
-                <span className="text-[10px] font-extrabold text-primary/80">
-                  {CONFIDENCE_KN[recommendation.confidence] ?? recommendation.confidence}
-                  {typeof recommendation.confidence_score === "number" ? ` · ${recommendation.confidence_score}%` : ""} ವಿಶ್ವಾಸ
-                </span>
-              )}
-            </div>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100 leading-normal">{recommendation.recommendation}</p>
-            {recommendation.reasoning && <p className="text-xs text-slate-550 dark:text-slate-400 leading-relaxed font-semibold">{recommendation.reasoning}</p>}
-          </div>
-        )}
-
-        {recommendation?.expected_outcome && (
-          <div className="space-y-1">
-            <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">ನಿರೀಕ್ಷಿತ ಫಲಿತಾಂಶ (Expected outcome)</p>
-            <p className="text-xs text-slate-550 dark:text-slate-400 leading-relaxed font-semibold">{recommendation.expected_outcome}</p>
-          </div>
-        )}
-
-        {recommendation?.outstanding_issues && recommendation.outstanding_issues.length > 0 && (
-          <div className="space-y-2">
-            <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400">
-              <ListChecks className="h-3.5 w-3.5" /> ಬಾಕಿ ಇರುವ ವಿಷಯಗಳು (Outstanding Issues)
-            </p>
-            <ul className="space-y-1.5">
-              {recommendation.outstanding_issues.map((o, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs font-semibold leading-relaxed">
-                  <span
-                    className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                      o.status === "answered"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                        : o.status === "partial"
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                          : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
-                    }`}
-                  >
-                    {ISSUE_STATUS_KN[o.status] ?? o.status}
-                  </span>
-                  <span className="text-slate-800 dark:text-slate-205">{o.issue}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {error && <p className="flex items-center gap-1.5 text-xs text-destructive font-semibold"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
-
-        {meta?.buttonLabel && action && (
-          GENERATE_ACTIONS.has(action) ? (
-            <LanguageChoiceButton
-              size="sm"
-              className="w-full h-9 font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-              busy={busy}
-              icon={meta.icon}
-              onChoose={(language) => runOneClickAction(language)}
-            >
-              {meta.buttonLabel}
-            </LanguageChoiceButton>
-          ) : (
-            <Button size="sm" className="w-full h-9 font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer" disabled={busy} onClick={() => runOneClickAction()}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <meta.icon className="h-4 w-4" />}
-              {meta.buttonLabel}
-              {!busy && <ArrowRight className="ml-auto h-3.5 w-3.5" />}
-            </Button>
-          )
-        )}
-      </div>
-
-      {/* 5. Mobile & Tablet preview layout (< 1024px) */}
+      {/* 4. Collapsed preview layout (All screen sizes) */}
       {recommendation && (
-        <div className="lg:hidden block space-y-3">
+        <div className="block space-y-3">
           <div className="relative">
             <div className="line-clamp-4 md:line-clamp-8 text-xs font-semibold text-slate-800 dark:text-slate-200 leading-relaxed space-y-2 select-none">
               <div>
