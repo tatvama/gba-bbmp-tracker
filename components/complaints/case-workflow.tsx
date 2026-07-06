@@ -355,6 +355,11 @@ export function CaseWorkflow({
                 </div>
               </div>
             )}
+            <div className="mt-4 pt-4 border-t">
+              <Button size="sm" variant="outline" disabled={busy || reached > 1 || status.toLowerCase() === "acknowledged"} onClick={() => mark("Acknowledged")}>
+                <FileCheck2 className="h-4 w-4 mr-1.5" /> Mark acknowledged
+              </Button>
+            </div>
           </StepPanel>
         )}
 
