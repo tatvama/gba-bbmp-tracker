@@ -310,13 +310,23 @@ function mimeFromName(name: string | null): string {
   return "image/jpeg";
 }
 
+export interface VisualScanHooks {
+  /** Called before each pair is judged — (pairsDone, pairsTotal). Optional;
+   *  lets a caller (e.g. the "vision_scan" background job) report progress. */
+  onProgress?: (done: number, total: number) => void | Promise<void>;
+  /** Checked between pairs; returning true stops the scan early with whatever
+   *  matches were already found (a real, honored mid-scan cancellation point —
+   *  unlike a single AI call, this loop has many natural stopping points). */
+  isCancelled?: () => boolean | Promise<boolean>;
+}
+
 /**
  * VISUAL scan within a division: pairwise vision compare of photos from DIFFERENT
  * job codes inside the ±6-month / adjacent-year window that hashes did NOT already
  * match (the print→scan case). Bounded by a pair budget; verdicts cached in
  * photo_match_verdicts so each pair is judged once.
  */
-export async function scanDivisionVisualDuplicates(division: string): Promise<VisualScanResult> {
+export async function scanDivisionVisualDuplicates(division: string, hooks?: VisualScanHooks): Promise<VisualScanResult> {
   const admin = createAdminClient();
   const rows = (await loadPhotoRows(division)).filter((r) => r.path && r.bucket);
   if (rows.length < 2) return { ok: true, comparisons: 0, cached: 0, matches: [], capped: false };
@@ -339,7 +349,11 @@ export async function scanDivisionVisualDuplicates(division: string): Promise<Vi
   const matches: VisualDuplicateMatch[] = [];
   let comparisons = 0;
   let cached = 0;
+  let pairIndex = 0;
   for (const [a, b] of budgeted) {
+    if (hooks?.isCancelled && (await hooks.isCancelled())) break;
+    await hooks?.onProgress?.(pairIndex, budgeted.length);
+    pairIndex++;
     const [docA, docB] = a.documentId < b.documentId ? [a, b] : [b, a];
     // cache lookup
     const { data: existing } = await admin

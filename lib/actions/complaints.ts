@@ -6,8 +6,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getSignedUrl, uploadBuffer, buildPath, validateUpload } from "@/lib/storage/supabase-upload";
 import { getR2SignedUrl, uploadToR2, deleteFromR2 } from "@/lib/storage/r2-upload";
 import { buildMergedPdf } from "@/lib/pdf/merge";
-import { processDocumentOcr, analyzeDocumentById } from "@/lib/ocr/process-document";
+import { analyzeDocumentById } from "@/lib/ocr/process-document";
 import { isAiConfigured } from "@/lib/ai/provider";
+import { startJob } from "@/lib/jobs/runner";
+// Side-effect import: registers the "ocr" job handler.
+import "@/lib/jobs/handlers";
 import { writeAudit, diffFields } from "@/lib/audit";
 import {
   complaintSchema,
@@ -785,7 +788,7 @@ function docTypeToEvent(docType: string): string {
 export async function uploadComplaintScanAction(
   complaintId: string,
   formData: FormData,
-): Promise<{ ok: boolean; documentId?: string; ocrStatus?: string; aiSummary?: string; suggestedStatus?: string; confidence?: string; error?: string }> {
+): Promise<{ ok: boolean; documentId?: string; jobId?: string; ocrStatus?: string; aiSummary?: string; suggestedStatus?: string; confidence?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
   const { user, admin } = a;
@@ -846,38 +849,23 @@ export async function uploadComplaintScanAction(
   await addTimeline(admin, { complaintId, eventType: docTypeToEvent(docType), title: `Uploaded: ${docType}`, createdBy: user.id, relatedDocumentId: documentId });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "scan_uploaded", oldValue: null, newValue: docType }] });
 
-  // OCR (PDF-capable), then a permanent AI summary. Never blocks the upload.
-  let ocrStatus = "Processing";
-  let aiSummary: string | undefined = undefined;
-  let suggestedStatus: string | undefined = undefined;
-  let confidence: string | undefined = undefined;
-  try {
-    const r = await processDocumentOcr(documentId, { buffer: merged.pdf, analyze: false });
-    ocrStatus = r.status;
-    if (r.status !== "Failed" && isAiConfigured()) {
-      // Generate + store the summary once (OCR text is already present).
-      await analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) =>
-        console.error("[complaint-scan] summary generation failed", e),
-      );
-      const { data: updatedDoc } = await admin
-        .from("complaint_documents")
-        .select("ai_summary,ai_suggested_status,ai_confidence")
-        .eq("id", documentId)
-        .single();
-      if (updatedDoc?.ai_summary) {
-        aiSummary = updatedDoc.ai_summary;
-      }
-      suggestedStatus = updatedDoc?.ai_suggested_status ?? undefined;
-      confidence = updatedDoc?.ai_confidence ?? undefined;
-    }
-  } catch (e) {
-    console.error("[complaint-scan] OCR failed (upload preserved)", e);
-    ocrStatus = "Failed";
-  }
+  // OCR (PDF-capable), then a permanent AI summary — genuinely never blocks
+  // the upload now: runs as a background job instead of inline. The job
+  // handler (lib/jobs/handlers/ocr.ts) re-downloads the just-uploaded PDF
+  // from R2 by storage_path (processDocumentOcr's own fallback path) rather
+  // than serializing the buffer through the job's jsonb input column.
+  const jobResult = await startJob(admin, {
+    type: "ocr",
+    title: "OCR",
+    entityType: "complaint_document",
+    entityId: documentId,
+    input: { documentId, analyze: isAiConfigured() },
+    userId: user.id,
+  });
 
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
-  return { ok: true, documentId, ocrStatus, aiSummary, suggestedStatus, confidence };
+  return { ok: true, documentId, jobId: jobResult.jobId, ocrStatus: "Processing" };
 }
 
 // ── AI drafts ───────────────────────────────────────────────────────────────

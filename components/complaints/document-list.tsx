@@ -47,9 +47,12 @@ export function DocumentList({
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
 
-  // Poll while any document's summary is still generating so "Generating…" flips
-  // to "View Summary" on its own without the user refreshing.
-  const anyGenerating = documents.some((d) => d.ai_summary_status === "generating");
+  // Poll while any document's summary or OCR is still running so the badges
+  // flip on their own without the user refreshing — OCR now runs as a
+  // background job (survives navigation) instead of blocking the "Re-run OCR"
+  // click, so this page no longer sees the final status in the click's own
+  // response and needs to pick it up the same way the AI-summary polling already did.
+  const anyGenerating = documents.some((d) => d.ai_summary_status === "generating" || d.ocr_status === "Processing");
   React.useEffect(() => {
     if (!anyGenerating) return;
     const t = setInterval(() => router.refresh(), 4000);

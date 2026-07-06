@@ -8,6 +8,14 @@ import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { processQueuedJobDocs } from "@/lib/ocr/process-job-document";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES, STORAGE_BUCKETS } from "@/lib/constants";
 import { convertJobCaseCore } from "@/lib/forensic/convert-job-case";
+import { startJob } from "@/lib/jobs/runner";
+// NOTE: deliberately NOT importing "@/lib/jobs/handlers" here for its
+// side-effect registration, unlike every other startJob() caller — that
+// index imports ./ifms-download, which imports downloadNextJobCore FROM
+// this very file, so doing it here would be a circular import. Relying
+// instead on instrumentation.ts importing the handlers index once at server
+// boot (before any request can reach startIfmsDownloadRun below), same as
+// every job type needs anyway for the retry/dead-job sweep to dispatch it.
 import {
   checkPortalReachable,
   resolveTargets,
@@ -99,6 +107,7 @@ export interface StartRunResult {
   ok: boolean;
   runId?: string;
   codes?: string[];
+  jobId?: string;
   error?: string;
 }
 
@@ -141,8 +150,21 @@ export async function startIfmsDownloadRun(input: { targets: string; codes?: str
     .select("id")
     .single();
   if (error || !data) return { ok: false, error: error?.message ?? "Could not start the download run." };
+  const runId = data.id as string;
 
-  return { ok: true, runId: data.id as string, codes };
+  // Autonomous from here — the "ifms_download" job keeps calling
+  // downloadNextJobCore in a server-side loop until done, with no client
+  // needing to stay open and keep calling downloadNextJob() itself.
+  const job = await startJob(admin, {
+    type: "ifms_download",
+    title: `IFMS download — ${codes.length} job${codes.length === 1 ? "" : "s"}`,
+    entityType: "job_download_run",
+    entityId: runId,
+    input: { runId },
+    userId: user.id,
+  });
+
+  return { ok: true, runId, codes, jobId: job.jobId };
 }
 
 export interface DownloadStepResult {
@@ -162,7 +184,9 @@ export interface DownloadStepResult {
  * Process ONE job of a run: fetch its file list, download each file into the
  * job-documents bucket, and create job_documents rows (Queued for OCR). Resumable —
  * a file already stored (same job + filename) is skipped. The client calls this in a
- * loop until `done` is true.
+ * loop until `done` is true; the "ifms_download" background job (lib/jobs/handlers/
+ * ifms-download.ts) calls downloadNextJobCore directly in the same kind of loop, but
+ * server-side and autonomously (no client needed to keep calling).
  */
 export async function downloadNextJob(runId: string): Promise<DownloadStepResult> {
   let user;
@@ -172,7 +196,17 @@ export async function downloadNextJob(runId: string): Promise<DownloadStepResult
     return { ok: false, done: true, filesDownloaded: 0, filesFailed: 0, cursor: 0, total: 0, jobsDone: 0, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
   const admin = createAdminClient();
+  return downloadNextJobCore(admin, runId, user.id);
+}
 
+/**
+ * Request-free core of downloadNextJob — extracted so the background job
+ * handler can call it in a loop with no cookies/session (mirrors
+ * lib/forensic/convert-job-case.ts's convertJobCaseCore split for the same
+ * reason). Behavior is identical; only the auth check moved to the caller.
+ */
+export async function downloadNextJobCore(admin: ReturnType<typeof createAdminClient>, runId: string, userId: string): Promise<DownloadStepResult> {
+  const user = { id: userId };
   const { data: run } = await admin.from("job_download_runs").select("*").eq("id", runId).single();
   if (!run) return { ok: false, done: true, filesDownloaded: 0, filesFailed: 0, cursor: 0, total: 0, jobsDone: 0, error: "Run not found" };
 

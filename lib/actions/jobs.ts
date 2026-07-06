@@ -4,26 +4,20 @@ import { after } from "next/server";
 import { requireRole, getSessionUser, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
-import { runComplaintDraft, type DraftProgress } from "@/lib/ai/complaint-draft";
-import { runAdvisorAnalysis } from "@/lib/ai/advisor/recommendation-engine";
-import { notifyUser } from "@/lib/notifications";
+import { startJob, dispatchJob } from "@/lib/jobs/runner";
+import { listAllTaskItems } from "@/lib/jobs/adapters";
+import type { JobType, TaskItem } from "@/lib/jobs/types";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
+// Side-effect import: registers every job type's handler (ai_draft today,
+// more as later stages land) — see lib/jobs/handlers/index.ts.
+import "@/lib/jobs/handlers";
 
 const nowISO = () => new Date().toISOString();
-
-/** Rough progress % per real pipeline stage — "drafting" then ramps toward 90
- *  as streamed text accumulates (see onDraftProgress below). Purely cosmetic. */
-const STAGE_PROGRESS: Record<DraftProgress["stage"], number> = {
-  loading_case: 8,
-  building_history: 20,
-  drafting: 35,
-  safety_check: 95,
-};
 
 export interface BackgroundJob {
   id: string;
   type: string;
-  status: "queued" | "running" | "done" | "failed";
+  status: "queued" | "running" | "retrying" | "done" | "failed" | "cancelled";
   title: string | null;
   entity_type: string | null;
   entity_id: string | null;
@@ -31,6 +25,12 @@ export interface BackgroundJob {
   result: unknown;
   error: string | null;
   created_at: string;
+  cancel_requested?: boolean;
+  retry_count?: number;
+  max_retries?: number;
+  next_retry_at?: string | null;
+  finished_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface AppNotification {
@@ -64,78 +64,16 @@ export async function startAiDraftJob(input: {
   const admin = createAdminClient();
   const title = `${COMPLAINT_DRAFT_KINDS[input.kind] ?? "AI draft"}`;
 
-  const { data: job, error } = await admin
-    .from("background_jobs")
-    .insert({
-      type: "ai_draft",
-      status: "running",
-      title,
-      entity_type: "complaint",
-      entity_id: input.complaintId,
-      input,
-      created_by: user.id,
-    })
-    .select("id")
-    .single();
-  if (error || !job) return { ok: false, error: error?.message ?? "Could not start the job." };
-  const jobId = job.id as string;
-  const userId = user.id;
-  const link = `/complaints/${input.complaintId}?tab=ai`;
-
-  after(async () => {
-    const a = createAdminClient();
-
-    // Live status: written to the SAME job row the client already polls, under
-    // result.partial so it's unambiguous vs. the final { text, lintWarning }
-    // shape. Stage changes always write immediately; same-stage text deltas
-    // (streamed tokens) are throttled so we don't hammer the DB per-token.
-    // Writes are chained (not fire-and-forget) so a slow in-flight write can
-    // never land AFTER the final done/failed update and resurrect "partial".
-    let writeChain: Promise<unknown> = Promise.resolve();
-    let lastStage: DraftProgress["stage"] | null = null;
-    let lastWriteAt = 0;
-    const onDraftProgress = (p: DraftProgress) => {
-      const now = Date.now();
-      const stageChanged = p.stage !== lastStage;
-      if (!stageChanged && now - lastWriteAt < 500) return;
-      lastStage = p.stage;
-      lastWriteAt = now;
-      const progress = p.stage === "drafting" && p.partialText
-        ? Math.min(90, 35 + Math.floor(p.partialText.length / 25))
-        : STAGE_PROGRESS[p.stage];
-      writeChain = writeChain.then(() =>
-        a.from("background_jobs")
-          .update({ progress, result: { partial: true, stage: p.stage, stageLabel: p.label, text: p.partialText ?? null } })
-          .eq("id", jobId),
-      ).catch(() => {});
-    };
-
-    try {
-      const r = await runComplaintDraft(a, input, onDraftProgress);
-      await writeChain;
-      if (!r.ok || !r.text) {
-        await a.from("background_jobs").update({ status: "failed", error: r.error ?? "Generation failed", finished_at: nowISO() }).eq("id", jobId);
-        await notifyUser(a, userId, { type: "job_failed", title: `Draft failed — ${title}`, body: r.error ?? undefined, link, entityType: "complaint", entityId: input.complaintId });
-        return;
-      }
-      // Persist the finished draft so it survives navigation (shows in Saved drafts).
-      await a.from("ai_drafts").insert({ entity_type: "complaint", entity_id: input.complaintId, kind: input.kind, content: r.text, language: input.language ?? null, created_by: userId });
-      await a.from("background_jobs").update({ status: "done", progress: 100, result: { text: r.text, lintWarning: r.lintWarning ?? null, truncated: r.truncated ?? false }, finished_at: nowISO() }).eq("id", jobId);
-      await notifyUser(a, userId, { type: "job_done", title: `Draft ready — ${title}`, body: "Open the complaint to review, edit and print it.", link, entityType: "complaint", entityId: input.complaintId });
-      // The generated letter is fresh correspondence — re-run the advisor so its
-      // next-step reasoning reflects what we just sent. We're already inside an
-      // after() background context, so call the engine DIRECTLY (never nest
-      // triggerAdvisorAnalysis, whose own after() wouldn't fire here).
-      await runAdvisorAnalysis(a, input.complaintId).catch(() => {});
-    } catch (e) {
-      await writeChain;
-      const msg = e instanceof Error ? e.message : "Generation failed";
-      await a.from("background_jobs").update({ status: "failed", error: msg, finished_at: nowISO() }).eq("id", jobId).then(() => {}, () => {});
-      await notifyUser(a, userId, { type: "job_failed", title: `Draft failed — ${title}`, body: msg, link, entityType: "complaint", entityId: input.complaintId });
-    }
+  const r = await startJob(admin, {
+    type: "ai_draft",
+    title,
+    entityType: "complaint",
+    entityId: input.complaintId,
+    input,
+    userId: user.id,
+    link: `/complaints/${input.complaintId}?tab=ai`,
   });
-
-  return { ok: true, jobId };
+  return r;
 }
 
 /** Poll a single job (for the component that started it). */
@@ -152,19 +90,65 @@ export async function getJobAction(jobId: string): Promise<{ job?: BackgroundJob
   return { job: data as BackgroundJob };
 }
 
-/** The current user's still-running jobs — drives the global "running" indicator. */
-export async function listMyActiveJobs(): Promise<BackgroundJob[]> {
+/** Everything the Global Task Center shows for the current user: real
+ *  background_jobs rows (queued/running/retrying + a recent-history window of
+ *  terminal ones) merged with the ZIP-import/ack-reconciliation read-only
+ *  adapters, all normalized into one TaskItem shape. Thin wrapper over
+ *  lib/jobs/adapters.ts's plain listAllTaskItems, which the SSE route
+ *  (app/api/jobs/events/route.ts) also calls directly with an explicit userId
+ *  rather than re-deriving it from cookies per snapshot. */
+export async function listAllTasks(opts: { recentHours?: number } = {}): Promise<TaskItem[]> {
   const user = await getSessionUser();
   if (!user) return [];
   const admin = createAdminClient();
-  const { data } = await admin
+  return listAllTaskItems(admin, user.id, opts);
+}
+
+/** User-requested cancellation. A queued job (never claimed by a handler) is
+ *  cancelled immediately; a running/retrying one is flagged and the handler's
+ *  own ctx.isCancelled() check (where it loops — see lib/jobs/runner.ts)
+ *  honors it cooperatively on its next check, since single-process Node can't
+ *  forcibly kill an in-flight async function from the outside. */
+export async function cancelJobAction(jobId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "Not authorized" };
+  const admin = createAdminClient();
+  const { data: job } = await admin.from("background_jobs").select("created_by, status").eq("id", jobId).maybeSingle();
+  if (!job || job.created_by !== user.id) return { ok: false, error: "Job not found." };
+  if (!["queued", "running", "retrying"].includes(job.status as string)) return { ok: true };
+
+  await admin.from("background_jobs").update({ cancel_requested: true }).eq("id", jobId);
+  if (job.status === "queued") {
+    await admin.from("background_jobs").update({ status: "cancelled", finished_at: nowISO() }).eq("id", jobId);
+  }
+  return { ok: true };
+}
+
+/** Re-dispatch a failed job through the SAME handler it originally used,
+ *  reusing its stored input — this is the generic retry path every job type
+ *  gets for free from the framework, not a per-feature reimplementation. */
+export async function retryJobAction(jobId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "Not authorized" };
+  const admin = createAdminClient();
+  const { data: job } = await admin
     .from("background_jobs")
-    .select("id,type,status,title,entity_type,entity_id,progress,result,error,created_at")
-    .eq("created_by", user.id)
-    .in("status", ["queued", "running"])
-    .order("created_at", { ascending: false })
-    .limit(25);
-  return (data as BackgroundJob[]) ?? [];
+    .select("id, type, title, entity_type, entity_id, created_by, status")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job || job.created_by !== user.id) return { ok: false, error: "Job not found." };
+  if (job.status !== "failed") return { ok: false, error: "Only failed jobs can be retried." };
+
+  await admin.from("background_jobs").update({ status: "queued", error: null, cancel_requested: false, retry_count: 0, finished_at: null }).eq("id", jobId);
+  const meta = {
+    type: job.type as JobType,
+    userId: user.id,
+    title: (job.title as string | null) ?? job.type,
+    entityType: job.entity_type as string | null,
+    entityId: job.entity_id as string | null,
+  };
+  after(() => dispatchJob(jobId, meta));
+  return { ok: true };
 }
 
 /** Recent notifications + unread count for the current user (the alerts bell). */

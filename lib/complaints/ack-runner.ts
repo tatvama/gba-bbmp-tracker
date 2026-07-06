@@ -24,6 +24,7 @@ import { scoreAckMatch, loadComplaintPool, type PoolComplaint } from "@/lib/comp
 import { ackThumbKey } from "@/lib/complaints/ack-reconcile";
 import { decodeQrFromImage } from "@/lib/pdf/qr-decode";
 import { parseAckReference } from "@/lib/pdf/letter-reference";
+import { publishJobChange } from "@/lib/jobs/bus";
 
 /** Hard cap so a pathological upload can't run forever; the rest is reported. */
 const MAX_PAGES = 600;
@@ -35,7 +36,12 @@ async function setProgress(
   batchId: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
-  await admin.from("ack_import_batches").update(patch).eq("id", batchId);
+  const { data } = await admin.from("ack_import_batches").update(patch).eq("id", batchId).select("created_by").maybeSingle();
+  // Nudges the Task Center's adapter (lib/jobs/adapters.ts) via the same
+  // in-process bus the generic job runner uses — this engine's own storage
+  // and execution are otherwise untouched, per the plan's exclusion boundary.
+  const owner = (data as { created_by?: string } | null)?.created_by;
+  if (owner) publishJobChange(owner);
 }
 
 async function getSharp() {
