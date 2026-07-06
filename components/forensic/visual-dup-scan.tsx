@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Eye, ArrowLeftRight } from "lucide-react";
+import { Loader2, Eye, ArrowLeftRight, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { scanDivisionVisualDuplicatesAction } from "@/lib/actions/job-photo-dedupe";
+import { getJobAction, cancelJobAction } from "@/lib/actions/jobs";
 import type { DupPhoto, VisualScanResult } from "@/lib/forensic/job-photo-dedupe";
 
 function photoHref(p: DupPhoto): string {
@@ -39,18 +41,62 @@ export function VisualDupScan({ divisions }: { divisions: string[] }) {
   const [division, setDivision] = React.useState(divisions[0] ?? "");
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<VisualScanResult | null>(null);
+  const [jobId, setJobId] = React.useState<string | null>(null);
+  const [progress, setProgress] = React.useState<{ pct: number | null; message: string | null }>({ pct: null, message: null });
+  const activeRef = React.useRef(true);
+  React.useEffect(() => () => { activeRef.current = false; }, []);
 
+  // Runs as a background job now — up to 60 sequential vision-API calls that
+  // used to block this button (and die if the user navigated away) instead
+  // keep running server-side; this just polls for progress + the final result.
   async function run() {
     if (!division) return;
     setBusy(true);
     setResult(null);
-    try {
-      setResult(await scanDivisionVisualDuplicatesAction(division));
-    } catch (e) {
-      setResult({ ok: false, comparisons: 0, cached: 0, matches: [], capped: false, error: e instanceof Error ? e.message : "Failed" });
-    } finally {
-      setBusy(false);
+    setProgress({ pct: null, message: null });
+    const started = await scanDivisionVisualDuplicatesAction(division);
+    if (!started.ok || !started.jobId) {
+      if (activeRef.current) {
+        setResult({ ok: false, comparisons: 0, cached: 0, matches: [], capped: false, error: started.error ?? "Could not start the scan." });
+        setBusy(false);
+      }
+      return;
     }
+    setJobId(started.jobId);
+    poll(started.jobId);
+  }
+
+  function poll(id: string) {
+    setTimeout(async () => {
+      const r = await getJobAction(id);
+      if (!activeRef.current) return;
+      const job = r.job;
+      if (!job) {
+        setResult({ ok: false, comparisons: 0, cached: 0, matches: [], capped: false, error: r.error ?? "Scan not found." });
+        setBusy(false);
+        return;
+      }
+      if (job.status === "done") {
+        setResult(job.result as VisualScanResult);
+        setBusy(false);
+        setJobId(null);
+        return;
+      }
+      if (job.status === "failed" || job.status === "cancelled") {
+        setResult({ ok: false, comparisons: 0, cached: 0, matches: [], capped: false, error: job.error ?? "Scan cancelled." });
+        setBusy(false);
+        setJobId(null);
+        return;
+      }
+      const r2 = job.result as { message?: string } | null;
+      setProgress({ pct: job.progress ?? null, message: r2?.message ?? null });
+      poll(id);
+    }, 1200);
+  }
+
+  async function cancel() {
+    if (!jobId) return;
+    await cancelJobAction(jobId);
   }
 
   return (
@@ -79,9 +125,23 @@ export function VisualDupScan({ divisions }: { divisions: string[] }) {
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
           {busy ? "Scanning…" : "Scan visually"}
         </Button>
+        {busy && jobId && (
+          <Button type="button" size="sm" variant="outline" onClick={cancel}>
+            <Ban className="h-4 w-4" /> Cancel
+          </Button>
+        )}
       </div>
 
-      {result && (
+      {busy && (
+        <div className="mt-3 space-y-1">
+          <Progress value={progress.pct ?? undefined} indeterminate={progress.pct == null} />
+          <p className="text-[11px] text-muted-foreground">
+            {progress.message ?? "Starting…"} — safe to navigate away, this keeps running and you can check back or watch it from the Task Center.
+          </p>
+        </div>
+      )}
+
+      {!busy && result && (
         <div className="mt-3 text-sm">
           {result.error ? (
             <p className="text-rose-600 dark:text-rose-400">{result.error}</p>

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/supabase-upload";
-import { processDocumentOcr, analyzeDocumentById } from "@/lib/ocr/process-document";
+import { analyzeDocumentById } from "@/lib/ocr/process-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { findPhotoMatches, deriveStage } from "@/lib/dedupe-photos";
 import { scanDivisionVisualDuplicates } from "@/lib/forensic/job-photo-dedupe";
@@ -11,6 +11,9 @@ import { getComplaintSettings, getForensicsRules } from "@/lib/settings";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { uploadToR2 } from "@/lib/storage/r2-upload";
 import { COMPLAINT_FIELD_ROLES, STORAGE_BUCKETS, R2_STORAGE_SENTINEL } from "@/lib/constants";
+import { startJob } from "@/lib/jobs/runner";
+// Side-effect import: registers the "ocr" job handler.
+import "@/lib/jobs/handlers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -187,18 +190,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  // 4) OCR inline (best-effort). Failure NEVER breaks the upload. Summary is
-  // generated separately below (analyze:false here) so it happens for PDFs and
-  // OCR-disabled images too, via a single code path.
+  // 4) OCR as a background job — never blocks the upload response (previously
+  // awaited processDocumentOcr() inline). willAnalyzeAfterOcr decides whether
+  // THIS job also generates the AI summary once OCR finishes (processDocumentOcr's
+  // own analyze option) — section 5 below skips firing a second, separate
+  // analyzeDocumentById call in that case, since racing ahead of an in-flight
+  // OCR job would re-run OCR itself via its ensureOcr fallback.
   let ocrStatus = initialOcr;
-  if (wantsOcr && settings.ocrAutoRun) {
-    try {
-      const r = await processDocumentOcr(documentId, { buffer, analyze: false });
-      ocrStatus = r.status;
-    } catch (e) {
-      console.error("[upload] OCR failed (upload preserved)", e);
-      ocrStatus = "Failed";
-    }
+  const willAnalyzeAfterOcr = isAiConfigured() && !isSitePhoto && !asEvidence;
+  const ocrJobStarting = wantsOcr && settings.ocrAutoRun;
+  let ocrJobId: string | undefined;
+  if (ocrJobStarting) {
+    ocrStatus = "Processing";
+    const started = await startJob(admin, {
+      type: "ocr",
+      title: "OCR",
+      entityType: "complaint_document",
+      entityId: documentId,
+      input: { documentId, analyze: willAnalyzeAfterOcr },
+      userId: user.id,
+    });
+    ocrJobId = started.jobId;
   }
 
   // 4b) VISUAL duplicate scan (print→scan reuse the hashes above can't catch).
@@ -239,16 +251,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
   }
 
-  // 5) AI summary — generate ONCE now, store permanently. Runs in the background
-  // (OCR'ing the file first if needed) so the upload returns immediately; the
-  // document list shows "Generating…" then "View Summary". Skipped for pure
+  // 5) AI summary — generate ONCE now, store permanently. Skipped for pure
   // site/evidence photos (no text to summarise — their AI is image verification),
   // and when no AI key is configured. Photos can still be summarised on demand.
+  // When an OCR job just started above, THAT job generates the summary itself
+  // once OCR finishes — firing analyzeDocumentById separately here would race
+  // ahead of it and re-run OCR via ensureOcr.
   let summaryStatus: "none" | "generating" = "none";
-  if (isAiConfigured() && !isSitePhoto && !asEvidence) {
+  if (willAnalyzeAfterOcr) {
     summaryStatus = "generating";
-    await admin.from("complaint_documents").update({ ai_summary_status: "generating" }).eq("id", documentId);
-    void analyzeDocumentById(documentId, { ensureOcr: true }).catch((e) => console.error("[upload] summary generation failed", e));
+    if (!ocrJobStarting) {
+      await admin.from("complaint_documents").update({ ai_summary_status: "generating" }).eq("id", documentId);
+      void analyzeDocumentById(documentId, { ensureOcr: true }).catch((e) => console.error("[upload] summary generation failed", e));
+    }
   }
 
   return NextResponse.json({
@@ -256,6 +271,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     documentId,
     bucket: R2_STORAGE_SENTINEL,
     ocrStatus,
+    ocrJobId,
     summaryStatus,
     aiConfigured: isAiConfigured(),
     duplicateWarning,

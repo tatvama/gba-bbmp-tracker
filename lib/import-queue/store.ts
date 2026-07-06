@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publishImportChange } from "./bus";
+import { publishJobChange } from "@/lib/jobs/bus";
 import type { ImportUploadEvent, ImportUploadSnapshot, ImportUploadStatus } from "./types";
 
 /**
@@ -89,12 +90,15 @@ export async function updateImportSession(
       next = { ...patch, events };
       const owner = (data as Row | null)?.created_by as string | null;
       await admin.from("import_uploads").update(next).eq("id", id);
-      if (owner) publishImportChange(owner);
+      // publishJobChange nudges the Task Center's adapter (lib/jobs/adapters.ts)
+      // via the same in-process bus the generic job runner uses — this engine's
+      // own storage/execution are otherwise untouched.
+      if (owner) { publishImportChange(owner); publishJobChange(owner); }
       return;
     }
     const { data } = await admin.from("import_uploads").update(next).eq("id", id).select("created_by").maybeSingle();
     const owner = (data as Row | null)?.created_by as string | null;
-    if (owner) publishImportChange(owner);
+    if (owner) { publishImportChange(owner); publishJobChange(owner); }
   } catch (e) {
     console.warn("[import-queue] updateImportSession failed", id, e);
   }
@@ -130,7 +134,7 @@ export async function claimNextQueued(
     stagedPath: row.staged_path as string | null,
     createdBy: row.created_by as string | null,
   };
-  if (snap.createdBy) publishImportChange(snap.createdBy);
+  if (snap.createdBy) { publishImportChange(snap.createdBy); publishJobChange(snap.createdBy); }
   return snap;
 }
 
@@ -148,7 +152,7 @@ export async function requeueOrphanedProcessing(admin: SupabaseClient): Promise<
   const rows = (data as Row[]) ?? [];
   for (const r of rows) {
     const owner = r.created_by as string | null;
-    if (owner) publishImportChange(owner);
+    if (owner) { publishImportChange(owner); publishJobChange(owner); }
   }
   return rows.length;
 }

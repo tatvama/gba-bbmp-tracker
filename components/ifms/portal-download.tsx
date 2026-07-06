@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { previewIfmsDownload, startIfmsDownloadRun, downloadNextJob, type PreviewJob } from "@/lib/actions/ifms";
+import { previewIfmsDownload, startIfmsDownloadRun, type PreviewJob } from "@/lib/actions/ifms";
+import { getJobAction, cancelJobAction } from "@/lib/actions/jobs";
 
 type Phase = "idle" | "previewing" | "preview" | "downloading" | "done";
 
@@ -28,6 +29,9 @@ export function PortalDownload() {
   const [invalid, setInvalid] = React.useState<string[]>([]);
   const [progress, setProgress] = React.useState<Progress | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [jobId, setJobId] = React.useState<string | null>(null);
+  const activeRef = React.useRef(true);
+  React.useEffect(() => () => { activeRef.current = false; }, []);
 
   const downloadableCodes = React.useMemo(() => jobs.filter((j) => j.exists && j.fileCount > 0).map((j) => j.jobCode), [jobs]);
   const totalFiles = React.useMemo(() => jobs.reduce((s, j) => s + j.fileCount, 0), [jobs]);
@@ -49,46 +53,57 @@ export function PortalDownload() {
     setPhase("preview");
   }
 
+  // The download now runs as an autonomous background job (lib/jobs/handlers/
+  // ifms-download.ts) — starting it and closing the tab no longer stalls the
+  // run; this just polls for live progress instead of driving it step by step.
   async function onDownload() {
     setError(null);
     setPhase("downloading");
     setProgress({ total: downloadableCodes.length, jobsDone: 0, filesDownloaded: 0, filesFailed: 0 });
 
     const start = await startIfmsDownloadRun({ targets, codes: downloadableCodes });
-    if (!start.ok || !start.runId) {
+    if (!start.ok || !start.jobId) {
       setError(start.error ?? "Could not start the download.");
       setPhase("preview");
       return;
     }
-
-    // Drive the run one job at a time so progress is live and the run is resumable.
-    let done = false;
-    let guard = 0;
-    while (!done && guard < downloadableCodes.length + 5) {
-      guard++;
-      const step = await downloadNextJob(start.runId);
-      if (!step.ok) {
-        setError(step.error ?? "Download failed.");
-        break;
-      }
-      setProgress({
-        total: step.total,
-        jobsDone: step.jobsDone,
-        filesDownloaded: (progressRef.current?.filesDownloaded ?? 0) + step.filesDownloaded,
-        filesFailed: (progressRef.current?.filesFailed ?? 0) + step.filesFailed,
-        currentJob: step.jobCode,
-      });
-      done = step.done;
-    }
-    setPhase("done");
-    router.refresh();
+    setJobId(start.jobId);
+    poll(start.jobId);
   }
 
-  // Keep a ref of the latest progress so the loop can accumulate file counts.
-  const progressRef = React.useRef<Progress | null>(null);
-  React.useEffect(() => {
-    progressRef.current = progress;
-  }, [progress]);
+  function poll(id: string) {
+    setTimeout(async () => {
+      const r = await getJobAction(id);
+      if (!activeRef.current) return;
+      const job = r.job;
+      if (!job) {
+        setError(r.error ?? "Download job not found.");
+        setPhase("done");
+        return;
+      }
+      const res = job.result as { jobsDone?: number; total?: number; currentJob?: string | null; filesDownloaded?: number; filesFailed?: number } | null;
+      setProgress((prev) => ({
+        total: res?.total ?? prev?.total ?? downloadableCodes.length,
+        jobsDone: res?.jobsDone ?? prev?.jobsDone ?? 0,
+        filesDownloaded: res?.filesDownloaded ?? prev?.filesDownloaded ?? 0,
+        filesFailed: res?.filesFailed ?? prev?.filesFailed ?? 0,
+        currentJob: res?.currentJob ?? prev?.currentJob,
+      }));
+      if (job.status === "done" || job.status === "failed" || job.status === "cancelled") {
+        if (job.status === "failed") setError(job.error ?? "Download failed.");
+        setPhase("done");
+        setJobId(null);
+        router.refresh();
+        return;
+      }
+      poll(id);
+    }, 1500);
+  }
+
+  async function cancelDownload() {
+    if (!jobId) return;
+    await cancelJobAction(jobId);
+  }
 
   const busy = phase === "previewing" || phase === "downloading";
   const pct = progress && progress.total > 0 ? Math.round((progress.jobsDone / progress.total) * 100) : 0;
@@ -183,7 +198,15 @@ export function PortalDownload() {
               {phase === "done" ? "Download complete — " : `Downloading ${progress.currentJob ?? ""}… `}
               {progress.jobsDone}/{progress.total} jobs · {progress.filesDownloaded} files saved
               {progress.filesFailed > 0 ? ` · ${progress.filesFailed} failed` : ""}
+              {phase === "downloading" && jobId && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={cancelDownload}>Cancel</Button>
+              )}
             </p>
+            {phase === "downloading" && (
+              <p className="text-xs text-muted-foreground">
+                Safe to navigate away — this keeps downloading in the background and you can check back, or watch it from the Task Center.
+              </p>
+            )}
             {phase === "done" && (
               <p className="text-xs text-muted-foreground">
                 The downloaded job cases appear below. Open one to run OCR + the forensic audit.

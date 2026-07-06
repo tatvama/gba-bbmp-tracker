@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { UserMenu, type UserMenuProps } from "./user-menu";
 import { Sidebar } from "./sidebar";
-import { JobsIndicator } from "./jobs-indicator";
+import { TaskCenter } from "./task-center";
 import { NotificationsBell } from "./notifications-bell";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -105,7 +105,7 @@ export function TopNav({ email, role }: UserMenuProps) {
       </Button>
 
       <div className="flex items-center gap-1.5">
-        <JobsIndicator />
+        <TaskCenter />
         <NotificationsBell />
         <ModeToggle />
         <UserMenu email={email} role={role} />
