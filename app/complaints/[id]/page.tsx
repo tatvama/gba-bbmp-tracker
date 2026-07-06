@@ -105,11 +105,6 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
         </div>
       </div>
 
-      {/* AI Advisory Row */}
-      <div className="no-print">
-        <AIInsightsPanel complaintId={id} initialRecommendation={aiRecommendation} aiConfigured={flags.aiConfigured} priority={complaint.priority ?? null} />
-      </div>
-
       {/* Complaint Main Title Section */}
       <div className="space-y-2 select-none">
         <p className="font-mono text-xs font-bold text-slate-455 dark:text-slate-500 tracking-wider">
@@ -155,6 +150,11 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
             return badges;
           })()}
         </div>
+      </div>
+
+      {/* AI Advisory Row */}
+      <div className="no-print">
+        <AIInsightsPanel complaintId={id} initialRecommendation={aiRecommendation} aiConfigured={flags.aiConfigured} priority={complaint.priority ?? null} />
       </div>
 
       {flags.canField && (
