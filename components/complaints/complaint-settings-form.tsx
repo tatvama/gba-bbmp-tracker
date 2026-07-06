@@ -107,6 +107,11 @@ const METAS: Record<keyof ComplaintSettings, FieldMeta> = {
     defaultVal: "7 Days",
     explanation: "Days after acknowledgment before the advisor recommends a pre-reminder follow-up letter."
   },
+  excludeSaturdaysAsWorkingDay: {
+    label: "Exclude Saturdays",
+    defaultVal: "OFF",
+    explanation: "The escalation ladder's 7-working-day reminder/legal-notice windows always skip Sunday. Turn this on to also skip Saturday."
+  },
 };
 
 export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings }) {
@@ -691,6 +696,28 @@ export function ComplaintSettingsForm({ initial }: { initial: ComplaintSettings 
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal pl-1">
                   {METAS.aiAdvisorPreReminderSlaDays.explanation}
                 </p>
+              </div>
+
+              <div className="flex items-center justify-between group pt-1">
+                <div className="flex flex-col pr-6 min-w-0">
+                  <span className="text-xs font-bold text-slate-850 dark:text-slate-200">
+                    Exclude Saturdays
+                  </span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal mt-0.5">
+                    {METAS.excludeSaturdaysAsWorkingDay.explanation}
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center shrink-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="excludeSaturdaysAsWorkingDay"
+                    checked={formValues.excludeSaturdaysAsWorkingDay}
+                    onChange={(e) => handleInputChange("excludeSaturdaysAsWorkingDay", e.target.checked)}
+                    disabled={!formValues.aiAdvisorEnabled}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 dark:bg-slate-855 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:bg-slate-200 peer-checked:bg-orange-600 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-650 peer-disabled:opacity-50" />
+                </label>
               </div>
             </div>
           </CardContent>

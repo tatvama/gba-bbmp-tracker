@@ -92,6 +92,7 @@ export async function updateComplaintSettings(
     aiAdvisorReminderSlaDays: num("aiAdvisorReminderSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorReminderSlaDays),
     aiAdvisorEscalationSlaDays: num("aiAdvisorEscalationSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorEscalationSlaDays),
     aiAdvisorPreReminderSlaDays: num("aiAdvisorPreReminderSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorPreReminderSlaDays),
+    excludeSaturdaysAsWorkingDay: bool("excludeSaturdaysAsWorkingDay"),
   };
 
   const supabase = await createClient();

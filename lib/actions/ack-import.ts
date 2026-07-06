@@ -17,6 +17,7 @@ import { analyzeDocumentById } from "@/lib/ocr/process-document";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { analyzeComplaintIntake } from "@/lib/ai/complaint-intake-analyzer";
 import { scoreAckMatch, loadComplaintPool } from "@/lib/complaints/ack-matcher";
+import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
 import {
   ackThumbKey,
   type AckBatchView,
@@ -509,16 +510,37 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
       // Stamp acknowledgment_date + nudge status (best-effort, never overwrite).
       const { data: comp } = await admin
         .from("complaints")
-        .select("acknowledgment_date, complaint_number, status")
+        .select("acknowledgment_date, complaint_number, status, escalation_stage")
         .eq("id", complaintId)
         .single();
-      const c = (comp ?? {}) as { acknowledgment_date: string | null; complaint_number: string | null; status: string | null };
+      const c = (comp ?? {}) as {
+        acknowledgment_date: string | null;
+        complaint_number: string | null;
+        status: string | null;
+        escalation_stage: string | null;
+      };
       const compPatch: Record<string, unknown> = {};
       const ackDate = pickAckDate(it.extracted ?? {});
       if (!c.acknowledgment_date && ackDate) compPatch.acknowledgment_date = ackDate;
       const exRef = (it.extracted?.referenceNumber as string) || "";
       if (!c.complaint_number && exRef && !/^\d{3}-\d{2}-\d{6}$/.test(exRef)) compPatch.complaint_number = exRef;
       if (c.status === "Draft" || c.status === "Filed") compPatch.status = "Acknowledged";
+
+      // Start the no-reply escalation clock — but only the FIRST time an
+      // acknowledgment date lands (never re-arm on a re-attach/duplicate scan).
+      if (compPatch.acknowledgment_date && (c.escalation_stage ?? "awaiting_ack") === "awaiting_ack") {
+        const { data: awaitingReplyConfig } = await admin
+          .from("escalation_flow_configs")
+          .select("stage_key, sla_days, sla_unit, on_elapse_draft_kind, on_elapse_next_stage")
+          .eq("stage_key", "awaiting_reply")
+          .maybeSingle();
+        const enteredAt = new Date(`${compPatch.acknowledgment_date}T00:00:00Z`);
+        const deadline = awaitingReplyConfig ? computeStageDeadline(enteredAt, awaitingReplyConfig) : null;
+        compPatch.escalation_stage = "awaiting_reply";
+        compPatch.escalation_stage_entered_at = enteredAt.toISOString();
+        compPatch.escalation_stage_deadline = deadline ? deadline.toISOString() : null;
+      }
+
       if (Object.keys(compPatch).length) {
         compPatch.updated_by = user.id;
         await admin.from("complaints").update(compPatch).eq("id", complaintId);

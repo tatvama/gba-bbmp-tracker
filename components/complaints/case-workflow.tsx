@@ -18,6 +18,7 @@ import { LetterPreview } from "@/components/complaints/letter-preview";
 import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
 import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
+import { EscalationDeadlineBadge } from "@/components/complaints/escalation-deadline-badge";
 import { openDraftPdf } from "@/lib/print-letter";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -121,6 +122,8 @@ export function CaseWorkflow({
   aiConfigured,
   letter,
   documents = [],
+  escalationStage,
+  escalationStageDeadline,
 }: {
   complaintId: string;
   status: string;
@@ -129,6 +132,8 @@ export function CaseWorkflow({
   aiConfigured: boolean;
   letter?: WorkflowLetter | null;
   documents?: ComplaintDocument[];
+  escalationStage?: string;
+  escalationStageDeadline?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -255,6 +260,15 @@ export function CaseWorkflow({
             })}
           </div>
         </div>
+
+        {/* No-reply escalation ladder countdown — auto-drafts a reminder / legal
+            notice / escalation letter into the print queue when this elapses.
+            Shown regardless of which step tab is active. */}
+        {escalationStage && (
+          <div className="mb-6">
+            <EscalationDeadlineBadge stage={escalationStage} deadline={escalationStageDeadline ?? null} />
+          </div>
+        )}
 
         {/* Active step panel */}
         {active === "submit" && (

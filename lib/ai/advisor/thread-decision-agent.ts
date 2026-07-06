@@ -184,9 +184,23 @@ export async function analyzeThread(input: {
   const { text: correspondence, count: analyzedCount } = buildCorrespondence(ctx, input.demands);
   const base = fallback(fb, healthScore, ctx, analyzedCount);
 
+  const LADDER_STAGE_LABEL: Record<string, string> = {
+    awaiting_ack: "waiting for the department's acknowledgment",
+    awaiting_reply: "the original letter is awaiting a reply",
+    reminder_sent: "a reminder letter has already gone out and is awaiting a reply",
+    legal_notice_sent: "a legal notice has already gone out (after the reminder) and is awaiting a reply",
+    escalated: "already escalated to Lokayukta / Chief Secretary / CM office",
+    replied: "a reply has been received",
+    closed: "closed",
+  };
+  const ladderStage = ctx.complaint.escalation_stage;
+
   const signals = [
     `Deterministic health score: ${healthScore.healthScore}/100 (${healthScore.riskLevel} risk).`,
     healthScore.riskFactors.length ? `Risk factors: ${healthScore.riskFactors.join("; ")}.` : "",
+    ladderStage
+      ? `No-reply escalation ladder status (round ${ctx.complaint.escalation_round}): ${LADDER_STAGE_LABEL[ladderStage] ?? ladderStage}. The ladder auto-drafts the next letter on its own schedule (reminder -> legal notice -> escalation) — your job is to judge whether the CONTENT of the correspondence already warrants moving faster or slower than that schedule, not to duplicate its date math.`
+      : "",
     input.reminderSuggestion ? `Reminder/escalation timing: ${input.reminderSuggestion.reasonLabel} (${input.reminderSuggestion.daysSinceEvent} days).` : "",
     input.replyGap ? `Latest reply-gap check: ${input.replyGap.summary} (${input.replyGap.unaddressedCount} demand(s) unaddressed).` : "",
     input.evidenceGaps?.length ? `Evidence gaps detected: ${input.evidenceGaps.join("; ")}.` : "",
@@ -211,7 +225,7 @@ Work through these questions against the COMPLETE correspondence above:
 - Has the complaint been satisfactorily resolved / can it be recommended for closure?
 
 Then choose EXACTLY ONE primary next action from: ${actionList}.
-Guidance: 'wait' = within SLA, nothing to do yet; 'generate_reminder' = no reply and the wait has run long; 'request_clarification' = a reply came but is ambiguous/incomplete on specific points; 'counter_reply' = a reply came but left demands unaddressed and pressing it is still worthwhile; 'upload_evidence' = our own case needs more supporting documents; 'escalate' = the department is stonewalling, contradicting itself, or has broken commitments and a higher authority is now warranted; 'convert_to_rti' = an escalation has already been sent and STALLED (no response for a long time), so an RTI request under the RTI Act 2005 is now the strongest lever to compel the records; 'close' = fully resolved or nothing further is useful; 'review' = you cannot judge and a human must look.
+Guidance: 'wait' = within SLA, nothing to do yet; 'generate_reminder' = no reply and the wait has run long (note: the ladder auto-drafts this reminder on its own schedule too — recommend it explicitly only if the content already justifies acting sooner than that schedule); 'request_clarification' = a reply came but is ambiguous/incomplete on specific points; 'counter_reply' = a reply came but left demands unaddressed and pressing it is still worthwhile; 'upload_evidence' = our own case needs more supporting documents; 'escalate' = the department is stonewalling, contradicting itself, or has broken commitments badly enough to jump ahead of the ladder's own reminder/legal-notice pacing and go straight to a higher authority (Lokayukta / Chief Secretary / CM office) — if a reminder or legal notice has already gone out per the ladder status above and is simply still awaiting its own deadline, prefer 'wait' unless the content genuinely warrants moving faster; 'convert_to_rti' = an escalation has already been sent and STALLED (no response for a long time), so an RTI request under the RTI Act 2005 is now the strongest lever to compel the records; 'close' = fully resolved or nothing further is useful; 'review' = you cannot judge and a human must look.
 
 Output STRICT JSON of EXACTLY this shape:
 {

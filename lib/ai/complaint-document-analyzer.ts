@@ -200,6 +200,15 @@ export function buildComplaintDraftPrompt(input: {
     chief_secretary_letter:
       "Address to the Chief Secretary / Additional Chief Secretary, Urban Development Department, Government of Karnataka. Summarise the systemic failure to act despite the complaint and follow-ups, give the chronology, and request administrative intervention and a special enquiry. " +
       CAUTION,
+    cm_office_letter:
+      "Address to the Chief Minister's Office, Government of Karnataka (Public Grievance Cell). Summarise the full chronology of correspondence, the reminder and legal notice already sent without an adequate response, the civic/public-interest impact, and request the Chief Minister's Office to direct BBMP/the concerned department to act and respond. " +
+      CAUTION,
+    reminder_letter:
+      "This is a REMINDER, sent because no reply has been received to our earlier letter. Open by citing the reference number and date of that ORIGINAL letter (from the case history) and state plainly that no reply or action has been received to date. Restate the original demands briefly as a numbered list. State that a reply/action is required within 7 working days of this letter, failing which the matter will be escalated. Keep it firm but courteous, one page. " +
+      CAUTION,
+    legal_notice:
+      "This is a LEGAL NOTICE, sent because our original letter AND a subsequent reminder have both gone unanswered. Cite the reference number and dates of both the original letter and the reminder (from the case history). State clearly that the department has failed to reply or take any action within the periods given. List the outstanding demands as a numbered list. State that if a complete reply/action is not received within 7 working days of this notice, the matter will be escalated to the Karnataka Lokayukta and/or the Chief Secretary and/or the Chief Minister's Office without further notice. Use a firm, formal register appropriate to a legal notice while staying within the cautious-framing rule below. " +
+      CAUTION,
     records_preservation:
       "Request that ALL original records (MB books, measurement sheets, QC/quality tests, geo-tagged photographs, the contractor-eligibility set, insurance, and the IFMS / eProc audit logs) be preserved in status-quo pending production, and NOT weeded, altered, or the work completed, while this matter is under examination. Cite the case number and the risk of alteration. " +
       CAUTION,

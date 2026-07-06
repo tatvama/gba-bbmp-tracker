@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ jobNumber: 
   const draftId = url.searchParams.get("draftId");
 
   const admin = createAdminClient();
-  const cols = "id, skeleton, quantities, file_name, evidence_index, lint_ok";
+  const cols = "id, skeleton, quantities, file_name, evidence_index, lint_ok, complaint_id";
   // Always scope by job_number — a draftId from another job must not be served (IDOR).
   let q = admin
     .from("letter_drafts")
@@ -53,6 +53,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ jobNumber: 
   const skeleton = data.skeleton as LetterSkeleton;
   const fileBase = (data.file_name as string) || `Letter_${jobNumber}`;
 
+  let reference: string | null = null;
+  if (data.complaint_id) {
+    const { data: complaintRow } = await admin
+      .from("complaints")
+      .select("internal_case_number")
+      .eq("id", data.complaint_id)
+      .maybeSingle();
+    reference = complaintRow?.internal_case_number ?? null;
+  }
+
   if (format === "csv") {
     const csv = evidenceIndexToCsv(skeleton.evidenceIndex ?? []);
     return new NextResponse("﻿" + csv, {
@@ -72,6 +82,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ jobNumber: 
   const bytes = await buildLetterDocx(skeleton, {
     quantityTable: quantities.length ? buildQuantityTable(quantities) : null,
     riskTable: findingsForRisk.length ? buildRiskTable(findingsForRisk) : null,
+    reference,
   });
 
   return new NextResponse(new Uint8Array(bytes), {
