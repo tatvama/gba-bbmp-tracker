@@ -852,10 +852,16 @@ function CounterReplyPanel({
   let counterTooltip = "";
   let counterLabel = "Counter Reply";
   if (counterState === "locked") {
-    counterTooltip = "Counter Reply becomes available after a department reply is received and AI completes its analysis. Waiting for Department Reply";
+    if (!hasAcknowledge) {
+      counterTooltip = "Counter Reply becomes available after a department reply is received. Waiting for case acknowledgement first.";
+    } else if (escalationStage === "awaiting_reply") {
+      counterTooltip = `Counter Reply becomes available after a department reply is received. The department has ${diffDays > 0 ? diffDays : 0} days remaining to respond before reminders escalate.`;
+    } else {
+      counterTooltip = "Counter Reply becomes available after a department reply is received and AI completes its analysis.";
+    }
     counterLabel = "Counter Reply 🔒";
   } else if (counterState === "active") {
-    counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response.";
+    counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response. Available now.";
     counterLabel = "Counter Reply 🔵";
   } else if (counterState === "completed") {
     counterTooltip = "Counter-reply has been drafted and filed to the case.";
@@ -865,32 +871,42 @@ function CounterReplyPanel({
   let reminderTooltip = "";
   let reminderLabel = "Reminder Letter";
   if (reminderState === "locked") {
-    reminderTooltip = "Reminder Letter will become available after the configured reply waiting period expires if no department reply is received.";
+    if (!hasAcknowledge) {
+      reminderTooltip = "Reminder Letter will become available after the complaint is acknowledged and the 14-day reply waiting period expires.";
+    } else {
+      reminderTooltip = "Reminder Letter will become available after the configured reply waiting period expires if no department reply is received.";
+    }
     reminderLabel = "Reminder Letter 🔒";
   } else if (reminderState === "waiting") {
     reminderTooltip = `Reminder Letter will become available after the configured reply waiting period expires if no department reply is received. Available in ${diffDays > 0 ? diffDays : 0} Days.`;
     reminderLabel = "Reminder Letter ⏳";
   } else if (reminderState === "active") {
-    reminderTooltip = "Generate a reminder letter requesting the department to respond to the complaint.";
+    reminderTooltip = "Generate a reminder letter requesting the department to respond to the complaint. Available now.";
     reminderLabel = "Reminder Letter 🔵";
   } else if (reminderState === "completed") {
-    reminderTooltip = "Reminder letter has already been generated.";
+    reminderTooltip = "Reminder letter has already been generated and filed.";
     reminderLabel = "Reminder Letter ✓";
   }
 
   let legalTooltip = "";
   let legalLabel = "Legal Notice";
   if (legalState === "locked") {
-    legalTooltip = "Legal Notice will become available after the reminder waiting period expires if no department reply is received.";
+    if (!hasAcknowledge) {
+      legalTooltip = "Legal Notice will become available after the complaint is acknowledged, reminder is sent, and waiting periods expire.";
+    } else if (escalationStage === "awaiting_reply") {
+      legalTooltip = `Legal Notice will become available after the reminder waiting period expires. Requires reminder letter to be generated first (reminder becomes available in ${diffDays > 0 ? diffDays : 0} Days).`;
+    } else {
+      legalTooltip = "Legal Notice will become available after the reminder waiting period expires if no department reply is received.";
+    }
     legalLabel = "Legal Notice 🔒";
   } else if (legalState === "waiting") {
     legalTooltip = `Legal Notice will become available after the reminder waiting period expires if no department reply is received. Available in ${diffDays > 0 ? diffDays : 0} Working Days.`;
     legalLabel = "Legal Notice ⏳";
   } else if (legalState === "active") {
-    legalTooltip = "Generate a formal legal notice before escalating the complaint.";
+    legalTooltip = "Generate a formal legal notice before escalating the complaint. Available now.";
     legalLabel = "Legal Notice 🔵";
   } else if (legalState === "completed") {
-    legalTooltip = "Legal Notice has already been generated.";
+    legalTooltip = "Legal Notice has already been generated and filed.";
     legalLabel = "Legal Notice ✓";
   }
 
