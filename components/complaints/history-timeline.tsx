@@ -680,9 +680,6 @@ function ActivityFeed({
         </div>
       ) : (
         <div className="relative pt-2">
-          {/* Symmetrical Vertical line spanning the entire timeline feed container */}
-          <div className="absolute left-[17px] sm:left-[21px] md:left-[161px] top-6 bottom-6 w-0.5 bg-slate-200 dark:bg-slate-800" />
-          
           <div className="space-y-0">
             {(() => {
               let globalIndex = 0;
