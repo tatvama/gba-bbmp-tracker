@@ -729,19 +729,11 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           </DropdownMenu>
 
           {canEdit && (
-            <>
-              <Button asChild size="sm" variant="outline" className="h-9 font-semibold hover:scale-[1.01] transition-all cursor-pointer">
-                <Link href="/complaints/import">
-                  <Upload className="h-4 w-4 mr-1.5" /> Upload ZIP
-                </Link>
-              </Button>
-
-              <Button asChild size="sm" className="h-9 font-semibold hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm">
-                <Link href="/complaints/import">
-                  <Plus className="h-4 w-4 mr-1" /> New Complaint
-                </Link>
-              </Button>
-            </>
+            <Button asChild size="sm" className="h-9 font-semibold hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm">
+              <Link href="/complaints/import">
+                <Plus className="h-4 w-4 mr-1" /> New Complaint
+              </Link>
+            </Button>
           )}
         </div>
       </div>
