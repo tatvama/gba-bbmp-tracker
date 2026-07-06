@@ -869,17 +869,17 @@ function CounterReplyPanel({
   let counterLabel = "Counter Reply";
   if (counterState === "locked") {
     if (!hasAcknowledge) {
-      counterTooltip = "Counter Reply becomes available after a department reply is received. Waiting for case acknowledgement first. It takes 14 days minimum for a reply timeline to run.";
+      counterTooltip = "Counter Reply becomes available after a department reply is received and AI completes its analysis. Waiting for case acknowledgement first (14 days minimum remaining).";
       counterLabel = "Counter Reply (in 14d+)";
     } else if (effectiveStage === "awaiting_reply") {
-      counterTooltip = `Counter Reply becomes available after a department reply is received. The department has ${diffDays > 0 ? diffDays : 0} days remaining to respond.`;
+      counterTooltip = `Counter Reply becomes available after a department reply is received and AI completes its analysis. Department reply expected in ${diffDays > 0 ? diffDays : 0} days.`;
       counterLabel = `Counter Reply (in ${diffDays > 0 ? diffDays : 0}d)`;
     } else {
       counterTooltip = "Counter Reply becomes available after a department reply is received and AI completes its analysis.";
       counterLabel = "Counter Reply (in 0d)";
     }
   } else if (counterState === "active") {
-    counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response. Available now (0 days remaining).";
+    counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response. Available now.";
     counterLabel = "Counter Reply 🔵";
   } else if (counterState === "completed") {
     counterTooltip = "Counter-reply has been drafted and filed to the case.";
