@@ -163,7 +163,6 @@ export function CaseWorkflow({
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
-  const [ackDateInput, setAckDateInput] = React.useState(() => new Date().toISOString().slice(0, 10));
 
   React.useEffect(() => {
     if (!summaryDoc) return;
@@ -298,6 +297,7 @@ export function CaseWorkflow({
               complaintId={complaintId}
               docTypes={["Complaint acknowledgement", "Postal receipt", "Email printout", "Portal screenshot"]}
               defaultDocType="Complaint acknowledgement"
+              dateLabel="Acknowledgement date"
             />
             {ackDocs.length > 0 && (
               <div className="mt-4 space-y-3">
@@ -355,21 +355,6 @@ export function CaseWorkflow({
                 </div>
               </div>
             )}
-            <div className="mt-4 flex flex-col gap-1.5 max-w-[200px]">
-              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-500">Acknowledgement Date</Label>
-              <Input
-                type="date"
-                value={ackDateInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAckDateInput(e.target.value)}
-                disabled={busy || reached > 1 || status.toLowerCase() === "acknowledged"}
-                className="h-10 text-xs rounded-lg border border-slate-200 dark:border-slate-800 font-semibold"
-              />
-            </div>
-            <div className="mt-3">
-              <Button size="sm" variant="outline" disabled={busy || reached > 1 || status.toLowerCase() === "acknowledged"} onClick={() => mark("Acknowledged", ackDateInput)}>
-                <FileCheck2 className="h-4 w-4 mr-1.5" /> Mark acknowledged
-              </Button>
-            </div>
           </StepPanel>
         )}
 
