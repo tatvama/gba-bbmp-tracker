@@ -91,7 +91,7 @@ export function AIInsightsPanel({
   return (
     <div className="space-y-3">
       <AIRecommendationCard complaintId={complaintId} recommendation={recommendation} aiConfigured={aiConfigured} priority={priority} />
-      <AITimelineInsight recommendation={recommendation} />
+      <AITimelineInsight recommendation={recommendation} className="lg:block hidden" />
     </div>
   );
 }
