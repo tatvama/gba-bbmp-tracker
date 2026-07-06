@@ -91,6 +91,7 @@ export async function updateComplaintSettings(
     aiAdvisorEnabled: bool("aiAdvisorEnabled"),
     aiAdvisorReminderSlaDays: num("aiAdvisorReminderSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorReminderSlaDays),
     aiAdvisorEscalationSlaDays: num("aiAdvisorEscalationSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorEscalationSlaDays),
+    aiAdvisorPreReminderSlaDays: num("aiAdvisorPreReminderSlaDays", DEFAULT_COMPLAINT_SETTINGS.aiAdvisorPreReminderSlaDays),
   };
 
   const supabase = await createClient();

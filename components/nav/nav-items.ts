@@ -33,7 +33,6 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, group: "main" },
-  { href: "/search", label: "Search", icon: Search, group: "main" },
   { href: "/wards", label: "Wards", icon: Map, group: "main" },
   { href: "/corporations", label: "Corporations", icon: Building2, group: "main" },
   { href: "/explorer", label: "Tree Map", icon: LayoutGrid, group: "main" },

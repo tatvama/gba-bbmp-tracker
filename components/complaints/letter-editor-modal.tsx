@@ -202,7 +202,7 @@ export function LetterEditorModal({
             <DialogTitle className="font-extrabold text-slate-800 dark:text-slate-100 text-sm tracking-tight">{title}</DialogTitle>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mr-10">
             {/* View / Edit Toggle */}
             <div className="flex items-center gap-0.5 border rounded-lg bg-muted/40 p-0.5 text-xs mr-2">
               <button type="button" onClick={() => setMode("edit")} className={toggleCls(mode === "edit")}>

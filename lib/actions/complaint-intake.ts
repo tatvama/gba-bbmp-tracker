@@ -145,6 +145,14 @@ async function createOneComplaint(
     ex.department ? `Department: ${ex.department}.` : "",
     ex.reporterName ? `Reporter: ${ex.reporterName}.` : "",
     ex.requestedAction ? `Requested action: ${ex.requestedAction}.` : "",
+    ex.receiver ? `Receiver: ${ex.receiver}.` : "",
+    ex.addressedTo ? `Addressed To: ${ex.addressedTo}.` : "",
+    ex.emails?.length ? `Emails: ${ex.emails.join(", ")}.` : "",
+    ex.contactNumbers?.length ? `Contact Numbers: ${ex.contactNumbers.join(", ")}.` : "",
+    ex.addresses?.length ? `Addresses: ${ex.addresses.join("; ")}.` : "",
+    ex.references?.length ? `References: ${ex.references.join("; ")}.` : "",
+    ex.attachments?.length ? `Attachments: ${ex.attachments.join(", ")}.` : "",
+    ex.language ? `Language: ${ex.language}.` : "",
     "Created from an uploaded letter/PDF (AI-assisted intake — verify details).",
   ].filter(Boolean);
 

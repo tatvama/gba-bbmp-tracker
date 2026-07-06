@@ -40,8 +40,10 @@ export async function preprocessForOcr(input: Buffer): Promise<PreprocessResult>
         withoutEnlargement: true,
       })
       .grayscale()
+      .median(3) // noise removal filter
+      .linear(1.15, -15) // contrast boost: suppresses page background, darkens text
       .normalize() // stretch contrast
-      .sharpen()
+      .sharpen({ sigma: 1, m1: 1, m2: 2 }) // precise text sharpening
       .png({ compressionLevel: 6 })
       .toBuffer();
 

@@ -14,6 +14,9 @@ export class TesseractOCRProvider implements OCRProvider {
     const language = options?.language || "eng";
     const worker = await createWorker(language);
     try {
+      await worker.setParameters({
+        tessedit_pageseg_mode: "1" as any, // 1 = Automatic page segmentation with OSD
+      });
       const { data } = await worker.recognize(input);
       return {
         text: data.text ?? "",

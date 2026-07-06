@@ -61,6 +61,34 @@ export function evaluateReminderWorkflow(ctx: AdvisorContext): ReminderSuggestio
     return { action: "none", daysSinceEvent: 0, reasonLabel: "Not yet filed" };
   }
   const daysSinceFiling = daysBetween(baseDate, today);
+
+  // Check if acknowledged and SLA since acknowledgment has elapsed.
+  const ackDate = complaint.acknowledgment_date ?? null;
+  if (ackDate) {
+    const daysSinceAck = daysBetween(ackDate, today);
+    const preSla = settings.aiAdvisorPreReminderSlaDays ?? 7;
+    if (daysSinceAck >= preSla && !hasOpenFollowUpReminder) {
+      return {
+        action: "generate_reminder",
+        daysSinceEvent: daysSinceAck,
+        reasonLabel: `${daysSinceAck} days since acknowledgment, pre-reminder SLA (${preSla} days) elapsed`,
+      };
+    }
+    if (daysSinceAck >= preSla && hasOpenFollowUpReminder) {
+      return {
+        action: "none",
+        daysSinceEvent: daysSinceAck,
+        reasonLabel: "Acknowledgment SLA elapsed but a follow-up reminder is already open",
+      };
+    }
+    return {
+      action: "none",
+      daysSinceEvent: daysSinceAck,
+      reasonLabel: `${daysSinceAck} days since acknowledgment — within pre-reminder SLA (${preSla} days)`,
+    };
+  }
+
+  // Otherwise check standard filing SLA (14 days)
   if (daysSinceFiling >= settings.aiAdvisorReminderSlaDays && !hasOpenFollowUpReminder) {
     return {
       action: "generate_reminder",

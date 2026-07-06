@@ -86,6 +86,7 @@
     "eslint-config-next": "15.1.6",
     "pg": "8.13.1",
     "postcss": "8.4.49",
+    "server-only": "^0.0.1",
     "tailwindcss": "3.4.17",
     "tsx": "4.19.2",
     "typescript": "5.7.3",

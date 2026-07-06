@@ -35,6 +35,40 @@ export interface ComplaintIntakeExtraction {
   recommendedEscalation: string;
   confidence: "High" | "Medium" | "Low";
   needsManualReview: boolean;
+
+  // New detailed fields for multi-complaint letter auto-population
+  area?: string;
+  ward?: string;
+  division?: string;
+  reporter?: string;
+  jobCodes?: string[];
+  references?: string[];
+  complaintDate?: string;
+  receiver?: string;
+  addressedTo?: string;
+  emails?: string[];
+  contactNumbers?: string[];
+  addresses?: string[];
+  attachments?: string[];
+  language?: string;
+  wardId?: string | null;
+  wardNo?: number | null;
+  wardName?: string | null;
+  divisionId?: string | null;
+  divisionName?: string | null;
+  corporationId?: string | null;
+  corporationName?: string | null;
+  assignedContactId?: string | null;
+  fieldConfidence?: {
+    subject?: "High" | "Medium" | "Low";
+    complaintType?: "High" | "Medium" | "Low";
+    department?: "High" | "Medium" | "Low";
+    areaOrWard?: "High" | "Medium" | "Low";
+    reporterName?: "High" | "Medium" | "Low";
+    requestedAction?: "High" | "Medium" | "Low";
+    jobNumber?: "High" | "Medium" | "Low";
+    summary?: "High" | "Medium" | "Low";
+  };
 }
 
 function fallback(): ComplaintIntakeExtraction {
@@ -56,6 +90,28 @@ function fallback(): ComplaintIntakeExtraction {
     recommendedEscalation: "",
     confidence: "Low",
     needsManualReview: true,
+    area: "",
+    ward: "",
+    division: "",
+    reporter: "",
+    jobCodes: [],
+    references: [],
+    complaintDate: "",
+    receiver: "",
+    addressedTo: "",
+    emails: [],
+    contactNumbers: [],
+    addresses: [],
+    attachments: [],
+    language: "English",
+    wardId: null,
+    wardNo: null,
+    wardName: null,
+    divisionId: null,
+    divisionName: null,
+    corporationId: null,
+    corporationName: null,
+    assignedContactId: null,
   };
 }
 
@@ -67,23 +123,36 @@ function findJobCode(text: string): string {
 
 /** The exact JSON shape both the text and vision extractors ask the model for. */
 const INTAKE_JSON_SHAPE = `{
-  "subject": "short subject/title of the complaint",
-  "complaintType": one of ${JSON.stringify(COMPLAINT_TYPE_VALUES)},
-  "department": "the department/office addressed (free text)",
-  "areaOrWard": "area / ward / location mentioned",
-  "officerNames": ["any named officer / engineer"],
-  "reporterName": "the complainant's name if present",
-  "requestedAction": "what the citizen is asking to be done",
-  "summary": "2-3 sentence plain summary",
-  "documentType": "letter | acknowledgement | reply | other",
-  "referenceNumber": "any reference / inward number",
-  "jobNumber": "a BBMP works job code ddd-yy-nnnnnn if present, else empty",
-  "importantDates": [{ "label": "", "date": "YYYY-MM-DD" }],
-  "suggestedStatus": "Draft | Filed | Acknowledged | Reply Received",
-  "suggestedNextActions": ["concrete next steps the citizen could take"],
-  "recommendedEscalation": "if unresolved, the next forum (e.g. RTI, Lokayukta)",
-  "confidence": "High | Medium | Low",
-  "needsManualReview": false
+  "subject": "Short subject/title of the complaint (generate one in the original language if missing)",
+  "type": "one of ${JSON.stringify(COMPLAINT_TYPE_VALUES)}",
+  "department": "the department / office addressed (free text)",
+  "area": "area / location mentioned",
+  "ward": "ward number or name if mentioned",
+  "division": "division name if mentioned",
+  "reporter": "complainant name, citizen association, or organization name",
+  "requestedAction": "the requested action exactly as written (do not summarize or translate, maintain original language)",
+  "jobCodes": ["any BBMP works job codes (ddd-yy-nnnnnn), work orders, file/tender/reference numbers"],
+  "references": ["any reference citations or previous letters cited"],
+  "complaintDate": "the date printed on the complaint letter (YYYY-MM-DD, or raw text)",
+  "receiver": "receiver designation and/or name",
+  "addressedTo": "complete recipient address block/details",
+  "emails": ["any email addresses found"],
+  "contactNumbers": ["any mobile or phone numbers found"],
+  "addresses": ["any postal or site addresses mentioned"],
+  "attachments": ["any photos, bills, annexures, drawings or supporting sheets mentioned in text"],
+  "summary": "a concise 2-3 sentence summary in the original language of the document (do not translate)",
+  "language": "English | Kannada | Mixed",
+  "confidence": {
+    "subject": 0.0 to 1.0,
+    "department": 0.0 to 1.0,
+    "type": 0.0 to 1.0,
+    "area": 0.0 to 1.0,
+    "reporter": 0.0 to 1.0,
+    "requestedAction": 0.0 to 1.0,
+    "jobNumber": 0.0 to 1.0,
+    "summary": 0.0 to 1.0,
+    "overall": 0.0 to 1.0
+  }
 }`;
 
 async function getSharp() {
@@ -106,11 +175,108 @@ async function downscaleForVision(buf: Buffer): Promise<{ buffer: Buffer; mimeTy
 }
 
 /** Coerce an AI extraction object into a clean, fully-typed ComplaintIntakeExtraction. */
-function finalizeExtraction(base: ComplaintIntakeExtraction, data: Partial<ComplaintIntakeExtraction>): ComplaintIntakeExtraction {
-  const ex = sanitize({ ...base, ...data });
-  if (!COMPLAINT_TYPE_VALUES.includes(ex.complaintType as (typeof COMPLAINT_TYPE_VALUES)[number])) ex.complaintType = "Other";
-  if (!ex.jobNumber) ex.jobNumber = base.jobNumber;
-  return ex;
+function finalizeExtraction(base: ComplaintIntakeExtraction, data: any): ComplaintIntakeExtraction {
+  const getField = (keys: string[], defaultVal: any = "") => {
+    for (const k of keys) {
+      if (data[k] !== undefined && data[k] !== null) return data[k];
+      const lowerK = k.toLowerCase();
+      if (data[lowerK] !== undefined && data[lowerK] !== null) return data[lowerK];
+      const upperK = k.charAt(0).toUpperCase() + k.slice(1);
+      if (data[upperK] !== undefined && data[upperK] !== null) return data[upperK];
+    }
+    return defaultVal;
+  };
+
+  const subject = getField(["subject"]);
+  const complaintType = getField(["type", "complaintType", "complaint_type"], "Other");
+  const department = getField(["department"]);
+  
+  const area = getField(["area"]);
+  const ward = getField(["ward"]);
+  const division = getField(["division"]);
+  const reporter = getField(["reporter", "reporterName", "reporter_name"]);
+  const requestedAction = getField(["requestedAction", "requested_action"]);
+  const summary = getField(["summary"]);
+  const receiver = getField(["receiver"]);
+  const addressedTo = getField(["addressedTo", "addressed_to"]);
+  const complaintDate = getField(["complaintDate", "complaint_date", "date"]);
+  const language = getField(["language"], "English");
+  
+  const emails = getField(["emails"], []);
+  const contactNumbers = getField(["contactNumbers", "contact_numbers", "contactnumber"], []);
+  const addresses = getField(["addresses"], []);
+  const attachments = getField(["attachments"], []);
+  const references = getField(["references"], []);
+  const jobCodes = getField(["jobCodes", "job_codes"], []);
+
+  const areaParts = [area, ward, division].filter(Boolean);
+  const areaOrWard = getField(["areaOrWard", "area_or_ward"]) || (areaParts.length ? areaParts.join(", ") : "");
+  const reporterName = reporter || "";
+  
+  let jobNumber = getField(["jobNumber", "job_number"]);
+  if (!jobNumber && Array.isArray(jobCodes)) {
+    const found = jobCodes.find((c: string) => /^\d{3}-\d{2}-\d{6}$/.test(c));
+    if (found) jobNumber = found;
+  }
+  if (!jobNumber) jobNumber = base.jobNumber;
+  
+  const documentType = getField(["documentType", "document_type"], "letter");
+  const referenceNumber = getField(["referenceNumber", "reference_number"]) || (Array.isArray(references) ? references[0] || "" : "");
+
+  const mapScore = (score: any): "High" | "Medium" | "Low" => {
+    const val = Number(score);
+    if (isNaN(val) || val === 0) return "Medium";
+    if (val >= 0.85) return "High";
+    if (val >= 0.6) return "Medium";
+    return "Low";
+  };
+
+  const fieldConfidence = {
+    subject: mapScore(data.confidence?.subject ?? 0.8),
+    complaintType: mapScore(data.confidence?.type ?? 0.8),
+    department: mapScore(data.confidence?.department ?? 0.8),
+    areaOrWard: mapScore(data.confidence?.area ?? 0.8),
+    reporterName: mapScore(data.confidence?.reporter ?? 0.8),
+    requestedAction: mapScore(data.confidence?.requestedAction ?? 0.8),
+    jobNumber: mapScore(data.confidence?.jobNumber ?? 0.8),
+    summary: mapScore(data.confidence?.summary ?? 0.8),
+  };
+
+  const overallConfidence = mapScore(data.confidence?.overall ?? 0.8);
+
+  const ex: ComplaintIntakeExtraction = {
+    ...base,
+    ...data,
+    subject,
+    complaintType,
+    department,
+    areaOrWard,
+    reporterName,
+    requestedAction,
+    jobNumber,
+    summary,
+    documentType,
+    referenceNumber,
+    emails,
+    contactNumbers,
+    addresses,
+    attachments,
+    references,
+    jobCodes,
+    complaintDate,
+    receiver,
+    addressedTo,
+    language,
+    division,
+    area,
+    ward,
+    reporter,
+    confidence: overallConfidence,
+    fieldConfidence,
+    needsManualReview: overallConfidence === "Low" || data.needsManualReview === true,
+  };
+
+  return sanitize(ex);
 }
 
 export async function analyzeComplaintIntake(ocrText: string): Promise<{ ok: boolean; extraction: ComplaintIntakeExtraction; error?: string }> {
@@ -129,7 +295,7 @@ Use only what is visible; leave fields empty/[] when not present. Do not invent 
 DOCUMENT:
 ${text.slice(0, 20_000)}`;
 
-  const r = await extractJson<ComplaintIntakeExtraction>({ system, prompt, fallback: base, maxTokens: 1800 });
+  const r = await extractJson<ComplaintIntakeExtraction>({ system, prompt, fallback: base, maxTokens: 2500 });
   return { ok: r.ok, extraction: finalizeExtraction(base, r.data), error: r.ok ? undefined : r.error };
 }
 
@@ -159,7 +325,7 @@ export async function analyzeComplaintIntakeFromImages(params: {
 
   const system =
     "You read ONE citizen's civic complaint letter / acknowledgement (BBMP / GBA, Bengaluru) from its page IMAGES — the images are authoritative; any OCR text is a NOISY hint (especially for Kannada/handwriting). These are real Bengaluru civic documents in Kannada and/or English — READ THE KANNADA. " +
-    "A complaint letter ALWAYS has a matter/subject and asks for something, so you MUST fill `subject` and `summary` even if there is no explicit 'Subject:' line — infer them from the body (you may write them in English and/or keep Kannada terms). Also fill `department`, `areaOrWard`, `reporterName`, `requestedAction` and dates whenever they are legible. Only structured identifiers you genuinely cannot see (a reference/job number, an officer's exact name) may be left empty — never invent those. " +
+    "A complaint letter ALWAYS has a matter/subject and asks for something, so you MUST fill `subject` and `summary` even if there is no explicit 'Subject:' line — infer them from the body (you must write them in the original language used in the document, keeping Kannada terms as-is, never translate). Also fill `department`, `area`, `ward`, `reporter`, `requestedAction` and dates whenever they are legible. Only structured identifiers you genuinely cannot see (a reference/job number, an officer's exact name) may be left empty — never invent those. " +
     "Output STRICT JSON only — no markdown fences, no commentary before or after.";
   const hint = (params.ocrText || "").trim()
     ? `OCR hint (noisy — trust the images over this):\n"""\n${params.ocrText.slice(0, 8000)}\n"""`
@@ -169,8 +335,6 @@ export async function analyzeComplaintIntakeFromImages(params: {
 Output STRICT JSON of EXACTLY this shape:
 ${INTAKE_JSON_SHAPE}`;
 
-  // Kannada is token-heavy — a long multi-ward complaint needs generous headroom
-  // or the JSON response truncates mid-value and fails to parse.
   const res = await generateVision({ system, prompt, images, temperature: 0, maxTokens: 4000 });
   if (!res.ok || !res.text) {
     console.warn(`[intake-vision] vision call failed (${res.error ?? "no text"}); falling back to OCR text`);
@@ -259,5 +423,27 @@ function sanitize(ex: ComplaintIntakeExtraction): ComplaintIntakeExtraction {
     suggestedStatus: ex.suggestedStatus ?? "",
     suggestedNextActions: ex.suggestedNextActions ?? [],
     recommendedEscalation: ex.recommendedEscalation ?? "",
+    area: ex.area ?? "",
+    ward: ex.ward ?? "",
+    division: ex.division ?? "",
+    reporter: ex.reporter ?? "",
+    jobCodes: ex.jobCodes ?? [],
+    references: ex.references ?? [],
+    complaintDate: ex.complaintDate ?? "",
+    receiver: ex.receiver ?? "",
+    addressedTo: ex.addressedTo ?? "",
+    emails: ex.emails ?? [],
+    contactNumbers: ex.contactNumbers ?? [],
+    addresses: ex.addresses ?? [],
+    attachments: ex.attachments ?? [],
+    language: ex.language ?? "English",
+    wardId: ex.wardId ?? null,
+    wardNo: ex.wardNo ?? null,
+    wardName: ex.wardName ?? null,
+    divisionId: ex.divisionId ?? null,
+    divisionName: ex.divisionName ?? null,
+    corporationId: ex.corporationId ?? null,
+    corporationName: ex.corporationName ?? null,
+    assignedContactId: ex.assignedContactId ?? null,
   };
 }

@@ -297,6 +297,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className,
         )}
         ref={ref}
+        value={value}
+        defaultValue={defaultValue}
         onChange={onChange}
         {...props}
       />

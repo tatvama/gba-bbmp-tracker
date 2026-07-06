@@ -482,6 +482,7 @@ export interface ComplaintSettings {
   aiAdvisorEnabled: boolean;
   aiAdvisorReminderSlaDays: number;
   aiAdvisorEscalationSlaDays: number;
+  aiAdvisorPreReminderSlaDays: number;
 }
 
 /** AI draft kinds available from the complaint detail page. */
@@ -522,8 +523,9 @@ export const DEFAULT_COMPLAINT_SETTINGS: ComplaintSettings = {
   maxUploadMb: 15,
   documentsPrivateByDefault: true,
   aiAdvisorEnabled: true,
-  aiAdvisorReminderSlaDays: 18,
+  aiAdvisorReminderSlaDays: 14,
   aiAdvisorEscalationSlaDays: 10,
+  aiAdvisorPreReminderSlaDays: 7,
 };
 
 // =============================================================================

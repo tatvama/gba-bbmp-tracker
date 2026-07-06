@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Loader2, UploadCloud, FileText, Sparkles, AlertTriangle,
-  CheckCircle2, Clock3, Eye, Link, Trash2, ArrowRight
+  CheckCircle2, Clock3, Eye, Link, Trash2, ArrowRight, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -219,7 +219,7 @@ export function AckReconcileUpload() {
                           : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 text-slate-400"
                       )}
                     >
-                      {isDone ? "✓" : idx + 1}
+                      {isDone ? <Check className="h-2.5 w-2.5 stroke-[3.5]" /> : idx + 1}
                     </div>
                     <div>
                       <p className={cn("text-xs font-bold", isDone ? "text-slate-700 dark:text-slate-300" : isActive ? "text-primary" : "text-slate-450 dark:text-slate-500")}>
