@@ -853,15 +853,15 @@ function CounterReplyPanel({
   let counterLabel = "Counter Reply";
   if (counterState === "locked") {
     if (!hasAcknowledge) {
-      counterTooltip = "Counter Reply becomes available after a department reply is received. Waiting for case acknowledgement first.";
+      counterTooltip = "Counter Reply becomes available after a department reply is received. Waiting for case acknowledgement first. It takes 14 days minimum for a reply timeline to run.";
     } else if (escalationStage === "awaiting_reply") {
-      counterTooltip = `Counter Reply becomes available after a department reply is received. The department has ${diffDays > 0 ? diffDays : 0} days remaining to respond before reminders escalate.`;
+      counterTooltip = `Counter Reply becomes available after a department reply is received. The department has ${diffDays > 0 ? diffDays : 0} days remaining to respond.`;
     } else {
       counterTooltip = "Counter Reply becomes available after a department reply is received and AI completes its analysis.";
     }
     counterLabel = "Counter Reply 🔒";
   } else if (counterState === "active") {
-    counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response. Available now.";
+    counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response. Available now (0 days remaining).";
     counterLabel = "Counter Reply 🔵";
   } else if (counterState === "completed") {
     counterTooltip = "Counter-reply has been drafted and filed to the case.";
@@ -872,16 +872,16 @@ function CounterReplyPanel({
   let reminderLabel = "Reminder Letter";
   if (reminderState === "locked") {
     if (!hasAcknowledge) {
-      reminderTooltip = "Reminder Letter will become available after the complaint is acknowledged and the 14-day reply waiting period expires.";
+      reminderTooltip = "Reminder Letter will become available after the complaint is acknowledged and the 14-day reply waiting period expires. It will take 14 days to activate from the date of acknowledgement.";
     } else {
       reminderTooltip = "Reminder Letter will become available after the configured reply waiting period expires if no department reply is received.";
     }
     reminderLabel = "Reminder Letter 🔒";
   } else if (reminderState === "waiting") {
-    reminderTooltip = `Reminder Letter will become available after the configured reply waiting period expires if no department reply is received. Available in ${diffDays > 0 ? diffDays : 0} Days.`;
+    reminderTooltip = `Reminder Letter will become available after the configured reply waiting period expires if no department reply is received. It will take ${diffDays > 0 ? diffDays : 0} days to activate.`;
     reminderLabel = "Reminder Letter ⏳";
   } else if (reminderState === "active") {
-    reminderTooltip = "Generate a reminder letter requesting the department to respond to the complaint. Available now.";
+    reminderTooltip = "Generate a reminder letter requesting the department to respond to the complaint. Available now (0 days remaining).";
     reminderLabel = "Reminder Letter 🔵";
   } else if (reminderState === "completed") {
     reminderTooltip = "Reminder letter has already been generated and filed.";
@@ -892,18 +892,18 @@ function CounterReplyPanel({
   let legalLabel = "Legal Notice";
   if (legalState === "locked") {
     if (!hasAcknowledge) {
-      legalTooltip = "Legal Notice will become available after the complaint is acknowledged, reminder is sent, and waiting periods expire.";
+      legalTooltip = "Legal Notice will become available after the complaint is acknowledged, reminder is sent, and waiting periods expire. It will take 21 days total (14 days reply + 7 days reminder waiting) to activate from the date of acknowledgement.";
     } else if (escalationStage === "awaiting_reply") {
-      legalTooltip = `Legal Notice will become available after the reminder waiting period expires. Requires reminder letter to be generated first (reminder becomes available in ${diffDays > 0 ? diffDays : 0} Days).`;
+      legalTooltip = `Legal Notice will become available after the reminder waiting period expires. Requires reminder letter to be generated first (reminder becomes available in ${diffDays > 0 ? diffDays : 0} days; legal notice takes ${diffDays > 0 ? diffDays + 7 : 7} days to activate).`;
     } else {
       legalTooltip = "Legal Notice will become available after the reminder waiting period expires if no department reply is received.";
     }
     legalLabel = "Legal Notice 🔒";
   } else if (legalState === "waiting") {
-    legalTooltip = `Legal Notice will become available after the reminder waiting period expires if no department reply is received. Available in ${diffDays > 0 ? diffDays : 0} Working Days.`;
+    legalTooltip = `Legal Notice will become available after the reminder waiting period expires if no department reply is received. It will take ${diffDays > 0 ? diffDays : 0} days to activate.`;
     legalLabel = "Legal Notice ⏳";
   } else if (legalState === "active") {
-    legalTooltip = "Generate a formal legal notice before escalating the complaint. Available now.";
+    legalTooltip = "Generate a formal legal notice before escalating the complaint. Available now (0 days remaining).";
     legalLabel = "Legal Notice 🔵";
   } else if (legalState === "completed") {
     legalTooltip = "Legal Notice has already been generated and filed.";
