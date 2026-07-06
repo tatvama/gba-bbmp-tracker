@@ -533,14 +533,14 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => (
-        <div className="flex flex-col items-start gap-1">
+        <div className="flex flex-col items-start gap-1 min-w-[180px]">
           <StatusBadge status={row.original.status} date={row.original.updated_at} />
-          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider pl-0.5">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider pl-0.5 whitespace-nowrap">
             {getNextActionForStatus(row.original.status)}
           </span>
         </div>
       ),
-      size: 145
+      size: 180
     },
     {
       accessorKey: "type",
