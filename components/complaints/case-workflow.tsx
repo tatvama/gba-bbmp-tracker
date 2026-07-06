@@ -966,7 +966,7 @@ function CounterReplyPanel({
                 </LanguageChoiceButton>
               </span>
             </TooltipTrigger>
-            <TooltipContent className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
+            <TooltipContent align="start" className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
               {counterTooltip}
             </TooltipContent>
           </Tooltip>
