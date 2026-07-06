@@ -355,7 +355,7 @@ export function CaseWorkflow({
                 const status = info.suggestedStatus;
                 const isConfident = info.confidence === "High" || info.confidence === "Medium";
                 if (isConfident && (status === "Reply Received" || status === "Action Taken Report Received")) {
-                  setReplySuggestion({ status, confidence: info.confidence });
+                  setReplySuggestion({ status: "Reply Received", confidence: info.confidence });
                 } else {
                   setReplySuggestion(null);
                 }
@@ -364,33 +364,18 @@ export function CaseWorkflow({
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {replySuggestion ? (
                 <>
-                  <Button size="sm" disabled={busy} onClick={() => mark(replySuggestion.status)}>
-                    {replySuggestion.status === "Action Taken Report Received"
-                      ? <FileCheck2 className="h-4 w-4" />
-                      : <MessageSquareReply className="h-4 w-4" />}
-                    Confirm: {replySuggestion.status === "Action Taken Report Received" ? "mark ATR received" : "mark reply received"}
+                  <Button size="sm" disabled={busy} onClick={() => mark("Reply Received")}>
+                    <MessageSquareReply className="h-4 w-4" />
+                    Confirm: mark reply received
                   </Button>
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <Sparkles className="h-3 w-3" /> AI read this as {replySuggestion.status === "Action Taken Report Received" ? "an Action Taken Report" : "a reply"}
+                    <Sparkles className="h-3 w-3" /> AI read this as a reply
                   </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => mark(replySuggestion.status === "Action Taken Report Received" ? "Reply Received" : "Action Taken Report Received")}
-                  >
-                    Not quite — mark as {replySuggestion.status === "Action Taken Report Received" ? "reply" : "ATR"} instead
-                  </Button>
                 </>
               ) : (
-                <>
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Reply Received")}>
-                    <MessageSquareReply className="h-4 w-4" /> Mark reply received
-                  </Button>
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Action Taken Report Received")}>
-                    <FileCheck2 className="h-4 w-4" /> Mark ATR received
-                  </Button>
-                </>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => mark("Reply Received")}>
+                  <MessageSquareReply className="h-4 w-4" /> Mark reply received
+                </Button>
               )}
             </div>
 
@@ -776,9 +761,6 @@ function CounterReplyPanel({ complaintId, aiConfigured, refreshKey = 0 }: { comp
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" disabled={!aiConfigured || analysing} onClick={analyse}>
-          {analysing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Analyse what the reply left unaddressed
-        </Button>
         <LanguageChoiceButton
           size="sm"
           variant="outline"
