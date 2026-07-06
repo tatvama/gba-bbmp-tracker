@@ -10,7 +10,7 @@ export default async function ComplaintSettingsPage() {
   const [settings, user] = await Promise.all([getComplaintSettings(), getSessionUser()]);
   if (!hasRole(user, ["ADMIN"])) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-[1500px]">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border/40 pb-5">
           <div className="space-y-1.5">
             <h1 className="text-xl font-extrabold tracking-tight text-foreground sm:text-2xl leading-none">
@@ -23,7 +23,7 @@ export default async function ComplaintSettingsPage() {
     );
   }
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-[1500px]">
       <ComplaintSettingsForm initial={settings} />
     </div>
   );
