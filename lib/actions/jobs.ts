@@ -71,7 +71,7 @@ export async function startAiDraftJob(input: {
     entityId: input.complaintId,
     input,
     userId: user.id,
-    link: `/complaints/${input.complaintId}?tab=ai`,
+    link: `/complaints/${input.complaintId}`,
   });
   return r;
 }

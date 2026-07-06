@@ -28,7 +28,7 @@ export const MODULE_LABEL: Record<JobType, string> = {
 export function resultLinkForRow(type: string, entityType: string | null, entityId: string | null): string | null {
   switch (type as JobType) {
     case "ai_draft":
-      return entityType === "complaint" && entityId ? `/complaints/${entityId}?tab=ai` : null;
+      return entityType === "complaint" && entityId ? `/complaints/${entityId}` : null;
     case "ocr":
     case "export":
       return entityType === "complaint" && entityId ? `/complaints/${entityId}` : null;

@@ -140,7 +140,7 @@ export function AIRecommendationCard({
       if (status === "done") {
         if (action === "generate_reminder") await markReminderGenerated(complaintId);
         setBusy(false);
-        router.push(`/complaints/${complaintId}?tab=ai`);
+        router.refresh();
         return;
       }
       if (status === "failed") {

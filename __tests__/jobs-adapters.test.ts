@@ -73,7 +73,7 @@ describe("adaptBackgroundJob", () => {
     expect(t.module).toBe("AI Drafting");
     expect(t.stage).toBe("drafting");
     expect(t.message).toBe("almost there");
-    expect(t.resultLink).toBe("/complaints/c1?tab=ai");
+    expect(t.resultLink).toBe("/complaints/c1");
   });
 
   it("does not build a resultLink for a job that is not yet done", () => {
