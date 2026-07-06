@@ -1106,6 +1106,106 @@ export async function countPrintPendingLetters(): Promise<number> {
   return count ?? 0;
 }
 
+const ACTIVE_ESCALATION_LADDER_STAGES = ["awaiting_reply", "reminder_sent", "legal_notice_sent"] as const;
+
+/** Count of complaints whose current escalation-ladder deadline falls within
+ *  the next `withinDays` days (dashboard "coming up" banner). */
+export async function countRepliesDueSoon(withinDays = 5): Promise<number> {
+  const supabase = await sb();
+  const now = new Date();
+  const until = new Date(now.getTime() + withinDays * 86_400_000);
+  const { count, error } = await supabase
+    .from("complaints")
+    .select("id", { count: "exact", head: true })
+    .in("escalation_stage", ACTIVE_ESCALATION_LADDER_STAGES)
+    .gte("escalation_stage_deadline", now.toISOString())
+    .lte("escalation_stage_deadline", until.toISOString());
+  logErr("countRepliesDueSoon", error);
+  return count ?? 0;
+}
+
+export interface ReplyDueSoon {
+  complaintId: string;
+  caseNumber: string | null;
+  title: string | null;
+  escalationStage: string;
+  deadline: string;
+}
+
+/** The complaints behind that count, soonest deadline first (dashboard list). */
+export async function listRepliesDueSoon(withinDays = 5, limit = 8): Promise<ReplyDueSoon[]> {
+  const supabase = await sb();
+  const now = new Date();
+  const until = new Date(now.getTime() + withinDays * 86_400_000);
+  const { data, error } = await supabase
+    .from("complaints")
+    .select("id, internal_case_number, title, escalation_stage, escalation_stage_deadline")
+    .in("escalation_stage", ACTIVE_ESCALATION_LADDER_STAGES)
+    .gte("escalation_stage_deadline", now.toISOString())
+    .lte("escalation_stage_deadline", until.toISOString())
+    .order("escalation_stage_deadline", { ascending: true })
+    .limit(limit);
+  logErr("listRepliesDueSoon", error);
+  return ((data as Record<string, any>[]) ?? []).map((r) => ({
+    complaintId: r.id,
+    caseNumber: r.internal_case_number ?? null,
+    title: r.title ?? null,
+    escalationStage: r.escalation_stage,
+    deadline: r.escalation_stage_deadline,
+  }));
+}
+
+export interface EscalationFlowConfig {
+  id: string;
+  stageKey: string;
+  label: string;
+  slaDays: number | null;
+  slaUnit: "calendar" | "working" | null;
+  onElapseDraftKind: string | null;
+  onElapseNextStage: string;
+  positionX: number;
+  positionY: number;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+/** The escalation ladder's configurable stages — single source of truth for
+ *  both the scheduler and the drag-drop process-flow page. */
+export async function listEscalationFlowConfigs(): Promise<EscalationFlowConfig[]> {
+  const supabase = await sb();
+  const { data, error } = await supabase
+    .from("escalation_flow_configs")
+    .select("id, stage_key, label, sla_days, sla_unit, on_elapse_draft_kind, on_elapse_next_stage, position_x, position_y, sort_order, is_active")
+    .order("sort_order", { ascending: true });
+  logErr("listEscalationFlowConfigs", error);
+  return ((data as Record<string, any>[]) ?? []).map((r) => ({
+    id: r.id,
+    stageKey: r.stage_key,
+    label: r.label,
+    slaDays: r.sla_days ?? null,
+    slaUnit: r.sla_unit ?? null,
+    onElapseDraftKind: r.on_elapse_draft_kind ?? null,
+    onElapseNextStage: r.on_elapse_next_stage,
+    positionX: r.position_x ?? 0,
+    positionY: r.position_y ?? 0,
+    sortOrder: r.sort_order ?? 0,
+    isActive: r.is_active,
+  }));
+}
+
+/** Live count of complaints currently sitting in each escalation_stage value —
+ *  drives the per-node badge on the process-flow page. */
+export async function getEscalationStageCounts(): Promise<Record<string, number>> {
+  const supabase = await sb();
+  const { data, error } = await supabase.from("complaints").select("escalation_stage").is("deleted_at", null);
+  logErr("getEscalationStageCounts", error);
+  const counts: Record<string, number> = {};
+  for (const row of (data as { escalation_stage: string }[] | null) ?? []) {
+    counts[row.escalation_stage] = (counts[row.escalation_stage] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /** A job-case evidence document (the source PDFs/JSON imported from the ZIP). */
 export interface JobEvidenceDoc {
   id: string;

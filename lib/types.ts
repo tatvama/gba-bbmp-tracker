@@ -183,6 +183,11 @@ export interface Complaint {
   gba_ward_id: string | null;
   gba_division: string | null;
   gba_subdivision: string | null;
+  // Escalation ladder (0031)
+  escalation_stage: string;
+  escalation_stage_deadline: string | null;
+  escalation_stage_entered_at: string | null;
+  escalation_round: number;
 }
 
 export interface ComplaintWithRelations extends Complaint {

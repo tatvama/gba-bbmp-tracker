@@ -29,6 +29,7 @@ import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
 import { generateDraftPdfService } from "@/lib/pdf/document-service";
+import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 import type { ComplaintExtraction } from "@/lib/types";
@@ -428,6 +429,11 @@ export async function addComplaintReply(complaintId: string, _prev: ActionState,
     latest_reply_summary: d.replySummary ?? null,
     latest_reply_date: d.replyDate ?? d.replyReceivedDate ?? todayISO(),
     status: "Reply Received",
+    // A reply always wins over the no-reply escalation ladder — halt it
+    // immediately, whatever stage it was in (matches reminder-workflow.ts's
+    // existing rule that latest_reply_date is a hard stop).
+    escalation_stage: "replied",
+    escalation_stage_deadline: null,
     updated_by: user.id,
   };
   if (followUp) { update.next_follow_up_date = followUp; update.next_action_date = followUp; }
@@ -595,7 +601,13 @@ export async function applyDocumentExtraction(_prev: ActionState, formData: Form
   const update: Record<string, unknown> = { updated_by: user.id };
   if (d.externalComplaintNumber) update.complaint_number = d.externalComplaintNumber;
   if (d.complaintGivenDate) update.date_submitted = d.complaintGivenDate;
-  if (d.replySummary) { update.latest_reply_summary = d.replySummary; update.latest_reply_date = d.replyDate ?? todayISO(); }
+  if (d.replySummary) {
+    update.latest_reply_summary = d.replySummary;
+    update.latest_reply_date = d.replyDate ?? todayISO();
+    // Same hard-stop as addComplaintReply — a reply halts the escalation ladder.
+    update.escalation_stage = "replied";
+    update.escalation_stage_deadline = null;
+  }
   if (d.actionTakenSummary) { update.latest_action_taken_summary = d.actionTakenSummary; update.latest_action_taken_date = d.actionTakenDate ?? todayISO(); }
   if (d.suggestedStatus) update.status = d.suggestedStatus;
   if (d.nextFollowUpDate) { update.next_follow_up_date = d.nextFollowUpDate; update.next_action_date = d.nextFollowUpDate; }
@@ -1033,10 +1045,18 @@ export async function fileCounterReplyAction(
   const { user, admin } = a;
   if (!content.trim()) return { ok: false, error: "Nothing to file — generate the counter-reply first." };
 
+  const { data: counterReplyCase } = await admin
+    .from("complaints")
+    .select("internal_case_number, escalation_round")
+    .eq("id", complaintId)
+    .single();
+
   let pdf: Buffer;
   let fileName: string;
   try {
-    const r = await generateDraftPdfService("Counter-reply", content);
+    const r = await generateDraftPdfService("Counter-reply", content, undefined, {
+      reference: counterReplyCase?.internal_case_number ?? null,
+    });
     pdf = r.buffer;
     fileName = `counter-reply-${Date.now()}.pdf`;
   } catch (e) {
@@ -1099,6 +1119,35 @@ export async function fileCounterReplyAction(
     createdBy: user.id,
   });
 
+  // Our counter-reply is now itself a letter awaiting a reply — re-arm the SAME
+  // no-reply escalation ladder for the next round, starting again from
+  // awaiting_reply. See lib/complaints/escalation-scheduler.ts for the ladder
+  // this feeds into.
+  const nextRound = (counterReplyCase?.escalation_round ?? 1) + 1;
+  const { data: awaitingReplyConfig } = await admin
+    .from("escalation_flow_configs")
+    .select("stage_key, sla_days, sla_unit, on_elapse_draft_kind, on_elapse_next_stage")
+    .eq("stage_key", "awaiting_reply")
+    .maybeSingle();
+  const now = new Date();
+  const deadline = awaitingReplyConfig ? computeStageDeadline(now, awaitingReplyConfig) : null;
+  await admin
+    .from("complaints")
+    .update({
+      escalation_round: nextRound,
+      escalation_stage: "awaiting_reply",
+      escalation_stage_entered_at: now.toISOString(),
+      escalation_stage_deadline: deadline ? deadline.toISOString() : null,
+    })
+    .eq("id", complaintId);
+  await admin.from("complaint_cycle_events").insert({
+    complaint_id: complaintId,
+    round: nextRound,
+    stage: "awaiting_reply",
+    event: "counter_reply_filed",
+    complaint_document_id: documentId,
+  });
+
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
   return { ok: true, documentId };
@@ -1124,10 +1173,18 @@ export async function fileEscalationAction(
   if (!content.trim()) return { ok: false, error: "Nothing to file — generate the escalation letter first." };
   const label = opts?.title || "Escalation letter";
 
+  const { data: escalationCase } = await admin
+    .from("complaints")
+    .select("internal_case_number")
+    .eq("id", complaintId)
+    .single();
+
   let pdf: Buffer;
   let fileName: string;
   try {
-    const r = await generateDraftPdfService(label, content);
+    const r = await generateDraftPdfService(label, content, undefined, {
+      reference: escalationCase?.internal_case_number ?? null,
+    });
     pdf = r.buffer;
     fileName = `escalation-${Date.now()}.pdf`;
   } catch (e) {

@@ -7,10 +7,11 @@
  */
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  Table, TableRow, TableCell, WidthType, ShadingType,
+  Table, TableRow, TableCell, WidthType, ShadingType, ImageRun,
 } from "docx";
 import type { LetterSkeleton } from "@/lib/letters/types";
 import type { TableModel } from "@/lib/letters/tables";
+import { buildQrDataUrl, qrPayloadForCase } from "@/lib/pdf/letter-reference";
 
 const KN_FONT = "Nirmala UI"; // Windows Kannada-capable; viewers substitute Noto Sans Kannada etc.
 const A4 = { width: 11906, height: 16838 }; // twips (210 × 297 mm)
@@ -95,14 +96,53 @@ export interface DocxOptions {
   quantityTable?: TableModel | null;
   paymentTable?: TableModel | null;
   riskTable?: TableModel | null;
+  /** Complaint's internal_case_number. Stamped as text + QR so a scanned-back
+   * acknowledgment of THIS letter can be matched to the complaint automatically —
+   * mirrors generateDraftPdfService's HTML reference header for the Puppeteer path. */
+  reference?: string | null;
 }
 
 const ROW_CAP = 80; // bound table size so generation stays inside the serverless window
+
+function pngBufferFromDataUrl(dataUrl: string): Buffer | null {
+  const m = dataUrl.match(/^data:image\/png;base64,(.+)$/);
+  return m?.[1] ? Buffer.from(m[1], "base64") : null;
+}
+
+/** Right-aligned "Our Ref" text + QR block, mirroring buildReferenceHeaderHtml. */
+async function referenceHeaderParagraphs(reference: string): Promise<Paragraph[]> {
+  const qrDataUrl = await buildQrDataUrl(qrPayloadForCase(reference));
+  const qrBuffer = qrDataUrl ? pngBufferFromDataUrl(qrDataUrl) : null;
+  const paras: Paragraph[] = [
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 40 },
+      children: [run(`Our Ref: ${reference}`, { bold: true, size: 22, color: ACCENT })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 200 },
+      children: [run("Quote this reference on any acknowledgment", { italics: true, size: 16 })],
+    }),
+  ];
+  if (qrBuffer) {
+    paras.push(new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 200 },
+      children: [new ImageRun({ type: "png", data: qrBuffer, transformation: { width: 70, height: 70 } })],
+    }));
+  }
+  return paras;
+}
 
 /** Build the Word document for a letter skeleton. Returns the .docx bytes. */
 export async function buildLetterDocx(sk: LetterSkeleton, opts: DocxOptions = {}): Promise<Buffer> {
   const children: (Paragraph | Table)[] = [];
   const cap = <T,>(rows: T[]): { rows: T[]; omitted: number } => ({ rows: rows.slice(0, ROW_CAP), omitted: Math.max(0, rows.length - ROW_CAP) });
+
+  if (opts.reference) {
+    children.push(...(await referenceHeaderParagraphs(opts.reference)));
+  }
 
   children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [run(sk.title, { bold: true, size: 28, color: ACCENT })] }));
 

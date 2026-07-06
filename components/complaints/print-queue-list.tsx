@@ -17,6 +17,7 @@ import { DocumentViewer, type ViewerTarget } from "@/components/complaints/docum
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { formatDate } from "@/lib/format";
 import type { PrintQueueLetter } from "@/lib/queries";
+import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
 
 const RISK_BADGE: Record<string, BadgeProps["variant"]> = {
   bill_stop: "destructive",
@@ -24,6 +25,34 @@ const RISK_BADGE: Record<string, BadgeProps["variant"]> = {
   procedural: "info",
   low: "muted",
 };
+
+// letter_drafts.variant is either a forensic letter variant (bill_stop/lokayukta/
+// rti/bilingual_summary) OR — for letters auto-drafted by the escalation
+// scheduler — a ComplaintDraftKind (reminder_letter, legal_notice, …). Label
+// + color both so a reminder is visually distinct from a legal notice or the
+// original letter in the same queue.
+const FORENSIC_VARIANT_LABEL: Record<string, string> = {
+  bill_stop: "Bill-stop letter",
+  lokayukta: "Lokayukta letter",
+  rti: "RTI letter",
+  bilingual_summary: "Bilingual summary",
+};
+
+const ESCALATION_VARIANT_BADGE: Record<string, BadgeProps["variant"]> = {
+  reminder_letter: "warning",
+  legal_notice: "destructive",
+  lokayukta_complaint: "destructive",
+  chief_secretary_letter: "destructive",
+  cm_office_letter: "destructive",
+  escalation_letter: "destructive",
+  counter_reply: "info",
+};
+
+function variantLabel(variant: string | null): string | null {
+  if (!variant) return null;
+  if (variant in COMPLAINT_DRAFT_KINDS) return COMPLAINT_DRAFT_KINDS[variant as ComplaintDraftKind];
+  return FORENSIC_VARIANT_LABEL[variant] ?? null;
+}
 
 function fmtDateTime(iso: string | null): string {
   if (!iso) return "";
@@ -90,7 +119,7 @@ export function PrintQueueList({ letters }: { letters: PrintQueueLetter[] }) {
         const res = await fetch("/api/pdf/draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: l.fileName || "Letter preview", text: l.content }),
+          body: JSON.stringify({ title: l.fileName || "Letter preview", text: l.content, reference: l.caseNumber }),
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
@@ -222,6 +251,11 @@ function LetterCard({
               {l.riskBand && (
                 <Badge variant={RISK_BADGE[l.riskBand] ?? "muted"} className="text-[10px]">
                   {l.riskBand.replace("_", " ")}
+                </Badge>
+              )}
+              {variantLabel(l.variant) && (
+                <Badge variant={ESCALATION_VARIANT_BADGE[l.variant ?? ""] ?? "muted"} className="text-[10px]">
+                  {variantLabel(l.variant)}
                 </Badge>
               )}
             </div>

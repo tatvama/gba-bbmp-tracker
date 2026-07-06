@@ -483,6 +483,10 @@ export interface ComplaintSettings {
   aiAdvisorReminderSlaDays: number;
   aiAdvisorEscalationSlaDays: number;
   aiAdvisorPreReminderSlaDays: number;
+  /** Escalation ladder's "working day" SLAs (reminder → legal notice) exclude
+   * Sunday always; set true to also exclude Saturday. Off by default because
+   * most BBMP offices are open most Saturdays. */
+  excludeSaturdaysAsWorkingDay: boolean;
 }
 
 /** AI draft kinds available from the complaint detail page. */
@@ -496,9 +500,12 @@ export const COMPLAINT_DRAFT_KINDS = {
   site_inspection_request: "Site inspection request",
   lokayukta_complaint: "Lokayukta complaint",
   chief_secretary_letter: "Chief Secretary / UDD letter",
+  cm_office_letter: "Chief Minister's office letter",
   records_preservation: "Records-preservation request",
   counter_reply: "Counter-reply to department reply",
   clarification_request: "Clarification request to department",
+  reminder_letter: "Reminder letter (no reply received)",
+  legal_notice: "Legal notice (failure to reply/act)",
 } as const;
 export type ComplaintDraftKind = keyof typeof COMPLAINT_DRAFT_KINDS;
 
@@ -507,8 +514,10 @@ export const ESCALATION_DRAFT_KINDS: ComplaintDraftKind[] = [
   "escalation_letter",
   "lokayukta_complaint",
   "chief_secretary_letter",
+  "cm_office_letter",
   "records_preservation",
   "counter_reply",
+  "legal_notice",
 ];
 
 export const DEFAULT_COMPLAINT_SETTINGS: ComplaintSettings = {
@@ -526,6 +535,7 @@ export const DEFAULT_COMPLAINT_SETTINGS: ComplaintSettings = {
   aiAdvisorReminderSlaDays: 14,
   aiAdvisorEscalationSlaDays: 10,
   aiAdvisorPreReminderSlaDays: 7,
+  excludeSaturdaysAsWorkingDay: false,
 };
 
 // =============================================================================

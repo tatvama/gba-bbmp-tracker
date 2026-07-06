@@ -23,4 +23,12 @@ describe("DOCX builder", () => {
     expect(buf[0]).toBe(0x50);
     expect(buf[1]).toBe(0x4b);
   });
+
+  it("stamps a reference + QR header when opts.reference is given", async () => {
+    const sk = assembleSkeleton(ctx);
+    const buf = await buildLetterDocx(sk, { reference: "DM-CMP-2026-000027" });
+    expect(buf.length).toBeGreaterThan(1500);
+    expect(buf[0]).toBe(0x50);
+    expect(buf[1]).toBe(0x4b);
+  });
 });
