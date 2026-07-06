@@ -203,7 +203,7 @@ export function CaseWorkflow({
   const ackDocs = documents.filter((d) => ACK_DOC_TYPES.includes(d.document_type || ""));
 
   return (
-    <Card className="no-print border border-slate-150 dark:border-slate-850 shadow-xs rounded-xl overflow-hidden mb-6">
+    <Card className="no-print border border-slate-150 dark:border-slate-850 shadow-xs rounded-xl mb-6">
       <CardContent className="p-6">
         {/* Progress Tracker (Timeline Style) */}
         <div className="mb-6 px-4 py-6 select-none bg-slate-50/45 dark:bg-slate-950/20 rounded-xl border border-slate-150 dark:border-slate-850">
