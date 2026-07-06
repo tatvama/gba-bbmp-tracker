@@ -6,6 +6,8 @@ import { bandProgress } from "@/lib/import-queue/types";
 import { getImportSession, updateImportSession } from "@/lib/import-queue/store";
 import { appendChunkAt, deleteStagedFile, looksLikeZip, stagedPathFor } from "@/lib/import-queue/staging";
 import { kickImportWorker } from "@/lib/import-queue/worker";
+import { publishImportChange } from "@/lib/import-queue/bus";
+import { publishJobChange } from "@/lib/jobs/bus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,6 +130,16 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session || session.createdBy !== user.id) {
     return NextResponse.json({ error: "Upload session not found." }, { status: 404 });
   }
+
+  // If the session is already completed, failed, or cancelled, delete it permanently from the database
+  if (session.status === "done" || session.status === "failed" || session.status === "cancelled") {
+    await deleteStagedFile(session.stagedPath);
+    await admin.from("import_uploads").delete().eq("id", id);
+    publishImportChange(user.id);
+    publishJobChange(user.id);
+    return NextResponse.json({ ok: true });
+  }
+
   if (session.status !== "uploading" && session.status !== "queued" && session.status !== "review") {
     return NextResponse.json({ error: `Cannot cancel a ${session.status} import.` }, { status: 409 });
   }

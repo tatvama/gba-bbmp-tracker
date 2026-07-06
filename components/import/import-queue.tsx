@@ -428,6 +428,10 @@ export function ImportQueue({
       .filter((s) => s.status === "done" || s.status === "failed" || s.status === "cancelled")
       .map((s) => s.id);
     setClearedSessionIds((prev) => [...prev, ...ids]);
+    // Call the delete API for each completed session to clear them permanently from the database!
+    ids.forEach((id) => {
+      fetch(`/api/import-queue/${id}`, { method: "DELETE" }).catch(() => {});
+    });
   };
 
   // ── derived view state ──────────────────────────────────────────────────────
