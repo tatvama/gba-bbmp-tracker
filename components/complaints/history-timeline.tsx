@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -41,33 +42,136 @@ import type { ComplaintHistoryEvent, ComplaintHistoryType } from "@/lib/complain
 import type { ComplaintDocument } from "@/lib/types";
 import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 
-// ── Event Style Map ──────────────────────────────────────────────────────────
+// ── Visual Mapping Helper ───────────────────────────────────────────────────
 
-interface ActivityStyle {
-  label: string;
+interface EventVisuals {
   Icon: LucideIcon;
+  borderColor: string;
+  iconColor: string;
+  label: string;
   borderClass: string;
-  iconBgClass: string;
 }
 
-const STYLES: Record<ComplaintHistoryType, ActivityStyle> = {
-  Created: { label: "Case Created", Icon: Plus, borderClass: "border-l-blue-500", iconBgClass: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" },
-  Filed: { label: "Filed", Icon: Send, borderClass: "border-l-blue-500", iconBgClass: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" },
-  Acknowledged: { label: "Acknowledged", Icon: ClipboardCheck, borderClass: "border-l-indigo-500", iconBgClass: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400" },
-  "Reply Received": { label: "Reply Received", Icon: Mail, borderClass: "border-l-teal-500", iconBgClass: "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400" },
-  "Action Taken": { label: "Action Taken", Icon: FileCheck2, borderClass: "border-l-emerald-500", iconBgClass: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400" },
-  "Site Visit": { label: "Site Visit", Icon: MapPin, borderClass: "border-l-amber-500", iconBgClass: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400" },
-  "Photo Evidence": { label: "Photo Evidence", Icon: Camera, borderClass: "border-l-cyan-500", iconBgClass: "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400" },
-  "Follow-up": { label: "Follow-up", Icon: Bell, borderClass: "border-l-amber-500", iconBgClass: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400" },
-  Escalation: { label: "Escalation", Icon: Gavel, borderClass: "border-l-rose-500", iconBgClass: "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400" },
-  Reminder: { label: "Reminder", Icon: CheckCircle2, borderClass: "border-l-emerald-500", iconBgClass: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400" },
-  "Status Change": { label: "Status Updated", Icon: RefreshCw, borderClass: "border-l-slate-400 dark:border-l-slate-600", iconBgClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-500" },
-  Closure: { label: "Closed", Icon: Archive, borderClass: "border-l-slate-400 dark:border-l-slate-600", iconBgClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-500" },
-  Reopened: { label: "Reopened", Icon: RotateCcw, borderClass: "border-l-rose-500", iconBgClass: "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400" },
-  Note: { label: "Note", Icon: StickyNote, borderClass: "border-l-slate-400 dark:border-l-slate-600", iconBgClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-500" },
-};
+function getEventVisuals(event: ComplaintHistoryEvent): EventVisuals {
+  const t = event.type;
+  if (event.isAiCorrespondence) {
+    return {
+      Icon: Sparkles,
+      borderColor: "border-purple-200 dark:border-purple-900/50",
+      iconColor: "text-purple-600 dark:text-purple-400",
+      label: "AI Correspondence",
+      borderClass: "border-l-purple-500",
+    };
+  }
 
-const AI_STYLE: ActivityStyle = { label: "AI Correspondence", Icon: Sparkles, borderClass: "border-l-violet-500", iconBgClass: "bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400" };
+  switch (t) {
+    case "Created":
+    case "Filed":
+      return {
+        Icon: Plus,
+        borderColor: "border-slate-200 dark:border-slate-800",
+        iconColor: "text-slate-500 dark:text-slate-400",
+        label: "Case Intake",
+        borderClass: "border-l-slate-400 dark:border-l-slate-600",
+      };
+    case "Acknowledged":
+      return {
+        Icon: ClipboardCheck,
+        borderColor: "border-blue-200 dark:border-blue-900/50",
+        iconColor: "text-blue-600 dark:text-blue-400",
+        label: "Case Acknowledged",
+        borderClass: "border-l-blue-500",
+      };
+    case "Reply Received":
+      return {
+        Icon: Mail,
+        borderColor: "border-indigo-200 dark:border-indigo-900/50",
+        iconColor: "text-indigo-600 dark:text-indigo-400",
+        label: "Reply Received",
+        borderClass: "border-l-indigo-500",
+      };
+    case "Action Taken":
+      return {
+        Icon: FileCheck2,
+        borderColor: "border-emerald-200 dark:border-emerald-900/50",
+        iconColor: "text-emerald-600 dark:text-emerald-400",
+        label: "Action Taken",
+        borderClass: "border-l-emerald-500",
+      };
+    case "Site Visit":
+      return {
+        Icon: MapPin,
+        borderColor: "border-amber-200 dark:border-amber-900/50",
+        iconColor: "text-amber-600 dark:text-amber-400",
+        label: "Field Inspection",
+        borderClass: "border-l-amber-500",
+      };
+    case "Photo Evidence":
+      return {
+        Icon: Camera,
+        borderColor: "border-blue-200 dark:border-blue-900/50",
+        iconColor: "text-blue-600 dark:text-blue-400",
+        label: "Photo Evidence",
+        borderClass: "border-l-blue-500",
+      };
+    case "Follow-up":
+      return {
+        Icon: Bell,
+        borderColor: "border-amber-200 dark:border-amber-900/50",
+        iconColor: "text-amber-650 dark:text-amber-450",
+        label: "System Follow-up",
+        borderClass: "border-l-amber-500",
+      };
+    case "Reminder":
+      return {
+        Icon: CheckCircle2,
+        borderColor: "border-emerald-250 dark:border-emerald-900/50",
+        iconColor: "text-emerald-600 dark:text-emerald-400",
+        label: "System Reminder",
+        borderClass: "border-l-emerald-500",
+      };
+    case "Escalation":
+      return {
+        Icon: Gavel,
+        borderColor: "border-rose-250 dark:border-rose-900/50",
+        iconColor: "text-rose-600 dark:text-rose-455",
+        label: "Case Escalated",
+        borderClass: "border-l-rose-500",
+      };
+    case "Status Change":
+      return {
+        Icon: RefreshCw,
+        borderColor: "border-amber-250 dark:border-amber-900/50",
+        iconColor: "text-amber-600 dark:text-amber-450",
+        label: "Status Updated",
+        borderClass: "border-l-slate-400 dark:border-l-slate-600",
+      };
+    case "Closure":
+      return {
+        Icon: Archive,
+        borderColor: "border-slate-200 dark:border-slate-800",
+        iconColor: "text-slate-600 dark:text-slate-500",
+        label: "Case Closed",
+        borderClass: "border-l-slate-400 dark:border-l-slate-600",
+      };
+    case "Reopened":
+      return {
+        Icon: RotateCcw,
+        borderColor: "border-rose-250 dark:border-rose-900/50",
+        iconColor: "text-rose-600 dark:text-rose-455",
+        label: "Case Reopened",
+        borderClass: "border-l-rose-500",
+      };
+    default:
+      return {
+        Icon: StickyNote,
+        borderColor: "border-slate-200 dark:border-slate-800",
+        iconColor: "text-slate-500 dark:text-slate-400",
+        label: "Internal Note",
+        borderClass: "border-l-slate-400 dark:border-l-slate-600",
+      };
+  }
+}
 
 // ── Time & Date Formatting ───────────────────────────────────────────────────
 
@@ -138,17 +242,7 @@ function groupEventsByDate(
   }));
 }
 
-// ── Presentation pieces ──────────────────────────────────────────────────────
-
-const ActivityTimestamp = React.memo(function ActivityTimestamp({ date }: { date: string }) {
-  return (
-    <div className="text-right select-none shrink-0 text-slate-400 dark:text-slate-500 font-semibold text-[11px] self-end mt-1.5 sm:mt-0">
-      <span>{formatTimestampDate(date)} {formatTimestampTime(date)}</span>
-      <span className="mx-1.5">•</span>
-      <span className="font-bold text-slate-500 dark:text-slate-400">{timeAgo(date)}</span>
-    </div>
-  );
-});
+// ── Attachment & Description sub-components ───────────────────────────────
 
 const ActivityAttachment = React.memo(function ActivityAttachment({ event }: { event: ComplaintHistoryEvent }) {
   const [busy, setBusy] = React.useState(false);
@@ -191,15 +285,15 @@ function ActivityDescription({ text }: { text: string }) {
   const [expanded, setExpanded] = React.useState(false);
   const isLong = text.length > 150;
 
-  if (!isLong) return <p className="text-[13px] sm:text-[14px] text-slate-600 dark:text-slate-400 leading-normal">{text}</p>;
+  if (!isLong) return <p className="text-[13px] text-slate-655 dark:text-slate-400 leading-relaxed font-medium">{text}</p>;
 
   return (
-    <p className="text-[13px] sm:text-[14px] text-slate-600 dark:text-slate-400 leading-normal">
-      {expanded ? text : `${text.slice(0, 130)}...`}
+    <p className="text-[13px] text-slate-655 dark:text-slate-400 leading-relaxed font-medium">
+      {expanded ? text : `${text.slice(0, 135)}...`}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-        className="ml-1.5 font-bold text-primary hover:underline text-[9.5px] uppercase tracking-wide cursor-pointer focus:outline-none"
+        className="ml-1.5 font-bold text-[#e27226] hover:underline text-[10px] uppercase tracking-wide cursor-pointer focus:outline-none"
       >
         {expanded ? "Show Less" : "Show More"}
       </button>
@@ -207,113 +301,185 @@ function ActivityDescription({ text }: { text: string }) {
   );
 }
 
+// ── Unified 3-Column Timeline Item ──────────────────────────────────────────
+
+interface ActivityItemProps {
+  event: ComplaintHistoryEvent;
+  doc: ComplaintDocument | null;
+  onViewSummary: (doc: ComplaintDocument) => void;
+  isFirstInDateGroup: boolean;
+  groupLabel: string;
+  isFirstGlobal: boolean;
+  isLastGlobal: boolean;
+}
+
 const ActivityItem = React.memo(function ActivityItem({
   event,
   doc,
   onViewSummary,
-}: {
-  event: ComplaintHistoryEvent;
-  doc: ComplaintDocument | null;
-  onViewSummary: (doc: ComplaintDocument) => void;
-}) {
+  isFirstInDateGroup,
+  groupLabel,
+  isFirstGlobal,
+  isLastGlobal,
+}: ActivityItemProps) {
   const [expanded, setExpanded] = React.useState(false);
-  const style = event.isAiCorrespondence ? AI_STYLE : (STYLES[event.type] || STYLES.Note);
+  const style = getEventVisuals(event);
   const hasDetail = !!event.documentId;
+  const isLatest = isFirstGlobal;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(!expanded); }
   };
 
   return (
-    <div
-      onClick={() => hasDetail && setExpanded(!expanded)}
-      onKeyDown={handleKeyDown}
-      tabIndex={hasDetail ? 0 : -1}
-      role={hasDetail ? "button" : "presentation"}
-      aria-expanded={hasDetail ? expanded : undefined}
-      className={cn(
-        "group border rounded-xl p-3 sm:p-3.5 flex flex-col justify-between bg-card transition-all duration-150 ease-out border-l-2 select-none outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-        style.borderClass,
-        "shadow-[0_1px_3px_rgba(0,0,0,0.01)] hover:shadow-xs hover:bg-slate-50/20 dark:hover:bg-slate-800/20",
-        hasDetail ? "cursor-pointer" : "cursor-default",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3 flex-col sm:flex-row">
-        <div className="flex items-start gap-3 min-w-0 flex-1">
-          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs mt-0.5", style.iconBgClass)}>
-            <style.Icon className="h-4.5 w-4.5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="text-[14px] sm:text-[15px] font-bold text-slate-800 dark:text-slate-200">{event.title}</span>
-              {event.createdByProfile && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 select-none">
-                  by {event.createdByProfile.name} ({event.createdByProfile.role})
-                </span>
-              )}
-            </div>
-            {event.summary && (
-              <div className="mt-1">
-                <ActivityDescription text={event.summary} />
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-between sm:justify-end border-t border-slate-50 dark:border-slate-900/40 pt-2 sm:pt-0 sm:border-0 shrink-0">
-          <ActivityTimestamp date={event.createdAt} />
-          {hasDetail && (
-            <button type="button" className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0" aria-label="Toggle attachment">
-              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
+    <div className="grid grid-cols-[36px_1fr] sm:grid-cols-[44px_1fr] md:grid-cols-[120px_44px_1fr] gap-x-3 sm:gap-x-5 md:gap-x-6 items-start relative select-none">
+      
+      {/* COLUMN 1: Group Date & Time (Left - Hidden on mobile/tablet) */}
+      <div className="hidden md:flex flex-col items-end text-right pr-1.5 select-none leading-tight mt-2.5">
+        {isFirstInDateGroup ? (
+          <>
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {groupLabel}
+            </span>
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-205 mt-1 font-mono">
+              {formatTimestampTime(event.createdAt)}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs font-bold text-slate-400 dark:text-slate-550 font-mono">
+            {formatTimestampTime(event.createdAt)}
+          </span>
+        )}
+      </div>
+
+      {/* COLUMN 2: Timeline Connector & Node (Center) */}
+      <div className="flex flex-col items-center justify-start h-full relative self-stretch select-none">
+        {/* Top Connector Segment */}
+        {!isFirstGlobal && (
+          <div className="absolute top-0 bottom-[calc(100%-18px)] sm:bottom-[calc(100%-22px)] w-0.5 bg-slate-200 dark:bg-slate-800" />
+        )}
+        
+        {/* Bottom Connector Segment */}
+        {!isLastGlobal && (
+          <div className="absolute top-[18px] sm:top-[22px] bottom-0 w-0.5 bg-slate-200 dark:bg-slate-800" />
+        )}
+
+        {/* Circular Node Element */}
+        <div
+          className={cn(
+            "relative flex items-center justify-center rounded-full border bg-white dark:bg-slate-900 shadow-sm shrink-0 z-10 transition-all duration-200 hover:scale-105",
+            isLatest ? "h-9 w-9 sm:h-11 sm:w-11 border-orange-500 ring-4 ring-orange-500/10" : "h-8 w-8 sm:h-10 sm:w-10 border-slate-200 dark:border-slate-800",
+            style.borderColor
           )}
+        >
+          <style.Icon className={cn(isLatest ? "h-4.5 w-4.5 sm:h-5 sm:w-5" : "h-4 w-4 sm:h-4.5 sm:w-4.5", style.iconColor)} />
         </div>
       </div>
 
-      <AnimatePresence initial={false}>
-        {expanded && hasDetail && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="overflow-hidden mt-2.5 pl-11"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <ActivityAttachment event={event} />
-              {doc && doc.ai_summary_status === "ready" && (
+      {/* COLUMN 3: Activity Details Card (Right) */}
+      <div className="pb-8 min-w-0">
+        <div
+          onClick={() => hasDetail && setExpanded(!expanded)}
+          onKeyDown={handleKeyDown}
+          tabIndex={hasDetail ? 0 : -1}
+          role={hasDetail ? "button" : "presentation"}
+          aria-expanded={hasDetail ? expanded : undefined}
+          className={cn(
+            "group border rounded-xl p-4 sm:p-5 flex flex-col justify-between bg-card transition-all duration-200 ease-out border-l-2 select-none outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+            style.borderClass,
+            isLatest ? "ring-1 ring-orange-500/15 border-l-orange-500 dark:border-l-orange-500 shadow-xs" : "shadow-[0_1px_3px_rgba(0,0,0,0.01)] hover:shadow-xs border-l-slate-350 dark:border-l-slate-700",
+            hasDetail ? "cursor-pointer" : "cursor-default",
+          )}
+        >
+          {/* Responsive date display for tablet/mobile where Left Column is hidden */}
+          <div className="flex md:hidden items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2 mb-2">
+            <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-none">
+              {isFirstInDateGroup ? `${groupLabel} • ${formatTimestampTime(event.createdAt)}` : formatTimestampTime(event.createdAt)}
+            </span>
+            <span className="text-[9.5px] font-bold text-slate-400 dark:text-slate-500 leading-none">
+              {timeAgo(event.createdAt)}
+            </span>
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[14px] sm:text-[15px] font-extrabold text-slate-850 dark:text-slate-100 leading-tight">
+                  {event.title}
+                </span>
+                {isLatest && (
+                  <Badge className="bg-orange-100 hover:bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/40 text-[9px] font-extrabold uppercase py-0 px-1.5 h-4.5 rounded leading-none shrink-0">
+                    Latest
+                  </Badge>
+                )}
+                {event.createdByProfile && (
+                  <span className="text-[9.5px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-800/80 leading-none">
+                    by {event.createdByProfile.name}
+                  </span>
+                )}
+              </div>
+              {event.summary && (
+                <div className="mt-2.5">
+                  <ActivityDescription text={event.summary} />
+                </div>
+              )}
+            </div>
+            
+            {/* Collapse indicator & desktop duration */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="hidden md:inline-block text-[10px] font-bold text-slate-400 dark:text-slate-500 select-none">
+                {timeAgo(event.createdAt)}
+              </span>
+              {hasDetail && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewSummary(doc);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-left hover:border-slate-300 dark:hover:border-slate-700 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 shadow-3xs text-[11px] font-bold text-slate-700 dark:text-slate-305 cursor-pointer"
-                  aria-label="View AI summary"
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-350 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  aria-label="Toggle details"
                 >
-                  <FileSearch className="h-3.5 w-3.5 text-primary shrink-0" />
-                  View Summary
+                  {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </button>
               )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+
+          <AnimatePresence initial={false}>
+            {expanded && hasDetail && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+                className="overflow-hidden mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <ActivityAttachment event={event} />
+                  {doc && doc.ai_summary_status === "ready" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewSummary(doc);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-left hover:border-slate-300 dark:hover:border-slate-700 hover:scale-[1.01] active:scale-[0.99] transition-all duration-150 shadow-3xs text-[11px] font-bold text-slate-750 dark:text-slate-300 cursor-pointer"
+                      aria-label="View AI summary"
+                    >
+                      <FileSearch className="h-3.5 w-3.5 text-primary shrink-0" />
+                      View Summary
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
     </div>
   );
 });
 
-const ActivityGroup = React.memo(function ActivityGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
-      <div className="flex items-center gap-2 select-none py-1">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{label}</span>
-        <div className="h-px bg-slate-100 dark:bg-slate-800/80 flex-1" />
-      </div>
-      <div className="space-y-2">{children}</div>
-    </motion.div>
-  );
-});
+// ── Filters & Feed Components ──────────────────────────────────────────────
 
 const FILTERS: { value: string; label: string; test: (e: ComplaintHistoryEvent) => boolean }[] = [
   { value: "all", label: "All Activity", test: () => true },
@@ -348,65 +514,84 @@ function ActivityFeed({
   }, [events, searchQuery, filterType]);
 
   const grouped = React.useMemo(() => groupEventsByDate(filteredEvents, sortOrder), [filteredEvents, sortOrder]);
+  const totalFilteredCount = filteredEvents.length;
 
   return (
-    <div className="space-y-3.5">
-      <div className="flex flex-col sm:flex-row gap-2.5 items-center justify-between bg-slate-50/50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-2.5 rounded-xl shadow-3xs w-full">
+    <div className="space-y-6">
+      {/* Unified Filters Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3.5 items-center justify-between bg-slate-50/50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3 rounded-xl shadow-2xs w-full select-none">
         <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
           <Input
             type="text"
             placeholder="Search case history..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 w-full"
+            className="pl-9.5 h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 w-full font-medium"
             aria-label="Search case history"
           />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[145px] h-9 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 cursor-pointer" aria-label="Filter events type">
+            <SelectTrigger className="w-[145px] h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 font-bold cursor-pointer" aria-label="Filter events type">
               <SelectValue placeholder="All Activity" />
             </SelectTrigger>
             <SelectContent>
-              {FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+              {FILTERS.map((f) => <SelectItem key={f.value} value={f.value} className="text-xs font-semibold">{f.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "newest" | "oldest")}>
-            <SelectTrigger className="w-[125px] h-9 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 cursor-pointer" aria-label="Sort chronological order">
+            <SelectTrigger className="w-[125px] h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 font-bold cursor-pointer" aria-label="Sort chronological order">
               <SelectValue placeholder="Newest First" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="newest">Newest First</SelectItem>
-              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="newest" className="text-xs font-semibold">Newest First</SelectItem>
+              <SelectItem value="oldest" className="text-xs font-semibold">Oldest First</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
+      {/* Timeline Output Feed */}
       {grouped.length === 0 ? (
-        <div className="flex flex-col items-center justify-center border border-dashed rounded-xl py-12 text-center bg-card border-slate-200 dark:border-slate-800 select-none">
-          <Clock className="h-8 w-8 text-slate-300 dark:text-slate-700 mb-2" />
+        <div className="flex flex-col items-center justify-center border border-dashed rounded-xl py-14 text-center bg-card border-slate-200 dark:border-slate-800 select-none">
+          <Clock className="h-8 w-8 text-slate-350 dark:text-slate-650 mb-2" />
           <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300">No events found</h5>
-          <p className="text-[11px] text-muted-foreground mt-1 max-w-xs leading-normal">No history matches your search and filter.</p>
+          <p className="text-[11px] text-muted-foreground mt-1 max-w-xs leading-normal">No history matches your search and filter criteria.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {grouped.map(({ label, items }) => (
-            <ActivityGroup key={label} label={label}>
-              {items.map((e) => {
-                const doc = e.documentId ? documents.find((d) => d.id === e.documentId) : null;
-                return (
-                  <ActivityItem
-                    key={e.id}
-                    event={e}
-                    doc={doc ?? null}
-                    onViewSummary={(d) => setSummaryDoc(d)}
-                  />
-                );
-              })}
-            </ActivityGroup>
-          ))}
+        <div className="relative pt-2">
+          {/* Symmetrical Vertical line spanning the entire timeline feed container */}
+          <div className="absolute left-[17px] sm:left-[21px] md:left-[165px] top-6 bottom-6 w-0.5 bg-slate-150 dark:bg-slate-800" />
+          
+          <div className="space-y-0">
+            {(() => {
+              let globalIndex = 0;
+              return grouped.map(({ label, items }) => (
+                <React.Fragment key={label}>
+                  {items.map((event, idx) => {
+                    const doc = event.documentId ? documents.find((d) => d.id === event.documentId) : null;
+                    const isFirstGlobal = globalIndex === 0;
+                    const isLastGlobal = globalIndex === totalFilteredCount - 1;
+                    globalIndex++;
+
+                    return (
+                      <ActivityItem
+                        key={event.id}
+                        event={event}
+                        doc={doc ?? null}
+                        onViewSummary={(d) => setSummaryDoc(d)}
+                        isFirstInDateGroup={idx === 0}
+                        groupLabel={label}
+                        isFirstGlobal={isFirstGlobal}
+                        isLastGlobal={isLastGlobal}
+                      />
+                    );
+                  })}
+                </React.Fragment>
+              ));
+            })()}
+          </div>
         </div>
       )}
       <DocumentSummaryModal doc={summaryDoc} onClose={() => setSummaryDoc(null)} />
@@ -423,7 +608,7 @@ export function HistoryTimeline({
 }) {
   if (events.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-12 text-center border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-14 text-center border-slate-200 dark:border-slate-800">
         <Clock className="h-8 w-8 text-slate-300 dark:text-slate-700 mb-2" aria-hidden />
         <p className="text-xs font-bold text-slate-800 dark:text-slate-300">No activity yet</p>
         <p className="mt-1 text-[11px] text-muted-foreground max-w-xs leading-normal">Uploads, replies, drafts, and status updates will appear here.</p>
