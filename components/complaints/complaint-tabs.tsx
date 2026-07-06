@@ -73,7 +73,6 @@ export function ComplaintTabs({
             <TabsTrigger value="replies" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Replies ({replies.length})</TabsTrigger>
             <TabsTrigger value="followups" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Follow-ups ({reminders.filter((r) => r.status === "Pending").length})</TabsTrigger>
             <TabsTrigger value="escalations" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Escalations ({escalations.length})</TabsTrigger>
-            <TabsTrigger value="ai" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">AI Drafts</TabsTrigger>
             <TabsTrigger value="audit" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-2xs font-extrabold text-[12.5px] px-4 py-2 rounded-lg transition-all">Audit</TabsTrigger>
           </TabsList>
         </div>
@@ -288,10 +287,6 @@ export function ComplaintTabs({
             </CardContent></Card>
           ))}
         </div>
-      </TabsContent>
-
-      <TabsContent value="ai">
-        <ComplaintAiDrafts complaintId={c.id} aiConfigured={flags.aiConfigured} saved={aiDrafts} caseNumber={c.internal_case_number} />
       </TabsContent>
 
       <TabsContent value="audit">

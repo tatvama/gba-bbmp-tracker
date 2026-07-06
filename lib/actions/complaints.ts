@@ -302,15 +302,36 @@ export async function deleteComplaint(id: string): Promise<ActionState> {
   return { success: true };
 }
 
-export async function setComplaintStatus(id: string, status: string, note?: string): Promise<ActionState> {
+export async function setComplaintStatus(
+  id: string,
+  status: string,
+  note?: string,
+  acknowledgmentDate?: string,
+): Promise<ActionState> {
   const a = await authed(COMPLAINT_WRITE_ROLES);
   if ("error" in a) return { error: a.error };
   const { user, admin } = a;
   const { data: before } = await admin.from("complaints").select("status").eq("id", id).single();
   const update: Record<string, unknown> = { status, updated_by: user.id };
   if (status === "Closed" || status === "Resolved") update.closure_date = todayISO();
-  // Reopening a closed/resolved case clears the closure date.
   if (status === "Reopened") update.closure_date = null;
+  if (status === "Acknowledged") {
+    const ackDateStr = acknowledgmentDate || todayISO();
+    update.acknowledgment_date = ackDateStr;
+
+    // Start the no-reply escalation clock if needed
+    const { data: awaitingReplyConfig } = await admin
+      .from("escalation_flow_configs")
+      .select("stage_key, sla_days, sla_unit")
+      .eq("stage_key", "awaiting_reply")
+      .maybeSingle();
+
+    const enteredAt = new Date(`${ackDateStr}T00:00:00Z`);
+    const deadline = awaitingReplyConfig ? computeStageDeadline(enteredAt, awaitingReplyConfig) : null;
+    update.escalation_stage = "awaiting_reply";
+    update.escalation_stage_entered_at = enteredAt.toISOString();
+    update.escalation_stage_deadline = deadline ? deadline.toISOString() : null;
+  }
   const { error } = await admin.from("complaints").update(update).eq("id", id);
   if (error) return { error: error.message };
   const isClosure = status === "Closed" || status === "Resolved";
@@ -845,6 +866,29 @@ export async function uploadComplaintScanAction(
     .single();
   if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the document." };
   const documentId = doc.id as string;
+
+  if (docType === "Complaint acknowledgement") {
+    const ackDateStr = docDate || todayISO();
+    const update: Record<string, unknown> = {
+      status: "Acknowledged",
+      acknowledgment_date: ackDateStr,
+      updated_by: user.id,
+    };
+
+    const { data: awaitingReplyConfig } = await admin
+      .from("escalation_flow_configs")
+      .select("stage_key, sla_days, sla_unit")
+      .eq("stage_key", "awaiting_reply")
+      .maybeSingle();
+
+    const enteredAt = new Date(`${ackDateStr}T00:00:00Z`);
+    const deadline = awaitingReplyConfig ? computeStageDeadline(enteredAt, awaitingReplyConfig) : null;
+    update.escalation_stage = "awaiting_reply";
+    update.escalation_stage_entered_at = enteredAt.toISOString();
+    update.escalation_stage_deadline = deadline ? deadline.toISOString() : null;
+
+    await admin.from("complaints").update(update).eq("id", complaintId);
+  }
 
   await addTimeline(admin, { complaintId, eventType: docTypeToEvent(docType), title: `Uploaded: ${docType}`, createdBy: user.id, relatedDocumentId: documentId });
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "scan_uploaded", oldValue: null, newValue: docType }] });
