@@ -488,7 +488,7 @@ const ActivityItem = React.memo(function ActivityItem({
       </div>
 
       {/* COLUMN 3: Activity Details Card (Right) */}
-      <div className="pb-6 min-w-0">
+      <div className="pb-3.5 min-w-0">
         <div
           onClick={() => hasDetail && setExpanded(!expanded)}
           onKeyDown={handleKeyDown}
@@ -651,37 +651,24 @@ function ActivityFeed({
   return (
     <div className="space-y-6">
       {/* Unified Filters Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3.5 items-center justify-between bg-slate-50/50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3 rounded-xl shadow-2xs w-full select-none">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
-          <Input
-            type="text"
-            placeholder="Search case history..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9.5 h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 w-full font-medium"
-            aria-label="Search case history"
-          />
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[145px] h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 font-bold cursor-pointer" aria-label="Filter events type">
-              <SelectValue placeholder="All Activity" />
-            </SelectTrigger>
-            <SelectContent>
-              {FILTERS.map((f) => <SelectItem key={f.value} value={f.value} className="text-xs font-semibold">{f.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "newest" | "oldest")}>
-            <SelectTrigger className="w-[125px] h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 font-bold cursor-pointer" aria-label="Sort chronological order">
-              <SelectValue placeholder="Newest First" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest" className="text-xs font-semibold">Newest First</SelectItem>
-              <SelectItem value="oldest" className="text-xs font-semibold">Oldest First</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="flex flex-row gap-3.5 items-center justify-end bg-slate-50/50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3 rounded-xl shadow-2xs w-full select-none">
+        <Select value={filterType} onValueChange={setFilterType}>
+          <SelectTrigger className="w-[145px] h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 font-bold cursor-pointer" aria-label="Filter events type">
+            <SelectValue placeholder="All Activity" />
+          </SelectTrigger>
+          <SelectContent>
+            {FILTERS.map((f) => <SelectItem key={f.value} value={f.value} className="text-xs font-semibold">{f.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "newest" | "oldest")}>
+          <SelectTrigger className="w-[125px] h-9.5 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shrink-0 font-bold cursor-pointer" aria-label="Sort chronological order">
+            <SelectValue placeholder="Newest First" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest" className="text-xs font-semibold">Newest First</SelectItem>
+            <SelectItem value="oldest" className="text-xs font-semibold">Oldest First</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Timeline Output Feed */}
