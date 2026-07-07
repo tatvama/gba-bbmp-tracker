@@ -170,6 +170,7 @@ export async function detectRtiLetters(params: {
   pageImages: { buffer: Buffer; mimeType: string }[];
   ocrText: string;
   pageCount: number;
+  cache?: boolean;
 }): Promise<DetectedLetter[]> {
   const fallback = (): DetectedLetter[] => [
     {
@@ -197,6 +198,7 @@ export async function detectRtiLetters(params: {
     images,
     temperature: 0,
     maxTokens: 8000,
+    cache: params.cache ? { system: true } : undefined,
   });
   if (!res.ok || !res.text) {
     console.error("[detectRtiLetters] vision call failed:", res.error);

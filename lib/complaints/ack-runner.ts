@@ -167,7 +167,7 @@ export async function processAckBatch(batchId: string): Promise<void> {
 
       // Detect acknowledgment boundaries within this window; offset to global pages.
       const winOcr = sliceOcr(perPageOcr, winStart, winEnd);
-      const detected = await detectAckSections({ pageImages: visionImages, ocrText: winOcr, pageCount: winEnd - winStart + 1 });
+      const detected = await detectAckSections({ pageImages: visionImages, ocrText: winOcr, pageCount: winEnd - winStart + 1, cache: true });
       for (const d of detected) {
         sections.push({
           start: winStart + d.startPage - 1,
@@ -191,7 +191,7 @@ export async function processAckBatch(batchId: string): Promise<void> {
       for (let p = s.start; p <= s.end && sectionImages.length < 6; p++) {
         if (visionByPage[p]) sectionImages.push(visionByPage[p]!);
       }
-      const { extraction } = await analyzeComplaintIntakeFromImages({ pageImages: sectionImages, ocrText });
+      const { extraction } = await analyzeComplaintIntakeFromImages({ pageImages: sectionImages, ocrText, cache: true });
       // Seed from the detector when the per-section extractor came up blank.
       if (!extraction.subject && s.seedSubject) extraction.subject = s.seedSubject;
       if (!extraction.department && s.seedDept) extraction.department = s.seedDept;

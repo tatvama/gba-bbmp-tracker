@@ -164,6 +164,9 @@ export async function detectComplaintLetters(params: {
   pageImages: { buffer: Buffer; mimeType: string }[];
   ocrText: string;
   pageCount: number;
+  /** DETECTOR_SYSTEM is identical across every import, so a retry of this same
+   *  upload (or a future caller that re-runs detection) can reuse the cache. */
+  cache?: boolean;
 }): Promise<DetectedComplaintLetter[]> {
   const fallback = (): DetectedComplaintLetter[] => [
     { startPage: 1, endPage: Math.max(1, params.pageCount), subject: null, department: null, referenceNumber: null, documentDate: null },
@@ -181,6 +184,7 @@ export async function detectComplaintLetters(params: {
     images,
     temperature: 0,
     maxTokens: 8000,
+    cache: params.cache ? { system: true } : undefined,
   });
   if (!res.ok || !res.text) {
     console.error("[detectComplaintLetters] vision call failed:", res.error);

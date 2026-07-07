@@ -174,6 +174,9 @@ export async function detectAckSections(params: {
   pageImages: { buffer: Buffer; mimeType: string }[];
   ocrText: string;
   pageCount: number;
+  /** ack-runner.ts calls this once per 20-page window of the same batch —
+   *  DETECTOR_SYSTEM is identical across those calls, so it's cacheable. */
+  cache?: boolean;
 }): Promise<DetectedAckSection[]> {
   const slice = (params.pageImages || []).slice(0, MAX_DETECT_PAGES);
   if (!isAiConfigured() || slice.length === 0) return perPageFallback(params.pageCount);
@@ -187,6 +190,7 @@ export async function detectAckSections(params: {
     images,
     temperature: 0,
     maxTokens: 8000,
+    cache: params.cache ? { system: true } : undefined,
   });
   if (!res.ok || !res.text) {
     console.error("[detectAckSections] vision call failed:", res.error);

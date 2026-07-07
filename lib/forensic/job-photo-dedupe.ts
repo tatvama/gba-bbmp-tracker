@@ -374,6 +374,7 @@ export async function scanDivisionVisualDuplicates(division: string, hooks?: Vis
       const cmp = await compareTwoPhotos(
         { buffer: ba, mime: mimeFromName(docA.fileName) },
         { buffer: bb, mime: mimeFromName(docB.fileName) },
+        true,
       );
       comparisons += 1;
       if (!cmp) continue;

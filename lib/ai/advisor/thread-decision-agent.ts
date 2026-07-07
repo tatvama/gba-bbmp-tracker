@@ -209,7 +209,11 @@ export async function analyzeThread(input: {
 
   const actionList = RECOMMENDATION_ACTIONS.join(", ");
 
-  const prompt = `${correspondence.slice(0, 24_000)}
+  // Split at the existing seam so the (often large, byte-identical-until-a-new-
+  // event) correspondence can be a cache_control breakpoint — same resulting
+  // text as the single template literal this replaces, just as two segments.
+  const correspondenceBlock = correspondence.slice(0, 24_000);
+  const decisionRequest = `
 
 === DETERMINISTIC SIGNALS ===
 ${signals}
@@ -252,7 +256,21 @@ REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ)
   // parse — silently dropping back to the English fallback. 10k gives headroom
   // for complaints with longer histories. Hitting the cap = English fallback, so
   // over-provision rather than risk truncation.
-  const r = await extractJson<Partial<ThreadDecision>>({ system: SYSTEM, prompt, fallback: base, maxTokens: 10_000 });
+  //
+  // Caching: correspondenceBlock is identical between consecutive advisor runs
+  // on the same complaint until a new reply/action/letter is added, so it (+
+  // SYSTEM) is marked cacheable. 1h TTL, not the 5m default — re-analysis of
+  // the same complaint is more likely tens of minutes apart than seconds apart.
+  const r = await extractJson<Partial<ThreadDecision>>({
+    system: SYSTEM,
+    prompt: [
+      { text: correspondenceBlock, cache: true },
+      { text: decisionRequest },
+    ],
+    fallback: base,
+    maxTokens: 10_000,
+    cache: { system: true, ttl: "1h" },
+  });
   if (!r.ok) return { ok: false, data: base, error: r.error };
 
   const d = r.data;
