@@ -85,20 +85,20 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           <span className="text-slate-800 dark:text-slate-200 font-bold">Case Details</span>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/print`}>Case file</Link></Button>
+          <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/print`}>Case file</Link></Button>
           {flags.canVerify && (
             <>
-              <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/forensics`}><ShieldAlert className="h-4 w-4 mr-1 text-rose-500" /> Forensic audit</Link></Button>
+              <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/forensics`}><ShieldAlert className="h-4 w-4 mr-1 text-rose-500" /> Forensic audit</Link></Button>
               {complaint.job_number && (
                 <>
-                  <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/audit`}><Gavel className="h-4 w-4 mr-1 text-slate-550" /> Job-number audit</Link></Button>
-                  <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/letter`}><ScrollText className="h-4 w-4 mr-1 text-slate-550" /> Draft letter</Link></Button>
+                  <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/audit`}><Gavel className="h-4 w-4 mr-1 text-slate-550" /> Job-number audit</Link></Button>
+                  <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/job/${encodeURIComponent(complaint.job_number)}/letter`}><ScrollText className="h-4 w-4 mr-1 text-slate-550" /> Draft letter</Link></Button>
                 </>
               )}
-              <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/dossier`}><FolderArchive className="h-4 w-4 mr-1 text-slate-550" /> Dossier</Link></Button>
+              <Button asChild variant="outline" className="h-10 text-xs font-semibold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/dossier`}><FolderArchive className="h-4 w-4 mr-1 text-slate-550" /> Dossier</Link></Button>
             </>
           )}
-          <PrintButton className="h-10 text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5" />
+          <PrintButton className="h-10 text-xs font-semibold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5" />
           {flags.canEdit && (
             <Button asChild className="h-10 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer rounded-lg px-5"><Link href={`/complaints/${id}/edit`}><Pencil className="h-4 w-4 mr-1.5" /> Edit</Link></Button>
           )}
@@ -169,6 +169,8 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           escalationStage={complaint.escalation_stage}
           escalationStageDeadline={complaint.escalation_stage_deadline}
           acknowledgmentDate={complaint.acknowledgment_date}
+          submittedDate={complaint.date_submitted ?? null}
+          submissionChannel={complaint.complaint_mode ?? null}
         />
       )}
 

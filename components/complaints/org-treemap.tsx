@@ -1594,10 +1594,10 @@ export function OrgTreemap({
               </div>
 
               {/* Footer Actions */}
-              <div className="p-4 border-t flex items-center justify-between gap-3 bg-slate-50">
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900">
                 <button
                   onClick={handleExportCSV}
-                  className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 border rounded-xl text-xs font-extrabold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 cursor-pointer shadow-3xs"
+                  className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-extrabold text-slate-600 dark:text-slate-350 hover:text-slate-800 dark:hover:text-slate-100 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer shadow-3xs"
                 >
                   <Download className="h-4 w-4" /> Download Report
                 </button>
@@ -1620,7 +1620,7 @@ export function OrgTreemap({
       </AnimatePresence>
 
       {/* 🧭 Bottom Information Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white border rounded-xl px-5 py-3 text-xs font-bold text-slate-500 shadow-2xs no-print select-none">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl px-5 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 shadow-2xs no-print select-none">
         <div className="flex items-center gap-1.5">
           <History className="h-4 w-4 text-slate-400" />
           <span>Last Updated: Just now</span>
@@ -1630,14 +1630,14 @@ export function OrgTreemap({
           <span className="text-[10px] text-slate-400 uppercase font-black">Controls:</span>
           <button 
             onClick={() => setZoom(z => Math.max(50, z - 10))} 
-            className="h-6 w-6 border border-slate-200 rounded hover:bg-slate-50 flex items-center justify-center cursor-pointer font-extrabold shadow-3xs"
+            className="h-6 w-6 border border-slate-200 dark:border-slate-800 rounded hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center cursor-pointer font-extrabold shadow-3xs"
           >
             <ZoomOut className="h-3 w-3" />
           </button>
           <span className="font-mono min-w-[2.5rem] text-center">{zoom}%</span>
           <button 
             onClick={() => setZoom(z => Math.min(150, z + 10))} 
-            className="h-6 w-6 border border-slate-200 rounded hover:bg-slate-50 flex items-center justify-center cursor-pointer font-extrabold shadow-3xs"
+            className="h-6 w-6 border border-slate-200 dark:border-slate-800 rounded hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center cursor-pointer font-extrabold shadow-3xs"
           >
             <ZoomIn className="h-3 w-3" />
           </button>

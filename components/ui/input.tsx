@@ -211,14 +211,14 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           {/* Styled calendar popover */}
           {showCalendar && (
             <div
-              className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-[100] select-none w-[260px] text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100"
+              className="absolute top-full left-0 mt-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-xl rounded-xl p-3 z-[100] select-none w-[260px] text-xs font-semibold text-slate-700 dark:text-slate-300 animate-in fade-in zoom-in-95 duration-100"
             >
               {/* Header */}
-              <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100">
+              <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-                  className="p-1 rounded-lg hover:bg-slate-50 border border-slate-200/50 text-slate-500 cursor-pointer"
+                  className="p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-850 border border-slate-200/50 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-pointer"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
@@ -226,26 +226,26 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
                   <select
                     value={month}
                     onChange={(e) => setCurrentDate(new Date(year, parseInt(e.target.value), 1))}
-                    className="bg-transparent font-extrabold border-none outline-none text-slate-800 cursor-pointer text-xs focus:ring-0 p-0 pr-1 hover:text-primary transition-colors"
+                    className="bg-transparent font-extrabold border-none outline-none text-slate-800 dark:text-slate-250 cursor-pointer text-xs focus:ring-0 p-0 pr-1 hover:text-primary transition-colors"
                   >
                     {months.map((m, idx) => (
-                      <option key={m} value={idx}>{m}</option>
+                      <option key={m} value={idx} className="dark:bg-slate-950 dark:text-slate-200">{m}</option>
                     ))}
                   </select>
                   <select
                     value={year}
                     onChange={(e) => setCurrentDate(new Date(parseInt(e.target.value), month, 1))}
-                    className="bg-transparent font-extrabold border-none outline-none text-slate-800 cursor-pointer text-xs focus:ring-0 p-0 hover:text-primary transition-colors"
+                    className="bg-transparent font-extrabold border-none outline-none text-slate-800 dark:text-slate-250 cursor-pointer text-xs focus:ring-0 p-0 hover:text-primary transition-colors"
                   >
                     {years.map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y} className="dark:bg-slate-950 dark:text-slate-200">{y}</option>
                     ))}
                   </select>
                 </div>
                 <button
                   type="button"
                   onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-                  className="p-1 rounded-lg hover:bg-slate-50 border border-slate-200/50 text-slate-500 cursor-pointer"
+                  className="p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-850 border border-slate-200/50 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-pointer"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
@@ -279,8 +279,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
                         isSelected
                           ? "bg-primary text-white shadow-xs font-black"
                           : isToday(day)
-                          ? "border border-blue-500/40 text-primary hover:bg-slate-50"
-                          : "hover:bg-slate-50 text-slate-700"
+                          ? "border border-blue-500/40 text-primary hover:bg-slate-50 dark:hover:bg-slate-800"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300"
                       )}
                     >
                       {day}
@@ -290,7 +290,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
               </div>
 
               {/* Footer actions */}
-              <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-slate-100 text-[9px] font-black tracking-wider uppercase text-slate-400">
+              <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[9px] font-black tracking-wider uppercase text-slate-400">
                 <button
                   type="button"
                   onClick={handleClear}
