@@ -1,9 +1,8 @@
-import puppeteer from "puppeteer";
 import * as fs from "fs";
 import * as path from "path";
 import { PDFProvider, PDFGenerateOptions } from "./pdf-provider";
 import { GOV_DOC_CONFIG } from "./document-config";
-import { resolveChromePath } from "./chrome-path";
+import { launchBrowser } from "./chrome-path";
 
 export class PuppeteerPDFProvider implements PDFProvider {
   name = "puppeteer";
@@ -33,16 +32,7 @@ export class PuppeteerPDFProvider implements PDFProvider {
 </html>`;
 
     // Launch headless Chromium via Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: resolveChromePath(),
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--font-render-hinting=none",
-      ],
-    });
+    const browser = await launchBrowser();
 
     try {
       const page = await browser.newPage();

@@ -1,6 +1,5 @@
 import "server-only";
-import puppeteer from "puppeteer";
-import { resolveChromePath } from "./chrome-path";
+import { launchBrowser } from "./chrome-path";
 
 export interface RenderedPage {
   buffer: Buffer;
@@ -14,17 +13,7 @@ export interface PDFRenderer {
 
 class PuppeteerPDFRenderer implements PDFRenderer {
   async renderPages(pdfBuffer: Buffer): Promise<RenderedPage[]> {
-    const chromePath = resolveChromePath();
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: chromePath,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--font-render-hinting=none",
-      ],
-    });
+    const browser = await launchBrowser();
 
     try {
       const page = await browser.newPage();
