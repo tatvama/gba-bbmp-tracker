@@ -74,3 +74,26 @@ export async function commitForensicImportAction(params: {
   revalidatePath("/complaints/duplicate-photos");
   return result;
 }
+
+/** Check if a job number is already imported in any active complaint. */
+export async function checkDuplicateJobNumberAction(jobNumber: string): Promise<{ imported: boolean; caseNumber?: string | null }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch {
+    return { imported: false };
+  }
+  if (!jobNumber) return { imported: false };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("complaints")
+    .select("internal_case_number")
+    .eq("job_number", jobNumber)
+    .is("deleted_at", null)
+    .limit(1);
+
+  if (error || !data || data.length === 0) {
+    return { imported: false };
+  }
+  return { imported: true, caseNumber: data[0]?.internal_case_number as string | null };
+}

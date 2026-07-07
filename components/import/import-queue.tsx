@@ -24,7 +24,7 @@ import {
   type ImportEventsPayload, type ImportUploadSnapshot,
 } from "@/lib/import-queue/types";
 import { saveFileHandle, loadFileHandle, deleteFileHandle, fileFromHandle } from "@/lib/client/import-idb";
-import { getForensicImportBatchAction } from "@/lib/actions/forensic-zip-import";
+import { getForensicImportBatchAction, checkDuplicateJobNumberAction } from "@/lib/actions/forensic-zip-import";
 import { cn } from "@/lib/utils";
 
 interface LocalUpload {
@@ -256,6 +256,18 @@ export function ImportQueue({
       for (let i = 0; i < zips.length; i++) {
         const file = zips[i]!;
         try {
+          const jnMatch = file.name.match(/\b\d{3}-\d{2}-\d{6}\b/);
+          if (jnMatch) {
+            const jn = jnMatch[0];
+            const check = await checkDuplicateJobNumberAction(jn);
+            if (check.imported) {
+              const ok = window.confirm(
+                `Warning: Job Number ${jn} has already been imported as Case ${check.caseNumber || "Unknown"}.\n\nAre you sure you want to upload and process this ZIP again?`
+              );
+              if (!ok) continue;
+            }
+          }
+
           const r = await fetch("/api/import-queue", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -981,6 +993,17 @@ function QueueCard({
           </div>
         </div>
       </div>
+
+      {/* If this failed because the job was already imported, show a clear warning/alert banner */}
+      {(s.status === "failed" || local?.failed) && message.includes("already imported") && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/70 p-3.5 text-xs font-semibold text-rose-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-450 shadow-3xs">
+          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" />
+          <div className="space-y-0.5 text-left">
+            <p className="font-extrabold text-[12px] text-amber-900 dark:text-amber-450">Duplicate Job Detected</p>
+            <p className="text-amber-800 dark:text-amber-400 font-medium text-[11px] leading-relaxed">{message}</p>
+          </div>
+        </div>
+      )}
 
       {/* Segmented Progress Area (Always visible, key visual) */}
       <div className="bg-slate-50/40 dark:bg-slate-950/10 p-4 rounded-xl border border-slate-100 dark:border-slate-850">
