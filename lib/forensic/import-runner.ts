@@ -102,7 +102,13 @@ export async function processForensicBatch(
         const result = parseJob(code, es);
         result.alreadyImported = existing.has(result.jobCode);
         if (result.alreadyImported) {
-          result.warnings.push("A job case with this code already exists — committing will merge/refresh it.");
+          // A job case with this code is already in the system — do not
+          // re-upload/merge it silently. Defaults to excluded from commit;
+          // the review screen also disables re-including it.
+          result.skip = true;
+          result.warnings.push(
+            `Duplicate job number — a job case for ${result.jobCode} already exists. This folder will not be uploaded.`,
+          );
         }
         if (result.source === "ai-from-letter" && !result.dataset) {
           const ds = await deriveDatasetFromLetter(result.jobCode, result.letterText, result.extractedText);

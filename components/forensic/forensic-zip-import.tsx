@@ -157,6 +157,7 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
   }
 
   const selected = jobs.filter((j) => !j.skip && j.validCode);
+  const duplicateCount = jobs.filter((j) => j.alreadyImported).length;
 
   async function commit() {
     if (selected.length === 0) return;
@@ -266,6 +267,19 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
             </div>
           </div>
 
+          {duplicateCount > 0 && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50/40 p-3.5 dark:border-rose-900/50 dark:bg-rose-950/20">
+              <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+              <div className="text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
+                <span className="font-bold">
+                  {duplicateCount} job folder{duplicateCount === 1 ? "" : "s"} already imported
+                </span>
+                {" "}— a job case with that number already exists, so {duplicateCount === 1 ? "it" : "they"} can&apos;t be
+                uploaded again and {duplicateCount === 1 ? "is" : "are"} excluded below.
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             {jobs.map((j) => {
               const present = new Set(j.files.map((f) => f.role));
@@ -288,16 +302,27 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <input
                       type="checkbox"
-                      checked={!j.skip && j.validCode}
-                      disabled={!j.validCode}
+                      checked={!j.skip && j.validCode && !j.alreadyImported}
+                      disabled={!j.validCode || j.alreadyImported}
                       onChange={() => toggleSkip(j.jobCode)}
                       className="h-4 w-4 accent-primary"
-                      title={j.validCode ? "Include this job" : "Not a valid job code — cannot import"}
+                      title={
+                        j.alreadyImported
+                          ? "Duplicate job number — already imported, cannot be uploaded again"
+                          : j.validCode
+                            ? "Include this job"
+                            : "Not a valid job code — cannot import"
+                      }
                     />
                     <span className="font-mono text-sm font-bold text-slate-800 dark:text-slate-200">{j.jobCode}</span>
                     {!j.validCode && (
                       <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                         invalid code
+                      </span>
+                    )}
+                    {j.alreadyImported && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                        <AlertTriangle className="h-3 w-3" /> duplicate — can&apos;t be uploaded
                       </span>
                     )}
                     {j.riskColour && (
@@ -308,11 +333,6 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sourceBadge.cls}`}>
                       {sourceBadge.text}
                     </span>
-                    {j.alreadyImported && (
-                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                        already imported · will refresh
-                      </span>
-                    )}
                   </div>
 
                   {/* present / missing checklist */}
@@ -371,6 +391,22 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
                         The drafted DOCX/PDF will be attached to the complaint as the printable letter.
                       </p>
                     </details>
+                  )}
+
+                  {j.warnings.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {j.warnings.map((w, i) => (
+                        <p
+                          key={i}
+                          className={`flex items-start gap-1 text-[11px] ${
+                            j.alreadyImported ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-500"
+                          }`}
+                        >
+                          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                          {w}
+                        </p>
+                      ))}
+                    </div>
                   )}
 
                   {j.missing.length > 0 && (
