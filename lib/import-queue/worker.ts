@@ -157,9 +157,14 @@ async function processOne(session: Claimed): Promise<void> {
     }
     const jobs = ((batch.jobs as ForensicJobResult[]) ?? []).filter(Boolean);
     const importable = jobs.filter((j) => !j.skip && j.validCode);
+    const duplicates = jobs.filter((j) => j.alreadyImported).map((j) => j.jobCode);
     await updateImportSession(admin, session.id, { job_codes: jobs.map((j) => j.jobCode) });
     if (!importable.length) {
-      throw new Error("No valid job-code folders found in this ZIP.");
+      throw new Error(
+        duplicates.length
+          ? `All ${duplicates.length} job folder(s) in this ZIP (${duplicates.join(", ")}) were already imported — nothing new to upload.`
+          : "No valid job-code folders found in this ZIP.",
+      );
     }
 
     // ── 3) Review gate or auto-commit ────────────────────────────────────────
@@ -202,6 +207,7 @@ async function processOne(session: Claimed): Promise<void> {
       `${okJobs.length} complaint(s) created` +
       (failJobs.length ? `, ${failJobs.length} job(s) failed` : "") +
       (fileFails.length ? `, ${fileFails.length} file(s) failed to store` : "") +
+      (duplicates.length ? `, ${duplicates.length} duplicate job number(s) skipped (already imported)` : "") +
       ".";
     await updateImportSession(
       admin,

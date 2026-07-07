@@ -24,6 +24,7 @@ import {
   type ImportEventsPayload, type ImportUploadSnapshot,
 } from "@/lib/import-queue/types";
 import { saveFileHandle, loadFileHandle, deleteFileHandle, fileFromHandle } from "@/lib/client/import-idb";
+import { getForensicImportBatchAction } from "@/lib/actions/forensic-zip-import";
 import { cn } from "@/lib/utils";
 
 interface LocalUpload {
@@ -768,6 +769,24 @@ function QueueCard({
   onRetry: () => void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
+  const [duplicateCodes, setDuplicateCodes] = React.useState<string[]>([]);
+  const fetchedDupRef = React.useRef(false);
+
+  // The worker excludes duplicate job numbers from commit silently (no
+  // dedicated column for this) — once a batch finishes, re-read its analyzed
+  // jobs once to find which ones were skipped as already-imported, so the
+  // done card can say so instead of just showing a lower complaint count.
+  React.useEffect(() => {
+    if (s.status !== "done" || !s.batchId || fetchedDupRef.current) return;
+    fetchedDupRef.current = true;
+    void getForensicImportBatchAction(s.batchId)
+      .then((res) => {
+        const dups = (res.jobs ?? []).filter((j) => j.alreadyImported).map((j) => j.jobCode);
+        if (dups.length) setDuplicateCodes(dups);
+      })
+      .catch(() => {});
+  }, [s.status, s.batchId]);
+
   const meta = STATUS_META[s.status] ?? STATUS_META.queued!;
   const uploadingLocally = Boolean(local) && s.status === "uploading" && !local?.failed;
   const progress = uploadingLocally
@@ -1038,6 +1057,20 @@ function QueueCard({
           )}
         </div>
       )}
+
+      {/* Duplicate job numbers — excluded from this import, not created/refreshed */}
+      {s.status === "done" && duplicateCodes.length > 0 && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50/40 p-3.5 dark:border-rose-900/50 dark:bg-rose-950/20">
+          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+          <div className="text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
+            <span className="font-bold">
+              {duplicateCodes.length} job number{duplicateCodes.length === 1 ? "" : "s"} already imported
+            </span>
+            {" "}— can&apos;t be uploaded again, so {duplicateCodes.length === 1 ? "it was" : "they were"} skipped:{" "}
+            <span className="font-mono font-bold">{duplicateCodes.join(", ")}</span>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -1090,8 +1123,8 @@ function SegmentedProgress({
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
-        <span className="text-slate-400 max-w-[70%] truncate block">
-          {status === "failed" ? "Ingestion error detected" : message}
+        <span className="text-slate-400 max-w-[70%] truncate block" title={message}>
+          {message || (status === "failed" ? "Ingestion error detected" : "")}
         </span>
         <span className="shrink-0 text-foreground font-bold">
           Stage {currentStageIdx + 1} of 6: <strong className="text-primary font-extrabold">{stageLabel}</strong>
