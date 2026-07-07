@@ -27,11 +27,18 @@ export function resolveChromePath(): string | undefined {
  * Flags for every headless Chromium launch in this app (letter-PDF generation +
  * the OCR page renderer). Beyond the container basics (--no-sandbox etc., already
  * required for a root/no-userns Docker container), the rest exist specifically to
- * shrink Chromium's memory footprint: this runs on small VPS/Coolify containers
- * where a full-featured launch (GPU process, extensions, background throttling
- * machinery, a zygote pre-fork) can be the difference between launching and
- * getting OOM-killed. None of these affect rendered output — safe defaults for a
- * scripted, single-page, no-GPU-needed render.
+ * shrink Chromium's resource footprint: this runs on small VPS/Coolify containers
+ * where a full multi-process launch (separate GPU/renderer/zygote processes, each
+ * with their own address space) can be the difference between launching and
+ * getting killed — by the OOM killer if memory is the binding constraint, or by a
+ * container PID/process-count limit or a seccomp policy blocking a syscall one of
+ * those child processes needs. --single-process collapses the whole browser into
+ * ONE OS process, which sidesteps both failure modes at once (there's no separate
+ * process left to be denied). Real tradeoff, so it's here rather than assumed
+ * elsewhere: single-process Chromium is less crash-isolated (a bad page can take
+ * the whole browser down) and Chromium upstream doesn't fully support it anymore —
+ * acceptable here because every render is one script-controlled PDF/HTML page, not
+ * arbitrary browsing. None of these flags change rendered output.
  */
 const CHROME_LAUNCH_ARGS = [
   "--no-sandbox",
@@ -45,18 +52,22 @@ const CHROME_LAUNCH_ARGS = [
   "--disable-background-timer-throttling",
   "--disable-backgrounding-occluded-windows",
   "--disable-renderer-backgrounding",
+  "--disable-crash-reporter",
+  "--disable-breakpad",
   "--no-zygote",
+  "--single-process",
 ];
 
 /**
  * Launch headless Chromium with this app's shared path/flags. On a launch
  * failure (the browser process itself never starts — distinct from a page-level
  * error once it's up), rethrows with the likely causes up front: Puppeteer's own
- * message is accurate but generic, and in practice this has always meant either
- * a missing system dependency or — on a small VPS/Coolify container that launches
- * fine locally — the container's memory limit being too tight for Chromium to
- * even start (look for an OOM kill in the host/Docker logs around the same
- * timestamp).
+ * message is accurate but generic. If Chromium's own startup log lines (D-Bus,
+ * crashpad) appear in the error before it dies, the binary itself is fine — it's
+ * being killed partway through launch, which on a small VPS/Coolify container
+ * almost always means the container's memory (or occasionally process-count)
+ * limit is too tight; check the host for an OOM-kill entry at the same timestamp
+ * (`dmesg | grep -i "out of memory"` or the container runtime's own logs).
  */
 export async function launchBrowser(): Promise<Browser> {
   try {
@@ -69,9 +80,11 @@ export async function launchBrowser(): Promise<Browser> {
     const detail = e instanceof Error ? e.message : String(e);
     throw new Error(
       `Could not launch headless Chromium for PDF rendering: ${detail} — ` +
-        "if this happens every time on this server, check the container's memory limit " +
-        "(Chromium needs headroom beyond Node's own usage to even start) or confirm all " +
-        "required system libraries are installed (see https://pptr.dev/troubleshooting).",
+        "if this happens every time on this server and Chromium's own startup log lines " +
+        "(dbus/crashpad) appear above, the binary is running but being killed partway " +
+        "through launch — check the container's memory limit and the host for an OOM-kill " +
+        `entry at this timestamp. Otherwise confirm all required system libraries are ` +
+        "installed (see https://pptr.dev/troubleshooting).",
     );
   }
 }
