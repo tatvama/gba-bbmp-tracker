@@ -23,6 +23,8 @@ import { DocumentSummaryModal } from "@/components/complaints/document-summary-m
 import { EscalationDeadlineBadge } from "@/components/complaints/escalation-deadline-badge";
 import { openDraftPdf } from "@/lib/print-letter";
 import { formatDateTime } from "@/lib/format";
+import { startAiDraftJob } from "@/lib/actions/jobs";
+import { useTask } from "@/lib/jobs/client/use-task";
 import {
   setComplaintStatus,
   fileComplaint,
@@ -705,7 +707,7 @@ function CounterReplyPanel({
   const router = useRouter();
   const [gap, setGap] = React.useState<ReplyGap | null>(null);
   const [analysing, setAnalysing] = React.useState(false);
-  const [generating, setGenerating] = React.useState(false);
+  const [starting, setStarting] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [lintWarning, setLintWarning] = React.useState<string | null>(null);
   const [truncated, setTruncated] = React.useState(false);
@@ -749,6 +751,41 @@ function CounterReplyPanel({
     return () => clearInterval(id);
   }, [loadFiles]);
 
+  // Resumes automatically: if a draft of the CURRENTLY selected kind was
+  // already generating before this mounted, `task` reflects it immediately —
+  // no local jobId to lose. Tracks whichever kind is selected, since this
+  // panel can generate counter_reply, reminder_letter, or legal_notice.
+  const { task, isActive, startTask } = useTask({
+    taskType: "ai_draft",
+    entityType: "complaint",
+    entityId: complaintId,
+    operation: selectedKind,
+  });
+  const generating = starting || isActive;
+
+  const prevStatusRef = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    const status = task?.status;
+    if (status === prevStatusRef.current) return;
+    prevStatusRef.current = status;
+    if (!status) return;
+    if (status === "done") {
+      // The ai_draft handler (lib/jobs/handlers/ai-draft.ts) already inserts
+      // the ai_drafts row itself on success — no separate client-side save.
+      const res = task?.result as { text?: string; lintWarning?: string | null; truncated?: boolean } | null;
+      if (res?.text) {
+        setDraft(res.text);
+        setLintWarning(res.lintWarning ?? null);
+        setTruncated(!!res.truncated);
+        setEditorOpen(true);
+        setSavedAt(formatDateTime(new Date().toISOString()));
+      }
+    } else if (status === "failed") {
+      setError(task?.error ?? "Could not generate the letter (is the AI key configured?).");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.status]);
+
   async function analyse() {
     setAnalysing(true);
     setError(null);
@@ -759,25 +796,25 @@ function CounterReplyPanel({
     setGap(r.data);
   }
 
+  // Runs as a background job (startAiDraftJob, the same one every other AI
+  // draft surface uses) instead of a direct blocking generateComplaintDraft
+  // call — the generation now survives navigation, and the useTask effect
+  // above picks up the result whenever it finishes.
   async function generate(kind: ComplaintDraftKind, language: DraftLanguage) {
     setSelectedKind(kind);
-    setGenerating(true);
     setError(null);
     setSavedMsg(null);
     setLintWarning(null);
     setTruncated(false);
     setSavedAt(null);
-    const r = await generateComplaintDraft({ complaintId, kind, language });
-    setGenerating(false);
-    if (!r.ok || !r.text) { setError(r.error ?? `Could not generate the letter (is the AI key configured?).`); return; }
-    setDraft(r.text);
-    setLintWarning(r.lintWarning ?? null);
-    setTruncated(!!r.truncated);
-    setEditorOpen(true);
-    // Auto-save the as-generated version immediately so it's never lost, without
-    // the timeline note / advisor re-run a deliberate Save triggers below.
-    void saveComplaintAiDraft({ complaintId, kind, content: r.text, language, silent: true })
-      .then((sr) => { if (sr.ok) setSavedAt(formatDateTime(new Date().toISOString())); });
+    setStarting(true);
+    const start = await startAiDraftJob({ complaintId, kind, language });
+    setStarting(false);
+    if (!start.ok || !start.jobId) {
+      setError(start.error ?? "Could not generate the letter (is the AI key configured?).");
+      return;
+    }
+    startTask(start.jobId);
   }
 
   async function save() {

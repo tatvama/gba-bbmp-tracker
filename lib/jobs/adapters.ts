@@ -51,9 +51,12 @@ export function adaptImportUpload(row: ImportUploadRow): TaskItem {
     status: IMPORT_STATUS_MAP[row.status] ?? "running",
     entityType: null,
     entityId: null,
+    operation: null,
+    subtype: null,
     progress: row.progress,
     stage: row.stage,
     message: row.message ?? (row.status === "review" ? "Ready for review" : null),
+    result: null,
     error: row.error,
     cancellable: false,
     resultLink: row.status === "review" ? `/complaints/import?import=${row.id}` : "/complaints/import",
@@ -110,9 +113,12 @@ export function adaptAckBatch(row: AckBatchRow): TaskItem {
     status: ACK_STATUS_MAP[row.status] ?? "running",
     entityType: null,
     entityId: null,
+    operation: null,
+    subtype: null,
     progress,
     stage: row.stage,
     message: row.message ?? (row.status === "review" ? "Ready for review" : null),
+    result: null,
     error: row.error,
     cancellable: false,
     resultLink: `/complaints/acknowledgments/${row.id}`,
@@ -147,11 +153,37 @@ export async function listAdaptedTasks(admin: SupabaseClient, userId: string, re
 // ---- background_jobs (the real framework jobs — ai_draft today, more as
 // later stages register) ----------------------------------------------------
 
+/** The frontend Task Registry's identity model needs an `operation`/`subtype`
+ *  per job, derived from the job's own `input` — never from `title`, which is
+ *  a display string that can be reworded without that being an identity
+ *  change. One case per type that actually has a narrower concept than its
+ *  entityType/entityId already captures; every other type is precise enough
+ *  as-is and projects both as null. */
+export function deriveOperationSubtype(type: string, input: unknown): { operation: string | null; subtype: string | null } {
+  const i = (input ?? {}) as Record<string, unknown>;
+  switch (type as JobType) {
+    case "ai_draft":
+      // Which letter kind (reminder_letter, counter_reply, ...) — the same
+      // complaint can have several kinds drafted independently in parallel.
+      return { operation: typeof i.kind === "string" ? i.kind : null, subtype: null };
+    case "vision_scan":
+      // entity_id is null for this type (a division name isn't a UUID — see
+      // lib/actions/job-photo-dedupe.ts) — the division is the only thing
+      // that disambiguates one scan from another.
+      return { operation: null, subtype: typeof i.division === "string" ? i.division : null };
+    default:
+      // ocr/ifms_download/export already have a precise enough entityId (or
+      // no narrower concept exists) — nothing to add.
+      return { operation: null, subtype: null };
+  }
+}
+
 /** Real framework jobs use their raw id (unprefixed) so retryJobAction /
  *  cancelJobAction — which only ever apply to background_jobs rows — can use
  *  a TaskItem's id directly with no parsing. */
 export function adaptBackgroundJob(row: JobRow): TaskItem {
   const result = row.result as { stage?: string; message?: string; complaintId?: string | null } | null;
+  const { operation, subtype } = deriveOperationSubtype(row.type, row.input);
   // OCR's entityId is the DOCUMENT (correct for the duplicate-prevention
   // index — you shouldn't OCR the same document twice concurrently), but the
   // useful "Open Result" destination is the document's COMPLAINT, which the
@@ -168,9 +200,12 @@ export function adaptBackgroundJob(row: JobRow): TaskItem {
     status: row.status,
     entityType: row.entity_type,
     entityId: row.entity_id,
+    operation,
+    subtype,
     progress: row.progress,
     stage: result?.stage ?? null,
     message: result?.message ?? null,
+    result: row.result,
     error: row.error,
     cancellable: isCancellableType(row.type, row.status),
     resultLink: row.status === "done" ? resultLinkForRow(row.type, linkEntityType, linkEntityId) : null,

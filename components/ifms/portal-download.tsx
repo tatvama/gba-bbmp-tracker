@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { previewIfmsDownload, startIfmsDownloadRun, type PreviewJob } from "@/lib/actions/ifms";
-import { getJobAction, cancelJobAction } from "@/lib/actions/jobs";
+import { useTask } from "@/lib/jobs/client/use-task";
 
 type Phase = "idle" | "previewing" | "preview" | "downloading" | "done";
 
@@ -27,14 +27,44 @@ export function PortalDownload() {
   const [phase, setPhase] = React.useState<Phase>("idle");
   const [jobs, setJobs] = React.useState<PreviewJob[]>([]);
   const [invalid, setInvalid] = React.useState<string[]>([]);
-  const [progress, setProgress] = React.useState<Progress | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [jobId, setJobId] = React.useState<string | null>(null);
-  const activeRef = React.useRef(true);
-  React.useEffect(() => () => { activeRef.current = false; }, []);
 
   const downloadableCodes = React.useMemo(() => jobs.filter((j) => j.exists && j.fileCount > 0).map((j) => j.jobCode), [jobs]);
   const totalFiles = React.useMemo(() => jobs.reduce((s, j) => s + j.fileCount, 0), [jobs]);
+
+  // No entityId is knowable before a run starts (each click creates a fresh
+  // job_download_run) — a user only ever runs one portal download at a time
+  // in practice, so "any active ifms_download job for me" is the identity.
+  // This is also what makes resumption automatic: if a download was already
+  // running before this component mounted, `task` reflects it immediately.
+  const { task, startTask, cancel } = useTask({ taskType: "ifms_download" });
+
+  const prevTaskStatusRef = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    const status = task?.status;
+    if (status === prevTaskStatusRef.current) return;
+    prevTaskStatusRef.current = status;
+    if (!status) return;
+    if (status === "queued" || status === "running" || status === "retrying") {
+      setPhase("downloading");
+    } else if (status === "done" || status === "failed" || status === "cancelled") {
+      if (status === "failed") setError(task?.error ?? "Download failed.");
+      setPhase("done");
+      router.refresh();
+    }
+  }, [task?.status, task?.error, router]);
+
+  const progress: Progress | null = React.useMemo(() => {
+    if (phase !== "downloading" && phase !== "done") return null;
+    const res = (task?.result ?? null) as { jobsDone?: number; total?: number; currentJob?: string | null; filesDownloaded?: number; filesFailed?: number } | null;
+    return {
+      total: res?.total ?? downloadableCodes.length,
+      jobsDone: res?.jobsDone ?? 0,
+      filesDownloaded: res?.filesDownloaded ?? 0,
+      filesFailed: res?.filesFailed ?? 0,
+      currentJob: res?.currentJob ?? undefined,
+    };
+  }, [task, phase, downloadableCodes.length]);
 
   async function onPreview() {
     setError(null);
@@ -53,13 +83,13 @@ export function PortalDownload() {
     setPhase("preview");
   }
 
-  // The download now runs as an autonomous background job (lib/jobs/handlers/
+  // The download runs as an autonomous background job (lib/jobs/handlers/
   // ifms-download.ts) — starting it and closing the tab no longer stalls the
-  // run; this just polls for live progress instead of driving it step by step.
+  // run. useTask above (not a poll loop owned by this component) reflects
+  // its live progress from the shared Task Registry.
   async function onDownload() {
     setError(null);
     setPhase("downloading");
-    setProgress({ total: downloadableCodes.length, jobsDone: 0, filesDownloaded: 0, filesFailed: 0 });
 
     const start = await startIfmsDownloadRun({ targets, codes: downloadableCodes });
     if (!start.ok || !start.jobId) {
@@ -67,42 +97,11 @@ export function PortalDownload() {
       setPhase("preview");
       return;
     }
-    setJobId(start.jobId);
-    poll(start.jobId);
-  }
-
-  function poll(id: string) {
-    setTimeout(async () => {
-      const r = await getJobAction(id);
-      if (!activeRef.current) return;
-      const job = r.job;
-      if (!job) {
-        setError(r.error ?? "Download job not found.");
-        setPhase("done");
-        return;
-      }
-      const res = job.result as { jobsDone?: number; total?: number; currentJob?: string | null; filesDownloaded?: number; filesFailed?: number } | null;
-      setProgress((prev) => ({
-        total: res?.total ?? prev?.total ?? downloadableCodes.length,
-        jobsDone: res?.jobsDone ?? prev?.jobsDone ?? 0,
-        filesDownloaded: res?.filesDownloaded ?? prev?.filesDownloaded ?? 0,
-        filesFailed: res?.filesFailed ?? prev?.filesFailed ?? 0,
-        currentJob: res?.currentJob ?? prev?.currentJob,
-      }));
-      if (job.status === "done" || job.status === "failed" || job.status === "cancelled") {
-        if (job.status === "failed") setError(job.error ?? "Download failed.");
-        setPhase("done");
-        setJobId(null);
-        router.refresh();
-        return;
-      }
-      poll(id);
-    }, 1500);
+    startTask(start.jobId);
   }
 
   async function cancelDownload() {
-    if (!jobId) return;
-    await cancelJobAction(jobId);
+    await cancel();
   }
 
   const busy = phase === "previewing" || phase === "downloading";
@@ -198,7 +197,7 @@ export function PortalDownload() {
               {phase === "done" ? "Download complete — " : `Downloading ${progress.currentJob ?? ""}… `}
               {progress.jobsDone}/{progress.total} jobs · {progress.filesDownloaded} files saved
               {progress.filesFailed > 0 ? ` · ${progress.filesFailed} failed` : ""}
-              {phase === "downloading" && jobId && (
+              {phase === "downloading" && task && (
                 <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={cancelDownload}>Cancel</Button>
               )}
             </p>

@@ -17,6 +17,11 @@ export interface JobRow {
   title: string | null;
   entity_type: string | null;
   entity_id: string | null;
+  /** The exact params the job was started with — already read fresh on every
+   *  dispatch/retry (lib/jobs/runner.ts); also the source for TaskItem's
+   *  operation/subtype projection (lib/jobs/adapters.ts) so the client never
+   *  has to infer a task's identity from its display title. */
+  input: unknown;
   progress: number | null;
   result: unknown;
   error: string | null;
@@ -30,7 +35,7 @@ export interface JobRow {
 }
 
 const COLS =
-  "id,type,status,title,entity_type,entity_id,progress,result,error,created_at,updated_at,finished_at,cancel_requested,retry_count,max_retries,next_retry_at";
+  "id,type,status,title,entity_type,entity_id,input,progress,result,error,created_at,updated_at,finished_at,cancel_requested,retry_count,max_retries,next_retry_at";
 
 /** Active (queued/running/retrying) jobs plus a recent-history window of
  *  terminal ones, for a specific user — the Global Task Center's data. */

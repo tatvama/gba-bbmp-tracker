@@ -11,12 +11,11 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useJobPoll } from "@/lib/hooks/use-job-poll";
-import { listAllTasks, retryJobAction, cancelJobAction } from "@/lib/actions/jobs";
-import type { TaskItem } from "@/lib/jobs/types";
+import { useTasks, useTaskActions } from "@/lib/jobs/client/use-task";
+import { ACTIVE_JOB_STATUSES, type TaskItem } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 
-const ACTIVE_STATUSES = new Set(["queued", "running", "retrying"]);
+const ACTIVE_STATUSES = ACTIVE_JOB_STATUSES;
 
 const STATUS_BADGE: Record<string, BadgeProps["variant"]> = {
   queued: "muted",
@@ -58,10 +57,10 @@ function estimateRemaining(task: TaskItem): string | null {
  * task (ZIP import, ack reconciliation — see lib/jobs/adapters.ts) the
  * current user has in flight or recently finished, visible from any page.
  * Replaces the old jobs-indicator.tsx chip (same trigger visual, now opens a
- * real panel instead of a read-only dropdown). Polls listAllTasks() every 5s
- * as the reliability floor; an EventSource against /api/jobs/events nudges an
- * immediate refresh so updates usually show up within ~150ms of a runner
- * write instead of waiting for the next poll tick.
+ * real panel instead of a read-only dropdown). A plain subscriber of the
+ * shared Task Registry (lib/jobs/client/task-registry.tsx) — the poll/SSE
+ * mechanics that used to live in this component now live there instead, so
+ * every other module's task-tracking UI updates on the exact same cadence.
  */
 export function TaskCenter() {
   const [open, setOpen] = React.useState(false);
@@ -74,21 +73,12 @@ export function TaskCenter() {
   const [logsFor, setLogsFor] = React.useState<TaskItem | null>(null);
   const [, forceTick] = React.useState(0); // re-renders elapsed/ETA labels every few seconds
 
-  const fetcher = React.useCallback(() => listAllTasks(), []);
-  const { data: tasks, refresh } = useJobPoll<TaskItem[]>(fetcher, 5000);
-  const list = tasks ?? [];
-
-  React.useEffect(() => {
-    if (!open) return;
-    const es = new EventSource("/api/jobs/events");
-    // The SSE payload already carries the full task list, but re-using the
-    // same server action as the poll fallback keeps ONE code path for "how do
-    // we get the list" rather than two slightly-different shapes — a
-    // deliberate simplicity-over-micro-optimization tradeoff at this app's
-    // scale (a handful of tasks per user, not a high-throughput queue).
-    es.onmessage = () => refresh();
-    return () => es.close();
-  }, [open, refresh]);
+  // The Task Center is just a subscriber like every other module now — the
+  // one shared poll+SSE subscription lives in the Task Registry provider
+  // (lib/jobs/client/task-registry.tsx, mounted once in app/layout.tsx), not
+  // here. No fetch, no EventSource, no interval owned by this component.
+  const list = useTasks();
+  const { cancel, retry } = useTaskActions();
 
   React.useEffect(() => {
     if (!open) return;
@@ -100,14 +90,12 @@ export function TaskCenter() {
 
   async function doRetry(task: TaskItem) {
     setBusyId(task.id);
-    await retryJobAction(task.id);
-    refresh();
+    await retry(task.id);
     setBusyId(null);
   }
   async function doCancel(task: TaskItem) {
     setBusyId(task.id);
-    await cancelJobAction(task.id);
-    refresh();
+    await cancel(task.id);
     setBusyId(null);
   }
   function copyError(task: TaskItem) {

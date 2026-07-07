@@ -9,6 +9,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type JobStatus = "queued" | "running" | "retrying" | "done" | "failed" | "cancelled";
 
+/** Shared "is this task still in flight" check — one definition, used by the
+ *  Task Registry's hooks and the Global Task Center alike. */
+export const ACTIVE_JOB_STATUSES: ReadonlySet<JobStatus> = new Set(["queued", "running", "retrying"]);
+
 /** Every job type the framework knows about. Add a new one here + register a
  *  handler and config in registry.ts — that's the only place a new module
  *  plugs in (no feature-specific background systems). */
@@ -71,7 +75,8 @@ export interface JobDispatchMeta {
 
 /** The normalized shape every source (background_jobs directly, or an
  *  adapter over import_uploads / ack_import_batches — see lib/jobs/adapters.ts)
- *  is projected into for the Global Task Center to render uniformly. */
+ *  is projected into for the Global Task Center to render uniformly, and for
+ *  the frontend Task Registry (lib/jobs/client/*) to match tasks by identity. */
 export interface TaskItem {
   id: string;
   source: "background_jobs" | "import_uploads" | "ack_import_batches";
@@ -81,9 +86,23 @@ export interface TaskItem {
   status: JobStatus;
   entityType: string | null;
   entityId: string | null;
+  /** The specific action within `type` — e.g. an ai_draft job's draft kind.
+   *  Derived from the job's own `input` at read time (see adaptBackgroundJob),
+   *  never from `title` — a stable identity field, not a display string. */
+  operation: string | null;
+  /** A narrower disambiguator for tasks with no entityId yet (e.g. a
+   *  vision_scan job's division, before any division-scoped entity exists). */
+  subtype: string | null;
   progress: number | null;
   stage: string | null;
   message: string | null;
+  /** The job's own result/progress payload, verbatim — `stage`/`message`
+   *  above are the two fields every job shares, but a type's handler can
+   *  report arbitrary structured extras (e.g. ifms_download's jobsDone/total/
+   *  filesDownloaded). Exposed generically so a consumer reads its own job
+   *  type's fields directly off the shared registry instead of a second,
+   *  type-specific poll. */
+  result: unknown;
   error: string | null;
   cancellable: boolean;
   resultLink: string | null;

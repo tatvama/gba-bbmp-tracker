@@ -6,6 +6,7 @@ import { TopNav } from "@/components/nav/topnav";
 import { Sidebar } from "@/components/nav/sidebar";
 import { getSessionUser } from "@/lib/auth";
 import { PageTransition } from "@/components/nav/page-transition";
+import { TaskRegistryProvider } from "@/lib/jobs/client/task-registry";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -44,18 +45,20 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="flex min-h-screen flex-col">
-            <TopNav email={user?.email ?? null} role={user?.role ?? null} />
-            <div className="flex flex-1">
-              <Sidebar />
-              <main
-                id="main-content"
-                className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10"
-              >
-                <PageTransition>{children}</PageTransition>
-              </main>
+          <TaskRegistryProvider>
+            <div className="flex min-h-screen flex-col">
+              <TopNav email={user?.email ?? null} role={user?.role ?? null} />
+              <div className="flex flex-1">
+                <Sidebar />
+                <main
+                  id="main-content"
+                  className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10"
+                >
+                  <PageTransition>{children}</PageTransition>
+                </main>
+              </div>
             </div>
-          </div>
+          </TaskRegistryProvider>
         </ThemeProvider>
       </body>
     </html>
