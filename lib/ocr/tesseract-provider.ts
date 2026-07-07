@@ -1,5 +1,5 @@
 import "server-only";
-import { createWorker } from "tesseract.js";
+import { createWorker, PSM } from "tesseract.js";
 import type { OCRProvider, OCRResult, OCROptions } from "./ocr-service";
 
 /**
@@ -15,7 +15,14 @@ export class TesseractOCRProvider implements OCRProvider {
     const worker = await createWorker(language);
     try {
       await worker.setParameters({
-        tessedit_pageseg_mode: "1" as any, // 1 = Automatic page segmentation with OSD
+        // PSM.AUTO (3), NOT AUTO_OSD (1). AUTO_OSD requests orientation/script
+        // detection, which needs a separate `osd.traineddata` that createWorker
+        // never downloads (it only fetches eng/kan) — so PSM 1 spammed the logs
+        // with "osd.traineddata not found / Tesseract couldn't load any
+        // languages!" on every page and detected nothing anyway. Scanned office
+        // copies are upright, so plain automatic page segmentation is the right
+        // mode and needs no extra data file.
+        tessedit_pageseg_mode: PSM.AUTO,
       });
       const { data } = await worker.recognize(input);
       return {
