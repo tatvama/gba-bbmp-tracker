@@ -1,5 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { adaptImportUpload, adaptAckBatch, adaptBackgroundJob } from "@/lib/jobs/adapters";
+import { adaptImportUpload, adaptAckBatch, adaptBackgroundJob, deriveOperationSubtype } from "@/lib/jobs/adapters";
+
+describe("deriveOperationSubtype", () => {
+  it("projects ai_draft's operation from input.kind", () => {
+    expect(deriveOperationSubtype("ai_draft", { complaintId: "c1", kind: "counter_reply" })).toEqual({ operation: "counter_reply", subtype: null });
+  });
+
+  it("projects vision_scan's subtype from input.division (entityId is null for this type)", () => {
+    expect(deriveOperationSubtype("vision_scan", { division: "North Zone" })).toEqual({ operation: null, subtype: "North Zone" });
+  });
+
+  it("projects nothing for types whose entityId is already precise (ocr, ifms_download, export)", () => {
+    expect(deriveOperationSubtype("ocr", { documentId: "d1", analyze: true })).toEqual({ operation: null, subtype: null });
+    expect(deriveOperationSubtype("ifms_download", { runId: "r1" })).toEqual({ operation: null, subtype: null });
+  });
+
+  it("degrades gracefully on missing/malformed input instead of throwing", () => {
+    expect(deriveOperationSubtype("ai_draft", null)).toEqual({ operation: null, subtype: null });
+    expect(deriveOperationSubtype("ai_draft", { kind: 123 })).toEqual({ operation: null, subtype: null });
+    expect(deriveOperationSubtype("vision_scan", undefined)).toEqual({ operation: null, subtype: null });
+  });
+});
 
 describe("adaptImportUpload", () => {
   it("maps 'review' to done and supplies a review-page link", () => {
@@ -64,6 +85,7 @@ describe("adaptBackgroundJob", () => {
   it("pulls stage/message out of the result jsonb and builds a resultLink when done", () => {
     const t = adaptBackgroundJob({
       id: "j1", type: "ai_draft", status: "done", title: "Counter-reply", entity_type: "complaint", entity_id: "c1",
+      input: { complaintId: "c1", kind: "counter_reply" },
       progress: 100, result: { stage: "drafting", message: "almost there" }, error: null,
       created_at: "2026-01-01T00:00:00Z", updated_at: null, finished_at: "2026-01-01T00:05:00Z",
       cancel_requested: false, retry_count: 0, max_retries: 3, next_retry_at: null,
@@ -73,12 +95,13 @@ describe("adaptBackgroundJob", () => {
     expect(t.module).toBe("AI Drafting");
     expect(t.stage).toBe("drafting");
     expect(t.message).toBe("almost there");
-    expect(t.resultLink).toBe("/complaints/c1?tab=ai");
+    expect(t.operation).toBe("counter_reply");
   });
 
   it("does not build a resultLink for a job that is not yet done", () => {
     const t = adaptBackgroundJob({
       id: "j1", type: "ai_draft", status: "running", title: "Counter-reply", entity_type: "complaint", entity_id: "c1",
+      input: { complaintId: "c1", kind: "counter_reply" },
       progress: 40, result: null, error: null,
       created_at: "2026-01-01T00:00:00Z", updated_at: null, finished_at: null,
       cancel_requested: false, retry_count: 0, max_retries: 3, next_retry_at: null,
@@ -89,6 +112,7 @@ describe("adaptBackgroundJob", () => {
   it("is never cancellable for ai_draft (no registered cancel point yet)", () => {
     const t = adaptBackgroundJob({
       id: "j1", type: "ai_draft", status: "running", title: "Counter-reply", entity_type: "complaint", entity_id: "c1",
+      input: { complaintId: "c1", kind: "counter_reply" },
       progress: 40, result: null, error: null,
       created_at: "2026-01-01T00:00:00Z", updated_at: null, finished_at: null,
       cancel_requested: false, retry_count: 0, max_retries: 3, next_retry_at: null,

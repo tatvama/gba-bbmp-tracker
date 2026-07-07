@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
-import { startAiDraftJob, getJobAction } from "@/lib/actions/jobs";
+import { startAiDraftJob } from "@/lib/actions/jobs";
+import { useTask } from "@/lib/jobs/client/use-task";
 import { markReminderGenerated } from "@/lib/actions/ai-advisor";
 import { openDraftPdf } from "@/lib/print-letter";
 import { formatDateTime } from "@/lib/format";
@@ -58,15 +59,13 @@ export function AIRecommendationCard({
   priority?: string | null;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = React.useState(false);
+  const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
-  const activeRef = React.useRef(true);
 
   React.useEffect(() => {
     setMounted(true);
-    return () => { activeRef.current = false; };
   }, []);
 
   React.useEffect(() => {
@@ -98,6 +97,43 @@ export function AIRecommendationCard({
   const action = recommendation?.recommendation_action ?? null;
   const meta = action ? ACTION_META[action] : null;
 
+  // Which draft kind the CURRENT recommendation would generate, if any — this
+  // is also exactly what background_jobs.input.kind stores, so it doubles as
+  // the task's `operation` identity below.
+  const kind =
+    action === "generate_reminder" ? "reminder_email"
+    : action === "counter_reply" ? "counter_reply"
+    : action === "request_clarification" ? "clarification_request"
+    : action === "convert_to_rti" ? "rti_from_complaint"
+    : null;
+
+  // Resumes automatically: if this draft was already started before the user
+  // navigated away, this finds it the moment the component mounts — no local
+  // jobId to lose, no per-feature "check on mount" code. "__none__" is a
+  // sentinel: useTask must always be called (rules of hooks), and it simply
+  // never matches a real job when there's nothing generate-able right now.
+  const { task, isActive, startTask } = useTask({
+    taskType: "ai_draft",
+    entityType: "complaint",
+    entityId: complaintId,
+    operation: kind ?? "__none__",
+  });
+  const busy = starting || isActive;
+
+  const prevStatusRef = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    const status = task?.status;
+    if (status === prevStatusRef.current) return;
+    prevStatusRef.current = status;
+    if (status === "done") {
+      if (action === "generate_reminder") void markReminderGenerated(complaintId);
+      router.refresh();
+    } else if (status === "failed") {
+      setError(task?.error ?? "Generation failed.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.status]);
+
   async function runOneClickAction(language?: DraftLanguage) {
     if (!action) return;
     setError(null);
@@ -116,41 +152,16 @@ export function AIRecommendationCard({
       router.push(`/complaints/${complaintId}?step=escalate`);
       return;
     }
-
-    const kind =
-      action === "generate_reminder" ? "reminder_email"
-      : action === "counter_reply" ? "counter_reply"
-      : action === "request_clarification" ? "clarification_request"
-      : action === "convert_to_rti" ? "rti_from_complaint"
-      : null;
     if (!kind) return;
 
-    setBusy(true);
+    setStarting(true);
     const start = await startAiDraftJob({ complaintId, kind, language });
+    setStarting(false);
     if (!start.ok || !start.jobId) {
       setError(start.error ?? "Could not start generation.");
-      setBusy(false);
       return;
     }
-    const jobId = start.jobId;
-    const poll = async () => {
-      if (!activeRef.current) return;
-      const r = await getJobAction(jobId);
-      const status = r.job?.status;
-      if (status === "done") {
-        if (action === "generate_reminder") await markReminderGenerated(complaintId);
-        setBusy(false);
-        router.push(`/complaints/${complaintId}?tab=ai`);
-        return;
-      }
-      if (status === "failed") {
-        setError(r.job?.error ?? "Generation failed.");
-        setBusy(false);
-        return;
-      }
-      setTimeout(poll, 2500);
-    };
-    setTimeout(poll, 1500);
+    startTask(start.jobId);
   }
 
   return (
