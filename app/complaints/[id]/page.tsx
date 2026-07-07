@@ -169,6 +169,8 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           escalationStage={complaint.escalation_stage}
           escalationStageDeadline={complaint.escalation_stage_deadline}
           acknowledgmentDate={complaint.acknowledgment_date}
+          submittedDate={complaint.date_submitted ?? null}
+          submissionChannel={complaint.complaint_mode ?? null}
         />
       )}
 

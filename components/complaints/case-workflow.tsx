@@ -22,7 +22,7 @@ import { LanguageChoiceButton } from "@/components/complaints/language-choice-bu
 import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import { EscalationDeadlineBadge } from "@/components/complaints/escalation-deadline-badge";
 import { openDraftPdf } from "@/lib/print-letter";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatDate } from "@/lib/format";
 import { startAiDraftJob } from "@/lib/actions/jobs";
 import { useTask } from "@/lib/jobs/client/use-task";
 import {
@@ -130,6 +130,8 @@ export function CaseWorkflow({
   escalationStage,
   escalationStageDeadline,
   acknowledgmentDate,
+  submittedDate,
+  submissionChannel,
 }: {
   complaintId: string;
   status: string;
@@ -141,6 +143,8 @@ export function CaseWorkflow({
   escalationStage?: string;
   escalationStageDeadline?: string | null;
   acknowledgmentDate?: string | null;
+  submittedDate?: string | null;
+  submissionChannel?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -302,6 +306,8 @@ export function CaseWorkflow({
             setSummaryDoc={setSummaryDoc}
             generateSummary={generateSummary}
             busyId={busyId}
+            submittedDate={submittedDate ?? null}
+            submissionChannel={submissionChannel ?? null}
           />
         )}
 
@@ -482,6 +488,8 @@ function SubmitPanel({
   setSummaryDoc,
   generateSummary,
   busyId,
+  submittedDate,
+  submissionChannel,
 }: {
   complaintId: string;
   jobNumber: string | null;
@@ -493,8 +501,10 @@ function SubmitPanel({
   setSummaryDoc: (d: ComplaintDocument | null) => void;
   generateSummary: (id: string, force: boolean) => Promise<void>;
   busyId: string | null;
+  submittedDate: string | null;
+  submissionChannel: string | null;
 }) {
-  const [submittedDate, setSubmittedDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [submittedDateInput, setSubmittedDateInput] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [channel, setChannel] = React.useState<string>(SUBMIT_CHANNELS[0]);
   const [referenceNo, setReferenceNo] = React.useState("");
   const [filedTo, setFiledTo] = React.useState("");
@@ -542,7 +552,7 @@ function SubmitPanel({
     setError(null);
     const r = await fileComplaint({
       complaintId,
-      submittedDate,
+      submittedDate: submittedDateInput,
       channel,
       filedTo: filedTo || null,
       referenceNo: referenceNo || null,
@@ -652,7 +662,29 @@ function SubmitPanel({
 
       {/* Record the submission */}
       {filed ? (
-        <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> This complaint is marked as filed. Move to the Acknowledge step when you receive the officer&apos;s acknowledgement.</p>
+        <div className="space-y-2 rounded-md border border-emerald-250 bg-emerald-50/20 p-3.5 dark:border-emerald-900/30 dark:bg-emerald-950/10">
+          <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+            <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+            This complaint is marked as filed
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 text-xs font-semibold text-slate-650 dark:text-slate-400 pl-5.5">
+            {submittedDate && (
+              <div>
+                <span className="text-slate-400 dark:text-slate-500 uppercase text-[10px] tracking-wider block font-bold">Submission Date</span>
+                <span>{formatDate(submittedDate)}</span>
+              </div>
+            )}
+            {submissionChannel && (
+              <div>
+                <span className="text-slate-400 dark:text-slate-500 uppercase text-[10px] tracking-wider block font-bold">Submission Channel</span>
+                <span>{submissionChannel}</span>
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-450 pl-5.5 pt-1.5 italic">
+            Move to the Acknowledge step when you receive the officer&apos;s acknowledgement.
+          </p>
+        </div>
       ) : (
         <div className="space-y-3 rounded-md border p-3">
           <p className="text-xs font-medium">Have you submitted this letter? Record it:</p>
@@ -664,7 +696,12 @@ function SubmitPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label className="text-xs">Submitted on</Label>
-              <input type="date" value={submittedDate} onChange={(e) => setSubmittedDate(e.target.value)} className={selectCls} />
+              <Input
+                type="date"
+                value={submittedDateInput}
+                onChange={(e) => setSubmittedDateInput(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Channel</Label>
