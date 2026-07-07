@@ -76,6 +76,7 @@ export function ImportQueue({
   const [live, setLive] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   const [clearedSessionIds, setClearedSessionIds] = React.useState<string[]>([]);
+  const [clearing, setClearing] = React.useState(false);
   const [sortBy, setSortBy] = React.useState<"date" | "name" | "size" | "status">("date");
 
   const queueRef = React.useRef<{ id: string; file: File }[]>([]);
@@ -423,16 +424,36 @@ export function ImportQueue({
     });
   };
 
-  const clearCompletedJobs = () => {
+  const clearCompletedJobs = React.useCallback(() => {
     const ids = sessions
       .filter((s) => s.status === "done" || s.status === "failed" || s.status === "cancelled")
       .map((s) => s.id);
+    if (!ids.length) return;
+    setClearing(true);
+    // Optimistic hide for instant feedback — reverted below for any id whose
+    // delete didn't actually confirm.
     setClearedSessionIds((prev) => [...prev, ...ids]);
-    // Call the delete API for each completed session to clear them permanently from the database!
-    ids.forEach((id) => {
-      fetch(`/api/import-queue/${id}`, { method: "DELETE" }).catch(() => {});
+    // `keepalive` matters here: without it, a fire-and-forget fetch can be
+    // aborted mid-flight by the very next navigation (or a reload/tab close),
+    // which used to leave the row un-deleted in the DB — so it silently came
+    // back the next time this page loaded, even though the UI had already
+    // hidden it. `keepalive` tells the browser to keep sending the request
+    // even if this page is being torn down. `allSettled` (not `.catch(() =>
+    // {})`) also means a real server-side failure (e.g. a 404/403) is no
+    // longer swallowed — those ids get put back so they aren't lost silently.
+    void Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/import-queue/${id}`, { method: "DELETE", keepalive: true }).then((r) => ({ id, ok: r.ok })),
+      ),
+    ).then((results) => {
+      const failedIds = results.map((r, i) => (r.status === "fulfilled" && r.value.ok ? null : ids[i]!)).filter((id): id is string => id !== null);
+      if (failedIds.length) {
+        setClearedSessionIds((prev) => prev.filter((id) => !failedIds.includes(id)));
+        setError(`Could not clear ${failedIds.length} job${failedIds.length === 1 ? "" : "s"} — try again.`);
+      }
+      setClearing(false);
     });
-  };
+  }, [sessions]);
 
   // ── derived view state ──────────────────────────────────────────────────────
   const ordered = React.useMemo(() => {
@@ -704,9 +725,11 @@ export function ImportQueue({
               variant="outline"
               size="sm"
               onClick={clearCompletedJobs}
+              disabled={clearing}
               className="h-8 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-rose-950/20"
             >
-              <Trash2 className="h-3.5 w-3.5 mr-1" /> Clear Completed
+              {clearing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}
+              {clearing ? "Clearing…" : "Clear Completed"}
             </Button>
           </div>
         </div>
