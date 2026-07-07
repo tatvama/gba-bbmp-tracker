@@ -24,7 +24,7 @@ import {
   type ImportEventsPayload, type ImportUploadSnapshot,
 } from "@/lib/import-queue/types";
 import { saveFileHandle, loadFileHandle, deleteFileHandle, fileFromHandle } from "@/lib/client/import-idb";
-import { getForensicImportBatchAction, checkDuplicateJobNumberAction } from "@/lib/actions/forensic-zip-import";
+import { getForensicImportBatchAction } from "@/lib/actions/forensic-zip-import";
 import { cn } from "@/lib/utils";
 
 interface LocalUpload {
@@ -256,18 +256,6 @@ export function ImportQueue({
       for (let i = 0; i < zips.length; i++) {
         const file = zips[i]!;
         try {
-          const jnMatch = file.name.match(/\b\d{3}-\d{2}-\d{6}\b/);
-          if (jnMatch) {
-            const jn = jnMatch[0];
-            const check = await checkDuplicateJobNumberAction(jn);
-            if (check.imported) {
-              const ok = window.confirm(
-                `Warning: Job Number ${jn} has already been imported as Case ${check.caseNumber || "Unknown"}.\n\nAre you sure you want to upload and process this ZIP again?`
-              );
-              if (!ok) continue;
-            }
-          }
-
           const r = await fetch("/api/import-queue", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
