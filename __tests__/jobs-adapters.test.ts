@@ -10,9 +10,9 @@ describe("deriveOperationSubtype", () => {
     expect(deriveOperationSubtype("vision_scan", { division: "North Zone" })).toEqual({ operation: null, subtype: "North Zone" });
   });
 
-  it("projects nothing for types whose entityId is already precise (ocr, ifms_download, export)", () => {
+  it("projects nothing for types whose entityId is already precise (ocr, export)", () => {
     expect(deriveOperationSubtype("ocr", { documentId: "d1", analyze: true })).toEqual({ operation: null, subtype: null });
-    expect(deriveOperationSubtype("ifms_download", { runId: "r1" })).toEqual({ operation: null, subtype: null });
+    expect(deriveOperationSubtype("export", { complaintId: "c1" })).toEqual({ operation: null, subtype: null });
   });
 
   it("degrades gracefully on missing/malformed input instead of throwing", () => {

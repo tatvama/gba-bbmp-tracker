@@ -15,7 +15,6 @@ import { CaseThread } from "@/components/complaints/case-thread";
 import { JobEvidenceList } from "@/components/complaints/job-evidence-list";
 import type { JobEvidenceDoc } from "@/lib/queries";
 import { ReplyForm, ActionForm, CommunicationForm, EscalationForm } from "@/components/complaints/complaint-forms";
-import { ComplaintAiDrafts } from "@/components/complaints/complaint-ai-drafts";
 import { HistoryTimeline } from "@/components/complaints/history-timeline";
 import { buildComplaintHistory } from "@/lib/complaint-history";
 import { completeComplaintReminder } from "@/lib/actions/complaints";

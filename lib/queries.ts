@@ -869,30 +869,6 @@ export async function getSecondAppeal(id: string): Promise<RtiSecondAppeal | nul
 }
 
 
-export async function listRtiTemplates(kind?: string): Promise<Template[]> {
-  const supabase = await sb();
-  let q = supabase.from("templates").select("*").eq("active", true).order("title");
-  if (kind) q = q.eq("kind", kind);
-  const { data, error } = await q;
-  logErr("listRtiTemplates", error);
-  return (data as Template[]) ?? [];
-}
-
-export async function listAiDrafts(
-  entityType: string,
-  entityId: string,
-): Promise<AiDraft[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
-    .from("ai_drafts")
-    .select("*")
-    .eq("entity_type", entityType)
-    .eq("entity_id", entityId)
-    .order("created_at", { ascending: false });
-  logErr("listAiDrafts", error);
-  return (data as AiDraft[]) ?? [];
-}
-
 export async function listCommunications(
   entityType: string,
   entityId: string,
@@ -906,21 +882,6 @@ export async function listCommunications(
     .order("occurred_at", { ascending: false });
   logErr("listCommunications", error);
   return (data as CommunicationLog[]) ?? [];
-}
-
-export async function listRemindersForEntity(
-  entityType: string,
-  entityId: string,
-): Promise<Reminder[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
-    .from("reminders")
-    .select("*")
-    .eq("entity_type", entityType)
-    .eq("entity_id", entityId)
-    .order("due_date", { ascending: true, nullsFirst: false });
-  logErr("listRemindersForEntity", error);
-  return (data as Reminder[]) ?? [];
 }
 
 /** Pending RTI reminders soonest-first (RTI dashboard "urgent follow-ups"). */
@@ -1108,22 +1069,6 @@ export async function countPrintPendingLetters(): Promise<number> {
 
 const ACTIVE_ESCALATION_LADDER_STAGES = ["awaiting_reply", "reminder_sent", "legal_notice_sent"] as const;
 
-/** Count of complaints whose current escalation-ladder deadline falls within
- *  the next `withinDays` days (dashboard "coming up" banner). */
-export async function countRepliesDueSoon(withinDays = 5): Promise<number> {
-  const supabase = await sb();
-  const now = new Date();
-  const until = new Date(now.getTime() + withinDays * 86_400_000);
-  const { count, error } = await supabase
-    .from("complaints")
-    .select("id", { count: "exact", head: true })
-    .in("escalation_stage", ACTIVE_ESCALATION_LADDER_STAGES)
-    .gte("escalation_stage_deadline", now.toISOString())
-    .lte("escalation_stage_deadline", until.toISOString());
-  logErr("countRepliesDueSoon", error);
-  return count ?? 0;
-}
-
 export interface ReplyDueSoon {
   complaintId: string;
   caseNumber: string | null;
@@ -1247,17 +1192,6 @@ export async function listComplaintDocuments(complaintId: string): Promise<Compl
   return (data as ComplaintDocument[]) ?? [];
 }
 
-export async function getComplaintDocument(id: string): Promise<ComplaintDocument | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
-    .from("complaint_documents")
-    .select("*, uploaded_by_profile:profiles!uploaded_by(name, role)")
-    .eq("id", id)
-    .maybeSingle();
-  logErr("getComplaintDocument", error);
-  return (data as ComplaintDocument) ?? null;
-}
-
 export async function listComplaintTimeline(complaintId: string): Promise<ComplaintTimelineEntry[]> {
   const supabase = await sb();
   const { data, error } = await supabase
@@ -1363,139 +1297,6 @@ export async function listComplaintDocsForReports(): Promise<
     .limit(1000);
   logErr("listComplaintDocsForReports", error);
   return (data as unknown as (ComplaintDocument & { complaint?: { id: string; title: string; internal_case_number: string | null } | null })[]) ?? [];
-}
-
-export interface ComplaintDashboardStats {
-  total: number;
-  filedThisMonth: number;
-  pending: number;
-  overdue: number;
-  repliesReceived: number;
-  actionTaken: number;
-  noReply: number;
-  followUpsDueToday: number;
-  escalationsPending: number;
-  ocrPending: number;
-  lowConfidenceOcr: number;
-  needsManualReview: number;
-  aiCriticalRisk: number;
-  aiNeedsAction: number;
-}
-
-export async function complaintDashboardStats(): Promise<ComplaintDashboardStats> {
-  const supabase = await sb();
-  const today = new Date().toISOString().slice(0, 10);
-  const monthStart = today.slice(0, 8) + "01";
-  const OPEN = [
-    "Draft", "Filed", "Acknowledged", "Under Review", "Assigned To Engineer",
-    "Site Visit Pending", "Site Visit Done", "Work In Progress", "Reply Received",
-    "Action Taken Report Received", "Partially Resolved", "Reopened", "Escalated",
-    "No Response", "Overdue",
-  ];
-  const count = async (table: string, mod?: (q: any) => any) => {
-    let q = supabase.from(table).select("*", { count: "exact", head: true });
-    if (mod) q = mod(q);
-    const { count: c, error } = await q;
-    logErr(`count:${table}`, error);
-    return c ?? 0;
-  };
-  const notDeleted = (q: any) => q.is("deleted_at", null);
-
-  // complaint_ai_recommendations has no RLS (matches background_jobs/notifications
-  // — bookkeeping tables read via the admin client only), so these two counts use
-  // createAdminClient() instead of the session-scoped `count()` closure above.
-  const adminCount = async (table: string, mod?: (q: any) => any) => {
-    try {
-      const admin = createAdminClient();
-      let q = admin.from(table).select("*", { count: "exact", head: true });
-      if (mod) q = mod(q);
-      const { count: c, error } = await q;
-      logErr(`count:${table}`, error);
-      return c ?? 0;
-    } catch (e) {
-      logErr(`count:${table}`, e);
-      return 0;
-    }
-  };
-
-  const [
-    total, filedThisMonth, pending, overdue, repliesReceived, actionTaken,
-    followUpsDueToday, escalationsPending, ocrPending, lowConfidenceOcr, needsManualReview, noReply,
-    aiCriticalRisk, aiNeedsAction,
-  ] = await Promise.all([
-    count("complaints", notDeleted),
-    count("complaints", (q) => notDeleted(q).gte("date_submitted", monthStart)),
-    count("complaints", (q) => notDeleted(q).in("status", OPEN)),
-    count("complaints", (q) => notDeleted(q).in("status", OPEN).lt("next_follow_up_date", today)),
-    count("complaints", (q) => notDeleted(q).not("latest_reply_date", "is", null)),
-    count("complaints", (q) => notDeleted(q).not("latest_action_taken_date", "is", null)),
-    count("complaints", (q) => notDeleted(q).eq("next_follow_up_date", today)),
-    count("complaints", (q) => notDeleted(q).eq("status", "Escalated")),
-    count("complaint_documents", (q) => q.in("ocr_status", ["Not Started", "Queued", "Processing"])),
-    count("complaint_documents", (q) => q.eq("ocr_status", "Needs Manual Review")),
-    count("complaint_documents", (q) => q.in("verification_status", ["Pending Review", "Low Confidence", "Needs Correction"])),
-    count("complaints", (q) => notDeleted(q).is("latest_reply_date", null).in("status", ["Filed", "Acknowledged", "Under Review", "Assigned To Engineer"])),
-    adminCount("complaint_ai_recommendations", (q) => q.in("risk_level", ["High", "Critical"])),
-    adminCount("complaint_ai_recommendations", (q) => q.in("recommendation_action", ["generate_reminder", "escalate", "review"])),
-  ]);
-
-  return {
-    total, filedThisMonth, pending, overdue, repliesReceived, actionTaken, noReply,
-    followUpsDueToday, escalationsPending, ocrPending, lowConfidenceOcr, needsManualReview,
-    aiCriticalRisk, aiNeedsAction,
-  };
-}
-
-export interface AiAdvisorWorklistItem {
-  id: string;
-  title: string;
-  internal_case_number: string | null;
-  status: string;
-  risk_level: "Low" | "Medium" | "High" | "Critical";
-  health_score: number;
-  recommendation: string | null;
-  recommendation_action: string | null;
-}
-
-/**
- * Complaints the AI Advisor flags as needing attention (a reminder/escalation/
- * review recommended, or High/Critical risk), for the dashboard worklist card.
- * Read via the admin client (this table has no RLS, matching background_jobs).
- */
-export async function listAiAdvisorWorklist(limit = 8): Promise<AiAdvisorWorklistItem[]> {
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (e) {
-    logErr("listAiAdvisorWorklist", e);
-    return [];
-  }
-  const { data, error } = await admin
-    .from("complaint_ai_recommendations")
-    .select("recommendation, recommendation_action, risk_level, health_score, complaint:complaints!complaint_id(id,title,internal_case_number,status,deleted_at)")
-    .or("recommendation_action.in.(generate_reminder,escalate,review),risk_level.in.(High,Critical)")
-    .order("health_score", { ascending: true })
-    .limit(limit * 3); // over-fetch — some rows may point at soft-deleted complaints
-  logErr("listAiAdvisorWorklist", error);
-
-  type Row = {
-    recommendation: string | null;
-    recommendation_action: string | null;
-    risk_level: "Low" | "Medium" | "High" | "Critical";
-    health_score: number;
-    complaint: { id: string; title: string; internal_case_number: string | null; status: string; deleted_at: string | null } | null;
-  };
-  const rows = ((data as unknown as Row[]) ?? []).filter((r) => r.complaint && !r.complaint.deleted_at);
-  return rows.slice(0, limit).map((r) => ({
-    id: r.complaint!.id,
-    title: r.complaint!.title,
-    internal_case_number: r.complaint!.internal_case_number,
-    status: r.complaint!.status,
-    risk_level: r.risk_level,
-    health_score: r.health_score,
-    recommendation: r.recommendation,
-    recommendation_action: r.recommendation_action,
-  }));
 }
 
 export async function rtiDashboardStats(): Promise<RtiDashboardStats> {
@@ -2755,14 +2556,3 @@ export async function getJobDossier(jobNumber: string): Promise<JobDossierCompla
   });
 }
 
-/** A single letter draft (for reopening into the drafter). */
-export async function getLetterDraft(id: string): Promise<LetterDraftRow | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
-    .from("letter_drafts")
-    .select("id, job_number, variant, language, signatory_key, content, lint_ok, ai_used, file_name, created_at")
-    .eq("id", id)
-    .maybeSingle();
-  logErr("getLetterDraft", error);
-  return data ? toLetterDraftRow(data as Record<string, unknown>) : null;
-}

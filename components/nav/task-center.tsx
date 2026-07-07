@@ -103,21 +103,29 @@ export function TaskCenter() {
   }
 
   const q = search.trim().toLowerCase();
-  const filtered = list
-    .filter((t) => !statusFilter || t.status === statusFilter)
-    .filter((t) => !q || t.title.toLowerCase().includes(q) || t.module.toLowerCase().includes(q))
-    .sort((a, b) => (newestFirst ? 1 : -1) * (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  const filtered = React.useMemo(
+    () =>
+      list
+        .filter((t) => !statusFilter || t.status === statusFilter)
+        .filter((t) => !q || t.title.toLowerCase().includes(q) || t.module.toLowerCase().includes(q))
+        .sort((a, b) => (newestFirst ? 1 : -1) * (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())),
+    [list, statusFilter, q, newestFirst],
+  );
 
-  const active = filtered.filter((t) => ACTIVE_STATUSES.has(t.status));
-  const completed = filtered.filter((t) => t.status === "done");
-  const failed = filtered.filter((t) => t.status === "failed" || t.status === "cancelled");
+  const active = React.useMemo(() => filtered.filter((t) => ACTIVE_STATUSES.has(t.status)), [filtered]);
+  const completed = React.useMemo(() => filtered.filter((t) => t.status === "done"), [filtered]);
+  const failed = React.useMemo(() => filtered.filter((t) => t.status === "failed" || t.status === "cancelled"), [filtered]);
 
-  const groups = groupByModule
-    ? Array.from(new Set(filtered.map((t) => t.module))).map((label) => ({
-        label,
-        tasks: filtered.filter((t) => t.module === label),
-      }))
-    : null;
+  const groups = React.useMemo(
+    () =>
+      groupByModule
+        ? Array.from(new Set(filtered.map((t) => t.module))).map((label) => ({
+            label,
+            tasks: filtered.filter((t) => t.module === label),
+          }))
+        : null,
+    [groupByModule, filtered],
+  );
 
   return (
     <>

@@ -166,6 +166,7 @@ export function CaseWorkflow({
   const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [ackDateInput, setAckDateInput] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!summaryDoc) return;
@@ -175,8 +176,10 @@ export function CaseWorkflow({
 
   async function generateSummary(id: string, force: boolean) {
     setBusyId(id);
-    await generateDocumentSummaryAction(id, complaintId, { force });
+    setError(null);
+    const r = await generateDocumentSummaryAction(id, complaintId, { force });
     setBusyId(null);
+    if (!r.ok) { setError(r.error ?? "Could not generate the summary."); return; }
     router.refresh();
   }
 
@@ -195,8 +198,10 @@ export function CaseWorkflow({
 
   async function mark(next: string, customDate?: string) {
     setBusy(true);
-    await setComplaintStatus(complaintId, next, undefined, customDate);
+    setError(null);
+    const r = await setComplaintStatus(complaintId, next, undefined, customDate);
     setBusy(false);
+    if (!r.success) { setError(r.error ?? "Could not update the status."); return; }
     setReplySuggestion(null);
     router.refresh();
   }
@@ -268,6 +273,12 @@ export function CaseWorkflow({
             })}
           </div>
         </div>
+
+        {error && (
+          <p className="mb-4 flex items-center gap-1.5 text-xs text-destructive">
+            <AlertTriangle className="h-3.5 w-3.5" /> {error}
+          </p>
+        )}
 
         {/* No-reply escalation ladder countdown — auto-drafts a reminder / legal
             notice / escalation letter into the print queue when this elapses.

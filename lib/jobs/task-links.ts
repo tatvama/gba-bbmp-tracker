@@ -12,15 +12,14 @@ import type { JobType } from "./types";
  *  point. Honest on purpose: a Cancel button only renders for a type in this
  *  list. ai_draft/ocr are a single streaming/OCR call with no clean midpoint
  *  to stop, so they're deliberately absent — vision_scan checks between every
- *  photo pair, ifms_download checks between every job code. */
-export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan", "ifms_download"];
+ *  photo pair. */
+export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan"];
 
 export const MODULE_LABEL: Record<JobType, string> = {
   ai_draft: "AI Drafting",
   ocr: "OCR",
   vision_scan: "Vision Scan",
   export: "Export",
-  ifms_download: "IFMS Download",
 };
 
 /** Where "Open Result" should take the user once a background_jobs-sourced
@@ -34,8 +33,6 @@ export function resultLinkForRow(type: string, entityType: string | null, entity
       return entityType === "complaint" && entityId ? `/complaints/${entityId}` : null;
     case "vision_scan":
       return "/complaints/duplicate-photos";
-    case "ifms_download":
-      return "/complaints/portal";
     default:
       return null;
   }

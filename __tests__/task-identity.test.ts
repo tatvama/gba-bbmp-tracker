@@ -64,9 +64,9 @@ describe("matchesIdentity", () => {
     expect(matchesIdentity(scanB, filter)).toBe(false);
   });
 
-  it("matches by taskType alone when no entity is knowable yet (e.g. ifms_download before a run starts)", () => {
-    const t = task({ type: "ifms_download", entityType: "job_download_run", entityId: "run-1", operation: null, subtype: null });
-    expect(matchesIdentity(t, { taskType: "ifms_download" })).toBe(true);
+  it("matches by taskType alone when the filter doesn't narrow further", () => {
+    const t = task({ type: "export", entityType: "complaint", entityId: "c1", operation: null, subtype: null });
+    expect(matchesIdentity(t, { taskType: "export" })).toBe(true);
   });
 
   it("explicit null is a real value to match, not a wildcard", () => {

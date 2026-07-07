@@ -10,6 +10,5 @@ import "./ai-draft";
 import "./ocr";
 import "./vision-scan";
 // Stage 7: import "./export";
-import "./ifms-download";
 
 export {};

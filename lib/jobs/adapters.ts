@@ -172,8 +172,8 @@ export function deriveOperationSubtype(type: string, input: unknown): { operatio
       // that disambiguates one scan from another.
       return { operation: null, subtype: typeof i.division === "string" ? i.division : null };
     default:
-      // ocr/ifms_download/export already have a precise enough entityId (or
-      // no narrower concept exists) — nothing to add.
+      // ocr/export already have a precise enough entityId (or no narrower
+      // concept exists) — nothing to add.
       return { operation: null, subtype: null };
   }
 }

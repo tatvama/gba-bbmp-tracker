@@ -36,7 +36,6 @@ import { generateDraftPdfService } from "@/lib/pdf/document-service";
 import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
-import type { ComplaintExtraction } from "@/lib/types";
 
 export interface ActionState {
   error?: string;
@@ -698,50 +697,6 @@ export async function generateDocumentSummaryAction(
     .finally(() => { revalidatePath(`/complaints/${complaintId}`); });
   revalidatePath(`/complaints/${complaintId}`);
   return { ok: true };
-}
-
-/** Read a document's STORED summary (never regenerates) for surfaces that only
- *  hold a document id (e.g. the reply-files list, correspondence thread). */
-export async function getDocumentSummaryAction(documentId: string): Promise<{
-  ok: boolean;
-  error?: string;
-  summary?: {
-    title: string | null;
-    documentType: string | null;
-    uploadedAt: string | null;
-    documentDate: string | null;
-    status: string;
-    error: string | null;
-    generatedAt: string | null;
-    aiSummary: string | null;
-    confidence: string | null;
-    extraction: ComplaintExtraction | null;
-  };
-}> {
-  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
-  if ("error" in a) return { ok: false, error: a.error };
-  const { admin } = a;
-  const { data: d } = await admin
-    .from("complaint_documents")
-    .select("title, document_type, uploaded_at, document_date, ai_summary_status, ai_summary_error, ai_summary_generated_at, ai_summary, ai_confidence, ai_extracted_json")
-    .eq("id", documentId)
-    .maybeSingle();
-  if (!d) return { ok: false, error: "Document not found." };
-  return {
-    ok: true,
-    summary: {
-      title: d.title,
-      documentType: d.document_type,
-      uploadedAt: d.uploaded_at,
-      documentDate: d.document_date,
-      status: d.ai_summary_status ?? "none",
-      error: d.ai_summary_error,
-      generatedAt: d.ai_summary_generated_at,
-      aiSummary: d.ai_summary,
-      confidence: d.ai_confidence,
-      extraction: (d.ai_extracted_json as ComplaintExtraction) ?? null,
-    },
-  };
 }
 
 /**

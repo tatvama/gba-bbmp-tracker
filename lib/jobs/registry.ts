@@ -18,7 +18,6 @@ export const JOB_CONFIG: Record<JobType, JobConfig> = {
   ocr: { maxDurationMs: 5 * 60_000, maxRetries: 2, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 2 },
   vision_scan: { maxDurationMs: 15 * 60_000, maxRetries: 1, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 1 },
   export: { maxDurationMs: 3 * 60_000, maxRetries: 2, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 2 },
-  ifms_download: { maxDurationMs: 30 * 60_000, maxRetries: 1, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 1 },
 };
 
 const handlers: Partial<Record<JobType, JobHandler>> = {};

@@ -27,16 +27,6 @@ export interface AnalyzedLetter extends DetectedLetter {
   ocrText: string;
 }
 
-/** Result of analysing an uploaded office-copy PDF (before any case is created). */
-export interface AnalyzeRtiResult {
-  success?: boolean;
-  error?: string;
-  /** Storage path of the merged PDF held for the commit step. */
-  storagePath?: string;
-  pageCount?: number;
-  letters?: AnalyzedLetter[];
-}
-
 /** A (possibly user-edited) letter to turn into its own RTI case. */
 export interface CommitLetterInput {
   startPage: number;

@@ -26,7 +26,6 @@ import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { uploadToR2, downloadFromR2, deleteFromR2, isR2Url } from "@/lib/storage/r2-upload";
 import { randomUUID } from "node:crypto";
 import type {
-  AnalyzeRtiResult,
   AnalyzedLetter,
   CommitLetterInput,
   CommitRtiLettersResult,
@@ -235,38 +234,6 @@ export async function updateRti(
     entityId: id,
     changedBy: user.id,
     changes: diffFields(before ?? null, row),
-  });
-  revalidatePath(`/rti/${id}`);
-  revalidatePath("/rti");
-  return { success: true, id };
-}
-
-export async function setRtiStatus(id: string, status: string): Promise<ActionState> {
-  let user;
-  try {
-    user = await requireRole(RTI_WRITE_ROLES);
-  } catch (e) {
-    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
-  }
-  if (!RTI_STATUSES.includes(status as never)) return { error: "Invalid status" };
-
-  const supabase = await createClient();
-  const { data: before } = await supabase
-    .from("rti_applications")
-    .select("status")
-    .eq("id", id)
-    .single();
-  const { error } = await supabase
-    .from("rti_applications")
-    .update({ status, updated_by: user.id })
-    .eq("id", id);
-  if (error) return { error: error.message };
-
-  await writeAudit(supabase, {
-    entityType: "rti",
-    entityId: id,
-    changedBy: user.id,
-    changes: [{ field: "status", oldValue: before?.status, newValue: status }],
   });
   revalidatePath(`/rti/${id}`);
   revalidatePath("/rti");
@@ -759,8 +726,10 @@ export async function uploadRtiAcknowledgementAction(
           updated_by: user.id,
         })
         .eq("id", rtiId);
-    } catch {}
-    
+    } catch (fallbackError) {
+      console.error("[uploadRtiAcknowledgementAction] fallback status update failed", fallbackError);
+    }
+
     revalidatePath(`/rti/${rtiId}`);
     return { error: e instanceof Error ? e.message : "Processing failed" };
   }
@@ -1187,61 +1156,6 @@ function genUniqueRef(): string {
   return `RTI-${year}-${suffix}`;
 }
 
-/**
- * Phase 1 of multi-letter import: merge the uploaded file(s) into one PDF, store
- * it, OCR every page once, and ask the AI to find the letter boundaries. Creates
- * NO cases — returns the detected letters (with per-letter OCR sliced in) for the
- * user to review/edit before {@link commitRtiLettersAction} creates the cases.
- */
-export async function analyzeRtiOfficeCopyAction(formData: FormData): Promise<AnalyzeRtiResult> {
-  try {
-    await requireRole(RTI_WRITE_ROLES);
-  } catch (e) {
-    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
-  }
-
-  if (!isAiConfigured()) {
-    return {
-      error:
-        "AI is not configured on the server, so letters can't be detected automatically. Set ANTHROPIC_API_KEY (and AI_PROVIDER=anthropic) and try again.",
-    };
-  }
-
-  let rawFiles = formData.getAll("files");
-  if (rawFiles.length === 0) rawFiles = formData.getAll("file");
-  const files = rawFiles.filter(
-    (x): x is File =>
-      typeof x === "object" && x !== null && typeof (x as { arrayBuffer?: unknown }).arrayBuffer === "function",
-  );
-  if (files.length === 0) return { error: "No files provided" };
-
-  const parts: { buffer: Buffer; mimeType: string }[] = [];
-  for (const f of files) {
-    const isImage = f.type.startsWith("image/");
-    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-    if (!isImage && !isPdf) {
-      return { error: `Unsupported file "${f.name}". Use images (JPEG, PNG, WebP) or PDF.` };
-    }
-    parts.push({ buffer: Buffer.from(await f.arrayBuffer()), mimeType: isPdf ? "application/pdf" : f.type });
-  }
-
-  try {
-    const { pdf, pageCount } = await buildMergedPdf(parts);
-
-    // Hold the merged PDF under a staging prefix until the user commits.
-    const storagePath = await uploadToR2({
-      key: `letters/_imports/${randomUUID()}.pdf`,
-      body: pdf,
-      contentType: "application/pdf",
-    });
-
-    const letters = await detectLettersFromPdf(pdf, pageCount);
-    return { success: true, storagePath, pageCount, letters };
-  } catch (e) {
-    console.error("[analyzeRtiOfficeCopyAction]", e);
-    return { error: e instanceof Error ? e.message : "Analysis failed" };
-  }
-}
 
 /** Render → OCR → AI detect → slice per-letter OCR. Shared by the synchronous and
  *  background (refresh-safe) import paths. */
@@ -1728,7 +1642,9 @@ export async function uploadRtiDocumentAction(
           .from("rti_documents")
           .update({ ocr_status: "Failed", ai_status: "Failed" })
           .eq("id", docId);
-      } catch {}
+      } catch (fallbackError) {
+        console.error("[uploadRtiDocumentAction] fallback status update failed", fallbackError);
+      }
     }
     revalidatePath(`/rti/${rtiId}`);
     return { error: e instanceof Error ? e.message : "Processing failed" };
@@ -1791,7 +1707,9 @@ export async function reprocessRtiDocumentAction(docId: string): Promise<ActionS
         .from("rti_documents")
         .update({ ocr_status: "Failed", ai_status: "Failed" })
         .eq("id", docId);
-    } catch {}
+    } catch (fallbackError) {
+      console.error("[reprocessRtiDocumentAction] fallback status update failed", fallbackError);
+    }
     return { error: e instanceof Error ? e.message : "Reprocessing failed" };
   }
 }

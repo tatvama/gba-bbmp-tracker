@@ -507,7 +507,7 @@ Deletion sets `deleted_at = NOW()`. All read queries MUST filter:
 ```typescript
 .is("deleted_at", null)
 ```
-Enforced in: `listComplaints`, `getComplaint`, `listComplaintsForWard`, `globalSearch`, `complaintDashboardStats`, edit page.
+Enforced in: `listComplaints`, `getComplaint`, `listComplaintsForWard`, `globalSearch`, edit page.
 
 ### AI draft types (complaint)
 

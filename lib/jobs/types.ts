@@ -16,7 +16,7 @@ export const ACTIVE_JOB_STATUSES: ReadonlySet<JobStatus> = new Set(["queued", "r
 /** Every job type the framework knows about. Add a new one here + register a
  *  handler and config in registry.ts — that's the only place a new module
  *  plugs in (no feature-specific background systems). */
-export type JobType = "ai_draft" | "ocr" | "vision_scan" | "export" | "ifms_download";
+export type JobType = "ai_draft" | "ocr" | "vision_scan" | "export";
 
 /** What a handler is given to report progress and check for cancellation.
  *  `updateProgress`'s stage/message land in result.stage/result.message —
@@ -98,10 +98,9 @@ export interface TaskItem {
   message: string | null;
   /** The job's own result/progress payload, verbatim — `stage`/`message`
    *  above are the two fields every job shares, but a type's handler can
-   *  report arbitrary structured extras (e.g. ifms_download's jobsDone/total/
-   *  filesDownloaded). Exposed generically so a consumer reads its own job
-   *  type's fields directly off the shared registry instead of a second,
-   *  type-specific poll. */
+   *  report arbitrary structured extras of its own. Exposed generically so a
+   *  consumer reads its own job type's fields directly off the shared
+   *  registry instead of a second, type-specific poll. */
   result: unknown;
   error: string | null;
   cancellable: boolean;

@@ -8,5 +8,4 @@ export * from "./ack-history-timeline";
 export * from "./action-toolbar";
 export * from "./verification-section";
 export * from "./document-summary-card";
-export * from "./rti-acknowledgement-card";
 export * from "./types";
