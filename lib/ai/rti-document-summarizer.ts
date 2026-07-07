@@ -79,6 +79,9 @@ export async function summarizeRtiDocument(params: {
   images: { buffer: Buffer; mimeType: string }[];
   ocrText: string;
   rti: { subject?: string | null; internalRef?: string | null; publicAuthority?: string | null };
+  /** lib/actions/rti.ts's commitRtiLettersAction calls this once per letter in
+   *  a multi-letter import — SUMMARIZER_SYSTEM is identical across those calls. */
+  cache?: boolean;
 }): Promise<RtiDocumentSummary> {
   const images = params.images.slice(0, MAX_AI_PAGES).map((img) => ({
     mediaType: img.mimeType,
@@ -90,6 +93,7 @@ export async function summarizeRtiDocument(params: {
     prompt: buildPrompt(params.ocrText, params.rti),
     images,
     temperature: 0,
+    cache: params.cache ? { system: true } : undefined,
   });
 
   if (!result.ok || !result.text) {

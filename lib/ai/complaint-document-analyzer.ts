@@ -1,5 +1,5 @@
 import "server-only";
-import { generateText, isAiConfigured } from "@/lib/ai/provider";
+import { generateText, isAiConfigured, type PromptSegment } from "@/lib/ai/provider";
 import type { ComplaintExtraction } from "@/lib/types";
 import {
   COMPLAINT_DRAFT_KINDS,
@@ -183,7 +183,7 @@ export function buildComplaintDraftPrompt(input: {
   complaintContext: string;
   tone?: LegalTone;
   language?: DraftLanguage;
-}): { system: string; prompt: string } {
+}): { system: string; prompt: PromptSegment[] } {
   const what = COMPLAINT_DRAFT_KINDS[input.kind];
   const CAUTION =
     "CAUTIOUS FRAMING (non-negotiable): every adverse point is a documented suspicion or red flag that calls for records and explanation. NEVER state that any named officer, engineer or contractor committed fraud, theft, forgery or corruption — write 'requires production of records / verification / enquiry'. Build on the chronology and the unanswered points already in the case history; do not invent facts.";
@@ -221,15 +221,19 @@ export function buildComplaintDraftPrompt(input: {
       CAUTION,
   };
   const extra = extraByKind[input.kind] ?? "";
+  // Complaint context (case chronology/replies/actions/escalations/forensic
+  // findings) is identical across every kind drafted for the same complaint —
+  // the escalation ladder's terminal "Multiple" stage drafts reminder_letter,
+  // legal_notice and cm_office_letter back-to-back for one complaint. Putting
+  // it first (as its own cache_control segment) and moving the kind-specific
+  // "Draft: X." line to join extra/tone/language after it — same words, just
+  // reordered — lets that loop's 2nd/3rd call reuse the cached context instead
+  // of resending it. Nothing about the wording, instructions or output changed.
   return {
     system: DRAFT_SYSTEM,
-    prompt: `Draft: ${what}.
-
-Complaint context:
-${input.complaintContext}
-
-${extra}
-${toneLine(input.tone)}
-${languageLine(input.language)}`,
+    prompt: [
+      { text: `Complaint context:\n${input.complaintContext}`, cache: true },
+      { text: `\n\nDraft: ${what}.\n\n${extra}\n${toneLine(input.tone)}\n${languageLine(input.language)}` },
+    ],
   };
 }

@@ -149,10 +149,14 @@ export interface PhotoCompareResult {
 
 const COMPARE_SYSTEM = `You compare TWO photographs to decide whether they are the SAME photograph (same physical scene at the same moment) — even if one is a printout that was scanned or re-photographed, cropped, rotated, or recompressed. Judge by fixed scene content, structures, signage and geometry — NOT colour, exposure, or sharpness. If the scene is generic (e.g. a bare road) and you cannot point to SPECIFIC shared details, answer "unclear". Output STRICT JSON only.`;
 
-/** Compare two candidate photos for being the same underlying photograph. */
+/** Compare two candidate photos for being the same underlying photograph.
+ *  `cache`: lib/forensic/job-photo-dedupe.ts calls this up to VISUAL_PAIR_BUDGET
+ *  (60) times per division scan, sequentially — COMPARE_SYSTEM is identical
+ *  across every pair in that loop. */
 export async function compareTwoPhotos(
   a: { buffer: Buffer; mime: string },
   b: { buffer: Buffer; mime: string },
+  cache?: boolean,
 ): Promise<PhotoCompareResult | null> {
   if (!isAiConfigured()) return null;
   if (!VISION_MIMES.includes(a.mime) || !VISION_MIMES.includes(b.mime)) return null;
@@ -166,6 +170,7 @@ export async function compareTwoPhotos(
       { mediaType: b.mime, dataBase64: b.buffer.toString("base64") },
     ],
     maxTokens: 600,
+    cache: cache ? { system: true } : undefined,
   });
   if (!r.ok || !r.text) return null;
   const cleaned = r.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();

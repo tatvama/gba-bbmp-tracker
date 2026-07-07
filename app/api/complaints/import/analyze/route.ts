@@ -69,7 +69,8 @@ function detectLanguage(text: string): "English" | "Kannada" | "Mixed" {
 async function retryMissingField(
   missingField: string,
   ocrText: string,
-  images: { mediaType: string; dataBase64: string }[]
+  images: { mediaType: string; dataBase64: string }[],
+  cache?: boolean,
 ): Promise<string> {
   try {
     const prompt = `We processed a civic complaint letter but could not extract the "${missingField}".
@@ -87,6 +88,7 @@ ${ocrText.slice(0, 4000)}`;
       images,
       temperature: 0,
       maxTokens: 300,
+      cache: cache ? { system: true } : undefined,
     });
     return r.ok && r.text ? r.text.trim() : "";
   } catch {
@@ -339,7 +341,7 @@ export async function POST(req: NextRequest) {
         const combined = perPage.map((t, i) => `--- Page ${i + 1} ---\n${t}`).join("\n\n");
 
         send({ type: "progress", message: "Detecting complaint boundary letters (multiple letters)..." });
-        const letters = await detectComplaintLetters({ pageImages, ocrText: combined, pageCount });
+        const letters = await detectComplaintLetters({ pageImages, ocrText: combined, pageCount, cache: true });
 
         send({
           type: "detected",
@@ -362,7 +364,7 @@ export async function POST(req: NextRequest) {
             const lang = detectLanguage(ocrText);
 
             send({ type: "card_progress", index: idx, message: "Performing NER and structured extraction..." });
-            let { extraction } = await analyzeComplaintIntakeFromImages({ pageImages: letterImages, ocrText });
+            let { extraction } = await analyzeComplaintIntakeFromImages({ pageImages: letterImages, ocrText, cache: true });
 
             // File logging for diagnostics
             try {
@@ -391,19 +393,19 @@ export async function POST(req: NextRequest) {
 
             if (!extraction.subject || extraction.subject.length < 3) {
               send({ type: "card_progress", index: idx, message: "Retrying missing Subject extraction..." });
-              const subjectRetry = await retryMissingField("Subject", ocrText, downscaledForRetry);
+              const subjectRetry = await retryMissingField("Subject", ocrText, downscaledForRetry, true);
               if (subjectRetry) extraction.subject = subjectRetry;
             }
 
             if (!extraction.department || extraction.department.length < 3) {
               send({ type: "card_progress", index: idx, message: "Retrying missing Department extraction..." });
-              const deptRetry = await retryMissingField("Department", ocrText, downscaledForRetry);
+              const deptRetry = await retryMissingField("Department", ocrText, downscaledForRetry, true);
               if (deptRetry) extraction.department = deptRetry;
             }
 
             if (!extraction.areaOrWard || extraction.areaOrWard.length < 2) {
               send({ type: "card_progress", index: idx, message: "Retrying missing Location extraction..." });
-              const areaRetry = await retryMissingField("Area / Location", ocrText, downscaledForRetry);
+              const areaRetry = await retryMissingField("Area / Location", ocrText, downscaledForRetry, true);
               if (areaRetry) extraction.areaOrWard = areaRetry;
             }
 

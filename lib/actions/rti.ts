@@ -1247,7 +1247,7 @@ export async function analyzeRtiOfficeCopyAction(formData: FormData): Promise<An
  *  background (refresh-safe) import paths. */
 async function detectLettersFromPdf(pdf: Buffer, pageCount: number): Promise<AnalyzedLetter[]> {
   const { combined, perPage, pageImages } = await renderAndOcr(pdf);
-  const detected = await detectRtiLetters({ pageImages, ocrText: combined, pageCount });
+  const detected = await detectRtiLetters({ pageImages, ocrText: combined, pageCount, cache: true });
   return detected.map((l) => ({ ...l, ocrText: sliceOcr(perPage, l.startPage, l.endPage) }));
 }
 
@@ -1475,6 +1475,7 @@ export async function commitRtiLettersAction(params: {
         images: letterImages,
         ocrText: letter.ocrText || "",
         rti: { subject, internalRef: row.internal_ref, publicAuthority: letter.authority ?? null },
+        cache: true,
       });
 
       // 4. Attach the split as this case's Application document.

@@ -311,6 +311,10 @@ ${text.slice(0, 20_000)}`;
 export async function analyzeComplaintIntakeFromImages(params: {
   pageImages: { buffer: Buffer; mimeType: string }[];
   ocrText: string;
+  /** Callers looping this over many detected letters/sections in one batch
+   *  (ack-runner.ts, the ZIP-import analyze route) pass true — the system
+   *  prompt below is identical across every call in that loop. */
+  cache?: boolean;
 }): Promise<{ ok: boolean; extraction: ComplaintIntakeExtraction; error?: string }> {
   const imgs = (params.pageImages || []).slice(0, 6); // a single letter is rarely more
   if (!isAiConfigured() || imgs.length === 0) {
@@ -335,7 +339,14 @@ export async function analyzeComplaintIntakeFromImages(params: {
 Output STRICT JSON of EXACTLY this shape:
 ${INTAKE_JSON_SHAPE}`;
 
-  const res = await generateVision({ system, prompt, images, temperature: 0, maxTokens: 4000 });
+  const res = await generateVision({
+    system,
+    prompt,
+    images,
+    temperature: 0,
+    maxTokens: 4000,
+    cache: params.cache ? { system: true } : undefined,
+  });
   if (!res.ok || !res.text) {
     console.warn(`[intake-vision] vision call failed (${res.error ?? "no text"}); falling back to OCR text`);
     return analyzeComplaintIntake(params.ocrText || "");

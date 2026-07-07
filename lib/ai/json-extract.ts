@@ -1,5 +1,5 @@
 import "server-only";
-import { generateText, isAiConfigured } from "@/lib/ai/provider";
+import { generateText, isAiConfigured, type CacheOptions, type PromptSegment } from "@/lib/ai/provider";
 
 /**
  * Shared strict-JSON extraction for the forensic AI extractors. Extraction only
@@ -14,12 +14,13 @@ export interface ExtractResult<T> {
 
 export async function extractJson<T>(args: {
   system: string;
-  prompt: string;
+  prompt: string | PromptSegment[];
   fallback: T;
   maxTokens?: number;
+  cache?: CacheOptions;
 }): Promise<ExtractResult<T>> {
   if (!isAiConfigured()) return { ok: false, error: "AI not configured", data: args.fallback };
-  const r = await generateText({ system: args.system, prompt: args.prompt, temperature: 0, maxTokens: args.maxTokens ?? 3000 });
+  const r = await generateText({ system: args.system, prompt: args.prompt, temperature: 0, maxTokens: args.maxTokens ?? 3000, cache: args.cache });
   if (!r.ok || !r.text) return { ok: false, error: r.error ?? "AI request failed", data: args.fallback };
   const cleaned = r.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   try {

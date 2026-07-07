@@ -153,7 +153,7 @@ export async function runComplaintDraft(
   // longest case-history-heavy Kannada letters; 20k gives real headroom while
   // staying well under this model class's output ceiling.
   onProgress?.({ stage: "drafting", label: "Drafting with Claude…" });
-  const r = await generateTextStream({ system, prompt, maxTokens: 20_000 }, (partialText) => {
+  const r = await generateTextStream({ system, prompt, maxTokens: 20_000, cache: { system: true } }, (partialText) => {
     onProgress?.({ stage: "drafting", label: "Drafting with Claude…", partialText });
   });
   if (!r.ok || !r.text) return { ok: r.ok, text: r.text, error: r.error };

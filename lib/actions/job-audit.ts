@@ -107,7 +107,7 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
         : await downloadBuffer(d.storage_bucket as string, d.storage_path as string);
       if (buf) {
         formScreened++;
-        const fi = await analyzeDocFormIntegrity(buf, mime);
+        const fi = await analyzeDocFormIntegrity(buf, mime, true);
         if (fi.ok) for (const [k, v] of Object.entries(fi.flags)) { if (typeof v === "boolean" && v) formFlags[k] = true; }
       }
     }
@@ -118,28 +118,28 @@ export async function runJobAuditAction(jobNumber: string): Promise<JobAuditResu
     processed++;
 
     // Lifecycle dates from any document.
-    const dates = await extractTimelineDates(ocr, d.document_type as string);
+    const dates = await extractTimelineDates(ocr, d.document_type as string, true);
     Object.assign(timeline, Object.fromEntries(Object.entries(dates.data).filter(([, v]) => v)));
 
     if (isBill(type)) {
-      const b = await extractBillStructure(ocr);
+      const b = await extractBillStructure(ocr, true);
       if (b.bill.lineItems.length) bills.push(b.bill);
       docFields.push({ contractor: b.bill.contractor ?? null, work_order_amount: b.bill.sanctionedAmount ?? null });
-      const mb = await extractMbBill(ocr);
+      const mb = await extractMbBill(ocr, true);
       scheduleB.push(...mb.data.scheduleB.filter((s) => s.description));
       runningBills.push(...mb.data.runningBills);
     } else if (isMb(type)) {
-      const mb = await extractMbBill(ocr);
+      const mb = await extractMbBill(ocr, true);
       scheduleB.push(...mb.data.scheduleB.filter((s) => s.description));
       runningBills.push(...mb.data.runningBills);
     } else if (isTender(type)) {
-      const e = await extractEligibility(ocr);
+      const e = await extractEligibility(ocr, true);
       eligibility.push(...e.data.requirements.filter((r) => r.label));
     } else if (isInsurance(type)) {
-      const ins = await extractInsurance(ocr);
+      const ins = await extractInsurance(ocr, true);
       insurance = insurance.concat(ins.data.policies.filter((p) => p.type));
     } else if (isRoyalty(type)) {
-      const r = await extractRoyalty(ocr);
+      const r = await extractRoyalty(ocr, true);
       royalty!.push(...r.data.royalty.filter((x) => x.billedMaterialQty));
       disposal!.push(...r.data.disposal);
       salvage!.push(...r.data.salvage);

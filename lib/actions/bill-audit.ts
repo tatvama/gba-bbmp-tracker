@@ -60,7 +60,7 @@ export async function auditComplaintBills(complaintId: string): Promise<BillAudi
 
   const audits: BillAuditItem[] = [];
   for (const d of targets) {
-    const ex = await extractBillStructure(d.ocr);
+    const ex = await extractBillStructure(d.ocr, true);
     const findings = [...runBillRules(ex.bill), ...checkRates(ex.bill.lineItems, book)];
     const { score, redFlagCount } = scoreFindings(findings);
     audits.push({ documentId: d.id, documentType: d.type, bill: ex.bill, findings, score, redFlagCount });

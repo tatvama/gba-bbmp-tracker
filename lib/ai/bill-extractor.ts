@@ -47,11 +47,19 @@ export interface BillExtractResult {
   error?: string;
 }
 
-export async function extractBillStructure(ocrText: string): Promise<BillExtractResult> {
+/** `cache`: job-audit.ts calls this once per bill document in a job's document
+ *  loop — SYSTEM here is identical across every call in that loop. */
+export async function extractBillStructure(ocrText: string, cache?: boolean): Promise<BillExtractResult> {
   if (!isAiConfigured()) return { ok: false, error: "AI not configured", bill: empty(true) };
   if (!ocrText || ocrText.trim().length < 12) return { ok: false, error: "Not enough OCR text", bill: empty(true) };
 
-  const r = await generateText({ system: SYSTEM, prompt: prompt(ocrText), temperature: 0, maxTokens: 4000 });
+  const r = await generateText({
+    system: SYSTEM,
+    prompt: prompt(ocrText),
+    temperature: 0,
+    maxTokens: 4000,
+    cache: cache ? { system: true } : undefined,
+  });
   if (!r.ok || !r.text) return { ok: false, error: r.error ?? "AI request failed", bill: empty(true) };
 
   const cleaned = r.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();

@@ -28,9 +28,12 @@ const SYSTEM = `You visually screen a scanned government document for integrity 
 
 const VISION_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
+/** `cache`: job-audit.ts calls this once per bill/MB image, up to FORM_CAP=6 —
+ *  SYSTEM here is identical across those calls. */
 export async function analyzeDocFormIntegrity(
   buffer: Buffer,
   mime: string | null,
+  cache?: boolean,
 ): Promise<{ ok: boolean; flags: FormIntegrityFlags; error?: string }> {
   if (!isAiConfigured()) return { ok: false, error: "AI not configured", flags: EMPTY };
   if (!mime || !VISION_MIMES.includes(mime)) return { ok: false, error: "Not a supported image", flags: EMPTY };
@@ -50,6 +53,7 @@ export async function analyzeDocFormIntegrity(
 }`,
     images: [{ mediaType: mime, dataBase64: buffer.toString("base64") }],
     maxTokens: 800,
+    cache: cache ? { system: true } : undefined,
   });
   if (!r.ok || !r.text) return { ok: false, error: r.error ?? "Vision request failed", flags: EMPTY };
   const cleaned = r.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
