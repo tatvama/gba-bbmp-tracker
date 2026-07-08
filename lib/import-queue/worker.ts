@@ -145,7 +145,7 @@ async function processOne(session: Claimed): Promise<void> {
     await report(bandProgress("analyze", 0), "Analyzing", "Reading job folders, forensic reports and letters…", true);
     await processForensicBatch(batchId, tempDir, (p) => {
       void report(bandProgress("analyze", p.fraction), "Analyzing", p.message);
-    });
+    }, session.fileName);
 
     const { data: batch } = await admin
       .from("forensic_import_batches")

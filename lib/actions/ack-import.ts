@@ -9,15 +9,12 @@
 import { revalidatePath } from "next/cache";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { COMPLAINT_FIELD_ROLES, R2_STORAGE_SENTINEL } from "@/lib/constants";
-import { getR2SignedUrl, downloadFromR2, uploadToR2 } from "@/lib/storage/r2-upload";
+import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
+import { getR2SignedUrl, downloadFromR2 } from "@/lib/storage/r2-upload";
 import { extractPdfPages } from "@/lib/pdf/merge";
-import { buildPath } from "@/lib/storage/supabase-upload";
-import { analyzeDocumentById } from "@/lib/ocr/process-document";
-import { isAiConfigured } from "@/lib/ai/provider";
 import { analyzeComplaintIntake } from "@/lib/ai/complaint-intake-analyzer";
 import { scoreAckMatch, loadComplaintPool } from "@/lib/complaints/ack-matcher";
-import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
+import { attachAcknowledgmentDocument } from "@/lib/complaints/ack-attach";
 import {
   ackThumbKey,
   type AckBatchView,
@@ -411,18 +408,6 @@ export async function splitAckItemAction(itemId: string, atPage: number): Promis
   return { ok: true };
 }
 
-/** Pick the best acknowledgment date from an extraction (first valid ISO date). */
-function pickAckDate(extracted: Record<string, unknown>): string | null {
-  const dates = extracted?.importantDates;
-  if (Array.isArray(dates)) {
-    for (const d of dates) {
-      const v = (d as { date?: string })?.date;
-      if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    }
-  }
-  return null;
-}
-
 /**
  * Attach every CONFIRMED section to its assigned complaint: carve the page range
  * out of the preserved original PDF, upload it, insert a "Complaint acknowledgement"
@@ -475,91 +460,24 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
     try {
       const { pdf } = await extractPdfPages(original, it.page_start, it.page_end);
       const fileName = `acknowledgment-pp${it.page_start}-${it.page_end}.pdf`;
-      const path = buildPath(complaintId, fileName, Date.now(), Math.random().toString(36).slice(2, 8));
-      await uploadToR2({ key: path, body: pdf, contentType: "application/pdf" });
 
-      const { data: docRow, error: docErr } = await admin
-        .from("complaint_documents")
-        .insert({
-          complaint_id: complaintId,
-          document_type: "Complaint acknowledgement",
-          title: fileName,
-          original_file_name: fileName,
-          storage_bucket: R2_STORAGE_SENTINEL,
-          storage_path: path,
-          mime_type: "application/pdf",
-          file_size: pdf.byteLength,
-          ocr_status: it.ocr_text ? "Completed" : "Skipped",
-          ocr_raw_text: it.ocr_text ?? null,
-          ocr_clean_text: it.ocr_text ?? null,
-          ocr_language: "eng+kan",
-          ai_summary_status: isAiConfigured() && it.ocr_text ? "generating" : "none",
-          source_page_start: it.page_start,
-          source_page_end: it.page_end,
-          source_original_path: originalUrl,
-          source_original_name: originalName,
-          uploaded_by: user.id,
-        })
-        .select("id")
-        .single();
-      if (docErr || !docRow) throw new Error(docErr?.message || "Could not insert document.");
-      const documentId = docRow.id as string;
-
-      await admin.from("ack_import_items").update({ decision: "committed", attached_document_id: documentId }).eq("id", it.id);
-
-      // Stamp acknowledgment_date + nudge status (best-effort, never overwrite).
-      const { data: comp } = await admin
-        .from("complaints")
-        .select("acknowledgment_date, complaint_number, status, escalation_stage")
-        .eq("id", complaintId)
-        .single();
-      const c = (comp ?? {}) as {
-        acknowledgment_date: string | null;
-        complaint_number: string | null;
-        status: string | null;
-        escalation_stage: string | null;
-      };
-      const compPatch: Record<string, unknown> = {};
-      const ackDate = pickAckDate(it.extracted ?? {});
-      if (!c.acknowledgment_date && ackDate) compPatch.acknowledgment_date = ackDate;
-      const exRef = (it.extracted?.referenceNumber as string) || "";
-      if (!c.complaint_number && exRef && !/^\d{3}-\d{2}-\d{6}$/.test(exRef)) compPatch.complaint_number = exRef;
-      if (c.status === "Draft" || c.status === "Filed") compPatch.status = "Acknowledged";
-
-      // Start the no-reply escalation clock — but only the FIRST time an
-      // acknowledgment date lands (never re-arm on a re-attach/duplicate scan).
-      if (compPatch.acknowledgment_date && (c.escalation_stage ?? "awaiting_ack") === "awaiting_ack") {
-        const { data: awaitingReplyConfig } = await admin
-          .from("escalation_flow_configs")
-          .select("stage_key, sla_days, sla_unit, on_elapse_draft_kind, on_elapse_next_stage")
-          .eq("stage_key", "awaiting_reply")
-          .maybeSingle();
-        const enteredAt = new Date(`${compPatch.acknowledgment_date}T00:00:00Z`);
-        const deadline = awaitingReplyConfig ? computeStageDeadline(enteredAt, awaitingReplyConfig) : null;
-        compPatch.escalation_stage = "awaiting_reply";
-        compPatch.escalation_stage_entered_at = enteredAt.toISOString();
-        compPatch.escalation_stage_deadline = deadline ? deadline.toISOString() : null;
-      }
-
-      if (Object.keys(compPatch).length) {
-        compPatch.updated_by = user.id;
-        await admin.from("complaints").update(compPatch).eq("id", complaintId);
-      }
-
-      await admin.from("complaint_timeline").insert({
-        complaint_id: complaintId,
-        event_type: "Acknowledged",
-        title: "Acknowledgment attached from bulk scan",
-        summary: `Pages ${it.page_start}–${it.page_end} of ${originalName ?? "the scanned batch"}${ackDate ? ` · received ${ackDate}` : ""}.`,
-        related_document_id: documentId,
-        created_by: user.id,
+      const { documentId } = await attachAcknowledgmentDocument(admin, {
+        complaintId,
+        buffer: pdf,
+        fileName,
+        mimeType: "application/pdf",
+        ocrText: it.ocr_text,
+        extracted: it.extracted,
+        sourceOriginalPath: originalUrl,
+        sourceOriginalName: originalName,
+        sourcePageStart: it.page_start,
+        sourcePageEnd: it.page_end,
+        userId: user.id,
+        timelineTitle: "Acknowledgment attached from bulk scan",
+        timelineSummary: `Pages ${it.page_start}–${it.page_end} of ${originalName ?? "the scanned batch"}`,
       });
 
-      if (isAiConfigured() && it.ocr_text) {
-        void analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) =>
-          console.error("[ack-commit] summary generation failed", e),
-        );
-      }
+      await admin.from("ack_import_items").update({ decision: "committed", attached_document_id: documentId }).eq("id", it.id);
       attached++;
     } catch (e) {
       console.error("[commitAckBatchAction] attach failed", complaintId, e);

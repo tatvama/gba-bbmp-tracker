@@ -174,6 +174,28 @@ describe("groupEntriesByJobCode + parseJob", () => {
     expect(j.dataset).toBeNull();
     expect(j.missing).toContain("Forensic dataset (JSON)");
   });
+  it("falls back to the ZIP's own filename when no path carries a job code", () => {
+    const flat: RawEntry[] = [
+      { relPath: "estimate.pdf", size: 100 },
+      { relPath: "photo.jpg", size: 200 },
+    ];
+    const g = groupEntriesByJobCode(flat, `${CODE}.zip`);
+    expect([...g.keys()]).toEqual([CODE]);
+    expect(g.get(CODE)).toEqual(flat);
+  });
+  it("does not use the fallback filename when at least one entry already has a job code", () => {
+    const mixed: RawEntry[] = [
+      { relPath: `${B}/${CODE}/info.txt`, size: 10 },
+      { relPath: "photo.jpg", size: 200 },
+    ];
+    const g = groupEntriesByJobCode(mixed, "999-99-999999.zip");
+    expect([...g.keys()]).toEqual([CODE]);
+    expect(g.get(CODE)).toHaveLength(1);
+  });
+  it("stays empty when neither paths nor the fallback filename carry a job code", () => {
+    const g = groupEntriesByJobCode([{ relPath: "estimate.pdf", size: 100 }], "receipts.zip");
+    expect(g.size).toBe(0);
+  });
 });
 
 describe("computeMissing", () => {
