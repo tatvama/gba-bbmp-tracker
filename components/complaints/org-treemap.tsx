@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Info,
@@ -96,36 +97,143 @@ interface NodeCardProps {
   isExpanded?: boolean;
   onToggleExpand?: (e: React.MouseEvent) => void;
   isMatched?: boolean;
+  isComplaintsDashboard?: boolean;
+  level?: "corporation" | "division" | "subdivision" | "engineer";
+  isActivePath?: boolean;
+  isSiblingInactive?: boolean;
 }
 
 function NodeCard({
   label, sublabel, count, countUnit, tint,
   active, hovered, onClick, onHover, nodeRef, size = "md", className,
-  icon: Icon, progress, isExpanded, onToggleExpand, isMatched
+  icon: Icon, progress, isExpanded, onToggleExpand, isMatched,
+  isComplaintsDashboard = true, level, isActivePath, isSiblingInactive
 }: NodeCardProps) {
-  const lifted = active || hovered;
-  
-  const boxShadow = active
-    ? `0 0 0 3px rgba(37,99,235,.15), 0 4px 12px ${toRgba(tint, 0.15)}`
-    : isMatched
-    ? `0 0 0 3px rgba(245,158,11,.2), 0 4px 12px ${toRgba(tint, 0.1)}`
-    : hovered
-    ? `0 2px 8px ${toRgba(tint, 0.15)}, 0 0 0 1px ${toRgba(tint, 0.5)}`
-    : `0 1px 3px rgba(0,0,0,0.04), 0 0 0 1.5px ${toRgba(tint, 0.15)}`;
+  let bg = "";
+  let boxShadow = "";
+  let borderStyle = "";
+  let titleClass = "text-slate-800 font-extrabold";
+  let iconColor = tint;
+  let transformStyle = "";
+  let transitionClass = "transition-all duration-200 ease-out";
 
-  const bg = active
-    ? "#ffffff"
-    : isMatched
-    ? "#fffdf5"
-    : `${toRgba(tint, hovered ? 0.06 : 0.03)}`;
+  if (isComplaintsDashboard) {
+    transitionClass = "transition-all duration-250 cubic-bezier(0.4, 0, 0.2, 1)";
+    const scaleFactor = isActivePath ? 1.02 : hovered ? 1.015 : 1.0;
+    const translateVal = hovered ? -3 : 0;
+    transformStyle = `translate3d(0, ${translateVal}px, 0) scale(${scaleFactor})`;
 
-  const borderStyle = active
-    ? "1.5px solid #2563EB"
-    : isMatched
-    ? "1.5px solid #F59E0B"
-    : hovered
-    ? `1px solid ${toRgba(tint, 0.7)}`
-    : `1px solid ${toRgba(tint, 0.25)}`;
+    if (level === "corporation") {
+      titleClass = "text-[#3730A3] font-black text-[13px] sm:text-sm";
+      iconColor = "#6366F1";
+      if (isActivePath) {
+        bg = "#EEF2FF";
+        borderStyle = "2px solid #6366F1";
+        boxShadow = "0 10px 15px -3px rgba(99, 102, 241, 0.18), 0 4px 6px -2px rgba(99, 102, 241, 0.08)";
+      } else if (isSiblingInactive) {
+        bg = "#F8FAFC";
+        borderStyle = "1px solid #E2E8F0";
+        titleClass = "text-[#94A3B8] font-bold text-[13px] sm:text-sm";
+        iconColor = "#CBD5E1";
+        boxShadow = "none";
+      } else {
+        bg = "#EEF2FF";
+        borderStyle = "1px solid #C7D2FE";
+        boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
+      }
+    } else if (level === "division") {
+      titleClass = "text-[#047857] font-black text-[12px] sm:text-xs";
+      iconColor = "#10B981";
+      if (isActivePath) {
+        bg = "#ECFDF5";
+        borderStyle = "2px solid #10B981";
+        boxShadow = "0 10px 15px -3px rgba(16, 185, 129, 0.18), 0 4px 6px -2px rgba(16, 185, 129, 0.08)";
+      } else if (isSiblingInactive) {
+        bg = "#F8FAFC";
+        borderStyle = "1px solid #E2E8F0";
+        titleClass = "text-[#94A3B8] font-bold text-[12px] sm:text-xs";
+        iconColor = "#CBD5E1";
+        boxShadow = "none";
+      } else {
+        bg = "#ECFDF5";
+        borderStyle = "1px solid #A7F3D0";
+        boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
+      }
+    } else if (level === "subdivision") {
+      titleClass = "text-[#B45309] font-black text-[11px]";
+      iconColor = "#F59E0B";
+      if (isActivePath) {
+        bg = "#FFFBEB";
+        borderStyle = "2px solid #F59E0B";
+        boxShadow = "0 10px 15px -3px rgba(245, 158, 11, 0.18), 0 4px 6px -2px rgba(245, 158, 11, 0.08)";
+      } else if (isSiblingInactive) {
+        bg = "#F8FAFC";
+        borderStyle = "1px solid #E2E8F0";
+        titleClass = "text-[#94A3B8] font-bold text-[11px]";
+        iconColor = "#CBD5E1";
+        boxShadow = "none";
+      } else {
+        bg = "#FFFBEB";
+        borderStyle = "1px solid #FDE68A";
+        boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
+      }
+    } else {
+      // level === "engineer"
+      titleClass = "text-[#1E293B] font-extrabold text-[10px]";
+      iconColor = "#2563EB";
+      if (isActivePath) {
+        bg = "#F8FAFC";
+        borderStyle = "2px solid #2563EB";
+        boxShadow = "0 8px 12px -3px rgba(37, 99, 235, 0.15)";
+      } else if (isSiblingInactive) {
+        bg = "#F8FAFC";
+        borderStyle = "1px solid #F1F5F9";
+        titleClass = "text-[#94A3B8] font-semibold text-[10px]";
+        iconColor = "#CBD5E1";
+        boxShadow = "none";
+      } else {
+        bg = "#F8FAFC";
+        borderStyle = "1px solid #CBD5E1";
+        boxShadow = "none";
+      }
+    }
+
+    if (isMatched) {
+      borderStyle = "2px solid #F59E0B";
+      bg = "#FFFDF5";
+    }
+
+    if (isSiblingInactive && !hovered) {
+      className = cn(className, "opacity-70");
+    }
+  } else {
+    // Legacy styling logic
+    const lifted = active || hovered;
+    boxShadow = active
+      ? `0 0 0 3px rgba(37,99,235,.15), 0 4px 12px ${toRgba(tint, 0.15)}`
+      : isMatched
+      ? `0 0 0 3px rgba(245,158,11,.2), 0 4px 12px ${toRgba(tint, 0.1)}`
+      : hovered
+      ? `0 2px 8px ${toRgba(tint, 0.15)}, 0 0 0 1px ${toRgba(tint, 0.5)}`
+      : `0 1px 3px rgba(0,0,0,0.04), 0 0 0 1.5px ${toRgba(tint, 0.15)}`;
+
+    bg = active
+      ? "#ffffff"
+      : isMatched
+      ? "#fffdf5"
+      : `${toRgba(tint, hovered ? 0.06 : 0.03)}`;
+
+    borderStyle = active
+      ? "1.5px solid #2563EB"
+      : isMatched
+      ? "1.5px solid #F59E0B"
+      : hovered
+      ? `1px solid ${toRgba(tint, 0.7)}`
+      : `1px solid ${toRgba(tint, 0.25)}`;
+
+    transformStyle = lifted ? "translateY(-2px) scale(1.01)" : "";
+    titleClass = "text-slate-800 font-extrabold text-xs";
+  }
 
   return (
     <button
@@ -135,7 +243,8 @@ function NodeCard({
       onMouseEnter={() => onHover?.(true)}
       onMouseLeave={() => onHover?.(false)}
       className={cn(
-        "flex flex-col rounded-xl transition-all duration-200 focus-visible:outline-none select-none cursor-pointer text-left",
+        "flex flex-col rounded-xl focus-visible:outline-none select-none cursor-pointer text-left",
+        transitionClass,
         size === "lg" ? "w-[190px] p-3" : size === "md" ? "w-[160px] p-2.5" : "w-[140px] p-2",
         className
       )}
@@ -143,26 +252,37 @@ function NodeCard({
         backgroundColor: bg,
         boxShadow,
         border: borderStyle,
-        transform: lifted ? "translateY(-2px) scale(1.01)" : undefined,
+        transform: transformStyle || undefined,
       }}
     >
       <div className="flex items-center justify-between w-full gap-1.5">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 mb-0.5 text-slate-500">
-            {Icon && <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: tint }} />}
+            {Icon && <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: iconColor }} />}
             <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
               {countUnit || "node"}
             </span>
           </div>
-          <h4 className="font-extrabold text-slate-800 leading-tight truncate text-xs">
+          <h4 className={cn("leading-tight truncate", titleClass)}>
             {label}
           </h4>
         </div>
 
         {count !== undefined && (
-          <span className="text-sm font-black tabular-nums leading-none ml-1.5 shrink-0 text-slate-700">
-            {count}
-          </span>
+          isComplaintsDashboard ? (
+            <span className={cn(
+              "text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 tabular-nums leading-none ml-1.5",
+              count === 0 ? "border border-slate-300 text-slate-500 bg-transparent" :
+              count < 100 ? "bg-blue-500 text-white shadow-xs" :
+              "bg-blue-700 text-white shadow-sm font-black"
+            )}>
+              {count}
+            </span>
+          ) : (
+            <span className="text-sm font-black tabular-nums leading-none ml-1.5 shrink-0 text-slate-700">
+              {count}
+            </span>
+          )
         )}
       </div>
 
@@ -538,15 +658,26 @@ export function OrgTreemap({
   bbmpCorps,
   complaints,
   printPending,
-  className
+  className,
+  isComplaintsDashboard = true
 }: {
   gbaCorps: GbaTreeCorp[];
   bbmpCorps: GbaTreeCorp[];
   complaints: ComplaintWithRelations[];
   printPending: number;
   className?: string;
+  isComplaintsDashboard?: boolean;
 }) {
   const [mode, setMode] = React.useState<Mode>("gba");
+  const [mounted, setMounted] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
   const gbaTotal = React.useMemo(() => buildDetailedTree(gbaCorps, complaints, true).reduce((s, c) => s + c.complaintCount, 0), [gbaCorps, complaints]);
   const bbmpTotal = React.useMemo(() => buildDetailedTree(bbmpCorps, complaints, false).reduce((s, c) => s + c.complaintCount, 0), [bbmpCorps, complaints]);
 
@@ -750,65 +881,100 @@ export function OrgTreemap({
     const next: SvgLine[] = [];
     const rootPos = pos("root");
 
-    // Root -> Corps
+    // Root -> Corps (Parent: Authority -> Blue)
     if (rootPos) {
       for (const c of corps) {
         const p = pos(c.id);
-        if (p) next.push({ d: makeCurve(rootPos, p), color: CORP_TINT[c.code] ?? "#888", glow: activeCorp === c.code });
+        if (p) {
+          next.push({
+            d: makeCurve(rootPos, p),
+            color: isComplaintsDashboard ? "#3B82F6" : (CORP_TINT[c.code] ?? "#888"),
+            glow: activeCorp === c.code
+          });
+        }
       }
     }
 
-    // Corp -> Divs
+    // Corp -> Divs (Parent: Corporation -> Indigo)
     if (activeCorp && corp) {
       const pp = pos(corp.id);
       if (pp) {
         for (const d of corp.children) {
           const p = pos(d.id);
-          if (p) next.push({ d: makeCurve(pp, p), color: CORP_TINT[activeCorp] ?? "#888", glow: activeDiv === d.name });
+          if (p) {
+            next.push({
+              d: makeCurve(pp, p),
+              color: isComplaintsDashboard ? "#6366F1" : (CORP_TINT[activeCorp] ?? "#888"),
+              glow: activeDiv === d.name
+            });
+          }
         }
       }
     }
 
-    // Div -> Subs
+    // Div -> Subs (Parent: Division -> Emerald)
     if (activeDiv && div) {
       const pp = pos(div.id);
       if (pp) {
         for (const s of div.children) {
           const p = pos(s.id);
-          if (p) next.push({ d: makeCurve(pp, p), color: CORP_TINT[activeCorp!] ?? "#888", glow: activeSub === s.name });
+          if (p) {
+            next.push({
+              d: makeCurve(pp, p),
+              color: isComplaintsDashboard ? "#10B981" : (CORP_TINT[activeCorp!] ?? "#888"),
+              glow: activeSub === s.name
+            });
+          }
         }
       }
     }
 
-    // Sub -> Wards
+    // Sub -> Wards (Parent: Subdivision -> Amber)
     if (activeSub && sub) {
       const pp = pos(sub.id);
       if (pp) {
         for (const w of sub.children) {
           const p = pos(w.id);
-          if (p) next.push({ d: makeCurve(pp, p), color: CORP_TINT[activeCorp!] ?? "#888", glow: activeWard === w.id });
+          if (p) {
+            next.push({
+              d: makeCurve(pp, p),
+              color: isComplaintsDashboard ? "#F59E0B" : (CORP_TINT[activeCorp!] ?? "#888"),
+              glow: activeWard === w.id
+            });
+          }
         }
       }
     }
 
-    // Ward -> Engineers
+    // Ward -> Engineers (Parent: Ward -> Slate)
     if (activeWard && wardNode) {
       const pp = pos(wardNode.id);
       if (pp) {
         for (const eng of wardNode.children) {
           const p = pos(eng.id);
-          if (p) next.push({ d: makeCurve(pp, p), color: CORP_TINT[activeCorp!] ?? "#888", glow: activeEng === eng.id });
+          if (p) {
+            next.push({
+              d: makeCurve(pp, p),
+              color: isComplaintsDashboard ? "#94A3B8" : (CORP_TINT[activeCorp!] ?? "#888"),
+              glow: activeEng === eng.id
+            });
+          }
         }
       }
     }
 
-    // Engineer -> Officers
+    // Engineer -> Officers (Parent: Engineer -> Slate)
     if (activeEng && engNode) {
       const pp = pos(engNode.id);
       if (pp) {
         for (const off of engNode.children) {
           const p = pos(off.id);
-          if (p) next.push({ d: makeCurve(pp, p), color: CORP_TINT[activeCorp!] ?? "#888" });
+          if (p) {
+            next.push({
+              d: makeCurve(pp, p),
+              color: isComplaintsDashboard ? "#94A3B8" : (CORP_TINT[activeCorp!] ?? "#888")
+            });
+          }
         }
       }
     }
@@ -816,7 +982,7 @@ export function OrgTreemap({
     setLines(prev =>
       JSON.stringify(prev) === JSON.stringify(next) ? prev : next
     );
-  }, [activeCorp, activeDiv, activeSub, activeWard, activeEng, corps, corp, div, sub, wardNode, engNode, zoom]);
+  }, [activeCorp, activeDiv, activeSub, activeWard, activeEng, corps, corp, div, sub, wardNode, engNode, zoom, isComplaintsDashboard]);
 
   // Navigation handlers
   const nav = {
@@ -1200,33 +1366,61 @@ export function OrgTreemap({
           {lines.filter(l => l.glow).map((l, i) => (
             <path key={`glow-${i}`} d={l.d} fill="none" stroke={l.color} strokeWidth={6} strokeOpacity={0.12} strokeLinecap="round" />
           ))}
-          {lines.map((l, i) => (
-            <path key={i} d={l.d} fill="none" stroke={l.color} strokeWidth={l.glow ? 2 : 1.5} strokeOpacity={l.glow ? 0.65 : 0.3} strokeLinecap="round" className="transition-all duration-300" />
-          ))}
+          {lines.map((l, i) => {
+            const defaultOpacity = isComplaintsDashboard ? 0.38 : 0.3; // 35% - 45% range
+            const activeOpacity = isComplaintsDashboard ? 0.55 : 0.65;
+            return (
+              <path
+                key={i}
+                d={l.d}
+                fill="none"
+                stroke={l.color}
+                strokeWidth={l.glow ? 2.5 : 1.5}
+                strokeOpacity={l.glow ? activeOpacity : defaultOpacity}
+                strokeLinecap="round"
+                className="transition-all duration-300"
+              />
+            );
+          })}
         </svg>
 
         {/* Nodes wrapper */}
         <div 
-          className="relative flex flex-col items-center gap-12 px-6 py-10 origin-top transition-transform duration-200" 
+          className={cn(
+            "relative flex flex-col items-center px-6 py-10 origin-top transition-transform duration-200",
+            isComplaintsDashboard ? "gap-16" : "gap-12"
+          )}
           style={{ zIndex: 1, transform: `scale(${zoom / 100})` }}
         >
           
           {/* 🏛️ Level 1: Root Node */}
           <div 
             ref={reg<HTMLDivElement>("root")} 
-            className="flex flex-col items-center gap-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 shadow-md text-white w-[220px] select-none hover:scale-101 hover:-translate-y-0.5 transition-all duration-200"
+            className={cn(
+              "flex flex-col items-center gap-1 rounded-xl px-6 py-3 text-white w-[220px] select-none transition-all duration-250 ease-in-out cursor-pointer",
+              isComplaintsDashboard
+                ? "hover:scale-102 hover:-translate-y-0.5"
+                : "bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md hover:scale-101 hover:-translate-y-0.5"
+            )}
+            style={isComplaintsDashboard ? {
+              background: "linear-gradient(135deg, #2563EB, #4F46E5)",
+              boxShadow: "0 10px 15px -3px rgba(37, 99, 235, 0.3), 0 4px 6px -2px rgba(37, 99, 235, 0.15)",
+              transform: hoverId === "root" ? "translate3d(0, -3px, 0) scale(1.02)" : "none"
+            } : undefined}
+            onMouseEnter={() => isComplaintsDashboard && setHoverId("root")}
+            onMouseLeave={() => isComplaintsDashboard && setHoverId(null)}
           >
             <div className="flex items-center gap-1.5">
-              <Building2 className="h-4 w-4 text-blue-200" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-blue-200">
+              <Building2 className={cn("h-4 w-4 shrink-0", isComplaintsDashboard ? "text-white" : "text-blue-200")} />
+              <span className={cn("text-[9px] font-black uppercase tracking-widest", isComplaintsDashboard ? "text-white/90" : "text-blue-200")}>
                 {rootLabel.title}
               </span>
             </div>
             <span className="text-2xl font-black tabular-nums leading-none mt-0.5">
               {rootLabel.count}
             </span>
-            <span className="text-[10px] font-semibold text-blue-100 opacity-90 mt-0.5">
-              complaints · {mode === "gba" ? "369 wards" : "225 wards"}
+            <span className={cn("text-[10px] font-semibold mt-0.5", isComplaintsDashboard ? "text-white/80" : "text-blue-100 opacity-90")}>
+              complaints &middot; {mode === "gba" ? "369 wards" : "225 wards"}
             </span>
           </div>
 
@@ -1235,6 +1429,8 @@ export function OrgTreemap({
             {corps.map(c => {
               const isMatched = isSearchMatched(c.id, c.type, c.label, c);
               const progress = c.complaintCount > 0 ? Math.round((c.closedCount / c.complaintCount) * 100) : 0;
+              const isActivePath = activeCorp === c.code;
+              const isSiblingInactive = activeCorp !== null && activeCorp !== c.code;
               return (
                 <NodeCard
                   key={c.code}
@@ -1242,7 +1438,7 @@ export function OrgTreemap({
                   label={c.name}
                   icon={Building}
                   count={c.complaintCount}
-                  countUnit="complaints"
+                  countUnit="corporation"
                   tint={CORP_TINT[c.code] ?? "#888"}
                   active={activeCorp === c.code}
                   isExpanded={activeCorp === c.code}
@@ -1254,6 +1450,10 @@ export function OrgTreemap({
                   isMatched={isMatched}
                   onClick={() => nav.corp(c.code)}
                   size="lg"
+                  isComplaintsDashboard={isComplaintsDashboard}
+                  level="corporation"
+                  isActivePath={isActivePath}
+                  isSiblingInactive={isSiblingInactive}
                 />
               );
             })}
@@ -1265,6 +1465,8 @@ export function OrgTreemap({
               {corp.children.map(d => {
                 const isMatched = isSearchMatched(d.id, d.type, d.label, d);
                 const progress = d.complaintCount > 0 ? Math.round((d.closedCount / d.complaintCount) * 100) : 0;
+                const isActivePath = activeDiv === d.name;
+                const isSiblingInactive = activeDiv !== null && activeDiv !== d.name;
                 return (
                   <NodeCard
                     key={d.name}
@@ -1272,7 +1474,7 @@ export function OrgTreemap({
                     label={d.name}
                     icon={MapPinned}
                     count={d.complaintCount}
-                    countUnit="complaints"
+                    countUnit="division"
                     tint={CORP_TINT[activeCorp!] ?? "#888"}
                     active={activeDiv === d.name}
                     isExpanded={activeDiv === d.name}
@@ -1284,6 +1486,10 @@ export function OrgTreemap({
                     isMatched={isMatched}
                     onClick={() => nav.div(d.name)}
                     size="md"
+                    isComplaintsDashboard={isComplaintsDashboard}
+                    level="division"
+                    isActivePath={isActivePath}
+                    isSiblingInactive={isSiblingInactive}
                   />
                 );
               })}
@@ -1295,6 +1501,8 @@ export function OrgTreemap({
             <div className="flex flex-wrap justify-center gap-4 animate-slide-down">
               {div.children.map(s => {
                 const isMatched = isSearchMatched(s.id, s.type, s.label, s);
+                const isActivePath = activeSub === s.name;
+                const isSiblingInactive = activeSub !== null && activeSub !== s.name;
                 return (
                   <NodeCard
                     key={s.name}
@@ -1302,7 +1510,7 @@ export function OrgTreemap({
                     label={s.name}
                     icon={Navigation}
                     count={s.complaintCount}
-                    countUnit="complaints"
+                    countUnit="subdivision"
                     tint={CORP_TINT[activeCorp!] ?? "#888"}
                     active={activeSub === s.name}
                     isExpanded={activeSub === s.name}
@@ -1313,6 +1521,10 @@ export function OrgTreemap({
                     isMatched={isMatched}
                     onClick={() => nav.sub(s.name)}
                     size="sm"
+                    isComplaintsDashboard={isComplaintsDashboard}
+                    level="subdivision"
+                    isActivePath={isActivePath}
+                    isSiblingInactive={isSiblingInactive}
                   />
                 );
               })}
@@ -1326,12 +1538,80 @@ export function OrgTreemap({
                 const tint = CORP_TINT[activeCorp!] ?? "#888";
                 const isMatched = isSearchMatched(w.id, w.type, w.label, w);
                 const isSelected = activeWard === w.id;
-                
-                // Color mapping by complaint density
-                let densityColor = "bg-emerald-500";
-                if (w.complaintCount > 100) densityColor = "bg-rose-500";
-                else if (w.complaintCount > 50) densityColor = "bg-orange-500";
-                else if (w.complaintCount > 10) densityColor = "bg-amber-500";
+                const isSiblingInactive = activeWard !== null && activeWard !== w.id;
+
+                let cardClass = "";
+                let cardStyle: React.CSSProperties = {};
+                let dotColor = "bg-neutral-400";
+                let countBadge = null;
+
+                if (isComplaintsDashboard) {
+                  if (isSelected) {
+                    dotColor = "bg-blue-600 ring-2 ring-blue-100 animate-pulse";
+                  } else if (w.complaintCount > 0) {
+                    dotColor = w.overdueCount > 0 ? "bg-red-500" : "bg-emerald-500";
+                  } else {
+                    dotColor = "bg-slate-400";
+                  }
+
+                  const customBg = isSelected
+                    ? "#ffffff"
+                    : isSiblingInactive
+                    ? "rgba(248, 250, 252, 0.65)"
+                    : "#F8FAFC";
+                  const customBorder = isSelected
+                    ? "2px solid #2563EB"
+                    : hoverId === w.id
+                    ? "1.5px solid #2563EB"
+                    : "1px solid #CBD5E1";
+                  const customShadow = isSelected
+                    ? "0 10px 15px -3px rgba(37, 99, 235, 0.15), 0 4px 6px -2px rgba(37, 99, 235, 0.05)"
+                    : hoverId === w.id
+                    ? "0 4px 12px rgba(0,0,0,0.04)"
+                    : "none";
+                  const customTransform = isSelected
+                    ? "scale(1.02)"
+                    : hoverId === w.id
+                    ? "translate3d(0, -3px, 0) scale(1.015)"
+                    : "none";
+
+                  cardStyle = {
+                    backgroundColor: customBg,
+                    border: customBorder,
+                    boxShadow: customShadow,
+                    transform: customTransform
+                  };
+
+                  cardClass = cn(
+                    "flex flex-col rounded-xl p-3 cursor-pointer transition-all duration-250 ease-out select-none w-[160px]",
+                    isSiblingInactive && hoverId !== w.id ? "opacity-70" : ""
+                  );
+
+                  countBadge = (
+                    <span className={cn(
+                      "text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 leading-none ml-1.5",
+                      w.complaintCount === 0 ? "border border-slate-350 text-slate-500 bg-transparent" :
+                      w.complaintCount < 100 ? "bg-blue-500 text-white" :
+                      "bg-blue-700 text-white font-black"
+                    )}>
+                      {w.complaintCount}
+                    </span>
+                  );
+                } else {
+                  let densityColor = "bg-emerald-500";
+                  if (w.complaintCount > 100) densityColor = "bg-rose-500";
+                  else if (w.complaintCount > 50) densityColor = "bg-orange-500";
+                  else if (w.complaintCount > 10) densityColor = "bg-amber-500";
+                  dotColor = densityColor;
+
+                  cardClass = cn(
+                    "flex flex-col rounded-xl border p-3 hover:shadow-md cursor-pointer transition-all duration-200 select-none w-[160px] hover:-translate-y-0.5",
+                    isSelected ? "ring-4 ring-blue-500/20 border-blue-500 bg-white" : "border-slate-200 bg-white/70",
+                    isMatched ? "border-amber-500 bg-amber-50/20 shadow-sm" : ""
+                  );
+
+                  countBadge = <span className="text-slate-550">{w.complaintCount} cases</span>;
+                }
 
                 return (
                   <div
@@ -1340,19 +1620,18 @@ export function OrgTreemap({
                     onClick={() => {
                       nav.ward(w.id);
                     }}
-                    className={cn(
-                      "flex flex-col rounded-xl border p-3 hover:shadow-md cursor-pointer transition-all duration-200 select-none w-[160px] hover:-translate-y-0.5",
-                      isSelected ? "ring-4 ring-blue-500/20 border-blue-500 bg-white" : "border-slate-200 bg-white/70",
-                      isMatched ? "border-amber-500 bg-amber-50/20 shadow-sm" : ""
-                    )}
+                    onMouseEnter={() => isComplaintsDashboard && setHoverId(w.id)}
+                    onMouseLeave={() => isComplaintsDashboard && setHoverId(null)}
+                    className={cardClass}
+                    style={cardStyle}
                   >
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-[9px] font-bold text-slate-400 uppercase">Ward {w.no}</span>
-                      <span className={cn("h-2 w-2 rounded-full", densityColor)} title={`${w.complaintCount} complaints`} />
+                      <span className={cn("h-2 w-2 rounded-full", dotColor)} title={`${w.complaintCount} complaints`} />
                     </div>
                     <span className="text-[11px] font-bold text-slate-800 leading-tight truncate mt-1">{w.name}</span>
                     <div className="flex items-center justify-between text-[10px] font-black text-slate-500 mt-2.5 border-t border-slate-100 pt-1.5">
-                      <span>{w.complaintCount} cases</span>
+                      {countBadge}
                       <span 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1377,6 +1656,8 @@ export function OrgTreemap({
               ) : (
                 wardNode.children.map(eng => {
                   const isMatched = isSearchMatched(eng.id, eng.type, eng.label, eng);
+                  const isActivePath = activeEng === eng.id;
+                  const isSiblingInactive = activeEng !== null && activeEng !== eng.id;
                   return (
                     <NodeCard
                       key={eng.id}
@@ -1395,6 +1676,10 @@ export function OrgTreemap({
                       isMatched={isMatched}
                       onClick={() => nav.eng(eng.id)}
                       size="sm"
+                      isComplaintsDashboard={isComplaintsDashboard}
+                      level="engineer"
+                      isActivePath={isActivePath}
+                      isSiblingInactive={isSiblingInactive}
                     />
                   );
                 })
@@ -1411,7 +1696,6 @@ export function OrgTreemap({
                 engNode.children.map(off => {
                   const isMatched = isSearchMatched(off.id, off.type, off.label, off);
                   const isSelected = activeOff === off.id;
-                  const tint = CORP_TINT[activeCorp!] ?? "#888";
                   return (
                     <div
                       key={off.id}
@@ -1420,10 +1704,19 @@ export function OrgTreemap({
                         setActiveOff(off.id);
                       }}
                       className={cn(
-                        "flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 select-none hover:shadow-sm w-[160px]",
-                        isSelected ? "ring-4 ring-blue-500/20 border-blue-500 bg-white" : "border-slate-200 bg-white",
-                        isMatched ? "border-amber-500 bg-amber-50/20" : ""
+                        "flex items-center gap-2 rounded-xl px-3 py-2 cursor-pointer transition-all duration-250 ease-out select-none w-[160px]",
+                        isComplaintsDashboard
+                          ? isSelected
+                            ? "border-2 border-blue-500 bg-white shadow-md scale-102"
+                            : "border border-slate-300 bg-slate-50 hover:bg-slate-100 hover:-translate-y-0.5 hover:shadow-xs"
+                          : isSelected
+                          ? "ring-4 ring-blue-500/20 border-blue-500 bg-white"
+                          : "border border-slate-200 bg-white hover:-translate-y-0.5 hover:shadow-sm",
+                        isMatched ? (isComplaintsDashboard ? "border-2 border-amber-500 bg-amber-50/20" : "border-amber-500 bg-amber-50/20") : ""
                       )}
+                      style={isComplaintsDashboard && isSelected ? {
+                        boxShadow: "0 10px 15px -3px rgba(37, 99, 235, 0.15), 0 4px 6px -2px rgba(37, 99, 235, 0.05)"
+                      } : undefined}
                     >
                       <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
                       <div className="min-w-0">
@@ -1438,186 +1731,243 @@ export function OrgTreemap({
           )}
 
         </div>
+
+        {/* Compact Enterprise Legend */}
+        {isComplaintsDashboard && (
+          <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-xs border border-slate-200 shadow-sm rounded-xl px-4 py-2.5 z-10 text-[10px] text-slate-500 font-bold space-y-1.5 max-w-sm select-none pointer-events-auto">
+            <div className="flex items-center gap-4 border-b pb-1.5 mb-1.5 border-slate-100 uppercase tracking-wider text-slate-400 text-[9px] font-black">
+              Hierarchy Legend
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: "linear-gradient(135deg, #2563EB, #4F46E5)" }} />
+                <span>Authority</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded bg-[#EEF2FF] border border-[#6366F1]" />
+                <span>Corporation</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded bg-[#ECFDF5] border border-[#10B981]" />
+                <span>Division</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded bg-[#FFFBEB] border border-[#F59E0B]" />
+                <span>Subdivision</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded bg-[#F8FAFC] border border-[#CBD5E1]" />
+                <span>Ward</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t pt-1.5 mt-1 border-slate-100">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span>Complaints Present</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                <span>No Complaints</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-600" />
+                <span>Currently Selected</span>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Render Mobile accordion view for smaller screens */}
       {renderMobileAccordion()}
 
       {/* Right Drawer Inspector Panel */}
-      <AnimatePresence>
-        {inspectorNode && (
-          <>
-            {/* Overlay backdrop */}
-            <div 
-              className="fixed inset-0 bg-slate-900/10 backdrop-blur-3xs z-40 no-print" 
-              onClick={() => setInspectorNode(null)} 
-            />
+      {mounted && typeof window !== "undefined" && createPortal(
+        <AnimatePresence>
+          {inspectorNode && (
+            <>
+              {/* Overlay backdrop */}
+              <div 
+                className="fixed inset-0 bg-slate-900/10 backdrop-blur-3xs z-40 no-print" 
+                onClick={() => setInspectorNode(null)} 
+              />
 
-            {/* Slide-out Drawer */}
-            <motion.div
-              initial={{ x: "100%", opacity: 0.5 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: "100%", opacity: 0.5 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 h-screen w-[440px] bg-white border-l border-slate-200 shadow-2xl z-50 flex flex-col no-print"
-            >
-              {/* Header */}
-              <div className="p-5 border-b flex items-center justify-between bg-slate-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-                    {inspectorNode.type === "root" ? <Building2 className="h-4.5 w-4.5" /> :
-                     inspectorNode.type === "corporation" ? <Building className="h-4.5 w-4.5" /> :
-                     inspectorNode.type === "division" ? <MapPinned className="h-4.5 w-4.5" /> :
-                     inspectorNode.type === "subdivision" ? <Navigation className="h-4.5 w-4.5" /> :
-                     inspectorNode.type === "ward" ? <MapPin className="h-4.5 w-4.5" /> :
-                     inspectorNode.type === "engineer" ? <HardHat className="h-4.5 w-4.5" /> :
-                     <UserRound className="h-4.5 w-4.5" />}
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                      {inspectorNode.type} Node Info
-                    </span>
-                    <h3 className="text-sm font-black text-slate-900 leading-tight truncate max-w-[280px]">
-                      {inspectorNode.label || inspectorNode.name}
-                    </h3>
-                  </div>
+              {/* Slide-out Drawer / Bottom Sheet */}
+              <motion.div
+                initial={isMobile ? { y: "100%", x: 0 } : { x: "100%", y: 0 }}
+                animate={{ x: 0, y: 0 }}
+                exit={isMobile ? { y: "100%", x: 0 } : { x: "100%", y: 0 }}
+                transition={{ type: "spring", damping: 28, stiffness: 220 }}
+                className={cn(
+                  "fixed bg-white shadow-2xl z-50 flex flex-col no-print border-slate-200 transition-all duration-200",
+                  "bottom-0 left-0 right-0 h-[80vh] w-full rounded-t-2xl border-t",
+                  "sm:top-0 sm:bottom-auto sm:left-auto sm:right-0 sm:h-screen sm:w-[440px] sm:rounded-t-none sm:rounded-l-2xl sm:border-l sm:border-t-0"
+                )}
+              >
+                {/* Mobile Drag Handle */}
+                <div className="flex justify-center py-2.5 sm:hidden bg-slate-50/50">
+                  <div className="w-12 h-1.5 bg-slate-350 rounded-full" />
                 </div>
 
-                <button 
-                  onClick={() => setInspectorNode(null)}
-                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Body Content */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin">
-                
-                {/* 1. Dynamic Overview Statistics */}
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Activity className="h-3.5 w-3.5" /> Overview & Statistics
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold">
-                    <div className="border rounded-xl p-3 bg-slate-50/50">
-                      <span className="text-xl font-black text-slate-800 leading-none">
-                        {inspectorNode.complaintCount || inspectorNode.complaintsCount || inspectorNode.complaintsList?.length || 0}
-                      </span>
-                      <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1">Total complaints</span>
+                {/* Header */}
+                <div className="p-4 sm:p-5 border-b flex items-center justify-between bg-slate-50/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                      {inspectorNode.type === "root" ? <Building2 className="h-4.5 w-4.5" /> :
+                       inspectorNode.type === "corporation" ? <Building className="h-4.5 w-4.5" /> :
+                       inspectorNode.type === "division" ? <MapPinned className="h-4.5 w-4.5" /> :
+                       inspectorNode.type === "subdivision" ? <Navigation className="h-4.5 w-4.5" /> :
+                       inspectorNode.type === "ward" ? <MapPin className="h-4.5 w-4.5" /> :
+                       inspectorNode.type === "engineer" ? <HardHat className="h-4.5 w-4.5" /> :
+                       <UserRound className="h-4.5 w-4.5" />}
                     </div>
-                    {inspectorNode.type !== "officer" && inspectorNode.type !== "engineer" ? (
-                      <div className="border rounded-xl p-3 bg-slate-50/50">
-                        <span className="text-xl font-black text-slate-800 leading-none">
-                          {inspectorNode.activeCount ?? 0}
-                        </span>
-                        <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1">Active Cases</span>
-                      </div>
-                    ) : (
-                      <div className="border rounded-xl p-3 bg-slate-50/50">
-                        <span className="text-xs font-bold text-slate-700 capitalize leading-none">
-                          {inspectorNode.designation || "Zone Officer"}
-                        </span>
-                        <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1.5">Designation</span>
-                      </div>
-                    )}
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                        {inspectorNode.type} Node Info
+                      </span>
+                      <h3 className="text-sm font-black text-slate-900 leading-tight truncate max-w-[200px] sm:max-w-[280px]">
+                        {inspectorNode.label || inspectorNode.name}
+                      </h3>
+                    </div>
                   </div>
+
+                  <button 
+                    onClick={() => setInspectorNode(null)}
+                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
 
-                {/* 2. Detailed Breakdown Grid */}
-                {inspectorNode.type !== "officer" && inspectorNode.type !== "engineer" && (
+                {/* Body Content */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin">
+                  
+                  {/* 1. Dynamic Overview Statistics */}
                   <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <ShieldAlert className="h-3.5 w-3.5 text-slate-400" /> Status Breakdown
+                      <Activity className="h-3.5 w-3.5" /> Overview & Statistics
                     </h4>
-                    <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-bold">
-                      <div className="p-2 border rounded bg-emerald-50/50 text-emerald-800 border-emerald-100/40">
-                        <span className="block font-black text-sm">{inspectorNode.activeCount ?? 0}</span>
-                        <span className="text-[7.5px] uppercase">Active</span>
+                    <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold">
+                      <div className="border rounded-xl p-3 bg-slate-50/50">
+                        <span className="text-xl font-black text-slate-800 leading-none">
+                          {inspectorNode.complaintCount || inspectorNode.complaintsCount || inspectorNode.complaintsList?.length || 0}
+                        </span>
+                        <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1">Total complaints</span>
                       </div>
-                      <div className="p-2 border rounded bg-rose-50/50 text-rose-800 border-rose-100/40">
-                        <span className="block font-black text-sm">{inspectorNode.overdueCount ?? 0}</span>
-                        <span className="text-[7.5px] uppercase">Overdue</span>
-                      </div>
-                      <div className="p-2 border rounded bg-slate-50 text-slate-655 border-slate-150">
-                        <span className="block font-black text-sm">{inspectorNode.closedCount ?? 0}</span>
-                        <span className="text-[7.5px] uppercase">Closed</span>
-                      </div>
+                      {inspectorNode.type !== "officer" && inspectorNode.type !== "engineer" ? (
+                        <div className="border rounded-xl p-3 bg-slate-50/50">
+                          <span className="text-xl font-black text-slate-800 leading-none">
+                            {inspectorNode.activeCount ?? 0}
+                          </span>
+                          <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1">Active Cases</span>
+                        </div>
+                      ) : (
+                        <div className="border rounded-xl p-3 bg-slate-50/50">
+                          <span className="text-xs font-bold text-slate-700 capitalize leading-none">
+                            {inspectorNode.designation || "Zone Officer"}
+                          </span>
+                          <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1.5">Designation</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* 3. Details description */}
-                {inspectorNode.extra && (
-                  <div className="p-3 border rounded-xl bg-slate-50 text-xs font-semibold text-slate-500">
-                    <span className="block text-[8px] text-slate-400 uppercase tracking-wider mb-1 font-bold">Historical / Delimitation Info</span>
-                    {inspectorNode.extra}
-                  </div>
-                )}
-
-                {/* 4. Recent activity log / complaints details */}
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5" /> Recent Activity & Complaints
-                  </h4>
-                  
-                  {(!inspectorNode.complaintsList || inspectorNode.complaintsList.length === 0) ? (
-                    <p className="text-xs text-slate-400 italic font-semibold text-center py-4 bg-slate-50 border rounded-xl">No complaints filed in this area</p>
-                  ) : (
-                    <ul className="divide-y divide-slate-100 space-y-2">
-                      {inspectorNode.complaintsList.map((c: any) => (
-                        <li key={c.id} className="pt-2.5 first:pt-0">
-                          <div className="flex items-start justify-between gap-2.5">
-                            <span className="text-xs font-extrabold text-slate-700 leading-snug line-clamp-2">
-                              {c.title}
-                            </span>
-                            <span className={cn(
-                              "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 leading-none",
-                              c.status === "Resolved" || c.status === "Closed" ? "bg-emerald-100 text-emerald-800" :
-                              c.status === "Assigned To Engineer" || c.status === "Work In Progress" ? "bg-blue-100 text-blue-800" :
-                              "bg-slate-100 text-slate-655"
-                            )}>
-                              {c.status}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">
-                            <span className="font-mono">{c.id.slice(0, 8)}</span>
-                            <span>&middot;</span>
-                            <span>{c.priority || "Medium"} Priority</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
+                  {/* 2. Detailed Breakdown Grid */}
+                  {inspectorNode.type !== "officer" && inspectorNode.type !== "engineer" && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <ShieldAlert className="h-3.5 w-3.5 text-slate-400" /> Status Breakdown
+                      </h4>
+                      <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-bold">
+                        <div className="p-2 border rounded bg-emerald-50/50 text-emerald-800 border-emerald-100/40">
+                          <span className="block font-black text-sm">{inspectorNode.activeCount ?? 0}</span>
+                          <span className="text-[7.5px] uppercase">Active</span>
+                        </div>
+                        <div className="p-2 border rounded bg-rose-50/50 text-rose-800 border-rose-100/40">
+                          <span className="block font-black text-sm">{inspectorNode.overdueCount ?? 0}</span>
+                          <span className="text-[7.5px] uppercase">Overdue</span>
+                        </div>
+                        <div className="p-2 border rounded bg-slate-50 text-slate-655 border-slate-150">
+                          <span className="block font-black text-sm">{inspectorNode.closedCount ?? 0}</span>
+                          <span className="text-[7.5px] uppercase">Closed</span>
+                        </div>
+                      </div>
+                    </div>
                   )}
+
+                  {/* 3. Details description */}
+                  {inspectorNode.extra && (
+                    <div className="p-3 border rounded-xl bg-slate-50 text-xs font-semibold text-slate-500">
+                      <span className="block text-[8px] text-slate-400 uppercase tracking-wider mb-1 font-bold">Historical / Delimitation Info</span>
+                      {inspectorNode.extra}
+                    </div>
+                  )}
+
+                  {/* 4. Recent activity log / complaints details */}
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5" /> Recent Activity & Complaints
+                    </h4>
+                    
+                    {(!inspectorNode.complaintsList || inspectorNode.complaintsList.length === 0) ? (
+                      <p className="text-xs text-slate-400 italic font-semibold text-center py-4 bg-slate-50 border rounded-xl">No complaints filed in this area</p>
+                    ) : (
+                      <ul className="divide-y divide-slate-100 space-y-2">
+                        {inspectorNode.complaintsList.map((c: any) => (
+                          <li key={c.id} className="pt-2.5 first:pt-0">
+                            <div className="flex items-start justify-between gap-2.5">
+                              <span className="text-xs font-extrabold text-slate-700 leading-snug line-clamp-2">
+                                {c.title}
+                              </span>
+                              <span className={cn(
+                                "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 leading-none",
+                                c.status === "Resolved" || c.status === "Closed" ? "bg-emerald-100 text-emerald-800" :
+                                c.status === "Assigned To Engineer" || c.status === "Work In Progress" ? "bg-blue-100 text-blue-800" :
+                                "bg-slate-100 text-slate-655"
+                              )}>
+                                {c.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">
+                              <span className="font-mono">{c.id.slice(0, 8)}</span>
+                              <span>&middot;</span>
+                              <span>{c.priority || "Medium"} Priority</span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
                 </div>
 
-              </div>
-
-              {/* Footer Actions */}
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900">
-                <button
-                  onClick={handleExportCSV}
-                  className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-extrabold text-slate-600 dark:text-slate-350 hover:text-slate-800 dark:hover:text-slate-100 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer shadow-3xs"
-                >
-                  <Download className="h-4 w-4" /> Download Report
-                </button>
-                
-                {inspectorNode.complaintsList && inspectorNode.complaintsList.length > 0 && (
+                {/* Footer Actions */}
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900">
                   <button
-                    onClick={() => {
-                      // Navigate or show complaints details logic
-                      window.open(`/complaints?search=${inspectorNode.label || inspectorNode.name}`, "_blank");
-                    }}
-                    className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 border border-transparent rounded-xl text-xs font-extrabold text-white bg-primary hover:bg-blue-700 cursor-pointer shadow-sm"
+                    onClick={handleExportCSV}
+                    className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-extrabold text-slate-600 dark:text-slate-350 hover:text-slate-800 dark:hover:text-slate-100 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer shadow-3xs"
                   >
-                    <Eye className="h-4 w-4" /> View Complaints
+                    <Download className="h-4 w-4" /> Download Report
                   </button>
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                  
+                  {inspectorNode.complaintsList && inspectorNode.complaintsList.length > 0 && (
+                    <button
+                      onClick={() => {
+                        // Navigate or show complaints details logic
+                        window.open(`/complaints?search=${inspectorNode.label || inspectorNode.name}`, "_blank");
+                      }}
+                      className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 border border-transparent rounded-xl text-xs font-extrabold text-white bg-primary hover:bg-blue-700 cursor-pointer shadow-sm"
+                    >
+                      <Eye className="h-4 w-4" /> View Complaints
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* 🧭 Bottom Information Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl px-5 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 shadow-2xs no-print select-none">

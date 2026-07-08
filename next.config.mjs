@@ -4,7 +4,7 @@ const nextConfig = {
   // tesseract.js: WASM/worker assets. @napi-rs/canvas: native .node binary.
   // pdfjs-dist: ESM legacy build loaded via dynamic import at runtime. All three
   // must stay external so webpack doesn't try to bundle native/worker assets.
-  serverExternalPackages: ["tesseract.js", "@napi-rs/canvas", "pdfjs-dist"],
+  serverExternalPackages: ["tesseract.js", "@napi-rs/canvas", "pdfjs-dist", "pg"],
   // Server Actions are enabled by default in Next 15.
   // Map provider/API keys intentionally omitted in v1 (placeholder only).
   eslint: {

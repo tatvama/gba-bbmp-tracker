@@ -33,57 +33,10 @@
  * not a correctness bug.
  */
 
-const ESCALATION_KEY = "__gbaEscalationSweeper__";
-const JOBS_KEY = "__gbaJobSweeper__";
-const ESCALATION_INTERVAL_MS = 20 * 60 * 1000; // 20 minutes — cheap indexed query, small row count
-const JOBS_SWEEP_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes — users are watching live progress in the Task Center
-
-function alreadyStarted(key: string): boolean {
-  const g = globalThis as Record<string, unknown>;
-  if (g[key]) return true;
-  g[key] = true;
-  return false;
-}
-
-async function runEscalationSweep(): Promise<void> {
-  try {
-    const { sweepEscalationCycles } = await import("@/lib/complaints/escalation-scheduler");
-    const result = await sweepEscalationCycles();
-    if (result.processed || result.errors.length) {
-      console.log(
-        `[escalation-sweeper] processed=${result.processed} skipped=${result.skipped} errors=${result.errors.length}`,
-      );
-      for (const err of result.errors) console.error("[escalation-sweeper]", err);
-    }
-  } catch (e) {
-    console.error("[escalation-sweeper] sweep crashed", e);
-  }
-}
-
-async function runJobSweep(): Promise<void> {
-  try {
-    const { sweepBackgroundJobs } = await import("@/lib/jobs/runner");
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createAdminClient();
-    const result = await sweepBackgroundJobs(admin);
-    if (result.reclaimed || result.retried) {
-      console.log(`[job-sweeper] reclaimed=${result.reclaimed} retried=${result.retried}`);
-    }
-  } catch (e) {
-    console.error("[job-sweeper] sweep crashed", e);
-  }
-}
-
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return; // never on the edge runtime
 
-  if (!alreadyStarted(ESCALATION_KEY)) {
-    void runEscalationSweep(); // catch anything that elapsed while the process was down
-    setInterval(() => void runEscalationSweep(), ESCALATION_INTERVAL_MS);
-  }
-
-  if (!alreadyStarted(JOBS_KEY)) {
-    void runJobSweep();
-    setInterval(() => void runJobSweep(), JOBS_SWEEP_INTERVAL_MS);
-  }
+  const { StartupManager } = await import("@/lib/startup");
+  await StartupManager.run();
 }
+
