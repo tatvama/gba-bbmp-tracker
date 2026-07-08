@@ -38,6 +38,7 @@ export async function processForensicBatch(
   batchId: string,
   tempDirPath: string,
   onProgress?: (p: AnalyzeProgress) => void,
+  originalFileName?: string | null,
 ): Promise<void> {
   const admin = createAdminClient();
   try {
@@ -48,7 +49,7 @@ export async function processForensicBatch(
     }
     const absByRel = new Map(files.map((f) => [f.relPath, f.absPath] as const));
     const raw: RawEntry[] = files.map((f) => ({ relPath: f.relPath, size: f.size }));
-    const grouped = groupEntriesByJobCode(raw);
+    const grouped = groupEntriesByJobCode(raw, originalFileName);
 
     // Which job codes are already imported?
     const codes = [...grouped.keys()];

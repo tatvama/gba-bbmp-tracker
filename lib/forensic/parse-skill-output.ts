@@ -154,13 +154,24 @@ function cap(text: string | null | undefined): string {
   return text.length > MAX_TEXT ? text.slice(0, MAX_TEXT) : text;
 }
 
-/** Group all ZIP entries by the job code found in each entry's path (no code → dropped). */
-export function groupEntriesByJobCode(entries: RawEntry[]): Map<string, RawEntry[]> {
+/**
+ * Group all ZIP entries by the job code found in each entry's path (no code →
+ * dropped). When NOTHING inside the ZIP carries a job code (a flat single-job
+ * export with generic file names), fall back to the job code embedded in the
+ * ZIP's own uploaded filename (e.g. "047-25-000003.zip") and treat every entry
+ * as belonging to that one job — otherwise the whole batch would be silently
+ * dropped ("No job-code folders found").
+ */
+export function groupEntriesByJobCode(entries: RawEntry[], fallbackName?: string | null): Map<string, RawEntry[]> {
   const map = new Map<string, RawEntry[]>();
   for (const e of entries) {
     const code = extractJobCode(e.relPath);
     if (!code) continue; // batch-level noise (no job code in path)
     (map.get(code) ?? map.set(code, []).get(code)!).push(e);
+  }
+  if (map.size === 0 && fallbackName) {
+    const code = extractJobCode(fallbackName);
+    if (code) map.set(code, entries);
   }
   return map;
 }

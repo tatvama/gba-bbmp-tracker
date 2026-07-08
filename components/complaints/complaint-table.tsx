@@ -273,6 +273,11 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
             <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
               {c.internal_case_number || "Pending"}
             </span>
+            {c.job_number && (
+              <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                Job {c.job_number}
+              </span>
+            )}
             <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
               {formatDate(c.date_submitted)}
             </span>
@@ -499,6 +504,11 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           <span className="font-mono text-xs font-bold text-foreground">
             {row.original.internal_case_number || "Pending"}
           </span>
+          {row.original.job_number && (
+            <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+              Job {row.original.job_number}
+            </span>
+          )}
           <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
             {formatDate(row.original.date_submitted)}
           </span>
@@ -607,6 +617,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
       const hay = [
         r.internal_case_number,
         r.complaint_number,
+        r.job_number,
         r.title,
         r.location,
         r.assigned_engineer?.full_name,
@@ -622,6 +633,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     exportRows(filtered.map((c) => ({
       case_no: c.internal_case_number ?? "",
       external_no: c.complaint_number ?? "",
+      job_number: c.job_number ?? "",
       title: c.title,
       type: c.type,
       ward: c.ward ? `${c.ward.new_no} ${c.ward.new_name}` : "",

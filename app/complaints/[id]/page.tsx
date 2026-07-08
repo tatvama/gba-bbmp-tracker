@@ -109,6 +109,9 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
       <div className="space-y-2 select-none">
         <p className="font-mono text-xs font-bold text-slate-455 dark:text-slate-500 tracking-wider">
           {complaint.internal_case_number ?? "—"}
+          {complaint.job_number && (
+            <span className="text-indigo-600 dark:text-indigo-400"> · Job {complaint.job_number}</span>
+          )}
         </p>
         <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight sm:text-[30px] leading-tight max-w-4xl">
           {complaint.title}

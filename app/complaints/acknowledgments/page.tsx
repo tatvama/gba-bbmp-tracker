@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { AckReconcileUpload } from "@/components/complaints/ack-reconcile-upload";
+import { AckByFilenameUpload } from "@/components/complaints/ack-by-filename-upload";
 import { Button } from "@/components/ui/button";
 import { AckHelpPanel } from "@/components/complaints/ack-help-panel";
 import { listAckBatchesAction } from "@/lib/actions/ack-import";
@@ -61,6 +62,8 @@ export default async function AcknowledgmentsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <AckReconcileUpload />
+
+          <AckByFilenameUpload />
 
           {batches.length > 0 && (
             <div className="space-y-3.5">

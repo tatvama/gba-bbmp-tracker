@@ -92,9 +92,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Upload failed." }, { status: 500 });
   }
 
-  const captured = { batchId, tempDir };
+  const captured = { batchId, tempDir, fileName: file.name };
   after(async () => {
-    await processForensicBatch(captured.batchId, captured.tempDir);
+    await processForensicBatch(captured.batchId, captured.tempDir, undefined, captured.fileName);
   });
 
   return NextResponse.json({ batchId });
