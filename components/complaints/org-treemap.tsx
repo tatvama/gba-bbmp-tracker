@@ -109,10 +109,22 @@ function NodeCard({
   icon: Icon, progress, isExpanded, onToggleExpand, isMatched,
   isComplaintsDashboard = true, level, isActivePath, isSiblingInactive
 }: NodeCardProps) {
+  const [isDark, setIsDark] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const checkDark = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    };
+    checkDark();
+    const obs = new MutationObserver(checkDark);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+
   let bg = "";
   let boxShadow = "";
   let borderStyle = "";
-  let titleClass = "text-slate-800 font-extrabold";
+  let titleClass = isDark ? "text-slate-250 font-extrabold" : "text-slate-800 font-extrabold";
   let iconColor = tint;
   let transformStyle = "";
   let transitionClass = "transition-all duration-200 ease-out";
@@ -124,83 +136,83 @@ function NodeCard({
     transformStyle = `translate3d(0, ${translateVal}px, 0) scale(${scaleFactor})`;
 
     if (level === "corporation") {
-      titleClass = "text-[#3730A3] font-black text-[13px] sm:text-sm";
-      iconColor = "#6366F1";
+      titleClass = isDark ? "text-indigo-300 font-black text-[13px] sm:text-sm" : "text-[#3730A3] font-black text-[13px] sm:text-sm";
+      iconColor = isDark ? "#818CF8" : "#6366F1";
       if (isActivePath) {
-        bg = "#EEF2FF";
-        borderStyle = "2px solid #6366F1";
-        boxShadow = "0 10px 15px -3px rgba(99, 102, 241, 0.18), 0 4px 6px -2px rgba(99, 102, 241, 0.08)";
+        bg = isDark ? "rgba(99, 102, 241, 0.2)" : "#EEF2FF";
+        borderStyle = isDark ? "2px solid #818CF8" : "2px solid #6366F1";
+        boxShadow = isDark ? "0 10px 15px -3px rgba(99, 102, 241, 0.3)" : "0 10px 15px -3px rgba(99, 102, 241, 0.18), 0 4px 6px -2px rgba(99, 102, 241, 0.08)";
       } else if (isSiblingInactive) {
-        bg = "#F8FAFC";
-        borderStyle = "1px solid #E2E8F0";
-        titleClass = "text-[#94A3B8] font-bold text-[13px] sm:text-sm";
-        iconColor = "#CBD5E1";
+        bg = isDark ? "#0f172a" : "#F8FAFC";
+        borderStyle = isDark ? "1px solid #1e293b" : "1px solid #E2E8F0";
+        titleClass = isDark ? "text-slate-500 font-bold text-[13px] sm:text-sm" : "text-[#94A3B8] font-bold text-[13px] sm:text-sm";
+        iconColor = isDark ? "#475569" : "#CBD5E1";
         boxShadow = "none";
       } else {
-        bg = "#EEF2FF";
-        borderStyle = "1px solid #C7D2FE";
-        boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
+        bg = isDark ? "rgba(99, 102, 241, 0.1)" : "#EEF2FF";
+        borderStyle = isDark ? "1px solid #4338CA" : "1px solid #C7D2FE";
+        boxShadow = "none";
       }
     } else if (level === "division") {
-      titleClass = "text-[#047857] font-black text-[12px] sm:text-xs";
-      iconColor = "#10B981";
+      titleClass = isDark ? "text-emerald-300 font-black text-[12px] sm:text-xs" : "text-[#047857] font-black text-[12px] sm:text-xs";
+      iconColor = isDark ? "#34D399" : "#10B981";
       if (isActivePath) {
-        bg = "#ECFDF5";
-        borderStyle = "2px solid #10B981";
-        boxShadow = "0 10px 15px -3px rgba(16, 185, 129, 0.18), 0 4px 6px -2px rgba(16, 185, 129, 0.08)";
+        bg = isDark ? "rgba(16, 185, 129, 0.2)" : "#ECFDF5";
+        borderStyle = isDark ? "2px solid #34D399" : "2px solid #10B981";
+        boxShadow = isDark ? "0 10px 15px -3px rgba(16, 185, 129, 0.3)" : "0 10px 15px -3px rgba(16, 185, 129, 0.18), 0 4px 6px -2px rgba(16, 185, 129, 0.08)";
       } else if (isSiblingInactive) {
-        bg = "#F8FAFC";
-        borderStyle = "1px solid #E2E8F0";
-        titleClass = "text-[#94A3B8] font-bold text-[12px] sm:text-xs";
-        iconColor = "#CBD5E1";
+        bg = isDark ? "#0f172a" : "#F8FAFC";
+        borderStyle = isDark ? "1px solid #1e293b" : "1px solid #E2E8F0";
+        titleClass = isDark ? "text-slate-500 font-bold text-[12px] sm:text-xs" : "text-[#94A3B8] font-bold text-[12px] sm:text-xs";
+        iconColor = isDark ? "#475569" : "#CBD5E1";
         boxShadow = "none";
       } else {
-        bg = "#ECFDF5";
-        borderStyle = "1px solid #A7F3D0";
-        boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
+        bg = isDark ? "rgba(16, 185, 129, 0.1)" : "#ECFDF5";
+        borderStyle = isDark ? "1px solid #065F46" : "1px solid #A7F3D0";
+        boxShadow = "none";
       }
     } else if (level === "subdivision") {
-      titleClass = "text-[#B45309] font-black text-[11px]";
-      iconColor = "#F59E0B";
+      titleClass = isDark ? "text-amber-300 font-black text-[11px]" : "text-[#B45309] font-black text-[11px]";
+      iconColor = isDark ? "#FBBF24" : "#F59E0B";
       if (isActivePath) {
-        bg = "#FFFBEB";
-        borderStyle = "2px solid #F59E0B";
-        boxShadow = "0 10px 15px -3px rgba(245, 158, 11, 0.18), 0 4px 6px -2px rgba(245, 158, 11, 0.08)";
+        bg = isDark ? "rgba(245, 158, 11, 0.2)" : "#FFFBEB";
+        borderStyle = isDark ? "2px solid #FBBF24" : "2px solid #F59E0B";
+        boxShadow = isDark ? "0 10px 15px -3px rgba(245, 158, 11, 0.3)" : "0 10px 15px -3px rgba(245, 158, 11, 0.18), 0 4px 6px -2px rgba(245, 158, 11, 0.08)";
       } else if (isSiblingInactive) {
-        bg = "#F8FAFC";
-        borderStyle = "1px solid #E2E8F0";
-        titleClass = "text-[#94A3B8] font-bold text-[11px]";
-        iconColor = "#CBD5E1";
+        bg = isDark ? "#0f172a" : "#F8FAFC";
+        borderStyle = isDark ? "1px solid #1e293b" : "1px solid #E2E8F0";
+        titleClass = isDark ? "text-slate-500 font-bold text-[11px]" : "text-[#94A3B8] font-bold text-[11px]";
+        iconColor = isDark ? "#475569" : "#CBD5E1";
         boxShadow = "none";
       } else {
-        bg = "#FFFBEB";
-        borderStyle = "1px solid #FDE68A";
-        boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
+        bg = isDark ? "rgba(245, 158, 11, 0.1)" : "#FFFBEB";
+        borderStyle = isDark ? "1px solid #78350F" : "1px solid #FDE68A";
+        boxShadow = "none";
       }
     } else {
       // level === "engineer"
-      titleClass = "text-[#1E293B] font-extrabold text-[10px]";
-      iconColor = "#2563EB";
+      titleClass = isDark ? "text-slate-200 font-extrabold text-[10px]" : "text-[#1E293B] font-extrabold text-[10px]";
+      iconColor = isDark ? "#3B82F6" : "#2563EB";
       if (isActivePath) {
-        bg = "#F8FAFC";
-        borderStyle = "2px solid #2563EB";
-        boxShadow = "0 8px 12px -3px rgba(37, 99, 235, 0.15)";
+        bg = isDark ? "#1e293b" : "#F8FAFC";
+        borderStyle = isDark ? "2px solid #3B82F6" : "2px solid #2563EB";
+        boxShadow = isDark ? "0 8px 12px -3px rgba(37, 99, 235, 0.3)" : "0 8px 12px -3px rgba(37, 99, 235, 0.15)";
       } else if (isSiblingInactive) {
-        bg = "#F8FAFC";
-        borderStyle = "1px solid #F1F5F9";
-        titleClass = "text-[#94A3B8] font-semibold text-[10px]";
-        iconColor = "#CBD5E1";
+        bg = isDark ? "#0f172a" : "#F8FAFC";
+        borderStyle = isDark ? "1px solid #1e293b" : "1px solid #F1F5F9";
+        titleClass = isDark ? "text-slate-500 font-semibold text-[10px]" : "text-[#94A3B8] font-semibold text-[10px]";
+        iconColor = isDark ? "#475569" : "#CBD5E1";
         boxShadow = "none";
       } else {
-        bg = "#F8FAFC";
-        borderStyle = "1px solid #CBD5E1";
+        bg = isDark ? "#1e293b" : "#F8FAFC";
+        borderStyle = isDark ? "1px solid #475569" : "1px solid #CBD5E1";
         boxShadow = "none";
       }
     }
 
     if (isMatched) {
-      borderStyle = "2px solid #F59E0B";
-      bg = "#FFFDF5";
+      borderStyle = isDark ? "2px solid #FBBF24" : "2px solid #F59E0B";
+      bg = isDark ? "rgba(245, 158, 11, 0.25)" : "#FFFDF5";
     }
 
     if (isSiblingInactive && !hovered) {
@@ -218,21 +230,21 @@ function NodeCard({
       : `0 1px 3px rgba(0,0,0,0.04), 0 0 0 1.5px ${toRgba(tint, 0.15)}`;
 
     bg = active
-      ? "#ffffff"
+      ? isDark ? "#1e293b" : "#ffffff"
       : isMatched
-      ? "#fffdf5"
-      : `${toRgba(tint, hovered ? 0.06 : 0.03)}`;
+      ? isDark ? "rgba(245,158,11,0.25)" : "#fffdf5"
+      : isDark ? "rgba(30,41,59,0.5)" : `${toRgba(tint, hovered ? 0.06 : 0.03)}`;
 
     borderStyle = active
-      ? "1.5px solid #2563EB"
+      ? isDark ? "1.5px solid #3B82F6" : "1.5px solid #2563EB"
       : isMatched
-      ? "1.5px solid #F59E0B"
+      ? isDark ? "1.5px solid #FBBF24" : "1.5px solid #F59E0B"
       : hovered
-      ? `1px solid ${toRgba(tint, 0.7)}`
-      : `1px solid ${toRgba(tint, 0.25)}`;
+      ? `1px solid ${isDark ? "#3b82f6" : toRgba(tint, 0.7)}`
+      : `1px solid ${isDark ? "#1e293b" : toRgba(tint, 0.25)}`;
 
     transformStyle = lifted ? "translateY(-2px) scale(1.01)" : "";
-    titleClass = "text-slate-800 font-extrabold text-xs";
+    titleClass = isDark ? "text-slate-200 font-extrabold text-xs" : "text-slate-800 font-extrabold text-xs";
   }
 
   return (
@@ -272,14 +284,14 @@ function NodeCard({
           isComplaintsDashboard ? (
             <span className={cn(
               "text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 tabular-nums leading-none ml-1.5",
-              count === 0 ? "border border-slate-300 text-slate-500 bg-transparent" :
+              count === 0 ? "border border-slate-300 dark:border-slate-800 text-slate-500 dark:text-slate-400 bg-transparent" :
               count < 100 ? "bg-blue-500 text-white shadow-xs" :
               "bg-blue-700 text-white shadow-sm font-black"
             )}>
               {count}
             </span>
           ) : (
-            <span className="text-sm font-black tabular-nums leading-none ml-1.5 shrink-0 text-slate-700">
+            <span className="text-sm font-black tabular-nums leading-none ml-1.5 shrink-0 text-slate-700 dark:text-slate-300">
               {count}
             </span>
           )
@@ -288,7 +300,7 @@ function NodeCard({
 
       {progress !== undefined && (
         <div className="w-full mt-2">
-          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-emerald-500 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
@@ -298,7 +310,7 @@ function NodeCard({
       )}
 
       {sublabel && (
-        <p className="text-[9px] text-slate-450 font-bold mt-1.5 truncate w-full border-t pt-1.5 border-slate-150">
+        <p className="text-[9px] text-slate-450 dark:text-slate-500 font-bold mt-1.5 truncate w-full border-t pt-1.5 border-slate-150 dark:border-slate-800">
           {sublabel}
         </p>
       )}
@@ -306,7 +318,7 @@ function NodeCard({
       {onToggleExpand && (
         <div 
           onClick={onToggleExpand}
-          className="flex items-center gap-0.5 text-[8.5px] font-bold text-slate-400 hover:text-primary transition-colors cursor-pointer mt-2 leading-none w-full justify-end border-t pt-1.5 border-slate-50"
+          className="flex items-center gap-0.5 text-[8.5px] font-bold text-slate-400 hover:text-primary transition-colors cursor-pointer mt-2 leading-none w-full justify-end border-t pt-1.5 border-slate-50 dark:border-slate-800"
         >
           {isExpanded ? <ChevronDown className="h-2.5 w-2.5 shrink-0" /> : <ChevronRight className="h-2.5 w-2.5 shrink-0" />}
           <span>{isExpanded ? "Collapse" : "Expand"}</span>
@@ -671,11 +683,25 @@ export function OrgTreemap({
   const [mode, setMode] = React.useState<Mode>("gba");
   const [mounted, setMounted] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
+  const [isDark, setIsDark] = React.useState(false);
   React.useEffect(() => {
     setMounted(true);
     const checkMobile = () => setIsMobile(window.innerWidth < 640);
     checkMobile();
     window.addEventListener("resize", checkMobile);
+    
+    if (typeof window !== "undefined") {
+      const checkDark = () => {
+        setIsDark(document.documentElement.classList.contains("dark"));
+      };
+      checkDark();
+      const obs = new MutationObserver(checkDark);
+      obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+      return () => {
+        window.removeEventListener("resize", checkMobile);
+        obs.disconnect();
+      };
+    }
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
   const gbaTotal = React.useMemo(() => buildDetailedTree(gbaCorps, complaints, true).reduce((s, c) => s + c.complaintCount, 0), [gbaCorps, complaints]);
@@ -1239,62 +1265,62 @@ export function OrgTreemap({
       {/* 📋 KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {/* Total */}
-        <div className="rounded-2xl border bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Total Complaints</span>
             <CircleAlert className="h-5 w-5 text-blue-500" />
           </div>
-          <p className="text-3xl font-black text-slate-900 leading-none">{kpiStats.total}</p>
-          <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
+          <p className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{kpiStats.total}</p>
+          <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-455 font-bold">
             <span>Across {totalWardsCount} Wards</span>
-            <span className="text-emerald-600">+{todayTrend} Today</span>
+            <span className="text-emerald-600 dark:text-emerald-450">+{todayTrend} Today</span>
           </div>
         </div>
 
         {/* Open */}
-        <div className="rounded-2xl border bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Open</span>
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
           </div>
-          <p className="text-3xl font-black text-slate-900 leading-none">{kpiStats.open}</p>
-          <span className="inline-flex items-center bg-emerald-50 text-emerald-700 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
+          <p className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{kpiStats.open}</p>
+          <span className="inline-flex items-center bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-405 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
             {kpiStats.total > 0 ? Math.round((kpiStats.open / kpiStats.total) * 100) : 0}% of total
           </span>
         </div>
 
         {/* Pending */}
-        <div className="rounded-2xl border bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Pending</span>
             <span className="h-2 w-2 rounded-full bg-amber-500" />
           </div>
-          <p className="text-3xl font-black text-slate-900 leading-none">{kpiStats.pending}</p>
-          <span className="inline-flex items-center bg-amber-50 text-amber-700 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
+          <p className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{kpiStats.pending}</p>
+          <span className="inline-flex items-center bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-405 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
             {kpiStats.total > 0 ? Math.round((kpiStats.pending / kpiStats.total) * 100) : 0}% of total
           </span>
         </div>
 
         {/* In Progress */}
-        <div className="rounded-2xl border bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">In Progress</span>
             <LoaderCircle className="h-4 w-4 animate-spin text-blue-500" />
           </div>
-          <p className="text-3xl font-black text-slate-900 leading-none">{kpiStats.inProgress}</p>
-          <span className="inline-flex items-center bg-blue-50 text-blue-700 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
+          <p className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{kpiStats.inProgress}</p>
+          <span className="inline-flex items-center bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-405 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
             Active Workload
           </span>
         </div>
 
         {/* Closed */}
-        <div className="rounded-2xl border bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card p-6 shadow-2xs space-y-2 hover:shadow-sm transition-all duration-300 transform hover:-translate-y-0.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Closed</span>
             <BadgeCheck className="h-5 w-5 text-rose-500" />
           </div>
-          <p className="text-3xl font-black text-slate-900 leading-none">{kpiStats.closed}</p>
-          <span className="inline-flex items-center bg-rose-50 text-rose-700 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
+          <p className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{kpiStats.closed}</p>
+          <span className="inline-flex items-center bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-455 text-[9px] font-black py-0.5 px-1.5 rounded-full uppercase tracking-wider">
             Resolved
           </span>
         </div>
@@ -1306,25 +1332,25 @@ export function OrgTreemap({
           <ModeToggle mode={mode} onChange={switchMode} gbaTotal={gbaTotal} bbmpTotal={bbmpTotal} />
           
           {/* Floating Search Input with Ctrl + K */}
-          <div className="relative flex items-center bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden pr-3">
+          <div className="relative flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xs overflow-hidden pr-3">
             <Search className="h-4 w-4 text-slate-400 absolute left-3.5" />
             <input
               id="hierarchy-search"
               placeholder="Search wards, officers... (Ctrl + K)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9 pr-6 border-none outline-none focus:ring-0 text-xs w-[240px] font-semibold text-slate-700 placeholder-slate-400"
+              className="h-9 pl-9 pr-6 border-none outline-none bg-transparent focus:ring-0 text-xs w-[240px] font-semibold text-slate-755 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
             />
             {searchQuery ? (
               <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 text-xs font-bold leading-none p-1 rounded-full cursor-pointer">&times;</button>
             ) : (
-              <kbd className="hidden sm:inline-block pointer-events-none select-none rounded border bg-slate-50 px-1.5 font-mono text-[9px] font-bold text-slate-400">⌘K</kbd>
+              <kbd className="hidden sm:inline-block pointer-events-none select-none rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-1.5 font-mono text-[9px] font-bold text-slate-450 dark:text-slate-550">⌘K</kbd>
             )}
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 bg-white border rounded-xl px-4 py-2 text-[11px] font-semibold text-slate-500 shadow-2xs select-none">
+        <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-[11px] font-semibold text-slate-555 dark:text-slate-400 shadow-2xs select-none">
           <span className="text-[10px] text-slate-400 uppercase mr-1">Density:</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 0–10</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 11–50</span>
@@ -1334,10 +1360,10 @@ export function OrgTreemap({
       </div>
 
       {/* Breadcrumb Path navigation */}
-      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-500 bg-white border rounded-xl px-4 py-3 shadow-2xs select-none">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 shadow-2xs select-none">
         {breadcrumbs.map((part, i) => (
           <React.Fragment key={part.id}>
-            {i > 0 && <ChevronRight className="h-3 w-3 text-slate-300 shrink-0 mx-0.5" />}
+            {i > 0 && <ChevronRight className="h-3 w-3 text-slate-300 dark:text-slate-700 shrink-0 mx-0.5" />}
             <button
               onClick={() => selectBreadcrumb(part)}
               className={cn(
@@ -1354,7 +1380,7 @@ export function OrgTreemap({
       {/* Desktop SVG Canvas Tree */}
       <div
         ref={containerRef}
-        className="hidden md:block relative overflow-auto rounded-2xl border bg-card shadow-sm"
+        className="hidden md:block relative overflow-auto rounded-2xl border border-slate-200 dark:border-slate-850 bg-card dark:bg-slate-900/60 shadow-sm"
         style={{ minHeight: 520 }}
       >
         {/* SVG Bezier overlay curves */}
@@ -1554,16 +1580,28 @@ export function OrgTreemap({
                     dotColor = "bg-slate-400";
                   }
 
-                  const customBg = isSelected
-                    ? "#ffffff"
-                    : isSiblingInactive
-                    ? "rgba(248, 250, 252, 0.65)"
-                    : "#F8FAFC";
-                  const customBorder = isSelected
-                    ? "2px solid #2563EB"
-                    : hoverId === w.id
-                    ? "1.5px solid #2563EB"
-                    : "1px solid #CBD5E1";
+                  const customBg = isDark
+                    ? (isSelected
+                      ? "#1e293b"
+                      : isSiblingInactive
+                      ? "rgba(15, 23, 42, 0.65)"
+                      : "#0f172a")
+                    : (isSelected
+                      ? "#ffffff"
+                      : isSiblingInactive
+                      ? "rgba(248, 250, 252, 0.65)"
+                      : "#F8FAFC");
+                  const customBorder = isDark
+                    ? (isSelected
+                      ? "2px solid #3B82F6"
+                      : hoverId === w.id
+                      ? "1.5px solid #3B82F6"
+                      : "1px solid #1e293b")
+                    : (isSelected
+                      ? "2px solid #2563EB"
+                      : hoverId === w.id
+                      ? "1.5px solid #2563EB"
+                      : "1px solid #CBD5E1");
                   const customShadow = isSelected
                     ? "0 10px 15px -3px rgba(37, 99, 235, 0.15), 0 4px 6px -2px rgba(37, 99, 235, 0.05)"
                     : hoverId === w.id
@@ -1590,7 +1628,7 @@ export function OrgTreemap({
                   countBadge = (
                     <span className={cn(
                       "text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 leading-none ml-1.5",
-                      w.complaintCount === 0 ? "border border-slate-350 text-slate-500 bg-transparent" :
+                      w.complaintCount === 0 ? "border border-slate-350 dark:border-slate-800 text-slate-500 dark:text-slate-400 bg-transparent" :
                       w.complaintCount < 100 ? "bg-blue-500 text-white" :
                       "bg-blue-700 text-white font-black"
                     )}>
@@ -1606,11 +1644,11 @@ export function OrgTreemap({
 
                   cardClass = cn(
                     "flex flex-col rounded-xl border p-3 hover:shadow-md cursor-pointer transition-all duration-200 select-none w-[160px] hover:-translate-y-0.5",
-                    isSelected ? "ring-4 ring-blue-500/20 border-blue-500 bg-white" : "border-slate-200 bg-white/70",
+                    isSelected ? "ring-4 ring-blue-500/20 border-blue-500 bg-white dark:bg-slate-900" : "border-slate-200 dark:border-slate-805 bg-white/70 dark:bg-slate-900/60",
                     isMatched ? "border-amber-500 bg-amber-50/20 shadow-sm" : ""
                   );
 
-                  countBadge = <span className="text-slate-550">{w.complaintCount} cases</span>;
+                  countBadge = <span className="text-slate-555 dark:text-slate-400">{w.complaintCount} cases</span>;
                 }
 
                 return (
@@ -1629,8 +1667,8 @@ export function OrgTreemap({
                       <span className="text-[9px] font-bold text-slate-400 uppercase">Ward {w.no}</span>
                       <span className={cn("h-2 w-2 rounded-full", dotColor)} title={`${w.complaintCount} complaints`} />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-800 leading-tight truncate mt-1">{w.name}</span>
-                    <div className="flex items-center justify-between text-[10px] font-black text-slate-500 mt-2.5 border-t border-slate-100 pt-1.5">
+                    <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight truncate mt-1">{w.name}</span>
+                    <div className="flex items-center justify-between text-[10px] font-black text-slate-500 dark:text-slate-450 mt-2.5 border-t border-slate-105 dark:border-slate-805 pt-1.5">
                       {countBadge}
                       <span 
                         onClick={(e) => {
@@ -1734,8 +1772,8 @@ export function OrgTreemap({
 
         {/* Compact Enterprise Legend */}
         {isComplaintsDashboard && (
-          <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-xs border border-slate-200 shadow-sm rounded-xl px-4 py-2.5 z-10 text-[10px] text-slate-500 font-bold space-y-1.5 max-w-sm select-none pointer-events-auto">
-            <div className="flex items-center gap-4 border-b pb-1.5 mb-1.5 border-slate-100 uppercase tracking-wider text-slate-400 text-[9px] font-black">
+          <div className="absolute bottom-4 left-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs border border-slate-200 dark:border-slate-800 shadow-sm rounded-xl px-4 py-2.5 z-10 text-[10px] text-slate-555 dark:text-slate-400 font-bold space-y-1.5 max-w-sm select-none pointer-events-auto">
+            <div className="flex items-center gap-4 border-b pb-1.5 mb-1.5 border-slate-100 dark:border-slate-800 uppercase tracking-wider text-slate-400 dark:text-slate-500 text-[9px] font-black">
               Hierarchy Legend
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -1744,23 +1782,23 @@ export function OrgTreemap({
                 <span>Authority</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded bg-[#EEF2FF] border border-[#6366F1]" />
+                <span className="h-2.5 w-2.5 rounded bg-[#EEF2FF] dark:bg-indigo-950/20 border border-[#6366F1] dark:border-indigo-900/40" />
                 <span>Corporation</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded bg-[#ECFDF5] border border-[#10B981]" />
+                <span className="h-2.5 w-2.5 rounded bg-[#ECFDF5] dark:bg-emerald-950/20 border border-[#10B981] dark:border-emerald-900/40" />
                 <span>Division</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded bg-[#FFFBEB] border border-[#F59E0B]" />
+                <span className="h-2.5 w-2.5 rounded bg-[#FFFBEB] dark:bg-amber-950/20 border border-[#F59E0B] dark:border-amber-900/40" />
                 <span>Subdivision</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded bg-[#F8FAFC] border border-[#CBD5E1]" />
+                <span className="h-2.5 w-2.5 rounded bg-[#F8FAFC] dark:bg-slate-950/30 border border-[#CBD5E1] dark:border-slate-800" />
                 <span>Ward</span>
               </span>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t pt-1.5 mt-1 border-slate-100">
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t pt-1.5 mt-1 border-slate-100 dark:border-slate-800">
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 <span>Complaints Present</span>
@@ -1799,20 +1837,20 @@ export function OrgTreemap({
                 exit={isMobile ? { y: "100%", x: 0 } : { x: "100%", y: 0 }}
                 transition={{ type: "spring", damping: 28, stiffness: 220 }}
                 className={cn(
-                  "fixed bg-white shadow-2xl z-50 flex flex-col no-print border-slate-200 transition-all duration-200",
+                  "fixed bg-white dark:bg-slate-950 shadow-2xl z-50 flex flex-col no-print border-slate-200 dark:border-slate-805 transition-all duration-200",
                   "bottom-0 left-0 right-0 h-[80vh] w-full rounded-t-2xl border-t",
                   "sm:top-0 sm:bottom-auto sm:left-auto sm:right-0 sm:h-screen sm:w-[440px] sm:rounded-t-none sm:rounded-l-2xl sm:border-l sm:border-t-0"
                 )}
               >
                 {/* Mobile Drag Handle */}
-                <div className="flex justify-center py-2.5 sm:hidden bg-slate-50/50">
-                  <div className="w-12 h-1.5 bg-slate-350 rounded-full" />
+                <div className="flex justify-center py-2.5 sm:hidden bg-slate-50/50 dark:bg-slate-900">
+                  <div className="w-12 h-1.5 bg-slate-350 dark:bg-slate-700 rounded-full" />
                 </div>
 
                 {/* Header */}
-                <div className="p-4 sm:p-5 border-b flex items-center justify-between bg-slate-50/50">
+                <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-850 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/60">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                    <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-450 shrink-0">
                       {inspectorNode.type === "root" ? <Building2 className="h-4.5 w-4.5" /> :
                        inspectorNode.type === "corporation" ? <Building className="h-4.5 w-4.5" /> :
                        inspectorNode.type === "division" ? <MapPinned className="h-4.5 w-4.5" /> :
@@ -1822,10 +1860,10 @@ export function OrgTreemap({
                        <UserRound className="h-4.5 w-4.5" />}
                     </div>
                     <div>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      <span className="text-[9px] font-black text-slate-405 dark:text-slate-500 uppercase tracking-widest">
                         {inspectorNode.type} Node Info
                       </span>
-                      <h3 className="text-sm font-black text-slate-900 leading-tight truncate max-w-[200px] sm:max-w-[280px]">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-slate-105 leading-tight truncate max-w-[200px] sm:max-w-[280px]">
                         {inspectorNode.label || inspectorNode.name}
                       </h3>
                     </div>
@@ -1833,14 +1871,14 @@ export function OrgTreemap({
 
                   <button 
                     onClick={() => setInspectorNode(null)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-350 cursor-pointer"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
                 {/* Body Content */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin">
+                <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin dark:bg-slate-950/20">
                   
                   {/* 1. Dynamic Overview Statistics */}
                   <div className="space-y-3">
@@ -1848,25 +1886,25 @@ export function OrgTreemap({
                       <Activity className="h-3.5 w-3.5" /> Overview & Statistics
                     </h4>
                     <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold">
-                      <div className="border rounded-xl p-3 bg-slate-50/50">
-                        <span className="text-xl font-black text-slate-800 leading-none">
+                      <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/60">
+                        <span className="text-xl font-black text-slate-800 dark:text-slate-205 leading-none">
                           {inspectorNode.complaintCount || inspectorNode.complaintsCount || inspectorNode.complaintsList?.length || 0}
                         </span>
-                        <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1">Total complaints</span>
+                        <span className="block text-[8.5px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1 font-extrabold">Total complaints</span>
                       </div>
                       {inspectorNode.type !== "officer" && inspectorNode.type !== "engineer" ? (
-                        <div className="border rounded-xl p-3 bg-slate-50/50">
-                          <span className="text-xl font-black text-slate-800 leading-none">
+                        <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/60">
+                          <span className="text-xl font-black text-slate-800 dark:text-slate-205 leading-none">
                             {inspectorNode.activeCount ?? 0}
                           </span>
-                          <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1">Active Cases</span>
+                          <span className="block text-[8.5px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1 font-extrabold">Active Cases</span>
                         </div>
                       ) : (
-                        <div className="border rounded-xl p-3 bg-slate-50/50">
-                          <span className="text-xs font-bold text-slate-700 capitalize leading-none">
+                        <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/60">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 capitalize leading-none">
                             {inspectorNode.designation || "Zone Officer"}
                           </span>
-                          <span className="block text-[8.5px] text-slate-400 uppercase tracking-wider mt-1.5">Designation</span>
+                          <span className="block text-[8.5px] text-slate-405 dark:text-slate-500 uppercase tracking-wider mt-1.5 font-extrabold">Designation</span>
                         </div>
                       )}
                     </div>
@@ -1879,17 +1917,17 @@ export function OrgTreemap({
                         <ShieldAlert className="h-3.5 w-3.5 text-slate-400" /> Status Breakdown
                       </h4>
                       <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-bold">
-                        <div className="p-2 border rounded bg-emerald-50/50 text-emerald-800 border-emerald-100/40">
+                        <div className="p-2 border border-emerald-100/40 dark:border-emerald-900/20 rounded bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-450">
                           <span className="block font-black text-sm">{inspectorNode.activeCount ?? 0}</span>
                           <span className="text-[7.5px] uppercase">Active</span>
                         </div>
-                        <div className="p-2 border rounded bg-rose-50/50 text-rose-800 border-rose-100/40">
+                        <div className="p-2 border border-rose-100/40 dark:border-rose-900/20 rounded bg-rose-50/50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-455">
                           <span className="block font-black text-sm">{inspectorNode.overdueCount ?? 0}</span>
                           <span className="text-[7.5px] uppercase">Overdue</span>
                         </div>
-                        <div className="p-2 border rounded bg-slate-50 text-slate-655 border-slate-150">
+                        <div className="p-2 border border-slate-150 dark:border-slate-800 rounded bg-slate-50 dark:bg-slate-900 text-slate-655 dark:text-slate-400 font-extrabold">
                           <span className="block font-black text-sm">{inspectorNode.closedCount ?? 0}</span>
-                          <span className="text-[7.5px] uppercase">Closed</span>
+                          <span className="text-[7.5px] uppercase font-bold">Closed</span>
                         </div>
                       </div>
                     </div>
@@ -1897,8 +1935,8 @@ export function OrgTreemap({
 
                   {/* 3. Details description */}
                   {inspectorNode.extra && (
-                    <div className="p-3 border rounded-xl bg-slate-50 text-xs font-semibold text-slate-500">
-                      <span className="block text-[8px] text-slate-400 uppercase tracking-wider mb-1 font-bold">Historical / Delimitation Info</span>
+                    <div className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1 font-bold">Historical / Delimitation Info</span>
                       {inspectorNode.extra}
                     </div>
                   )}
@@ -1910,25 +1948,25 @@ export function OrgTreemap({
                     </h4>
                     
                     {(!inspectorNode.complaintsList || inspectorNode.complaintsList.length === 0) ? (
-                      <p className="text-xs text-slate-400 italic font-semibold text-center py-4 bg-slate-50 border rounded-xl">No complaints filed in this area</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 italic font-semibold text-center py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl">No complaints filed in this area</p>
                     ) : (
-                      <ul className="divide-y divide-slate-100 space-y-2">
+                      <ul className="divide-y divide-slate-100 dark:divide-slate-850 space-y-2">
                         {inspectorNode.complaintsList.map((c: any) => (
                           <li key={c.id} className="pt-2.5 first:pt-0">
                             <div className="flex items-start justify-between gap-2.5">
-                              <span className="text-xs font-extrabold text-slate-700 leading-snug line-clamp-2">
+                              <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300 leading-snug line-clamp-2">
                                 {c.title}
                               </span>
                               <span className={cn(
                                 "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 leading-none",
-                                c.status === "Resolved" || c.status === "Closed" ? "bg-emerald-100 text-emerald-800" :
-                                c.status === "Assigned To Engineer" || c.status === "Work In Progress" ? "bg-blue-100 text-blue-800" :
-                                "bg-slate-100 text-slate-655"
+                                c.status === "Resolved" || c.status === "Closed" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-450" :
+                                c.status === "Assigned To Engineer" || c.status === "Work In Progress" ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-450" :
+                                "bg-slate-100 text-slate-655 dark:bg-slate-800 dark:text-slate-405"
                               )}>
                                 {c.status}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1 text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">
+                            <div className="flex items-center gap-2 mt-1 text-[8.5px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
                               <span className="font-mono">{c.id.slice(0, 8)}</span>
                               <span>&middot;</span>
                               <span>{c.priority || "Medium"} Priority</span>
