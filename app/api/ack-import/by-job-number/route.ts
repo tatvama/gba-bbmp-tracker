@@ -6,7 +6,6 @@ import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { validateUpload } from "@/lib/storage/supabase-upload";
 import { getComplaintSettings } from "@/lib/settings";
 import { extractJobCode } from "@/lib/ifms/downloader";
-import { loadComplaintPool } from "@/lib/complaints/ack-matcher";
 import { attachAcknowledgmentDocument } from "@/lib/complaints/ack-attach";
 
 export const runtime = "nodejs";
@@ -19,6 +18,13 @@ export const maxDuration = 60;
  * (not replacing) the AI-driven bulk mixed-PDF flow at /api/ack-import for
  * scans that don't arrive pre-separated. Runs synchronously since matching is
  * instant — no batch/progress polling needed.
+ *
+ * Matches with a direct, indexed `job_number` lookup per file (idx_complaints_
+ * job_number) rather than pulling the whole complaint pool into memory and
+ * filtering client-side — that pool used to be capped at an unordered
+ * `LIMIT 5000` (lib/complaints/ack-matcher.ts), so once the table grew past
+ * that a complaint could silently fall outside the window and never match,
+ * with no visible error. A per-code indexed query has no such ceiling.
  */
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
@@ -41,7 +47,6 @@ export async function POST(req: NextRequest) {
   const settings = await getComplaintSettings();
   const maxBytes = (settings.maxUploadMb || 15) * 1024 * 1024;
   const admin = createAdminClient();
-  const pool = await loadComplaintPool(admin);
 
   const attached: { fileName: string; complaintId: string; caseNumber: string | null; jobNumber: string }[] = [];
   const unmatched: { fileName: string; jobNumber: string }[] = [];
@@ -61,7 +66,38 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    const candidates = pool.filter((p) => extractJobCode(p.job_number) === code);
+    // Exact match first (fast, uses idx_complaints_job_number) — covers every
+    // complaint created through the ZIP/IFMS import pipelines, which always
+    // write the bare canonical code. Complaints created by hand have a free-
+    // text job_number field (no format enforcement), so a value like
+    // "Job 047-25-000003" or one with stray whitespace wouldn't hit the exact
+    // match — fall back to a substring scan, re-verified with the same
+    // extractJobCode used everywhere else so an incidental digit-run overlap
+    // can't produce a false match.
+    let candidates: { id: string; internal_case_number: string | null; title: string | null }[] | null = null;
+    const exact = await admin
+      .from("complaints")
+      .select("id, internal_case_number, title")
+      .eq("job_number", code)
+      .is("deleted_at", null);
+    if (exact.error) {
+      invalid.push({ fileName: file.name, reason: `Lookup failed: ${exact.error.message}` });
+      continue;
+    }
+    if (exact.data.length > 0) {
+      candidates = exact.data;
+    } else {
+      const fuzzy = await admin
+        .from("complaints")
+        .select("id, internal_case_number, title, job_number")
+        .ilike("job_number", `%${code}%`)
+        .is("deleted_at", null);
+      if (fuzzy.error) {
+        invalid.push({ fileName: file.name, reason: `Lookup failed: ${fuzzy.error.message}` });
+        continue;
+      }
+      candidates = fuzzy.data.filter((c) => extractJobCode(c.job_number) === code);
+    }
     if (candidates.length === 0) {
       unmatched.push({ fileName: file.name, jobNumber: code });
       continue;
