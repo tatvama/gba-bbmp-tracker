@@ -927,7 +927,7 @@ function QueueCard({
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.22 }}
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-card p-6 shadow-2xs transition-all hover:shadow-xs space-y-4",
+        "relative overflow-hidden rounded-xl border bg-card p-4 sm:p-6 shadow-2xs transition-all hover:shadow-xs space-y-4",
         working && "border-primary/45 bg-primary/[0.005]",
         s.status === "done" && "border-emerald-250 bg-emerald-50/[0.005]",
         (s.status === "failed" || local?.failed) && "border-rose-250 bg-rose-50/[0.005]",
@@ -942,13 +942,13 @@ function QueueCard({
       )}
 
       {/* Top Row: File icon & Name metadata */}
-      <div className="flex flex-wrap items-center gap-3.5 justify-between">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
           <div className={cn(
-            "rounded-xl p-2.5 shrink-0 shadow-3xs border",
-            pendingDupCode && "bg-rose-50 text-rose-600 border-rose-150 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900",
+            "rounded-xl p-2.5 shrink-0 shadow-3xs border mt-0.5 sm:mt-0",
+            pendingDupCode && "bg-rose-50 text-rose-600 border-rose-150 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900",
             !pendingDupCode && s.status === "done" && "bg-emerald-50 text-emerald-600 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900",
-            !pendingDupCode && (s.status === "failed" || local?.failed) && "bg-rose-50 text-rose-600 border-rose-150 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900",
+            !pendingDupCode && (s.status === "failed" || local?.failed) && "bg-rose-50 text-rose-600 border-rose-150 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900",
             !pendingDupCode && working && "bg-blue-50 text-primary border-blue-150 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900",
             !pendingDupCode && !working && s.status !== "done" && s.status !== "failed" && !local?.failed && "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
           )}>
@@ -967,11 +967,11 @@ function QueueCard({
             )}
           </div>
 
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <h3 className="truncate text-sm font-extrabold text-slate-800 dark:text-slate-200">
+          <div className="min-w-0 flex-1 space-y-1">
+            <h3 className="truncate text-sm font-extrabold text-slate-800 dark:text-slate-205">
               {s.fileName}
             </h3>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-450 dark:text-slate-500">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-450 dark:text-slate-500">
               <span className="font-mono">{fmtMB(s.fileSize)}</span>
               {s.jobCodes.length > 0 && (
                 <>
@@ -990,7 +990,7 @@ function QueueCard({
         </div>
 
         {/* Badges & Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 w-full sm:w-auto justify-start sm:justify-end">
           {queuePos > 0 && (
             <span className="flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
               <Clock className="h-3 w-3" /> Queue #{queuePos}
@@ -1001,7 +1001,7 @@ function QueueCard({
             {meta.label}
           </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
             {uploadingLocally && (
               <Button 
                 type="button" 
@@ -1047,7 +1047,7 @@ function QueueCard({
             {/* Expand / Collapse Details Trigger */}
             <button
               onClick={() => setExpanded(!expanded)}
-              className="rounded-lg p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors flex items-center gap-1 text-[11px] font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 px-2.5 hover:bg-slate-50"
+              className="rounded-lg p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors flex items-center gap-1 text-[11px] font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 px-2.5 hover:bg-slate-50 flex-1 sm:flex-none justify-center"
               aria-label="Toggle execution logs"
             >
               <span>{expanded ? "Hide Details" : "Show Details"}</span>
@@ -1294,11 +1294,11 @@ function SegmentedProgress({
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
-        <span className="text-slate-400 max-w-[70%] truncate block" title={message}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-semibold text-slate-500">
+        <span className="text-slate-400 max-w-full sm:max-w-[70%] truncate block" title={message}>
           {message || (status === "failed" ? "Ingestion error detected" : "")}
         </span>
-        <span className="shrink-0 text-foreground font-bold">
+        <span className="shrink-0 text-foreground font-bold text-left sm:text-right">
           Stage {currentStageIdx + 1} of 6: <strong className="text-primary font-extrabold">{stageLabel}</strong>
         </span>
       </div>
