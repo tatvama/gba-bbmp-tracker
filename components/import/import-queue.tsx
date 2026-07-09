@@ -73,9 +73,12 @@ export function ImportQueue({
   const [local, setLocal] = React.useState<Record<string, LocalUpload>>({});
   // Job code parsed from the ZIP's own filename that already matches an
   // imported job_case, reported by the server the moment the upload session
-  // is created — before any chunk is sent. Advisory only (see route.ts);
-  // upload still proceeds, this just lets the user cancel early if they want.
-  const [filenameDupes, setFilenameDupes] = React.useState<Record<string, string>>({});
+  // is created — before any chunk is sent (see route.ts). The upload is
+  // withheld (not enqueued) until the user confirms or discards, so a
+  // multi-GB re-upload of an already-imported job never actually happens.
+  const [pendingDupes, setPendingDupes] = React.useState<
+    Record<string, { jobCode: string; file: File; handle: FileSystemFileHandle | null }>
+  >({});
   const [resumable, setResumable] = React.useState<Record<string, FileSystemFileHandle>>({});
   const [autoCommit, setAutoCommit] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -283,8 +286,12 @@ export function ImportQueue({
           }
           const s = d.session;
           setSessions((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
-          if (d.duplicateJobNumber) {
-            setFilenameDupes((prev) => ({ ...prev, [s.id]: d.duplicateJobNumber! }));
+          if (d.duplicateJobNumber && s.status === "uploading") {
+            // Don't waste a multi-GB upload on a job the server already has
+            // — hold it here until the user explicitly confirms or discards.
+            const handle = handles?.[files.indexOf(file)] ?? null;
+            setPendingDupes((prev) => ({ ...prev, [s.id]: { jobCode: d.duplicateJobNumber!, file, handle } }));
+            continue;
           }
           if (s.status === "uploading") {
             const handle = handles?.[files.indexOf(file)] ?? null;
@@ -347,6 +354,34 @@ export function ImportQueue({
     void deleteFileHandle(id);
     await fetch(`/api/import-queue/${id}`, { method: "DELETE" }).catch(() => {});
   }, []);
+
+  // ── likely-duplicate ZIP held before upload: user's call ────────────────────
+  const confirmDuplicateUpload = React.useCallback(
+    (id: string) => {
+      const pending = pendingDupes[id];
+      if (!pending) return;
+      setPendingDupes((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      if (pending.handle) void saveFileHandle(id, pending.handle);
+      enqueueUpload(id, pending.file);
+    },
+    [pendingDupes, enqueueUpload],
+  );
+
+  const discardDuplicateSession = React.useCallback(
+    (id: string) => {
+      setPendingDupes((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      void cancelSession(id);
+    },
+    [cancelSession],
+  );
 
   const retryUpload = React.useCallback(
     (s: ImportUploadSnapshot) => {
@@ -774,10 +809,12 @@ export function ImportQueue({
                   local={local[s.id]}
                   queuePos={s.status === "queued" ? queuedIds.indexOf(s.id) + 1 : 0}
                   canResume={Boolean(resumable[s.id]) && !local[s.id]}
-                  filenameDupCode={filenameDupes[s.id]}
+                  pendingDupCode={pendingDupes[s.id]?.jobCode}
                   onResume={() => void resumeFromHandle(s)}
                   onCancel={() => void cancelSession(s.id)}
                   onRetry={() => retryUpload(s)}
+                  onConfirmDuplicateUpload={() => confirmDuplicateUpload(s.id)}
+                  onDiscardDuplicate={() => discardDuplicateSession(s.id)}
                 />
               ))}
             </AnimatePresence>
@@ -793,19 +830,23 @@ function QueueCard({
   local,
   queuePos,
   canResume,
-  filenameDupCode,
+  pendingDupCode,
   onResume,
   onCancel,
   onRetry,
+  onConfirmDuplicateUpload,
+  onDiscardDuplicate,
 }: {
   session: ImportUploadSnapshot;
   local?: LocalUpload;
   queuePos: number;
   canResume: boolean;
-  filenameDupCode?: string;
+  pendingDupCode?: string;
   onResume: () => void;
   onCancel: () => void;
   onRetry: () => void;
+  onConfirmDuplicateUpload: () => void;
+  onDiscardDuplicate: () => void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const [duplicateCodes, setDuplicateCodes] = React.useState<string[]>([]);
@@ -826,7 +867,9 @@ function QueueCard({
       .catch(() => {});
   }, [s.status, s.batchId]);
 
-  const meta = STATUS_META[s.status] ?? STATUS_META.queued!;
+  const meta = pendingDupCode
+    ? { label: "Awaiting confirmation", chip: "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/20 dark:text-rose-300 dark:border-rose-900" }
+    : STATUS_META[s.status] ?? STATUS_META.queued!;
   const uploadingLocally = Boolean(local) && s.status === "uploading" && !local?.failed;
   const progress = uploadingLocally
     ? Math.round((35 * (local!.sentBytes / Math.max(1, s.fileSize))))
@@ -887,12 +930,15 @@ function QueueCard({
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className={cn(
             "rounded-xl p-2.5 shrink-0 shadow-3xs border",
-            s.status === "done" && "bg-emerald-50 text-emerald-600 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900",
-            (s.status === "failed" || local?.failed) && "bg-rose-50 text-rose-600 border-rose-150 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900",
-            working && "bg-blue-50 text-primary border-blue-150 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900",
-            !working && s.status !== "done" && s.status !== "failed" && !local?.failed && "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
+            pendingDupCode && "bg-rose-50 text-rose-600 border-rose-150 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900",
+            !pendingDupCode && s.status === "done" && "bg-emerald-50 text-emerald-600 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900",
+            !pendingDupCode && (s.status === "failed" || local?.failed) && "bg-rose-50 text-rose-600 border-rose-150 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900",
+            !pendingDupCode && working && "bg-blue-50 text-primary border-blue-150 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900",
+            !pendingDupCode && !working && s.status !== "done" && s.status !== "failed" && !local?.failed && "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
           )}>
-            {s.status === "done" ? (
+            {pendingDupCode ? (
+              <AlertTriangle className="h-5 w-5" />
+            ) : s.status === "done" ? (
               <CheckCircle2 className="h-5 w-5" />
             ) : (s.status === "failed" || local?.failed) ? (
               <AlertTriangle className="h-5 w-5" />
@@ -998,46 +1044,60 @@ function QueueCard({
         </div>
       </div>
 
-      {/* Early heads-up from the filename alone, before/during upload — advisory,
-          not a hard block (see route.ts). Superseded by the definitive banners
-          below once the real per-folder check runs. */}
-      {filenameDupCode && s.status !== "done" && s.status !== "failed" && !local?.failed && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50/40 p-3.5 dark:border-rose-900/50 dark:bg-rose-950/20">
-          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
-          <div className="flex-1 text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
-            <span className="font-bold">Likely duplicate — job {filenameDupCode} already imported.</span>
-            {" "}Matched from the file name before upload started. Upload will continue, but this job
-            will be skipped automatically once confirmed — cancel now to save the wait if you don&apos;t need it re-checked.
+      {/* Likely duplicate, matched from the filename BEFORE a single byte was
+          sent (see route.ts) — the upload is held here, not enqueued, until
+          the user decides. Replaces the progress area entirely: there is
+          nothing "in progress" yet. */}
+      {pendingDupCode ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50/50 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+            <div className="flex-1 text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
+              <span className="font-bold">Likely duplicate — job {pendingDupCode} already imported.</span>
+              {" "}Matched from the file name — upload has NOT started, so you don&apos;t wait on a multi-GB
+              transfer just to be told it&apos;s a duplicate afterwards. If this ZIP only covers that one job,
+              discard it. If it also contains other jobs, upload anyway — those will still be created.
+            </div>
           </div>
-          {cancellable && (
+          <div className="flex items-center gap-2 pl-7">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="h-7 shrink-0 text-[11px] font-bold border-rose-250 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900/60 dark:text-rose-400"
-              onClick={onCancel}
+              className="h-8 text-xs font-bold border-rose-250 text-rose-700 hover:bg-rose-100/60 dark:border-rose-900/60 dark:text-rose-400"
+              onClick={onDiscardDuplicate}
             >
-              Cancel Upload
+              <X className="h-3.5 w-3.5 mr-1" /> Discard
             </Button>
-          )}
-        </div>
-      )}
-
-      {/* If this failed because the job was already imported, show a clear warning/alert banner */}
-      {(s.status === "failed" || local?.failed) && message.includes("already imported") && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/70 p-3.5 text-xs font-semibold text-rose-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-450 shadow-3xs">
-          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" />
-          <div className="space-y-0.5 text-left">
-            <p className="font-extrabold text-[12px] text-amber-900 dark:text-amber-450">Duplicate Job Detected</p>
-            <p className="text-amber-800 dark:text-amber-400 font-medium text-[11px] leading-relaxed">{message}</p>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-sm"
+              onClick={onConfirmDuplicateUpload}
+            >
+              <UploadCloud className="h-3.5 w-3.5 mr-1" /> Upload Anyway
+            </Button>
           </div>
         </div>
-      )}
+      ) : (
+        <>
+          {/* If this failed because the job was already imported, show a clear warning/alert banner */}
+          {(s.status === "failed" || local?.failed) && message.includes("already imported") && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/70 p-3.5 text-xs font-semibold text-rose-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-450 shadow-3xs">
+              <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" />
+              <div className="space-y-0.5 text-left">
+                <p className="font-extrabold text-[12px] text-amber-900 dark:text-amber-450">Duplicate Job Detected</p>
+                <p className="text-amber-800 dark:text-amber-400 font-medium text-[11px] leading-relaxed">{message}</p>
+              </div>
+            </div>
+          )}
 
-      {/* Segmented Progress Area (Always visible, key visual) */}
-      <div className="bg-slate-50/40 dark:bg-slate-950/10 p-4 rounded-xl border border-slate-100 dark:border-slate-850">
-        <SegmentedProgress progress={s.status === "done" ? 100 : progress} status={s.status} message={message} stageLabel={stepsList[currentStageIdx]?.label || ""} />
-      </div>
+          {/* Segmented Progress Area (Always visible, key visual) */}
+          <div className="bg-slate-50/40 dark:bg-slate-950/10 p-4 rounded-xl border border-slate-100 dark:border-slate-850">
+            <SegmentedProgress progress={s.status === "done" ? 100 : progress} status={s.status} message={message} stageLabel={stepsList[currentStageIdx]?.label || ""} />
+          </div>
+        </>
+      )}
 
       {/* Collapsible Details Area */}
       {expanded && (
