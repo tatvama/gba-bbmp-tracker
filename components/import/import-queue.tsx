@@ -71,6 +71,11 @@ export function ImportQueue({
 } = {}) {
   const [sessions, setSessions] = React.useState<ImportUploadSnapshot[]>([]);
   const [local, setLocal] = React.useState<Record<string, LocalUpload>>({});
+  // Job code parsed from the ZIP's own filename that already matches an
+  // imported job_case, reported by the server the moment the upload session
+  // is created — before any chunk is sent. Advisory only (see route.ts);
+  // upload still proceeds, this just lets the user cancel early if they want.
+  const [filenameDupes, setFilenameDupes] = React.useState<Record<string, string>>({});
   const [resumable, setResumable] = React.useState<Record<string, FileSystemFileHandle>>({});
   const [autoCommit, setAutoCommit] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -266,13 +271,21 @@ export function ImportQueue({
               autoCommit,
             }),
           });
-          const d = (await r.json()) as { session?: ImportUploadSnapshot; resumed?: boolean; error?: string };
+          const d = (await r.json()) as {
+            session?: ImportUploadSnapshot;
+            resumed?: boolean;
+            duplicateJobNumber?: string | null;
+            error?: string;
+          };
           if (!r.ok || !d.session) {
             setError(d.error || `Could not start the upload for ${file.name}.`);
             continue;
           }
           const s = d.session;
           setSessions((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
+          if (d.duplicateJobNumber) {
+            setFilenameDupes((prev) => ({ ...prev, [s.id]: d.duplicateJobNumber! }));
+          }
           if (s.status === "uploading") {
             const handle = handles?.[files.indexOf(file)] ?? null;
             if (handle) void saveFileHandle(s.id, handle);
@@ -761,6 +774,7 @@ export function ImportQueue({
                   local={local[s.id]}
                   queuePos={s.status === "queued" ? queuedIds.indexOf(s.id) + 1 : 0}
                   canResume={Boolean(resumable[s.id]) && !local[s.id]}
+                  filenameDupCode={filenameDupes[s.id]}
                   onResume={() => void resumeFromHandle(s)}
                   onCancel={() => void cancelSession(s.id)}
                   onRetry={() => retryUpload(s)}
@@ -779,6 +793,7 @@ function QueueCard({
   local,
   queuePos,
   canResume,
+  filenameDupCode,
   onResume,
   onCancel,
   onRetry,
@@ -787,6 +802,7 @@ function QueueCard({
   local?: LocalUpload;
   queuePos: number;
   canResume: boolean;
+  filenameDupCode?: string;
   onResume: () => void;
   onCancel: () => void;
   onRetry: () => void;
@@ -981,6 +997,31 @@ function QueueCard({
           </div>
         </div>
       </div>
+
+      {/* Early heads-up from the filename alone, before/during upload — advisory,
+          not a hard block (see route.ts). Superseded by the definitive banners
+          below once the real per-folder check runs. */}
+      {filenameDupCode && s.status !== "done" && s.status !== "failed" && !local?.failed && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50/40 p-3.5 dark:border-rose-900/50 dark:bg-rose-950/20">
+          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+          <div className="flex-1 text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
+            <span className="font-bold">Likely duplicate — job {filenameDupCode} already imported.</span>
+            {" "}Matched from the file name before upload started. Upload will continue, but this job
+            will be skipped automatically once confirmed — cancel now to save the wait if you don&apos;t need it re-checked.
+          </div>
+          {cancellable && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 text-[11px] font-bold border-rose-250 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900/60 dark:text-rose-400"
+              onClick={onCancel}
+            >
+              Cancel Upload
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* If this failed because the job was already imported, show a clear warning/alert banner */}
       {(s.status === "failed" || local?.failed) && message.includes("already imported") && (

@@ -6,6 +6,7 @@ import { IMPORT_CHUNK_SIZE, MAX_IMPORT_ZIP_BYTES } from "@/lib/import-queue/type
 import { listImportSessions, rowToSnapshot } from "@/lib/import-queue/store";
 import { stagedPathFor, stagedSize } from "@/lib/import-queue/staging";
 import { kickImportWorker } from "@/lib/import-queue/worker";
+import { extractJobCode } from "@/lib/ifms/downloader";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +63,27 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
+  // The real dedup check (against every job-code folder inside the ZIP) only
+  // happens after the whole file is uploaded and extracted — too late to save
+  // the wait on a multi-GB re-upload. Most exports here are one job per ZIP,
+  // named by its job code (e.g. "047-25-000003.zip"), so a cheap look-ahead
+  // against just the filename catches the common case immediately, before a
+  // single byte is uploaded. This is advisory, not a hard block: a multi-job
+  // ZIP whose filename happens to match one already-imported code should
+  // still upload normally for its other jobs — the authoritative per-folder
+  // check in processForensicBatch still runs and is what actually excludes it.
+  const filenameJobCode = extractJobCode(fileName);
+  let duplicateJobNumber: string | null = null;
+  if (filenameJobCode) {
+    const { data: dup } = await admin
+      .from("job_cases")
+      .select("job_number")
+      .eq("job_number", filenameJobCode)
+      .limit(1)
+      .maybeSingle();
+    if (dup) duplicateJobNumber = filenameJobCode;
+  }
+
   // Same file already in flight? Resume the upload / point at the running one
   // instead of importing the ZIP twice.
   const { data: existing } = await admin
@@ -83,7 +105,7 @@ export async function POST(req: NextRequest) {
         snap.receivedBytes = onDisk;
       }
     }
-    return NextResponse.json({ session: snap, resumed: true });
+    return NextResponse.json({ session: snap, resumed: true, duplicateJobNumber });
   }
 
   const { data, error } = await admin
@@ -110,5 +132,9 @@ export async function POST(req: NextRequest) {
   await admin.from("import_uploads").update({ staged_path: stagedPath }).eq("id", data.id);
 
   console.log(`[import-queue] session created id=${data.id} file=${fileName} size=${fileSize} user=${user.id}`);
-  return NextResponse.json({ session: rowToSnapshot({ ...data, staged_path: stagedPath } as Record<string, unknown>), resumed: false });
+  return NextResponse.json({
+    session: rowToSnapshot({ ...data, staged_path: stagedPath } as Record<string, unknown>),
+    resumed: false,
+    duplicateJobNumber,
+  });
 }

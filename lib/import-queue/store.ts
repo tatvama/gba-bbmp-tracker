@@ -57,17 +57,42 @@ export async function getImportSession(
   };
 }
 
-/** The sessions a user's import page cares about (active + last 24 h history). */
+/** Safety backstop for a single batch drop, not a real expected ceiling. */
+const MAX_ACTIVE_SESSIONS = 1000;
+/** How much finished/failed/cancelled history to keep showing alongside it. */
+const MAX_HISTORY_SESSIONS = 50;
+
+/**
+ * The sessions a user's import page cares about (active + last 24 h history).
+ * Queried as two separate lists — not one `OR` + single `LIMIT` — because a
+ * combined ascending-order query lets old *history* rows crowd out brand-new
+ * *active* uploads: with 50+ done/failed rows already inside the 24 h window,
+ * the single LIMIT 50 could fill entirely with history and never surface a
+ * batch of newly-added active uploads at all, even though they're still
+ * uploading/queued in the DB. Active sessions are effectively uncapped (a
+ * generous safety limit only); history is capped and kept to the most recent.
+ */
 export async function listImportSessions(admin: SupabaseClient, userId: string): Promise<ImportUploadSnapshot[]> {
   const cutoff = new Date(Date.now() - DONE_VISIBLE_HOURS * 3600 * 1000).toISOString();
-  const { data } = await admin
-    .from("import_uploads")
-    .select(SELECT_COLS)
-    .eq("created_by", userId)
-    .or(`status.in.(uploading,queued,processing,review),created_at.gte.${cutoff}`)
-    .order("created_at", { ascending: true })
-    .limit(50);
-  return ((data as Row[]) ?? []).map(rowToSnapshot);
+  const [{ data: active }, { data: history }] = await Promise.all([
+    admin
+      .from("import_uploads")
+      .select(SELECT_COLS)
+      .eq("created_by", userId)
+      .in("status", ["uploading", "queued", "processing", "review"])
+      .order("created_at", { ascending: true })
+      .limit(MAX_ACTIVE_SESSIONS),
+    admin
+      .from("import_uploads")
+      .select(SELECT_COLS)
+      .eq("created_by", userId)
+      .in("status", ["done", "failed", "cancelled"])
+      .gte("created_at", cutoff)
+      .order("created_at", { ascending: false })
+      .limit(MAX_HISTORY_SESSIONS),
+  ]);
+  const rows = [...((active as Row[]) ?? []), ...((history as Row[]) ?? [])];
+  return rows.map(rowToSnapshot);
 }
 
 /**
