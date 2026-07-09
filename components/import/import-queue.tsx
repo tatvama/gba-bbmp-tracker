@@ -463,6 +463,18 @@ export function ImportQueue({
     });
   };
 
+  const pauseUpload = React.useCallback((id: string) => {
+    abortsRef.current[id]?.abort();
+    setLocal((prev) => {
+      const item = prev[id];
+      if (!item) return prev;
+      return {
+        ...prev,
+        [id]: { ...item, failed: "Paused by user" }
+      };
+    });
+  }, []);
+
   const resumeAllPaused = () => {
     sessions.forEach((s) => {
       if (s.status === "uploading" && resumable[s.id] && !local[s.id]) {
@@ -811,6 +823,7 @@ export function ImportQueue({
                   canResume={Boolean(resumable[s.id]) && !local[s.id]}
                   pendingDupCode={pendingDupes[s.id]?.jobCode}
                   onResume={() => void resumeFromHandle(s)}
+                  onPause={() => pauseUpload(s.id)}
                   onCancel={() => void cancelSession(s.id)}
                   onRetry={() => retryUpload(s)}
                   onConfirmDuplicateUpload={() => confirmDuplicateUpload(s.id)}
@@ -832,6 +845,7 @@ function QueueCard({
   canResume,
   pendingDupCode,
   onResume,
+  onPause,
   onCancel,
   onRetry,
   onConfirmDuplicateUpload,
@@ -843,6 +857,7 @@ function QueueCard({
   canResume: boolean;
   pendingDupCode?: string;
   onResume: () => void;
+  onPause: () => void;
   onCancel: () => void;
   onRetry: () => void;
   onConfirmDuplicateUpload: () => void;
@@ -871,6 +886,7 @@ function QueueCard({
     ? { label: "Awaiting confirmation", chip: "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/20 dark:text-rose-300 dark:border-rose-900" }
     : STATUS_META[s.status] ?? STATUS_META.queued!;
   const uploadingLocally = Boolean(local) && s.status === "uploading" && !local?.failed;
+  const isPaused = Boolean(local) && local?.failed === "Paused by user";
   const progress = uploadingLocally
     ? Math.round((35 * (local!.sentBytes / Math.max(1, s.fileSize))))
     : s.progress;
@@ -986,7 +1002,28 @@ function QueueCard({
           </span>
 
           <div className="flex items-center gap-1.5">
-            {local?.failed && (
+            {uploadingLocally && (
+              <Button 
+                type="button" 
+                size="sm" 
+                variant="outline" 
+                className="h-8 text-xs font-bold shadow-2xs hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer border-slate-200 dark:border-slate-800 dark:bg-slate-900" 
+                onClick={onPause}
+              >
+                <Pause className="h-3.5 w-3.5 mr-1 text-slate-500" /> Pause
+              </Button>
+            )}
+            {isPaused && (
+              <Button 
+                type="button" 
+                size="sm" 
+                className="h-8 text-xs font-bold shadow-2xs hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer" 
+                onClick={onRetry}
+              >
+                <Play className="h-3.5 w-3.5 mr-1" /> Resume
+              </Button>
+            )}
+            {local?.failed && local.failed !== "Paused by user" && (
               <Button type="button" size="sm" variant="outline" className="h-8 text-xs font-bold shadow-2xs hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer" onClick={onRetry}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry Upload
               </Button>
