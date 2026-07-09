@@ -196,6 +196,45 @@ describe("groupEntriesByJobCode + parseJob", () => {
     const g = groupEntriesByJobCode([{ relPath: "estimate.pdf", size: 100 }], "receipts.zip");
     expect(g.size).toBe(0);
   });
+
+  // Real regression: a flat single-job ZIP (184-23-000003.zip) contained a
+  // scanned file hand-named "WB-MB-184-83-000003 MB Book.pdf" — one mistyped
+  // digit spawned a phantom second job (and, once imported, a phantom job
+  // case that then blocked the whole ZIP as "all duplicates").
+  it("folds a typo'd leaf-filename code into the ZIP-filename job instead of creating a phantom job", () => {
+    const flat: RawEntry[] = [
+      { relPath: "WB-Bill-Bill form 184-23-000003.pdf", size: 100 },
+      { relPath: "Pmc-184-23-000003 PMC report .pdf", size: 100 },
+      { relPath: "WB-MB-184-83-000003 MB Book.pdf", size: 100 }, // typo: 83 ≠ 23
+      { relPath: "info.txt", size: 10 },
+      { relPath: "Pmc-Blank.pdf", size: 10 },
+    ];
+    const notes: string[] = [];
+    const g = groupEntriesByJobCode(flat, "184-23-000003.zip", notes);
+    expect([...g.keys()]).toEqual(["184-23-000003"]);
+    // every file belongs to the one job — typo'd AND codeless ones included
+    expect(g.get("184-23-000003")).toHaveLength(5);
+    expect(notes.join(" ")).toContain("184-83-000003");
+  });
+  it("folds a typo'd leaf code into a single job-code folder, still dropping codeless noise", () => {
+    const es: RawEntry[] = [
+      { relPath: `${B}/${CODE}/info.txt`, size: 10 },
+      { relPath: `${A}/letters/Job_209-86-000004_complaint_KN.docx`, size: 100 }, // typo: 86 ≠ 26
+      { relPath: `${A}/work/_batch.log`, size: 10 }, // codeless noise
+    ];
+    const g = groupEntriesByJobCode(es);
+    expect([...g.keys()]).toEqual([CODE]);
+    expect(g.get(CODE)).toHaveLength(2); // info.txt + reassigned letter, noise still dropped
+  });
+  it("leaves multi-job ZIPs (several job-code folders) untouched — no folding", () => {
+    const es: RawEntry[] = [
+      { relPath: `${B}/${CODE}/info.txt`, size: 10 },
+      { relPath: `${B}/210-26-000001/info.txt`, size: 10 },
+      { relPath: `${A}/letters/Job_209-86-000004_complaint_KN.docx`, size: 100 },
+    ];
+    const g = groupEntriesByJobCode(es, `${CODE}.zip`);
+    expect([...g.keys()].sort()).toEqual(["209-26-000004", "209-86-000004", "210-26-000001"]);
+  });
 });
 
 describe("computeMissing", () => {

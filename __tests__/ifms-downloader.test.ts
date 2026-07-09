@@ -153,6 +153,15 @@ describe("extractJobCode", () => {
     expect(extractJobCode("Work 044-22-000011 road asphalting")).toBe("044-22-000011");
     expect(extractJobCode("no code here")).toBeNull();
   });
+  it("does not match a code embedded in a longer digit run (timestamps etc.)", () => {
+    expect(extractJobCode("IMG20231184-23-0000031.jpg")).toBeNull();
+    expect(extractJobCode("20231184-23-000003.jpg")).toBeNull();
+    expect(extractJobCode("184-23-0000031.jpg")).toBeNull();
+  });
+  it("still matches codes bounded by hyphens or words", () => {
+    expect(extractJobCode("BA-L4L4-ifms073-74055314-4-184-23-000003.pdf")).toBe("184-23-000003");
+    expect(extractJobCode("047-25-000003.zip")).toBe("047-25-000003");
+  });
 });
 
 describe("resolveTargets", () => {

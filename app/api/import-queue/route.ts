@@ -77,11 +77,16 @@ export async function POST(req: NextRequest) {
   if (filenameJobCode) {
     const { data: dup } = await admin
       .from("job_cases")
-      .select("job_number")
+      .select("job_number, complaint_id, complaints(deleted_at)")
       .eq("job_number", filenameJobCode)
       .limit(1)
       .maybeSingle();
-    if (dup) duplicateJobNumber = filenameJobCode;
+    // Same rule as processForensicBatch: a job case whose complaint was
+    // soft-deleted was explicitly discarded — re-import is allowed. (The join
+    // is many-to-one but supabase-js may type/return it as an array.)
+    const d = dup as unknown as { complaint_id: string | null; complaints: { deleted_at: string | null } | { deleted_at: string | null }[] | null } | null;
+    const complaint = Array.isArray(d?.complaints) ? d.complaints[0] : d?.complaints;
+    if (d && !(d.complaint_id && complaint?.deleted_at)) duplicateJobNumber = filenameJobCode;
   }
 
   // Same file already in flight? Resume the upload / point at the running one

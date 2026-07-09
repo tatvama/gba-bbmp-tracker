@@ -161,17 +161,63 @@ function cap(text: string | null | undefined): string {
  * ZIP's own uploaded filename (e.g. "047-25-000003.zip") and treat every entry
  * as belonging to that one job — otherwise the whole batch would be silently
  * dropped ("No job-code folders found").
+ *
+ * Trust hierarchy — folder names and the ZIP's own filename are machine-made
+ * and reliable; LEAF filenames are hand-typed by humans when scanning and get
+ * job codes mistyped (a real ZIP contained "WB-MB-184-83-000003 MB Book.pdf"
+ * inside job 184-23-000003 — one wrong digit). A code that appears ONLY in
+ * leaf filenames must not spawn its own job when the ZIP has exactly one
+ * trusted code: it would create a phantom job case + complaint out of a typo.
+ * So when there is a single "anchor" code (one job-code folder, or none and
+ * the ZIP filename carries a code), every other leaf-derived group is folded
+ * into the anchor job instead, and `notes` (if given) records what moved.
+ * Multi-job ZIPs (several job-code folders) are left exactly as before —
+ * there is no unambiguous place to fold a stray code into.
  */
-export function groupEntriesByJobCode(entries: RawEntry[], fallbackName?: string | null): Map<string, RawEntry[]> {
+export function groupEntriesByJobCode(
+  entries: RawEntry[],
+  fallbackName?: string | null,
+  notes?: string[],
+): Map<string, RawEntry[]> {
   const map = new Map<string, RawEntry[]>();
+  const dirAnchored = new Set<string>(); // codes that appear in a DIRECTORY segment
+  const noise: RawEntry[] = []; // entries with no job code anywhere in the path
   for (const e of entries) {
     const code = extractJobCode(e.relPath);
-    if (!code) continue; // batch-level noise (no job code in path)
+    if (!code) {
+      noise.push(e);
+      continue; // batch-level noise (no job code in path)
+    }
     (map.get(code) ?? map.set(code, []).get(code)!).push(e);
+    const dirPart = e.relPath.split("/").slice(0, -1).join("/");
+    if (extractJobCode(dirPart) === code) dirAnchored.add(code);
   }
-  if (map.size === 0 && fallbackName) {
-    const code = extractJobCode(fallbackName);
-    if (code) map.set(code, entries);
+
+  const zipCode = extractJobCode(fallbackName ?? null);
+  // The single trusted code, when one exists: a lone job-code folder wins;
+  // with no folders at all (flat ZIP), the ZIP's own filename wins.
+  const anchor =
+    dirAnchored.size === 1 ? [...dirAnchored][0]! : dirAnchored.size === 0 ? zipCode : null;
+
+  if (anchor) {
+    if (!map.has(anchor)) map.set(anchor, []);
+    const anchorEntries = map.get(anchor)!;
+    for (const [code, es] of map) {
+      if (code === anchor) continue;
+      anchorEntries.push(...es);
+      map.delete(code);
+      notes?.push(
+        `"${code}" appears only in ${es.length} hand-typed file name(s) (${es
+          .map((e) => e.relPath)
+          .slice(0, 3)
+          .join(", ")}${es.length > 3 ? ", …" : ""}) — treated as a typo of ${anchor}, not a separate job.`,
+      );
+    }
+    // A flat single-job ZIP named by its code: EVERY file in it belongs to
+    // that job, including ones with no code in the name (info.txt, blanks…).
+    // Folder-anchored batches keep dropping outside-the-folder noise as before.
+    if (dirAnchored.size === 0 && noise.length) anchorEntries.push(...noise);
+    if (anchorEntries.length === 0) map.delete(anchor);
   }
   return map;
 }

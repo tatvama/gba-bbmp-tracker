@@ -49,14 +49,32 @@ export async function processForensicBatch(
     }
     const absByRel = new Map(files.map((f) => [f.relPath, f.absPath] as const));
     const raw: RawEntry[] = files.map((f) => ({ relPath: f.relPath, size: f.size }));
-    const grouped = groupEntriesByJobCode(raw, originalFileName);
+    // Codes seen only in hand-typed leaf filenames that got folded into the
+    // ZIP's single real job (typo protection) — surfaced as job warnings so
+    // the review screen shows exactly which files were reassigned and why.
+    const groupingNotes: string[] = [];
+    const grouped = groupEntriesByJobCode(raw, originalFileName, groupingNotes);
 
-    // Which job codes are already imported?
+    // Which job codes are already imported? A job case whose linked complaint
+    // was soft-deleted doesn't count — the user explicitly discarded that
+    // import, so re-uploading it must work (commit upserts job_cases on
+    // job_number, refreshing the existing row rather than duplicating it).
     const codes = [...grouped.keys()];
     const existing = new Set<string>();
     if (codes.length) {
-      const { data } = await admin.from("job_cases").select("job_number").in("job_number", codes);
-      for (const r of data ?? []) existing.add(r.job_number as string);
+      const { data } = await admin
+        .from("job_cases")
+        .select("job_number, complaint_id, complaints(deleted_at)")
+        .in("job_number", codes);
+      type JoinRow = { job_number: string; complaint_id: string | null; complaints: { deleted_at: string | null } | { deleted_at: string | null }[] | null };
+      for (const r of (data ?? []) as unknown as JoinRow[]) {
+        // The complaint_id FK is many-to-one, so `complaints` is a single row
+        // at runtime — but supabase-js types it as an array without generated
+        // relationship metadata, so accept both shapes.
+        const complaint = Array.isArray(r.complaints) ? r.complaints[0] : r.complaints;
+        if (r.complaint_id && complaint?.deleted_at) continue;
+        existing.add(r.job_number);
+      }
     }
 
     const jobs: ForensicJobResult[] = [];
@@ -101,6 +119,9 @@ export async function processForensicBatch(
         }
 
         const result = parseJob(code, es);
+        // Typo-folding only happens when the batch resolves to a single job,
+        // so these notes always belong to the one job being parsed here.
+        if (groupingNotes.length) result.warnings.push(...groupingNotes);
         result.alreadyImported = existing.has(result.jobCode);
         if (result.alreadyImported) {
           // A job case with this code is already in the system — do not

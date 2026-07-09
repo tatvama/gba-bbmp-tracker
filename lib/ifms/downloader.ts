@@ -24,7 +24,9 @@ export const PORTAL_API = `${PORTAL_BASE}/vsswb/vss00CvStatusData.php`;
 export const PORTAL_FILES = `${PORTAL_BASE}/vssIFMS/Files`; // + <raddl>/<rFileName>
 const PORTAL_REFERER = `${PORTAL_BASE}/vsswb/`;
 
-const JOB_CODE_RE = /\d{3}-\d{2}-\d{6}/;
+// Digit guards: never match a "code" embedded in a longer digit run (camera/
+// WhatsApp timestamps like "20231184-23-0000031.jpg" are not job codes).
+const JOB_CODE_RE = /(?<!\d)\d{3}-\d{2}-\d{6}(?!\d)/;
 const MID_ID_RE = /--\d+-/g; // the "--14976594-" middle id segment to collapse
 // Reserved Windows filename punctuation. Spaces and hyphens are intentionally kept
 // (they are legal and common in portal names, e.g. "WO-1-Estimate PN.pdf").
