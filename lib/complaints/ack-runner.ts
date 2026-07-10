@@ -182,12 +182,14 @@ export async function processAckBatch(batchId: string): Promise<void> {
     }
 
     // Extract + match + persist each detected section.
-    await setProgress(admin, batchId, { stage: "Matching", message: `Matching ${sections.length} acknowledgment(s) to complaints…` });
+    await setProgress(admin, batchId, { stage: "Matching", message: `Matching 0/${sections.length} acknowledgment(s) to complaints…` });
     // Complaints that already have an acknowledgment attached — used to skip
     // re-processing a duplicate. Computed once against the current pool.
     const ackedIds = await loadAcknowledgedComplaintIds(admin, pool.map((c) => c.id));
     let order = 0;
     for (const s of sections) {
+      const currentItemIdx = order + 1;
+      await setProgress(admin, batchId, { stage: "Matching", message: `Matching ${currentItemIdx}/${sections.length} acknowledgment(s) to complaints…` });
       const ocrText = sliceOcr(perPageOcr, s.start, s.end);
       const thumbPaths: string[] = [];
       for (let p = s.start; p <= s.end; p++) if (thumbKeyByPage[p]) thumbPaths.push(thumbKeyByPage[p]!);
