@@ -17,6 +17,7 @@ import { AckWorkflowStepper } from "./ack-reconcile-upload";
 import {
   getAckBatchAction, updateAckItemAction, searchComplaintsForMatchAction,
   reextractAckItemAction, mergeAckItemsAction, splitAckItemAction, commitAckBatchAction,
+  rematchAckBatchAction,
 } from "@/lib/actions/ack-import";
 import { cn } from "@/lib/utils";
 import type { AckBatchView, AckReviewItem, ComplaintSummary, MatchConfidence } from "@/lib/complaints/ack-reconcile";
@@ -91,6 +92,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
   const [batch, setBatch] = React.useState<AckBatchView>(initial);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [committing, setCommitting] = React.useState(false);
+  const [rematching, setRematching] = React.useState(false);
   const [banner, setBanner] = React.useState<string | null>(null);
 
   // Search & Filter state
@@ -203,6 +205,20 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
     setBanner(`Attached ${r.attached ?? 0} acknowledgment(s) to their complaints.`);
     await resync();
     router.refresh();
+  }
+
+  async function rematch() {
+    setRematching(true);
+    setBanner(null);
+    const r = await rematchAckBatchAction(batch.id);
+    setRematching(false);
+    if (!r.ok) { setBanner(r.error || "Re-run failed."); return; }
+    await resync();
+    setBanner(
+      r.matched
+        ? `Re-ran matching against current complaints — ${r.matched} of ${r.total} now matched.`
+        : `Re-ran matching — still no complaint carries these job numbers. Confirm the complaint exists and its Job Number is set, then try again.`,
+    );
   }
 
   // Batch Select Actions
@@ -596,7 +612,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
       )}
 
       {/* Page Actions Footer */}
-      <div className="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-850">
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-4 dark:border-slate-850">
         <Button variant="outline" size="sm" className="h-9 font-bold rounded-lg" asChild>
           <Link href="/complaints/acknowledgments">
             <ArrowLeft className="h-4 w-4 mr-1.5" />
@@ -604,10 +620,23 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
           </Link>
         </Button>
         {!readOnly && (
-          <Button onClick={commit} disabled={committing || counts.confirmed === 0} className="h-9 font-bold px-4 gap-1.5 rounded-lg shadow-sm">
-            {committing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Attach {counts.confirmed} confirmed
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={rematch}
+              disabled={rematching || committing}
+              title="Re-check every acknowledgment against the current complaints — use this if a complaint was added (or its Job Number set) after this batch was scanned."
+              className="h-9 font-bold rounded-lg gap-1.5"
+            >
+              {rematching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Re-run matching
+            </Button>
+            <Button onClick={commit} disabled={committing || counts.confirmed === 0} className="h-9 font-bold px-4 gap-1.5 rounded-lg shadow-sm">
+              {committing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              Attach {counts.confirmed} confirmed
+            </Button>
+          </div>
         )}
       </div>
 

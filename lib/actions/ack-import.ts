@@ -15,6 +15,7 @@ import { extractPdfPages } from "@/lib/pdf/merge";
 import { analyzeComplaintIntake } from "@/lib/ai/complaint-intake-analyzer";
 import { scoreAckMatch, loadComplaintPool } from "@/lib/complaints/ack-matcher";
 import { attachAcknowledgmentDocument } from "@/lib/complaints/ack-attach";
+import { extractJobCode } from "@/lib/ifms/downloader";
 import {
   ackThumbKey,
   type AckBatchView,
@@ -295,6 +296,65 @@ export async function reextractAckItemAction(itemId: string): Promise<{ ok: bool
   const { error } = await admin.from("ack_import_items").update(patch).eq("id", itemId);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+/**
+ * Re-run MATCHING (not extraction) for every item in a batch against the CURRENT
+ * complaint pool, using each item's already-stored `extracted` fields. Cheap — no
+ * re-upload, no re-OCR, no AI call — so it's the right fix when the batch was
+ * processed before the complaint existed, or before a matcher improvement shipped
+ * (e.g. job codes transcribed with a Unicode dash now canonicalise and match).
+ * Never stomps a human decision: only pending items get their auto-assignment
+ * refreshed. Logs a diagnostic per item so production can show WHY a code that is
+ * clearly on the page still didn't resolve to a complaint.
+ */
+export async function rematchAckBatchAction(
+  batchId: string,
+): Promise<{ ok: boolean; matched?: number; total?: number; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  const { data: rows } = await admin
+    .from("ack_import_items")
+    .select("id, extracted, decision")
+    .eq("batch_id", batchId);
+  const items = (rows ?? []) as { id: string; extracted: Record<string, unknown> | null; decision: AckDecision }[];
+  if (items.length === 0) return { ok: false, error: "No acknowledgment sections in this batch." };
+
+  const pool = await loadComplaintPool(admin);
+  // How many distinct job codes does the pool actually carry? A telling number:
+  // if it's ~0 the pool/query is the problem, not the matcher.
+  const poolJobCodes = new Set(pool.map((c) => extractJobCode(c.job_number)).filter(Boolean));
+  console.log(`[rematchAckBatch] batch=${batchId} items=${items.length} pool=${pool.length} poolJobCodes=${poolJobCodes.size}`);
+
+  let matched = 0;
+  for (const it of items) {
+    const ex = (it.extracted ?? {}) as Record<string, unknown>;
+    const exJob = extractJobCode(ex.jobNumber) || extractJobCode(ex.referenceNumber);
+    const match = scoreAckMatch(ex as Parameters<typeof scoreAckMatch>[0], pool);
+    // Ground-truth diagnostic: the exact extracted job value (JSON-quoted so any
+    // hidden dash/space shows), its canonical form, whether the pool has it, and
+    // the resulting confidence. This is what tells us the real cause in prod.
+    console.log(
+      `[rematchAckBatch] item=${it.id} rawJob=${JSON.stringify(ex.jobNumber ?? null)} ` +
+        `canon=${JSON.stringify(exJob)} inPool=${exJob ? poolJobCodes.has(exJob) : false} ` +
+        `-> ${match.confidence} proposed=${match.proposedComplaintId ?? "none"}`,
+    );
+    const patch: Record<string, unknown> = {
+      proposed_complaint_id: match.proposedComplaintId,
+      match_confidence: match.confidence,
+      match_evidence: { candidates: match.candidates },
+    };
+    if (it.decision === "pending") patch.assigned_complaint_id = match.proposedComplaintId;
+    await admin.from("ack_import_items").update(patch).eq("id", it.id);
+    if (match.proposedComplaintId) matched++;
+  }
+
+  revalidatePath(`/complaints/acknowledgments/${batchId}`);
+  return { ok: true, matched, total: items.length };
 }
 
 /** Merge `mergeId` into `primaryId` (adjacent sections) — union the page range,
