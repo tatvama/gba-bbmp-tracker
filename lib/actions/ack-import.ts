@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
-import { getR2SignedUrl, downloadFromR2 } from "@/lib/storage/r2-upload";
+import { getR2SignedUrl, downloadFromR2, deleteFromR2 } from "@/lib/storage/r2-upload";
 import { extractPdfPages } from "@/lib/pdf/merge";
 import { analyzeComplaintIntake } from "@/lib/ai/complaint-intake-analyzer";
 import { scoreAckMatch, loadComplaintPool } from "@/lib/complaints/ack-matcher";
@@ -565,4 +565,55 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
   revalidatePath("/complaints");
   revalidatePath(`/complaints/acknowledgments/${batchId}`);
   return { ok: true, attached };
+}
+
+/** Delete a reconciliation batch, its items, and its R2 files. */
+export async function deleteAckBatchAction(batchId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+
+  // 1. Fetch batch info for deletion from R2
+  const { data: batch } = await admin
+    .from("ack_import_batches")
+    .select("original_storage_path")
+    .eq("id", batchId)
+    .single();
+
+  const originalUrl = (batch as { original_storage_path?: string } | null)?.original_storage_path;
+
+  // 2. Fetch items thumb paths to clean up thumbnail files in R2
+  const { data: items } = await admin
+    .from("ack_import_items")
+    .select("thumb_paths")
+    .eq("batch_id", batchId);
+
+  // 3. Delete from DB (cascade deletes items)
+  const { error: dErr } = await admin.from("ack_import_batches").delete().eq("id", batchId);
+  if (dErr) {
+    return { ok: false, error: dErr.message };
+  }
+
+  // 4. Delete files from R2
+  if (originalUrl) {
+    await deleteFromR2(originalUrl);
+  }
+
+  if (items && items.length > 0) {
+    for (const item of items) {
+      const paths = (item as { thumb_paths?: string[] | null })?.thumb_paths;
+      if (paths && Array.isArray(paths)) {
+        for (const path of paths) {
+          await deleteFromR2(path);
+        }
+      }
+    }
+  }
+
+  revalidatePath("/complaints");
+  revalidatePath("/complaints/acknowledgments");
+  return { ok: true };
 }
