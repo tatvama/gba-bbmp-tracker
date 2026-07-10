@@ -52,4 +52,17 @@ describe("scoreAckMatch", () => {
     const r = scoreAckMatch({ referenceNumber: "DM-CMP-2026-000027" }, pool);
     expect(r.proposedComplaintId).toBe("a");
   });
+
+  it("matches when AI vision transcribed the job code with a Unicode dash", () => {
+    // Real production failure: a scanned Kannada acknowledgment for job
+    // 001-23-000001 was extracted with en/em dashes ("001–23–000001"), which
+    // visually equals the ASCII code on the complaint but used to string-mismatch
+    // it → "No Match" despite an existing complaint. Must now match with high
+    // confidence just like the ASCII form.
+    for (const jobNumber of ["001–23–000001", "001—23—000001", "001 - 23 - 000001"]) {
+      const r = scoreAckMatch({ jobNumber }, pool);
+      expect(r.proposedComplaintId).toBe("b");
+      expect(r.confidence).toBe("high");
+    }
+  });
 });

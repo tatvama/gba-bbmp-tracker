@@ -1,6 +1,7 @@
 import "server-only";
 import { extractJson, extractorSystem } from "@/lib/ai/json-extract";
 import { generateVision, isAiConfigured } from "@/lib/ai/provider";
+import { extractJobCode } from "@/lib/ifms/downloader";
 
 /**
  * AI intake for "create a complaint from a letter / PDF" (no ZIP, no job code).
@@ -115,10 +116,9 @@ function fallback(): ComplaintIntakeExtraction {
   };
 }
 
-/** A job code anywhere in the text (ddd-yy-nnnnnn). */
+/** A job code anywhere in the text, canonicalised (dash-variant tolerant). */
 function findJobCode(text: string): string {
-  const m = text.match(/\d{3}-\d{2}-\d{6}/);
-  return m ? m[0] : "";
+  return extractJobCode(text) ?? "";
 }
 
 /** The exact JSON shape both the text and vision extractors ask the model for. */
@@ -213,10 +213,16 @@ function finalizeExtraction(base: ComplaintIntakeExtraction, data: any): Complai
   const areaOrWard = getField(["areaOrWard", "area_or_ward"]) || (areaParts.length ? areaParts.join(", ") : "");
   const reporterName = reporter || "";
   
-  let jobNumber = getField(["jobNumber", "job_number"]);
+  // Canonicalise whatever the model produced (it may emit an en/em-dash for the
+  // separators, or wrap the code in extra text) so the stored/displayed job
+  // number is always the clean ASCII "ddd-yy-nnnnnn" — exact matching downstream
+  // (and the by-job-number ack route's DB `.eq`) depends on this form.
+  let jobNumber = extractJobCode(getField(["jobNumber", "job_number"])) ?? "";
   if (!jobNumber && Array.isArray(jobCodes)) {
-    const found = jobCodes.find((c: string) => /^\d{3}-\d{2}-\d{6}$/.test(c));
-    if (found) jobNumber = found;
+    for (const c of jobCodes) {
+      const canon = extractJobCode(c);
+      if (canon) { jobNumber = canon; break; }
+    }
   }
   if (!jobNumber) jobNumber = base.jobNumber;
   

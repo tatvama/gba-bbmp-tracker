@@ -162,6 +162,20 @@ describe("extractJobCode", () => {
     expect(extractJobCode("BA-L4L4-ifms073-74055314-4-184-23-000003.pdf")).toBe("184-23-000003");
     expect(extractJobCode("047-25-000003.zip")).toBe("047-25-000003");
   });
+  it("canonicalises Unicode dash variants to ASCII hyphens (AI-vision / OCR output)", () => {
+    // The AI vision model reading a scanned Kannada acknowledgment emits these
+    // dash variants for the "ddd-yy-nnnnnn" separators; all must resolve to the
+    // one canonical ASCII form so exact matching works against the stored code.
+    expect(extractJobCode("186– 23–000001")).toBe("186-23-000001"); // en dash
+    expect(extractJobCode("186—23—000001")).toBe("186-23-000001"); // em dash
+    expect(extractJobCode("186‐23‐000001")).toBe("186-23-000001"); // figure dash
+    expect(extractJobCode("186−23−000001")).toBe("186-23-000001"); // minus sign
+    expect(extractJobCode("Job No. 186–23–000001 re: IFMS")).toBe("186-23-000001");
+  });
+  it("tolerates spaces around the separators", () => {
+    expect(extractJobCode("186 - 23 - 000001")).toBe("186-23-000001");
+    expect(extractJobCode("186-  23  -000001")).toBe("186-23-000001");
+  });
 });
 
 describe("resolveTargets", () => {

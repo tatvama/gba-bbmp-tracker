@@ -24,9 +24,24 @@ export const PORTAL_API = `${PORTAL_BASE}/vsswb/vss00CvStatusData.php`;
 export const PORTAL_FILES = `${PORTAL_BASE}/vssIFMS/Files`; // + <raddl>/<rFileName>
 const PORTAL_REFERER = `${PORTAL_BASE}/vsswb/`;
 
-// Digit guards: never match a "code" embedded in a longer digit run (camera/
-// WhatsApp timestamps like "20231184-23-0000031.jpg" are not job codes).
-const JOB_CODE_RE = /(?<!\d)\d{3}-\d{2}-\d{6}(?!\d)/;
+// Job code = ddd-yy-nnnnnn. The separators are captured groups so we can rebuild
+// a CANONICAL ASCII form regardless of how they were written:
+//   • The separator may be any dash-like character, not just ASCII hyphen.
+//     AI-vision transcriptions of scanned Kannada/English documents (and some
+//     OCR) routinely emit en-dash "–", em-dash "—", figure dash "‐", or the
+//     minus sign "−" for the separators. An ASCII-only regex silently failed on
+//     those, so a job code the human clearly sees on the page ("186-23-000001")
+//     did not string-equal the ASCII code stored on the complaint — which broke
+//     exact job-code matching everywhere (acknowledgment matching, ZIP dedup,
+//     the filename ack route) with no visible reason.
+//   • Optional spaces around the separators ("186 - 23 - 000001") are tolerated
+//     for the same reason, then dropped.
+// Digit guards (?<!\d)/(?!\d) still prevent matching a code embedded in a longer
+// digit run (camera/WhatsApp timestamps like "20231184-23-0000031.jpg").
+const DASH_CLASS = "[-\\u2010\\u2011\\u2012\\u2013\\u2014\\u2015\\u2212]";
+const JOB_CODE_RE = new RegExp(
+  `(?<!\\d)(\\d{3})\\s*${DASH_CLASS}\\s*(\\d{2})\\s*${DASH_CLASS}\\s*(\\d{6})(?!\\d)`,
+);
 const MID_ID_RE = /--\d+-/g; // the "--14976594-" middle id segment to collapse
 // Reserved Windows filename punctuation. Spaces and hyphens are intentionally kept
 // (they are legal and common in portal names, e.g. "WO-1-Estimate PN.pdf").
@@ -50,11 +65,18 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // Pure helpers (no network — unit-tested)
 // =============================================================================
 
-/** First job code (ddd-yy-nnnnnn) found anywhere in a string, or null. */
+/**
+ * First job code found anywhere in a string, returned in CANONICAL form
+ * `ddd-yy-nnnnnn` (ASCII hyphens, no spaces) no matter which dash character or
+ * spacing the source used. Returns null if none is present. Because every
+ * job-code comparison in the app funnels through this one helper, canonicalising
+ * here makes "186-23-000001", "186–23–000001" and "186 - 23 - 000001" all
+ * compare equal downstream.
+ */
 export function extractJobCode(value: unknown): string | null {
   if (value == null) return null;
   const m = String(value).match(JOB_CODE_RE);
-  return m ? m[0] : null;
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
 }
 
 /**
