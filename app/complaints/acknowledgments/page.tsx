@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/empty-state";
 import { AckReconcileUpload } from "@/components/complaints/ack-reconcile-upload";
 import { AckByFilenameUpload } from "@/components/complaints/ack-by-filename-upload";
 import { AckBatchRow } from "@/components/complaints/ack-batch-row";
+import { AckClearCompletedButton } from "@/components/complaints/ack-clear-completed-button";
 import { Button } from "@/components/ui/button";
 import { AckHelpPanel } from "@/components/complaints/ack-help-panel";
 import { listAckBatchesAction } from "@/lib/actions/ack-import";
@@ -72,6 +73,9 @@ export default async function AcknowledgmentsPage() {
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
                   Recent Upload History ({batches.length})
                 </h3>
+                <AckClearCompletedButton
+                  clearableCount={batches.filter((b) => b.status === "committed" || b.status === "failed").length}
+                />
               </div>
               <div className="space-y-3">
                 {batches.map((b) => (

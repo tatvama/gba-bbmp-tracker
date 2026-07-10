@@ -588,15 +588,9 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
   return { ok: true, attached, skippedDuplicate };
 }
 
-/** Delete a reconciliation batch, its items, and its R2 files. */
-export async function deleteAckBatchAction(batchId: string): Promise<{ ok: boolean; error?: string }> {
-  try {
-    await requireRole(COMPLAINT_FIELD_ROLES);
-  } catch (e) {
-    return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
-  }
-  const admin = createAdminClient();
-
+/** Core delete of one batch (DB row + cascaded items + its R2 files). No auth/
+ *  revalidate here — shared by the single-batch and clear-completed actions. */
+async function deleteOneAckBatch(admin: ReturnType<typeof createAdminClient>, batchId: string): Promise<{ ok: boolean; error?: string }> {
   // 1. Fetch batch info for deletion from R2
   const { data: batch } = await admin
     .from("ack_import_batches")
@@ -618,23 +612,63 @@ export async function deleteAckBatchAction(batchId: string): Promise<{ ok: boole
     return { ok: false, error: dErr.message };
   }
 
-  // 4. Delete files from R2
+  // 4. Delete files from R2 (best-effort — the DB row is already gone)
   if (originalUrl) {
-    await deleteFromR2(originalUrl);
+    await deleteFromR2(originalUrl).catch(() => {});
   }
-
   if (items && items.length > 0) {
     for (const item of items) {
       const paths = (item as { thumb_paths?: string[] | null })?.thumb_paths;
       if (paths && Array.isArray(paths)) {
         for (const path of paths) {
-          await deleteFromR2(path);
+          await deleteFromR2(path).catch(() => {});
         }
       }
     }
   }
+  return { ok: true };
+}
+
+/** Delete a reconciliation batch, its items, and its R2 files. */
+export async function deleteAckBatchAction(batchId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  const res = await deleteOneAckBatch(admin, batchId);
+  if (!res.ok) return res;
 
   revalidatePath("/complaints");
   revalidatePath("/complaints/acknowledgments");
   return { ok: true };
+}
+
+/** Delete every FINISHED batch (committed or failed) — clears history, leaves
+ *  anything still processing/in-review untouched. */
+export async function clearCompletedAckBatchesAction(): Promise<{ ok: boolean; cleared?: number; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  const { data: rows, error } = await admin
+    .from("ack_import_batches")
+    .select("id")
+    .in("status", ["committed", "failed"]);
+  if (error) return { ok: false, error: error.message };
+  const ids = (rows ?? []).map((r) => (r as { id: string }).id);
+  if (ids.length === 0) return { ok: true, cleared: 0 };
+
+  let cleared = 0;
+  for (const id of ids) {
+    const res = await deleteOneAckBatch(admin, id);
+    if (res.ok) cleared++;
+  }
+
+  revalidatePath("/complaints");
+  revalidatePath("/complaints/acknowledgments");
+  return { ok: true, cleared };
 }
