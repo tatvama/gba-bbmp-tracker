@@ -1,0 +1,21 @@
+-- =============================================================================
+-- 0035_complaints_reporter_name — add the missing `reporter_name` column.
+-- Target: Supabase Postgres. Run with: npm run db:migrate
+-- Idempotent: ADD COLUMN IF NOT EXISTS.
+--
+-- WHY: application code has referenced complaints.reporter_name for a while
+-- (lib/actions/complaint-intake.ts writes it when creating a complaint from an
+-- uploaded letter; lib/complaints/ack-matcher.ts read it for a fuzzy match
+-- tiebreaker) but no migration ever created the column. Effects in production:
+--   • loadComplaintPool selected reporter_name → PostgREST failed the whole
+--     query → the acknowledgment-matching pool was ALWAYS empty → no ack ever
+--     auto-matched to a complaint (the reported bug). (ack-matcher.ts no longer
+--     selects it, so ack matching is fixed regardless of this migration — this
+--     column just lets that fuzzy signal be re-enabled later and, more
+--     importantly, unbreaks the intake insert below.)
+--   • complaint-intake.ts INSERTs reporter_name → that insert errored whenever
+--     a letter-intake complaint carried a reporter name.
+-- Adding the column reconciles schema with code. Free-text (a citizen name /
+-- association), nullable, no default.
+-- =============================================================================
+alter table public.complaints add column if not exists reporter_name text;
