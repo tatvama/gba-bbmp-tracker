@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   Loader2, UploadCloud, FileText, AlertTriangle, CheckCircle2,
-  HelpCircle, Trash2, ArrowRight, ShieldQuestion,
+  HelpCircle, Trash2, ArrowRight, ShieldQuestion, BadgeCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,11 +12,13 @@ import { Card, CardContent } from "@/components/ui/card";
 interface AttachedResult { fileName: string; complaintId: string; caseNumber: string | null; jobNumber: string }
 interface UnmatchedResult { fileName: string; jobNumber: string }
 interface AmbiguousResult { fileName: string; jobNumber: string; candidates: { complaintId: string; caseNumber: string | null; title: string | null }[] }
+interface AlreadyAckResult { fileName: string; complaintId: string; caseNumber: string | null; jobNumber: string }
 interface InvalidResult { fileName: string; reason: string }
 interface ByJobNumberResponse {
   attached: AttachedResult[];
   unmatched: UnmatchedResult[];
   ambiguous: AmbiguousResult[];
+  alreadyAcknowledged: AlreadyAckResult[];
   invalid: InvalidResult[];
   error?: string;
 }
@@ -136,6 +138,24 @@ export function AckByFilenameUpload() {
                       <Link href={`/complaints/${a.complaintId}`} className="text-primary font-semibold hover:underline">
                         {a.caseNumber || "View case"}
                       </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {result.alreadyAcknowledged?.length > 0 && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50/30 dark:border-sky-950/40 dark:bg-sky-950/10 p-3.5 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-sky-700 dark:text-sky-400">
+                  <BadgeCheck className="h-4 w-4" /> Already acknowledged — skipped ({result.alreadyAcknowledged.length})
+                </div>
+                <ul className="space-y-1">
+                  {result.alreadyAcknowledged.map((a) => (
+                    <li key={a.complaintId + a.fileName} className="text-[11px] text-slate-600 dark:text-slate-400">
+                      <span className="font-mono">{a.fileName}</span> — job {a.jobNumber} is already acknowledged on{" "}
+                      <Link href={`/complaints/${a.complaintId}`} className="text-primary font-semibold hover:underline">
+                        {a.caseNumber || "this case"}
+                      </Link>
+                      , so nothing was attached again.
                     </li>
                   ))}
                 </ul>

@@ -20,7 +20,8 @@ import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { detectAckSections, MAX_DETECT_PAGES } from "@/lib/ai/ack-section-detector";
 import { analyzeComplaintIntakeFromImages } from "@/lib/ai/complaint-intake-analyzer";
-import { scoreAckMatch, loadComplaintPool, type PoolComplaint } from "@/lib/complaints/ack-matcher";
+import { scoreAckMatch, loadComplaintPool, loadAcknowledgedComplaintIds, type PoolComplaint } from "@/lib/complaints/ack-matcher";
+import { extractJobCode } from "@/lib/ifms/downloader";
 import { ackThumbKey } from "@/lib/complaints/ack-reconcile";
 import { decodeQrFromImage } from "@/lib/pdf/qr-decode";
 import { parseAckReference } from "@/lib/pdf/letter-reference";
@@ -182,9 +183,46 @@ export async function processAckBatch(batchId: string): Promise<void> {
 
     // Extract + match + persist each detected section.
     await setProgress(admin, batchId, { stage: "Matching", message: `Matching ${sections.length} acknowledgment(s) to complaints…` });
+    // Complaints that already have an acknowledgment attached — used to skip
+    // re-processing a duplicate. Computed once against the current pool.
+    const ackedIds = await loadAcknowledgedComplaintIds(admin, pool.map((c) => c.id));
     let order = 0;
     for (const s of sections) {
       const ocrText = sliceOcr(perPageOcr, s.start, s.end);
+      const thumbPaths: string[] = [];
+      for (let p = s.start; p <= s.end; p++) if (thumbKeyByPage[p]) thumbPaths.push(thumbKeyByPage[p]!);
+      const sortOrder = order++;
+      // A decoded reference QR names the complaint directly; otherwise the job
+      // code is often already in the (cheap) OCR text.
+      let qrRef: string | null = null;
+      for (let p = s.start; p <= s.end; p++) if (qrRefByPage[p]) { qrRef = qrRefByPage[p]!; break; }
+
+      // ── Cheap duplicate short-circuit — BEFORE the expensive vision call ──
+      // If this section's job code (from OCR / QR, no AI) uniquely identifies a
+      // complaint that is ALREADY acknowledged, there is nothing to re-parse:
+      // record it pre-skipped and move on, saving the per-section AI extraction.
+      const cheapJob = extractJobCode(ocrText) || extractJobCode(qrRef);
+      if (cheapJob) {
+        const hits = pool.filter((c) => extractJobCode(c.job_number) === cheapJob);
+        if (hits.length === 1 && ackedIds.has(hits[0]!.id)) {
+          await admin.from("ack_import_items").insert({
+            batch_id: batchId,
+            sort_order: sortOrder,
+            page_start: s.start,
+            page_end: s.end,
+            ocr_text: ocrText || null,
+            extracted: { jobNumber: cheapJob, subject: s.seedSubject ?? "" } as unknown as Record<string, unknown>,
+            thumb_paths: thumbPaths,
+            proposed_complaint_id: hits[0]!.id,
+            match_confidence: "high",
+            match_evidence: { candidates: [], alreadyAcknowledged: true } as unknown as Record<string, unknown>,
+            assigned_complaint_id: hits[0]!.id,
+            decision: "skipped", // already acknowledged — don't attach again
+          });
+          continue;
+        }
+      }
+
       // Read this section's fields from ITS OWN page images (vision), not just OCR
       // text — reliable on poor scans. Falls back to OCR text internally if AI is off.
       const sectionImages: { buffer: Buffer; mimeType: string }[] = [];
@@ -196,18 +234,17 @@ export async function processAckBatch(batchId: string): Promise<void> {
       if (!extraction.subject && s.seedSubject) extraction.subject = s.seedSubject;
       if (!extraction.department && s.seedDept) extraction.department = s.seedDept;
       if (!extraction.referenceNumber && s.seedRef) extraction.referenceNumber = s.seedRef;
-      // A decoded reference QR beats everything — it names the complaint directly.
-      let qrRef: string | null = null;
-      for (let p = s.start; p <= s.end; p++) if (qrRefByPage[p]) { qrRef = qrRefByPage[p]!; break; }
       if (qrRef) extraction.referenceNumber = qrRef;
 
       const match = scoreAckMatch(extraction, pool);
-      const thumbPaths: string[] = [];
-      for (let p = s.start; p <= s.end; p++) if (thumbKeyByPage[p]) thumbPaths.push(thumbKeyByPage[p]!);
+      // Post-match guard: the job code wasn't in the cheap text but AI found the
+      // complaint — if it's already acknowledged, mark it skipped, not pending,
+      // so it isn't re-attached.
+      const isAcked = match.proposedComplaintId ? ackedIds.has(match.proposedComplaintId) : false;
 
       await admin.from("ack_import_items").insert({
         batch_id: batchId,
-        sort_order: order++,
+        sort_order: sortOrder,
         page_start: s.start,
         page_end: s.end,
         ocr_text: ocrText || null,
@@ -215,9 +252,9 @@ export async function processAckBatch(batchId: string): Promise<void> {
         thumb_paths: thumbPaths,
         proposed_complaint_id: match.proposedComplaintId,
         match_confidence: match.confidence,
-        match_evidence: { candidates: match.candidates } as unknown as Record<string, unknown>,
+        match_evidence: { candidates: match.candidates, alreadyAcknowledged: isAcked } as unknown as Record<string, unknown>,
         assigned_complaint_id: match.proposedComplaintId, // pre-fill; human confirms/overrides
-        decision: "pending",
+        decision: isAcked ? "skipped" : "pending",
       });
     }
 

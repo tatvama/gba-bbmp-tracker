@@ -202,7 +202,8 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
     const r = await commitAckBatchAction(batch.id);
     setCommitting(false);
     if (!r.ok) { setBanner(r.error || "Attach failed."); return; }
-    setBanner(`Attached ${r.attached ?? 0} acknowledgment(s) to their complaints.`);
+    const dup = r.skippedDuplicate ? ` Skipped ${r.skippedDuplicate} already-acknowledged.` : "";
+    setBanner(`Attached ${r.attached ?? 0} acknowledgment(s) to their complaints.${dup}`);
     await resync();
     router.refresh();
   }
@@ -475,9 +476,16 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                         Pages {it.pageStart}{it.pageEnd > it.pageStart ? `–${it.pageEnd}` : ""}
                       </span>
                     </div>
-                    <span className={cn("rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-tight", conf.badge)}>
-                      {conf.label}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {it.alreadyAcknowledged && (
+                        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9px] font-bold tracking-tight text-sky-700 dark:border-sky-950/50 dark:bg-sky-950/20 dark:text-sky-300">
+                          Already acknowledged
+                        </span>
+                      )}
+                      <span className={cn("rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-tight", conf.badge)}>
+                        {conf.label}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Card Content Grid */}

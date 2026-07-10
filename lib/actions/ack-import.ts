@@ -13,7 +13,7 @@ import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { getR2SignedUrl, downloadFromR2, deleteFromR2 } from "@/lib/storage/r2-upload";
 import { extractPdfPages } from "@/lib/pdf/merge";
 import { analyzeComplaintIntake } from "@/lib/ai/complaint-intake-analyzer";
-import { scoreAckMatch, loadComplaintPool } from "@/lib/complaints/ack-matcher";
+import { scoreAckMatch, loadComplaintPool, loadAcknowledgedComplaintIds } from "@/lib/complaints/ack-matcher";
 import { attachAcknowledgmentDocument } from "@/lib/complaints/ack-attach";
 import { extractJobCode } from "@/lib/ifms/downloader";
 import {
@@ -103,7 +103,7 @@ interface AckItemRow {
   thumb_paths: string[] | null;
   proposed_complaint_id: string | null;
   match_confidence: MatchConfidence;
-  match_evidence: { candidates?: MatchCandidate[] } | null;
+  match_evidence: { candidates?: MatchCandidate[]; alreadyAcknowledged?: boolean } | null;
   assigned_complaint_id: string | null;
   decision: AckDecision;
   attached_document_id: string | null;
@@ -163,6 +163,7 @@ export async function getAckBatchAction(batchId: string): Promise<{ batch: AckBa
         proposedComplaintId: it.proposed_complaint_id,
         matchConfidence: it.match_confidence,
         candidates: it.match_evidence?.candidates ?? [],
+        alreadyAcknowledged: it.match_evidence?.alreadyAcknowledged ?? false,
         assignedComplaintId: it.assigned_complaint_id,
         decision: it.decision,
         attachedDocumentId: it.attached_document_id,
@@ -328,6 +329,7 @@ export async function rematchAckBatchAction(
   // How many distinct job codes does the pool actually carry? A telling number:
   // if it's ~0 the pool/query is the problem, not the matcher.
   const poolJobCodes = new Set(pool.map((c) => extractJobCode(c.job_number)).filter(Boolean));
+  const ackedIds = await loadAcknowledgedComplaintIds(admin, pool.map((c) => c.id));
   console.log(`[rematchAckBatch] batch=${batchId} items=${items.length} pool=${pool.length} poolJobCodes=${poolJobCodes.size}`);
 
   let matched = 0;
@@ -335,22 +337,28 @@ export async function rematchAckBatchAction(
     const ex = (it.extracted ?? {}) as Record<string, unknown>;
     const exJob = extractJobCode(ex.jobNumber) || extractJobCode(ex.referenceNumber);
     const match = scoreAckMatch(ex as Parameters<typeof scoreAckMatch>[0], pool);
+    const isAcked = match.proposedComplaintId ? ackedIds.has(match.proposedComplaintId) : false;
     // Ground-truth diagnostic: the exact extracted job value (JSON-quoted so any
     // hidden dash/space shows), its canonical form, whether the pool has it, and
     // the resulting confidence. This is what tells us the real cause in prod.
     console.log(
       `[rematchAckBatch] item=${it.id} rawJob=${JSON.stringify(ex.jobNumber ?? null)} ` +
-        `canon=${JSON.stringify(exJob)} inPool=${exJob ? poolJobCodes.has(exJob) : false} ` +
+        `canon=${JSON.stringify(exJob)} inPool=${exJob ? poolJobCodes.has(exJob) : false} acked=${isAcked} ` +
         `-> ${match.confidence} proposed=${match.proposedComplaintId ?? "none"}`,
     );
     const patch: Record<string, unknown> = {
       proposed_complaint_id: match.proposedComplaintId,
       match_confidence: match.confidence,
-      match_evidence: { candidates: match.candidates },
+      match_evidence: { candidates: match.candidates, alreadyAcknowledged: isAcked },
     };
-    if (it.decision === "pending") patch.assigned_complaint_id = match.proposedComplaintId;
+    // Only touch a still-pending item's assignment/decision — never stomp a
+    // human choice. An already-acknowledged match is skipped, not proposed.
+    if (it.decision === "pending") {
+      patch.assigned_complaint_id = match.proposedComplaintId;
+      if (isAcked) patch.decision = "skipped";
+    }
     await admin.from("ack_import_items").update(patch).eq("id", it.id);
-    if (match.proposedComplaintId) matched++;
+    if (match.proposedComplaintId && !isAcked) matched++;
   }
 
   revalidatePath(`/complaints/acknowledgments/${batchId}`);
@@ -475,7 +483,7 @@ export async function splitAckItemAction(itemId: string, atPage: number): Promis
  * nudge Draft/Filed complaints to Acknowledged. Idempotent — items already
  * committed are skipped, so a re-run only finishes what's left.
  */
-export async function commitAckBatchAction(batchId: string): Promise<{ ok: boolean; attached?: number; error?: string }> {
+export async function commitAckBatchAction(batchId: string): Promise<{ ok: boolean; attached?: number; skippedDuplicate?: number; error?: string }> {
   let user;
   try {
     user = await requireRole(COMPLAINT_FIELD_ROLES);
@@ -514,9 +522,20 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
     return { ok: false, error: "Could not download the original PDF." };
   }
 
+  // Defensive duplicate guard: never attach a second acknowledgment to a
+  // complaint that already has one — including one attached earlier in THIS
+  // same commit (seed from the DB, then add each as we attach).
+  const acknowledged = await loadAcknowledgedComplaintIds(admin, attachable.map((it) => it.assigned_complaint_id!));
   let attached = 0;
+  let skippedDuplicate = 0;
   for (const it of attachable) {
     const complaintId = it.assigned_complaint_id!;
+    if (acknowledged.has(complaintId)) {
+      // Already acknowledged — mark this section skipped instead of duplicating.
+      await admin.from("ack_import_items").update({ decision: "skipped" }).eq("id", it.id);
+      skippedDuplicate++;
+      continue;
+    }
     try {
       const { pdf } = await extractPdfPages(original, it.page_start, it.page_end);
       const fileName = `acknowledgment-pp${it.page_start}-${it.page_end}.pdf`;
@@ -538,6 +557,7 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
       });
 
       await admin.from("ack_import_items").update({ decision: "committed", attached_document_id: documentId }).eq("id", it.id);
+      acknowledged.add(complaintId); // so a later item for the same complaint is skipped
       attached++;
     } catch (e) {
       console.error("[commitAckBatchAction] attach failed", complaintId, e);
@@ -552,19 +572,20 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
     .eq("decision", "confirmed")
     .is("attached_document_id", null);
   const done = (remaining ?? 0) === 0;
+  const dupNote = skippedDuplicate ? ` Skipped ${skippedDuplicate} already-acknowledged.` : "";
   await admin
     .from("ack_import_batches")
     .update({
       status: done ? "committed" : "review",
       stage: done ? "Committed" : "Ready for review",
-      message: `Attached ${attached} acknowledgment(s).`,
+      message: `Attached ${attached} acknowledgment(s).${dupNote}`,
       ...(done ? { finished_at: new Date().toISOString() } : {}),
     })
     .eq("id", batchId);
 
   revalidatePath("/complaints");
   revalidatePath(`/complaints/acknowledgments/${batchId}`);
-  return { ok: true, attached };
+  return { ok: true, attached, skippedDuplicate };
 }
 
 /** Delete a reconciliation batch, its items, and its R2 files. */

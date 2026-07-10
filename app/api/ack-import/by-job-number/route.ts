@@ -7,6 +7,7 @@ import { validateUpload } from "@/lib/storage/supabase-upload";
 import { getComplaintSettings } from "@/lib/settings";
 import { extractJobCode } from "@/lib/ifms/downloader";
 import { attachAcknowledgmentDocument } from "@/lib/complaints/ack-attach";
+import { loadAcknowledgedComplaintIds } from "@/lib/complaints/ack-matcher";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
   const attached: { fileName: string; complaintId: string; caseNumber: string | null; jobNumber: string }[] = [];
   const unmatched: { fileName: string; jobNumber: string }[] = [];
   const ambiguous: { fileName: string; jobNumber: string; candidates: { complaintId: string; caseNumber: string | null; title: string | null }[] }[] = [];
+  const alreadyAcknowledged: { fileName: string; complaintId: string; caseNumber: string | null; jobNumber: string }[] = [];
   const invalid: { fileName: string; reason: string }[] = [];
 
   for (const file of files) {
@@ -112,6 +114,16 @@ export async function POST(req: NextRequest) {
     }
 
     const complaint = candidates[0]!;
+
+    // Already acknowledged? Don't attach a duplicate or run OCR again — stop
+    // here, before any work. (This path has no AI, but it does queue an OCR
+    // job on attach, which we also skip.)
+    const acked = await loadAcknowledgedComplaintIds(admin, [complaint.id]);
+    if (acked.has(complaint.id)) {
+      alreadyAcknowledged.push({ fileName: file.name, complaintId: complaint.id, caseNumber: complaint.internal_case_number, jobNumber: code });
+      continue;
+    }
+
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
       await attachAcknowledgmentDocument(admin, {
@@ -136,5 +148,5 @@ export async function POST(req: NextRequest) {
     for (const a of attached) revalidatePath(`/complaints/${a.complaintId}`);
   }
 
-  return NextResponse.json({ attached, unmatched, ambiguous, invalid });
+  return NextResponse.json({ attached, unmatched, ambiguous, alreadyAcknowledged, invalid });
 }

@@ -66,6 +66,9 @@ export interface AckReviewItem {
   assignedComplaintId: string | null;
   decision: AckDecision;
   attachedDocumentId: string | null;
+  /** True when the matched complaint already has an acknowledgment attached —
+   *  the section is auto-skipped so a duplicate isn't attached again. */
+  alreadyAcknowledged?: boolean;
   /** Resolved summaries so the UI can render without a second round-trip. */
   proposed: ComplaintSummary | null;
   assigned: ComplaintSummary | null;
