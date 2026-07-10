@@ -1,6 +1,19 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { createCanvas, type Canvas } from "@napi-rs/canvas";
 import { launchBrowser } from "./chrome-path";
+
+// Same package the primary in-process renderer already uses (below) — loaded
+// from disk into the Chromium tab via blob: URLs so the fallback needs zero
+// network access at render time. It used to fetch a DIFFERENT, older pdf.js
+// build (3.11.174) live from cdnjs.cloudflare.com on every call: a fallback
+// whose whole job is to rescue a PDF the primary renderer couldn't handle
+// must not itself depend on a third-party CDN being reachable — if egress to
+// cdnjs is blocked, slow, or the CDN has a bad day, the document silently
+// never gets rendered at all, and nothing downstream (OCR, AI field
+// extraction) has any page image to work with.
+const PDFJS_BUILD_DIR = path.join(process.cwd(), "node_modules", "pdfjs-dist", "legacy", "build");
 
 export interface RenderedPage {
   buffer: Buffer;
@@ -124,59 +137,69 @@ class PuppeteerPDFRenderer implements PDFRenderer {
       await page.setViewport({ width: 800, height: 1100, deviceScaleFactor: 2 });
       await page.goto("about:blank");
 
-      // Inject official PDF.js script into the browser environment
-      await page.addScriptTag({
-        url: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
-      });
+      // Read the ESM build straight from the installed package — same source
+      // the primary renderer imports — and hand both files into the page as
+      // strings so it can construct offline blob: URLs. No network fetch.
+      const [pdfLibSource, workerSource] = await Promise.all([
+        readFile(path.join(PDFJS_BUILD_DIR, "pdf.min.mjs"), "utf8"),
+        readFile(path.join(PDFJS_BUILD_DIR, "pdf.worker.min.mjs"), "utf8"),
+      ]);
 
       // Execute rasterization within the chromium tab context
-      const imagesDataUrls = await page.evaluate(async (base64) => {
-        // Decode base64 payload to binary array
-        const binaryString = atob(base64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
+      const imagesDataUrls = await page.evaluate(
+        async (base64: string, pdfLibSrc: string, workerSrc: string) => {
+          // Decode base64 payload to binary array
+          const binaryString = atob(base64);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
 
-        // Configure PDF.js Global Worker
-        // @ts-ignore
-        const pdfjsLib = window["pdfjs-dist/build/pdf"];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          // The ESM build isn't a global-namespace script — load it as a
+          // same-origin blob: URL and import it, entirely offline.
+          const libBlobUrl = URL.createObjectURL(new Blob([pdfLibSrc], { type: "text/javascript" }));
+          const pdfjsLib = (await import(/* webpackIgnore: true */ libBlobUrl)) as typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+          const workerBlobUrl = URL.createObjectURL(new Blob([workerSrc], { type: "text/javascript" }));
+          pdfjsLib.GlobalWorkerOptions.workerSrc = workerBlobUrl;
 
-        const loadingTask = pdfjsLib.getDocument({ data: bytes });
-        const pdf = await loadingTask.promise;
-        const numPages = pdf.numPages;
-        const urls: string[] = [];
+          const loadingTask = pdfjsLib.getDocument({ data: bytes });
+          const pdf = await loadingTask.promise;
+          const numPages = pdf.numPages;
+          const urls: string[] = [];
 
-        // Scale factor: Standard is 72 DPI. 300 DPI corresponds to scale 4.16.
-        // Scale 3.0 renders excellent quality (216 DPI) and keeps base64 payload optimized.
-        const scale = 3.0;
+          // Scale factor: Standard is 72 DPI. 300 DPI corresponds to scale 4.16.
+          // Scale 3.0 renders excellent quality (216 DPI) and keeps base64 payload optimized.
+          const scale = 3.0;
 
-        for (let i = 1; i <= numPages; i++) {
-          const pdfPage = await pdf.getPage(i);
-          const viewport = pdfPage.getViewport({ scale });
+          for (let i = 1; i <= numPages; i++) {
+            const pdfPage = await pdf.getPage(i);
+            const viewport = pdfPage.getViewport({ scale });
 
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d");
-          if (!context) continue;
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            if (!context) continue;
 
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
 
-          // Render PDF page into canvas context
-          await pdfPage.render({
-            canvasContext: context,
-            viewport: viewport,
-          }).promise;
+            // Render PDF page into canvas context
+            await pdfPage.render({
+              canvasContext: context,
+              viewport: viewport,
+            }).promise;
 
-          // Export as JPEG with 90% quality compression
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-          urls.push(dataUrl);
-        }
+            // Export as JPEG with 90% quality compression
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+            urls.push(dataUrl);
+          }
 
-        return urls;
-      }, pdfBase64);
+          return urls;
+        },
+        pdfBase64,
+        pdfLibSource,
+        workerSource,
+      );
 
       // Map base64 Data URLs back to Node buffers
       return imagesDataUrls.map((url, idx) => {
