@@ -16,6 +16,7 @@ import { analyzeComplaintIntake } from "@/lib/ai/complaint-intake-analyzer";
 import { scoreAckMatch, loadComplaintPool, loadAcknowledgedComplaintIds } from "@/lib/complaints/ack-matcher";
 import { attachAcknowledgmentDocument } from "@/lib/complaints/ack-attach";
 import { extractJobCode } from "@/lib/ifms/downloader";
+import { getComplaintSettings } from "@/lib/settings";
 import {
   ackThumbKey,
   type AckBatchView,
@@ -253,6 +254,111 @@ export async function searchComplaintsForMatchAction(query: string): Promise<Com
     )
     .limit(20);
   return ((data ?? []) as ComplaintRow[]).map(toSummary);
+}
+
+/**
+ * Create a brand-new complaint straight from an UNMATCHED acknowledgment's
+ * extracted fields and assign this section to it — the escape hatch for when
+ * no complaint exists yet to attach to. Created bare (no document): the only
+ * file we have here is the acknowledgment itself, which the normal commit
+ * step attaches once this section is confirmed, exactly like an existing-
+ * complaint match.
+ *
+ * Guards against duplicates: `complaints.job_number` carries no DB uniqueness
+ * (several complaints can legitimately share one job code — work-splitting),
+ * so this re-checks the LIVE complaint pool (not the batch's possibly-stale
+ * match data) for the same canonical job code before inserting. A sibling
+ * section earlier in this same batch — or a totally different import — may
+ * have already created the complaint this one belongs to; if so, link to it
+ * instead of creating a duplicate. Several existing complaints sharing the
+ * code is left for the human to resolve via search — there's no safe way to
+ * auto-pick one.
+ */
+export async function createComplaintFromAckItemAction(
+  itemId: string,
+): Promise<{ ok: boolean; complaintId?: string; caseNumber?: string; linkedExisting?: boolean; error?: string }> {
+  let user;
+  try {
+    user = await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  const { data: item } = await admin
+    .from("ack_import_items")
+    .select("id, extracted, assigned_complaint_id")
+    .eq("id", itemId)
+    .single();
+  if (!item) return { ok: false, error: "Section not found." };
+  const row = item as { extracted: Record<string, unknown> | null; assigned_complaint_id: string | null };
+  if (row.assigned_complaint_id) return { ok: false, error: "This acknowledgment is already linked to a complaint." };
+
+  const ex = (row.extracted ?? {}) as Record<string, unknown>;
+  const exJob = extractJobCode(ex.jobNumber) || extractJobCode(ex.referenceNumber);
+
+  if (exJob) {
+    const pool = await loadComplaintPool(admin);
+    const dupes = pool.filter((c) => extractJobCode(c.job_number) === exJob);
+    if (dupes.length === 1) {
+      await admin.from("ack_import_items").update({ assigned_complaint_id: dupes[0]!.id }).eq("id", itemId);
+      revalidatePath("/complaints/acknowledgments");
+      return { ok: true, complaintId: dupes[0]!.id, linkedExisting: true };
+    }
+    if (dupes.length > 1) {
+      return {
+        ok: false,
+        error: `${dupes.length} existing complaints already carry job code ${exJob} — search and link one of those instead of creating a new one.`,
+      };
+    }
+  }
+
+  const settings = await getComplaintSettings();
+  const year = new Date().getFullYear();
+  const { data: rpc, error: rpcError } = await admin.rpc("next_complaint_case_number", {
+    p_prefix: settings.caseNumberPrefix || "DM-CMP",
+    p_year: year,
+  });
+  if (rpcError || !rpc) return { ok: false, error: `Could not generate a case number: ${rpcError?.message ?? "unknown error"}` };
+  const caseNumber = rpc as string;
+
+  const subject = String(ex.subject || "").trim();
+  const refNumber = String(ex.referenceNumber || "").trim();
+  const title = (subject || (exJob ? `Untitled complaint — job ${exJob}` : "Untitled complaint (from acknowledgment)")).slice(0, 300);
+
+  const { data: comp, error } = await admin
+    .from("complaints")
+    .insert({
+      title,
+      type: "Other",
+      status: "Draft",
+      priority: "Medium",
+      job_number: exJob || null,
+      complaint_number: refNumber || null,
+      internal_case_number: caseNumber,
+      location: ex.areaOrWard ? String(ex.areaOrWard) : null,
+      reporter_name: ex.reporterName ? String(ex.reporterName) : null,
+      description:
+        "Created from an unmatched acknowledgment during bulk reconciliation — no original complaint letter on file; verify and complete details.",
+      created_by: user.id,
+      updated_by: user.id,
+    })
+    .select("id")
+    .single();
+  if (error || !comp) return { ok: false, error: error?.message ?? "Could not create the complaint." };
+  const complaintId = comp.id as string;
+
+  await admin.from("complaint_timeline").insert({
+    complaint_id: complaintId,
+    event_type: "Created",
+    title: "Complaint created from an unmatched acknowledgment",
+    summary: `${caseNumber} — created during bulk acknowledgment reconciliation.`,
+    created_by: user.id,
+  });
+  await admin.from("ack_import_items").update({ assigned_complaint_id: complaintId }).eq("id", itemId);
+
+  revalidatePath("/complaints");
+  revalidatePath("/complaints/acknowledgments");
+  return { ok: true, complaintId, caseNumber };
 }
 
 /** Re-run AI extraction + matching for one section (after a boundary edit, or to

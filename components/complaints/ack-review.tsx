@@ -8,7 +8,7 @@ import {
   Loader2, CheckCircle2, XCircle, Search, Scissors, Merge, RefreshCw,
   ArrowRight, FileText, Sparkles, Link2, RotateCcw, X, ChevronRight,
   ChevronLeft, Calendar, MapPin, Building2, HelpCircle, ArrowLeft,
-  Eye, PanelRightClose, ScanText
+  Eye, PanelRightClose, ScanText, FilePlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { AckWorkflowStepper } from "./ack-reconcile-upload";
 import {
   getAckBatchAction, updateAckItemAction, searchComplaintsForMatchAction,
   reextractAckItemAction, mergeAckItemsAction, splitAckItemAction, commitAckBatchAction,
-  rematchAckBatchAction,
+  rematchAckBatchAction, createComplaintFromAckItemAction,
 } from "@/lib/actions/ack-import";
 import { cn } from "@/lib/utils";
 import type { AckBatchView, AckReviewItem, ComplaintSummary, MatchConfidence } from "@/lib/complaints/ack-reconcile";
@@ -93,6 +93,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [committing, setCommitting] = React.useState(false);
   const [rematching, setRematching] = React.useState(false);
+  const [creatingId, setCreatingId] = React.useState<string | null>(null);
   const [banner, setBanner] = React.useState<string | null>(null);
 
   // Search & Filter state
@@ -178,6 +179,25 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
     // Update review item if it is open in drawer
     if (reviewItem && reviewItem.id === it.id) {
       setReviewItem((prev) => prev ? { ...prev, assignedComplaintId: c.id, assigned: c } : null);
+    }
+  }
+
+  async function createComplaintForItem(it: AckReviewItem) {
+    setCreatingId(it.id);
+    const r = await createComplaintFromAckItemAction(it.id);
+    setCreatingId(null);
+    if (!r.ok) { setBanner(r.error || "Could not create the complaint."); return; }
+    setBanner(
+      r.linkedExisting
+        ? "A complaint already carries this job code — linked to it instead of creating a duplicate."
+        : `Created complaint ${r.caseNumber ?? ""} and linked this acknowledgment to it.`,
+    );
+    const res = await getAckBatchAction(batch.id);
+    if ("error" in res) { setBanner(res.error); return; }
+    setBatch(res.batch);
+    if (reviewItem && reviewItem.id === it.id) {
+      const fresh = res.batch.items.find((x) => x.id === it.id);
+      if (fresh) setReviewItem(fresh);
     }
   }
 
@@ -546,10 +566,26 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-[10px] font-semibold text-rose-500 flex items-center gap-1">
-                        <XCircle className="h-3.5 w-3.5" />
-                        No matched case. Search and link target.
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-semibold text-rose-500 flex items-center gap-1">
+                          <XCircle className="h-3.5 w-3.5" />
+                          No matched case. Search and link target.
+                        </p>
+                        {!readOnly && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={creatingId === it.id}
+                            onClick={() => createComplaintForItem(it)}
+                            title="No complaint exists for this acknowledgment yet — create one (no files) from its extracted details."
+                            className="h-7 shrink-0 gap-1 rounded-lg text-[10px] font-bold"
+                          >
+                            {creatingId === it.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FilePlus className="h-3 w-3" />}
+                            Create Complaint
+                          </Button>
+                        )}
+                      </div>
                     )}
 
                     {/* Candidate Pick list */}
@@ -830,7 +866,23 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                               <p className="text-[10.5px] text-slate-450 mt-1 truncate">{reviewItem.assigned.title || "(no subject)"}</p>
                             </div>
                           ) : (
-                            <p className="text-[10.5px] font-bold text-rose-500">Not linked to a complaint.</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[10.5px] font-bold text-rose-500">Not linked to a complaint.</p>
+                              {!readOnly && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={creatingId === reviewItem.id}
+                                  onClick={() => createComplaintForItem(reviewItem)}
+                                  title="No complaint exists for this acknowledgment yet — create one (no files) from its extracted details."
+                                  className="h-7 shrink-0 gap-1 rounded-lg text-[10px] font-bold"
+                                >
+                                  {creatingId === reviewItem.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FilePlus className="h-3 w-3" />}
+                                  Create Complaint
+                                </Button>
+                              )}
+                            </div>
                           )}
 
                           {!readOnly && reviewItem.candidates.length > 0 && (
