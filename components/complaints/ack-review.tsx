@@ -167,7 +167,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
   }
 
   async function setDecision(it: AckReviewItem, decision: AckReviewItem["decision"]) {
-    if (readOnly) return;
+    if (it.decision === "committed") return;
     patchLocal(it.id, { decision });
     await updateAckItemAction({ itemId: it.id, decision });
   }
@@ -571,7 +571,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                           <XCircle className="h-3.5 w-3.5" />
                           No matched case. Search and link target.
                         </p>
-                        {!readOnly && (
+                        {it.decision !== "committed" && (
                           <Button
                             type="button"
                             size="sm"
@@ -589,7 +589,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                     )}
 
                     {/* Candidate Pick list */}
-                    {!readOnly && it.candidates.length > 0 && (
+                    {it.decision !== "committed" && it.candidates.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/80">
                         {it.candidates.slice(0, 3).map((c) => (
                           <button
@@ -610,12 +610,12 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                       </div>
                     )}
 
-                    {!readOnly && <ComplaintPicker onPick={(c) => assign(it, c)} />}
+                    {it.decision !== "committed" && <ComplaintPicker onPick={(c) => assign(it, c)} />}
                   </div>
                 </div>
 
                 {/* Card Action footer */}
-                {!readOnly && it.decision !== "committed" && (
+                {it.decision !== "committed" && (
                   <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-850">
                     <Button
                       size="sm"
@@ -663,25 +663,23 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
             Back to batches
           </Link>
         </Button>
-        {!readOnly && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={rematch}
-              disabled={rematching || committing}
-              title="Re-check every acknowledgment against the current complaints — use this if a complaint was added (or its Job Number set) after this batch was scanned."
-              className="h-9 font-bold rounded-lg gap-1.5"
-            >
-              {rematching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Re-run matching
-            </Button>
-            <Button onClick={commit} disabled={committing || counts.confirmed === 0} className="h-9 font-bold px-4 gap-1.5 rounded-lg shadow-sm">
-              {committing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              Attach {counts.confirmed} confirmed
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={rematch}
+            disabled={rematching || committing}
+            title="Re-check every acknowledgment against the current complaints — use this if a complaint was added (or its Job Number set) after this batch was scanned. Available even after this batch was attached, since a section without a complaint yet can still gain one later."
+            className="h-9 font-bold rounded-lg gap-1.5"
+          >
+            {rematching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Re-run matching
+          </Button>
+          <Button onClick={commit} disabled={committing || counts.confirmed === 0} className="h-9 font-bold px-4 gap-1.5 rounded-lg shadow-sm">
+            {committing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Attach {counts.confirmed} confirmed
+          </Button>
+        </div>
       </div>
 
       {/* Batch Actions bottom floating panel */}
@@ -868,7 +866,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                           ) : (
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-[10.5px] font-bold text-rose-500">Not linked to a complaint.</p>
-                              {!readOnly && (
+                              {reviewItem.decision !== "committed" && (
                                 <Button
                                   type="button"
                                   size="sm"
@@ -885,7 +883,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                             </div>
                           )}
 
-                          {!readOnly && reviewItem.candidates.length > 0 && (
+                          {reviewItem.decision !== "committed" && reviewItem.candidates.length > 0 && (
                             <div className="space-y-1.5 mt-2">
                               <div className="text-[9px] font-extrabold text-slate-450 uppercase">Proposed Matching Matches</div>
                               <div className="flex flex-wrap gap-1">
@@ -908,7 +906,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                             </div>
                           )}
 
-                          {!readOnly && <ComplaintPicker onPick={(c) => assign(reviewItem, c)} />}
+                          {reviewItem.decision !== "committed" && <ComplaintPicker onPick={(c) => assign(reviewItem, c)} />}
                         </div>
                       </div>
                     ) : (
@@ -919,7 +917,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                   </div>
 
                   {/* Drawer match review decisions */}
-                  {!readOnly && reviewItem.decision !== "committed" && (
+                  {reviewItem.decision !== "committed" && (
                     <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-slate-850">
                       <Button
                         size="sm"
