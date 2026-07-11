@@ -27,6 +27,7 @@ import { startAiDraftJob } from "@/lib/actions/jobs";
 import { useTask } from "@/lib/jobs/client/use-task";
 import {
   setComplaintStatus,
+  updateAcknowledgmentDateAction,
   fileComplaint,
   generateComplaintDraft,
   saveComplaintAiDraft,
@@ -169,8 +170,16 @@ export function CaseWorkflow({
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [summaryDoc, setSummaryDoc] = React.useState<ComplaintDocument | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
-  const [ackDateInput, setAckDateInput] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [ackDateInput, setAckDateInput] = React.useState(() => acknowledgmentDate || new Date().toISOString().slice(0, 10));
+  const [savingAckDate, setSavingAckDate] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  // Re-sync from the server value on a fresh load (e.g. after router.refresh())
+  // — but only when it actually changes, so it never clobbers text the user is
+  // mid-way through typing due to an unrelated re-render.
+  React.useEffect(() => {
+    if (acknowledgmentDate) setAckDateInput(acknowledgmentDate);
+  }, [acknowledgmentDate]);
 
   React.useEffect(() => {
     if (!summaryDoc) return;
@@ -207,6 +216,18 @@ export function CaseWorkflow({
     setBusy(false);
     if (!r.success) { setError(r.error ?? "Could not update the status."); return; }
     setReplySuggestion(null);
+    router.refresh();
+  }
+
+  /** Correct the acknowledgment date once it's already set (status has moved
+   *  on from Draft/Filed) — distinct from `mark()`, which would wrongly reset
+   *  status back to "Acknowledged" for a case that's since progressed further. */
+  async function saveAckDate() {
+    setSavingAckDate(true);
+    setError(null);
+    const r = await updateAcknowledgmentDateAction(complaintId, ackDateInput);
+    setSavingAckDate(false);
+    if (!r.success) { setError(r.error ?? "Could not update the acknowledgment date."); return; }
     router.refresh();
   }
 
@@ -319,9 +340,21 @@ export function CaseWorkflow({
                 type="date"
                 value={ackDateInput}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAckDateInput(e.target.value)}
-                disabled={busy || reached > 1 || status.toLowerCase() === "acknowledged"}
+                disabled={busy || savingAckDate}
                 className="h-10 text-xs rounded-lg border border-slate-200 dark:border-slate-800 font-semibold"
               />
+              {acknowledgmentDate && ackDateInput !== acknowledgmentDate && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingAckDate}
+                  onClick={saveAckDate}
+                  className="h-8 text-xs font-bold gap-1.5 self-start"
+                >
+                  {savingAckDate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Save date
+                </Button>
+              )}
             </div>
 
             <ScanCapture

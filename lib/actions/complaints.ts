@@ -344,6 +344,69 @@ export async function setComplaintStatus(
 }
 
 /**
+ * Set/correct the acknowledgment date WITHOUT touching `status`.
+ * setComplaintStatus's date handling is tied to setting status to literally
+ * "Acknowledged" — reusing it here would wrongly REGRESS a complaint that has
+ * since moved to "Reply Received"/"Escalated"/etc. back to "Acknowledged".
+ *
+ * Also closes a real gap: attachAcknowledgmentDocument only starts the
+ * no-reply escalation clock when it can pull a date OUT OF the scanned
+ * document's OCR/AI extraction (pickAckDate) — on a poor scan (low-confidence
+ * OCR) that fails, so `status` flips to "Acknowledged" and a document lands,
+ * but `acknowledgment_date` stays null and `escalation_stage` stays stuck at
+ * "awaiting_ack" forever, with no clock ever running. Providing the date HERE
+ * (still `awaiting_ack`) starts that clock for the first time; providing it
+ * while already `awaiting_reply` just re-anchors the existing clock to the
+ * corrected date. A case that's moved past either (replied/escalated/etc.)
+ * keeps its real stage/timing untouched — never rewound.
+ */
+export async function updateAcknowledgmentDateAction(id: string, newDate: string): Promise<ActionState> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: "Enter a valid date." };
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { error: a.error };
+  const { user, admin } = a;
+
+  const { data: before } = await admin
+    .from("complaints")
+    .select("acknowledgment_date, escalation_stage")
+    .eq("id", id)
+    .single();
+  if (!before) return { error: "Complaint not found." };
+
+  const update: Record<string, unknown> = { acknowledgment_date: newDate, updated_by: user.id };
+  const stage = before.escalation_stage ?? "awaiting_ack";
+  if (stage === "awaiting_ack" || stage === "awaiting_reply") {
+    const { data: awaitingReplyConfig } = await admin
+      .from("escalation_flow_configs")
+      .select("stage_key, sla_days, sla_unit")
+      .eq("stage_key", "awaiting_reply")
+      .maybeSingle();
+    const enteredAt = new Date(`${newDate}T00:00:00Z`);
+    const deadline = awaitingReplyConfig ? computeStageDeadline(enteredAt, awaitingReplyConfig) : null;
+    update.escalation_stage = "awaiting_reply";
+    update.escalation_stage_entered_at = enteredAt.toISOString();
+    update.escalation_stage_deadline = deadline ? deadline.toISOString() : null;
+  }
+
+  const { error } = await admin.from("complaints").update(update).eq("id", id);
+  if (error) return { error: error.message };
+  await addTimeline(admin, {
+    complaintId: id,
+    eventType: "Note",
+    title: "Acknowledgment date corrected",
+    summary: `${before.acknowledgment_date ?? "(not set)"} → ${newDate}`,
+    createdBy: user.id,
+  });
+  await writeAudit(admin, {
+    entityType: "complaint", entityId: id, changedBy: user.id,
+    changes: [{ field: "acknowledgment_date", oldValue: before.acknowledgment_date, newValue: newDate }],
+  });
+  revalidatePath(`/complaints/${id}`);
+  void triggerAdvisorAnalysis(id);
+  return { success: true, id };
+}
+
+/**
  * File (submit) a complaint: record HOW/WHEN it was submitted to the officer and
  * seed the follow-up. This is the "Submit" step of the case workflow — the drafted
  * letter (from the forensic ZIP) is submitted by hand/RPAD/portal, and the user

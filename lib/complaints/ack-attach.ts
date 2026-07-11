@@ -114,7 +114,14 @@ export async function attachAcknowledgmentDocument(
   };
   const compPatch: Record<string, unknown> = {};
   const ackDate = pickAckDate(input.extracted ?? {});
-  if (!c.acknowledgment_date && ackDate) compPatch.acknowledgment_date = ackDate;
+  // Even when OCR/AI couldn't read a date off the page (poor scan, low
+  // confidence), the acknowledgment is physically in hand NOW — fall back to
+  // today rather than leaving acknowledgment_date (and the no-reply
+  // escalation clock below, which is gated on this field) unset forever.
+  // Previously a failed extraction meant `status` still flipped to
+  // "Acknowledged" but the date/clock silently never got set — a human can
+  // correct the date afterward via updateAcknowledgmentDateAction.
+  if (!c.acknowledgment_date) compPatch.acknowledgment_date = ackDate || new Date().toISOString().slice(0, 10);
   const exRef = (input.extracted?.referenceNumber as string) || "";
   if (!c.complaint_number && exRef && !/^\d{3}-\d{2}-\d{6}$/.test(exRef)) compPatch.complaint_number = exRef;
   if (c.status === "Draft" || c.status === "Filed") compPatch.status = "Acknowledged";
