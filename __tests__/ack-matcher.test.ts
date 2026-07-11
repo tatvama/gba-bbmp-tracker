@@ -65,4 +65,63 @@ describe("scoreAckMatch", () => {
       expect(r.confidence).toBe("high");
     }
   });
+
+  it("treats an extracted-but-untracked job code as unmatched, even with a plausible-looking fuzzy candidate", () => {
+    // Real production case: the ack clearly carries job code 040-23-000002
+    // (visible in the extracted fields), but no complaint has that job code
+    // yet — a DIFFERENT job's complaint just happens to share enough generic
+    // words ("roads", "drains", "layout", "ward") plus the same area to score
+    // "Low Confidence" (~0.49) under the old rules. A specific, unmistakable
+    // job code with nothing tracking it should route to "create complaint",
+    // not a misleading fuzzy pick against an unrelated job.
+    const untracked: PoolComplaint[] = [
+      {
+        id: "x",
+        internal_case_number: "DM-CMP-2026-000221",
+        complaint_number: null,
+        job_number: "088-24-000055",
+        title: "Improvements of roads and drains in the layout, ward",
+        location: "Kengeri Division",
+        reporter_name: null,
+        status: "Filed",
+      },
+    ];
+    const r = scoreAckMatch(
+      {
+        jobNumber: "040-23-000002",
+        subject: "Irregularities corruption found in the roads and drains layout, ward works",
+        areaOrWard: "Kengeri Division",
+      },
+      untracked,
+    );
+    expect(r.confidence).toBe("none");
+    expect(r.proposedComplaintId).toBeNull();
+  });
+
+  it("still allows a fuzzy match on the same text when no job code was extracted at all", () => {
+    // Confirms the suppression above is scoped to "job code present but
+    // unmatched" — with no job code to trust over it, fuzzy text similarity
+    // should still work exactly as before.
+    const untracked: PoolComplaint[] = [
+      {
+        id: "x",
+        internal_case_number: "DM-CMP-2026-000221",
+        complaint_number: null,
+        job_number: "088-24-000055",
+        title: "Improvements of roads and drains in the layout, ward",
+        location: "Kengeri Division",
+        reporter_name: null,
+        status: "Filed",
+      },
+    ];
+    const r = scoreAckMatch(
+      {
+        subject: "Irregularities corruption found in the roads and drains layout, ward works",
+        areaOrWard: "Kengeri Division",
+      },
+      untracked,
+    );
+    expect(r.confidence).not.toBe("none");
+    expect(r.proposedComplaintId).toBe("x");
+  });
 });

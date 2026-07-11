@@ -7,7 +7,7 @@
  * and matches, and finally attach each confirmed acknowledgment to its complaint.
  */
 import { revalidatePath } from "next/cache";
-import { requireRole, AuthorizationError } from "@/lib/auth";
+import { requireRole, AuthorizationError, type SessionUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { getR2SignedUrl, downloadFromR2, deleteFromR2 } from "@/lib/storage/r2-upload";
@@ -256,28 +256,95 @@ export async function searchComplaintsForMatchAction(query: string): Promise<Com
   return ((data ?? []) as ComplaintRow[]).map(toSummary);
 }
 
+interface AckItemForAttach {
+  id: string;
+  page_start: number;
+  page_end: number;
+  ocr_text: string | null;
+  extracted: Record<string, unknown> | null;
+}
+
 /**
- * Create a brand-new complaint straight from an UNMATCHED acknowledgment's
- * extracted fields and assign this section to it — the escape hatch for when
- * no complaint exists yet to attach to. Created bare (no document): the only
- * file we have here is the acknowledgment itself, which the normal commit
- * step attaches once this section is confirmed, exactly like an existing-
- * complaint match.
+ * Attach one section's PDF page range to its assigned complaint: carve the
+ * range out of the preserved original PDF, hand it to
+ * attachAcknowledgmentDocument (uploads it, stamps acknowledgment_date/
+ * status/escalation clock, writes the timeline entry), then mark the section
+ * committed. Shared by commitAckBatchAction (loops over every confirmed
+ * section in a batch) and createComplaintFromAckItemAction (attaches the ONE
+ * section immediately after creating/linking its complaint). Never throws —
+ * a failed attach shouldn't unwind a caller that has other work to keep
+ * going (the rest of a commit loop) or a DB write it wants to keep regardless
+ * (a complaint just created for this exact section).
+ */
+async function attachOneAckItem(
+  admin: ReturnType<typeof createAdminClient>,
+  args: {
+    item: AckItemForAttach;
+    complaintId: string;
+    original: Buffer;
+    originalUrl: string;
+    originalName: string | null;
+    userId: string;
+  },
+): Promise<{ ok: true; documentId: string } | { ok: false; error: string }> {
+  try {
+    const { pdf } = await extractPdfPages(args.original, args.item.page_start, args.item.page_end);
+    const fileName = `acknowledgment-pp${args.item.page_start}-${args.item.page_end}.pdf`;
+    const { documentId } = await attachAcknowledgmentDocument(admin, {
+      complaintId: args.complaintId,
+      buffer: pdf,
+      fileName,
+      mimeType: "application/pdf",
+      ocrText: args.item.ocr_text,
+      extracted: args.item.extracted,
+      sourceOriginalPath: args.originalUrl,
+      sourceOriginalName: args.originalName,
+      sourcePageStart: args.item.page_start,
+      sourcePageEnd: args.item.page_end,
+      userId: args.userId,
+      timelineTitle: "Acknowledgment attached from bulk scan",
+      timelineSummary: `Pages ${args.item.page_start}–${args.item.page_end} of ${args.originalName ?? "the scanned batch"}`,
+    });
+    await admin.from("ack_import_items").update({ decision: "committed", attached_document_id: documentId }).eq("id", args.item.id);
+    return { ok: true, documentId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not attach the acknowledgment." };
+  }
+}
+
+/**
+ * Resolve an UNMATCHED acknowledgment straight from its extracted fields —
+ * link it to the complaint that already carries its job code, or create a
+ * brand-new one when none does — and attach the acknowledgment's own PDF
+ * pages to that complaint IN THE SAME STEP. No separate Confirm + batch-level
+ * Attach round-trip: this is the direct path for the "job code is clearly on
+ * the page, but nothing in the system carries it yet" case that scoreAckMatch
+ * deliberately refuses to fuzzy-guess for (see ack-matcher.ts). A brand-new
+ * complaint is created bare — no document at creation time — but the ack
+ * itself lands on it moments later via the same attachOneAckItem tail
+ * commitAckBatchAction uses.
  *
  * Guards against duplicates: `complaints.job_number` carries no DB uniqueness
  * (several complaints can legitimately share one job code — work-splitting),
  * so this re-checks the LIVE complaint pool (not the batch's possibly-stale
  * match data) for the same canonical job code before inserting. A sibling
  * section earlier in this same batch — or a totally different import — may
- * have already created the complaint this one belongs to; if so, link to it
- * instead of creating a duplicate. Several existing complaints sharing the
- * code is left for the human to resolve via search — there's no safe way to
- * auto-pick one.
+ * have already created the complaint this one belongs to; if so, link (and
+ * attach) to it instead of creating a duplicate — unless it already carries
+ * an acknowledgment, in which case this section is marked skipped instead of
+ * double-attaching. Several existing complaints sharing the code is left for
+ * the human to resolve via search — there's no safe way to auto-pick one.
  */
-export async function createComplaintFromAckItemAction(
-  itemId: string,
-): Promise<{ ok: boolean; complaintId?: string; caseNumber?: string; linkedExisting?: boolean; error?: string }> {
-  let user;
+export async function createComplaintFromAckItemAction(itemId: string): Promise<{
+  ok: boolean;
+  complaintId?: string;
+  caseNumber?: string;
+  linkedExisting?: boolean;
+  attached?: boolean;
+  alreadyAcknowledged?: boolean;
+  error?: string;
+}> {
+  let user: SessionUser;
   try {
     user = await requireRole(COMPLAINT_FIELD_ROLES);
   } catch (e) {
@@ -286,12 +353,42 @@ export async function createComplaintFromAckItemAction(
   const admin = createAdminClient();
   const { data: item } = await admin
     .from("ack_import_items")
-    .select("id, extracted, assigned_complaint_id")
+    .select("id, batch_id, page_start, page_end, ocr_text, extracted, assigned_complaint_id")
     .eq("id", itemId)
     .single();
   if (!item) return { ok: false, error: "Section not found." };
-  const row = item as { extracted: Record<string, unknown> | null; assigned_complaint_id: string | null };
+  const row = item as {
+    batch_id: string; page_start: number; page_end: number; ocr_text: string | null;
+    extracted: Record<string, unknown> | null; assigned_complaint_id: string | null;
+  };
   if (row.assigned_complaint_id) return { ok: false, error: "This acknowledgment is already linked to a complaint." };
+
+  // Carves this section's pages out of the batch's preserved original PDF and
+  // attaches them to `targetComplaintId` — called once we know WHERE to attach
+  // (either branch below), never before, so a blocked/errored path never
+  // downloads the PDF for nothing.
+  async function attachThisItem(targetComplaintId: string): Promise<boolean> {
+    const { data: batchRow } = await admin
+      .from("ack_import_batches")
+      .select("original_storage_path, original_name")
+      .eq("id", row.batch_id)
+      .single();
+    const originalUrl = (batchRow as { original_storage_path?: string } | null)?.original_storage_path;
+    const originalName = (batchRow as { original_name?: string } | null)?.original_name ?? null;
+    if (!originalUrl) return false;
+    const original = await downloadFromR2(originalUrl);
+    if (!original) return false;
+    const r = await attachOneAckItem(admin, {
+      item: { id: itemId, page_start: row.page_start, page_end: row.page_end, ocr_text: row.ocr_text, extracted: row.extracted },
+      complaintId: targetComplaintId,
+      original,
+      originalUrl,
+      originalName,
+      userId: user.id,
+    });
+    if (!r.ok) console.error("[createComplaintFromAckItemAction] attach failed", targetComplaintId, r.error);
+    return r.ok;
+  }
 
   const ex = (row.extracted ?? {}) as Record<string, unknown>;
   const exJob = extractJobCode(ex.jobNumber) || extractJobCode(ex.referenceNumber);
@@ -300,9 +397,18 @@ export async function createComplaintFromAckItemAction(
     const pool = await loadComplaintPool(admin);
     const dupes = pool.filter((c) => extractJobCode(c.job_number) === exJob);
     if (dupes.length === 1) {
-      await admin.from("ack_import_items").update({ assigned_complaint_id: dupes[0]!.id }).eq("id", itemId);
+      const linkedId = dupes[0]!.id;
+      const acked = await loadAcknowledgedComplaintIds(admin, [linkedId]);
+      if (acked.has(linkedId)) {
+        await admin.from("ack_import_items").update({ assigned_complaint_id: linkedId, decision: "skipped" }).eq("id", itemId);
+        revalidatePath("/complaints/acknowledgments");
+        return { ok: true, complaintId: linkedId, linkedExisting: true, alreadyAcknowledged: true };
+      }
+      await admin.from("ack_import_items").update({ assigned_complaint_id: linkedId, decision: "confirmed" }).eq("id", itemId);
+      const attached = await attachThisItem(linkedId);
+      revalidatePath("/complaints");
       revalidatePath("/complaints/acknowledgments");
-      return { ok: true, complaintId: dupes[0]!.id, linkedExisting: true };
+      return { ok: true, complaintId: linkedId, linkedExisting: true, attached };
     }
     if (dupes.length > 1) {
       return {
@@ -354,11 +460,12 @@ export async function createComplaintFromAckItemAction(
     summary: `${caseNumber} — created during bulk acknowledgment reconciliation.`,
     created_by: user.id,
   });
-  await admin.from("ack_import_items").update({ assigned_complaint_id: complaintId }).eq("id", itemId);
+  await admin.from("ack_import_items").update({ assigned_complaint_id: complaintId, decision: "confirmed" }).eq("id", itemId);
+  const attached = await attachThisItem(complaintId);
 
   revalidatePath("/complaints");
   revalidatePath("/complaints/acknowledgments");
-  return { ok: true, complaintId, caseNumber };
+  return { ok: true, complaintId, caseNumber, attached };
 }
 
 /** Re-run AI extraction + matching for one section (after a boundary edit, or to
@@ -642,31 +749,19 @@ export async function commitAckBatchAction(batchId: string): Promise<{ ok: boole
       skippedDuplicate++;
       continue;
     }
-    try {
-      const { pdf } = await extractPdfPages(original, it.page_start, it.page_end);
-      const fileName = `acknowledgment-pp${it.page_start}-${it.page_end}.pdf`;
-
-      const { documentId } = await attachAcknowledgmentDocument(admin, {
-        complaintId,
-        buffer: pdf,
-        fileName,
-        mimeType: "application/pdf",
-        ocrText: it.ocr_text,
-        extracted: it.extracted,
-        sourceOriginalPath: originalUrl,
-        sourceOriginalName: originalName,
-        sourcePageStart: it.page_start,
-        sourcePageEnd: it.page_end,
-        userId: user.id,
-        timelineTitle: "Acknowledgment attached from bulk scan",
-        timelineSummary: `Pages ${it.page_start}–${it.page_end} of ${originalName ?? "the scanned batch"}`,
-      });
-
-      await admin.from("ack_import_items").update({ decision: "committed", attached_document_id: documentId }).eq("id", it.id);
+    const r = await attachOneAckItem(admin, {
+      item: it,
+      complaintId,
+      original,
+      originalUrl,
+      originalName,
+      userId: user.id,
+    });
+    if (r.ok) {
       acknowledged.add(complaintId); // so a later item for the same complaint is skipped
       attached++;
-    } catch (e) {
-      console.error("[commitAckBatchAction] attach failed", complaintId, e);
+    } else {
+      console.error("[commitAckBatchAction] attach failed", complaintId, r.error);
     }
   }
 

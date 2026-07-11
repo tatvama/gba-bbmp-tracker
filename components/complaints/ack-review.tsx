@@ -188,9 +188,15 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
     setCreatingId(null);
     if (!r.ok) { setBanner(r.error || "Could not create the complaint."); return; }
     setBanner(
-      r.linkedExisting
-        ? "A complaint already carries this job code — linked to it instead of creating a duplicate."
-        : `Created complaint ${r.caseNumber ?? ""} and linked this acknowledgment to it.`,
+      r.alreadyAcknowledged
+        ? "A complaint already carries this job code, but it's already been acknowledged — skipped instead of attaching a duplicate."
+        : r.linkedExisting
+          ? r.attached
+            ? "A complaint already carries this job code — linked and attached this acknowledgment to it."
+            : "A complaint already carries this job code — linked to it, but the acknowledgment couldn't be attached automatically. Use Confirm + Attach below."
+          : r.attached
+            ? `Created complaint ${r.caseNumber ?? ""} and attached this acknowledgment to it.`
+            : `Created complaint ${r.caseNumber ?? ""} and linked this acknowledgment to it, but it couldn't be attached automatically. Use Confirm + Attach below.`,
     );
     const res = await getAckBatchAction(batch.id);
     if ("error" in res) { setBanner(res.error); return; }
