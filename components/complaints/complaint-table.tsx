@@ -885,7 +885,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
               <div className="relative flex-1 min-w-[240px]">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 shrink-0" />
                 <Input
-                  placeholder="Search case no, title, OCR..."
+                  placeholder="Search case no, title, officer, contractor..."
                   value={globalFilter}
                   onChange={(e) => setGlobalFilter(e.target.value)}
                   className="h-9 pl-9 bg-white dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 text-sm font-medium w-full"
