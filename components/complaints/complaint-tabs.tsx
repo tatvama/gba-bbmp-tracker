@@ -127,6 +127,12 @@ export function ComplaintTabs({
                   <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Assigned Engineer</span>
                   <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{c.assigned_engineer ? `${c.assigned_engineer.full_name} (${c.assigned_engineer.designation})` : "—"}</span>
                 </div>
+                {c.ack_officer_name && (
+                  <div className="space-y-1 col-span-2">
+                    <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Officer On Acknowledgment</span>
+                    <span className="text-sm font-extrabold text-slate-800 dark:text-slate-205">{c.ack_officer_name}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

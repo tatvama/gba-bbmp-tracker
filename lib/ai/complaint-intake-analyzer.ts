@@ -41,6 +41,7 @@ export interface ComplaintIntakeExtraction {
   area?: string;
   ward?: string;
   division?: string;
+  contractor?: string;
   reporter?: string;
   jobCodes?: string[];
   references?: string[];
@@ -94,6 +95,7 @@ function fallback(): ComplaintIntakeExtraction {
     area: "",
     ward: "",
     division: "",
+    contractor: "",
     reporter: "",
     jobCodes: [],
     references: [],
@@ -130,6 +132,8 @@ const INTAKE_JSON_SHAPE = `{
   "ward": "ward number or name if mentioned",
   "division": "division name if mentioned",
   "reporter": "complainant name, citizen association, or organization name",
+  "officers": ["names and/or designations of any BBMP/GBA engineer or officer who signed, stamped, received, or is named as handling this document (e.g. 'Assistant Engineer, Bommanahalli', 'Ramesh K, AEE') — read Kannada seals/signatures too; empty when none is legible, never invent a name"],
+  "contractor": "the contractor / agency / firm name if mentioned, else empty",
   "requestedAction": "the requested action exactly as written (do not summarize or translate, maintain original language)",
   "jobCodes": ["any BBMP works job codes (ddd-yy-nnnnnn), work orders, file/tender/reference numbers"],
   "references": ["any reference citations or previous letters cited"],
@@ -194,7 +198,15 @@ function finalizeExtraction(base: ComplaintIntakeExtraction, data: any): Complai
   const area = getField(["area"]);
   const ward = getField(["ward"]);
   const division = getField(["division"]);
+  const contractor = getField(["contractor"]);
   const reporter = getField(["reporter", "reporterName", "reporter_name"]);
+
+  // Officer/engineer names read off the document (signatures, seals, "received
+  // by" lines). Kept as free text — never resolved to a contacts row.
+  const officersRaw = getField(["officers", "officerNames", "officer_names"], []);
+  const officerNames = (Array.isArray(officersRaw) ? officersRaw : [officersRaw])
+    .map((o) => (typeof o === "string" ? o.trim() : ""))
+    .filter(Boolean);
   const requestedAction = getField(["requestedAction", "requested_action"]);
   const summary = getField(["summary"]);
   const receiver = getField(["receiver"]);
@@ -257,6 +269,7 @@ function finalizeExtraction(base: ComplaintIntakeExtraction, data: any): Complai
     complaintType,
     department,
     areaOrWard,
+    officerNames,
     reporterName,
     requestedAction,
     jobNumber,
@@ -276,6 +289,7 @@ function finalizeExtraction(base: ComplaintIntakeExtraction, data: any): Complai
     division,
     area,
     ward,
+    contractor,
     reporter,
     confidence: overallConfidence,
     fieldConfidence,
@@ -443,6 +457,7 @@ function sanitize(ex: ComplaintIntakeExtraction): ComplaintIntakeExtraction {
     area: ex.area ?? "",
     ward: ex.ward ?? "",
     division: ex.division ?? "",
+    contractor: ex.contractor ?? "",
     reporter: ex.reporter ?? "",
     jobCodes: ex.jobCodes ?? [],
     references: ex.references ?? [],

@@ -190,6 +190,9 @@ export interface Complaint {
   escalation_stage_deadline: string | null;
   escalation_stage_entered_at: string | null;
   escalation_round: number;
+  // Reporter (0035) + acknowledgment officer read off the attached ack (0038)
+  reporter_name: string | null;
+  ack_officer_name: string | null;
 }
 
 export interface ComplaintWithRelations extends Complaint {

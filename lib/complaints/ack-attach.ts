@@ -59,6 +59,26 @@ function pickAckDate(extracted: Record<string, unknown>): string | null {
   return null;
 }
 
+/** First non-empty trimmed string among the given keys of an extraction. */
+function exStr(extracted: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = extracted?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+/** The officer/engineer named on the acknowledgment, as free text (never a
+ *  contacts lookup): the extracted `officerNames` joined, else the receiver line. */
+function exOfficerName(extracted: Record<string, unknown>): string {
+  const names = extracted?.officerNames;
+  if (Array.isArray(names)) {
+    const joined = names.map((n) => (typeof n === "string" ? n.trim() : "")).filter(Boolean).join("; ");
+    if (joined) return joined;
+  }
+  return exStr(extracted, "receiver");
+}
+
 /**
  * Upload the document, insert it against the complaint, nudge the complaint's
  * acknowledgment/status/escalation state, and record a timeline entry. Throws
@@ -100,10 +120,14 @@ export async function attachAcknowledgmentDocument(
   if (docErr || !docRow) throw new Error(docErr?.message || "Could not insert document.");
   const documentId = docRow.id as string;
 
-  // Stamp acknowledgment_date + nudge status (best-effort, never overwrite).
+  // Stamp acknowledgment_date + nudge status + backfill any complaint fields the
+  // acknowledgment reveals (best-effort, FILL-EMPTY-ONLY — never overwrite a
+  // value already on the complaint).
   const { data: comp } = await admin
     .from("complaints")
-    .select("acknowledgment_date, complaint_number, status, escalation_stage")
+    .select(
+      "acknowledgment_date, complaint_number, status, escalation_stage, job_number, reporter_name, location, responsible_department, contractor, ack_officer_name, division_id",
+    )
     .eq("id", input.complaintId)
     .single();
   const c = (comp ?? {}) as {
@@ -111,9 +135,44 @@ export async function attachAcknowledgmentDocument(
     complaint_number: string | null;
     status: string | null;
     escalation_stage: string | null;
+    job_number: string | null;
+    reporter_name: string | null;
+    location: string | null;
+    responsible_department: string | null;
+    contractor: string | null;
+    ack_officer_name: string | null;
+    division_id: string | null;
   };
   const compPatch: Record<string, unknown> = {};
-  const ackDate = pickAckDate(input.extracted ?? {});
+  const ex = input.extracted ?? {};
+  const ackDate = pickAckDate(ex);
+  // Fields read off the acknowledgment, applied only where the complaint has a gap.
+  const filled: string[] = [];
+  const fillIfEmpty = (existing: string | null, column: string, value: string, label: string) => {
+    if (!existing && value) {
+      compPatch[column] = value;
+      filled.push(label);
+    }
+  };
+  const exJob = exStr(ex, "jobNumber");
+  if (/^\d{3}-\d{2}-\d{6}$/.test(exJob)) fillIfEmpty(c.job_number, "job_number", exJob, "job number");
+  fillIfEmpty(c.reporter_name, "reporter_name", exStr(ex, "reporterName", "reporter"), "reporter");
+  fillIfEmpty(c.location, "location", exStr(ex, "areaOrWard", "area", "ward"), "location");
+  fillIfEmpty(c.responsible_department, "responsible_department", exStr(ex, "department"), "department");
+  fillIfEmpty(c.contractor, "contractor", exStr(ex, "contractor"), "contractor");
+  fillIfEmpty(c.ack_officer_name, "ack_officer_name", exOfficerName(ex), "officer");
+  // Division: resolve the extracted name to a division row, but only when the
+  // complaint has none and the name matches EXACTLY ONE division (no guessing).
+  if (!c.division_id) {
+    const divName = exStr(ex, "division");
+    if (divName) {
+      const { data: divs } = await admin.from("divisions").select("id").ilike("name", divName).limit(2);
+      if (divs && divs.length === 1) {
+        compPatch.division_id = divs[0]!.id;
+        filled.push("division");
+      }
+    }
+  }
   // Even when OCR/AI couldn't read a date off the page (poor scan, low
   // confidence), the acknowledgment is physically in hand NOW — fall back to
   // today rather than leaving acknowledgment_date (and the no-reply
@@ -122,8 +181,11 @@ export async function attachAcknowledgmentDocument(
   // "Acknowledged" but the date/clock silently never got set — a human can
   // correct the date afterward via updateAcknowledgmentDateAction.
   if (!c.acknowledgment_date) compPatch.acknowledgment_date = ackDate || new Date().toISOString().slice(0, 10);
-  const exRef = (input.extracted?.referenceNumber as string) || "";
-  if (!c.complaint_number && exRef && !/^\d{3}-\d{2}-\d{6}$/.test(exRef)) compPatch.complaint_number = exRef;
+  const exRef = exStr(ex, "referenceNumber");
+  if (!c.complaint_number && exRef && !/^\d{3}-\d{2}-\d{6}$/.test(exRef)) {
+    compPatch.complaint_number = exRef;
+    filled.push("reference number");
+  }
   if (c.status === "Draft" || c.status === "Filed") compPatch.status = "Acknowledged";
 
   // Start the no-reply escalation clock — but only the FIRST time an
@@ -150,7 +212,9 @@ export async function attachAcknowledgmentDocument(
     complaint_id: input.complaintId,
     event_type: "Acknowledged",
     title: input.timelineTitle,
-    summary: `${input.timelineSummary}${ackDate ? ` · received ${ackDate}` : ""}`,
+    summary:
+      `${input.timelineSummary}${ackDate ? ` · received ${ackDate}` : ""}` +
+      (filled.length ? ` · auto-filled from acknowledgment: ${filled.join(", ")}` : ""),
     related_document_id: documentId,
     created_by: input.userId,
   });
