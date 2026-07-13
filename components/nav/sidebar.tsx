@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, NAV_SECTIONS } from "./nav-items";
+import { useTranslation } from "@/lib/i18n/client";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = React.useState(false);
+  const { t } = useTranslation("navigation");
 
   const activeHref = NAV_ITEMS.map((i) => i.href)
     .filter((href) =>
@@ -64,6 +66,7 @@ export function Sidebar({
   const NavLink = ({ item }: { item: (typeof NAV_ITEMS)[number] }) => {
     const Icon = item.icon;
     const active = item.href === activeHref;
+    const label = t(item.labelKey);
 
     const handleClick = (e: React.MouseEvent) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -97,7 +100,7 @@ export function Sidebar({
               ? "bg-primary/10 text-primary font-bold"
               : "font-semibold text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
-          title={collapsed && !isMobile ? item.label : undefined}
+          title={collapsed && !isMobile ? label : undefined}
         >
           <Icon
             className={cn(
@@ -107,7 +110,7 @@ export function Sidebar({
                 : "text-muted-foreground/60 group-hover:text-foreground/80",
             )}
           />
-          {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
+          {(!collapsed || isMobile) && <span className="truncate">{label}</span>}
         </Link>
       </li>
     );
@@ -124,12 +127,12 @@ export function Sidebar({
           if (items.length === 0) return null;
           return (
             <div key={section.group} className="flex flex-col gap-0.5">
-              {section.label && (!collapsed || isMobile) && (
+              {section.labelKey && (!collapsed || isMobile) && (
                 <p className="mb-1 px-4.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
-                  {section.label}
+                  {t(section.labelKey)}
                 </p>
               )}
-              {section.label && collapsed && !isMobile && (
+              {section.labelKey && collapsed && !isMobile && (
                 <div className="mx-2 border-t border-border/40 my-1" />
               )}
               <ul className="space-y-0.5">
@@ -149,14 +152,14 @@ export function Sidebar({
             type="button"
             onClick={() => setCollapsed(!collapsed)}
             className="w-full flex items-center justify-center rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-all duration-200"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
             ) : (
               <div className="flex items-center gap-2.5 w-full">
                 <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                <span className="font-semibold truncate">Collapse sidebar</span>
+                <span className="font-semibold truncate">{t("nav.collapseSidebar")}</span>
               </div>
             )}
           </button>

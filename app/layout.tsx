@@ -7,6 +7,8 @@ import { Sidebar } from "@/components/nav/sidebar";
 import { getSessionUser } from "@/lib/auth";
 import { PageTransition } from "@/components/nav/page-transition";
 import { TaskRegistryProvider } from "@/lib/jobs/client/task-registry";
+import { LanguageProvider } from "@/lib/i18n/client";
+import { getLocale } from "@/lib/i18n/get-locale";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,10 +33,10 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getSessionUser();
+  const [user, locale] = await Promise.all([getSessionUser(), getLocale()]);
 
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang={locale} className={inter.variable} suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <a href="#main-content" className="skip-link">
           Skip to main content
@@ -45,20 +47,22 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <TaskRegistryProvider>
-            <div className="flex min-h-screen flex-col">
-              <TopNav email={user?.email ?? null} role={user?.role ?? null} />
-              <div className="flex flex-1">
-                <Sidebar />
-                <main
-                  id="main-content"
-                  className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10"
-                >
-                  <PageTransition>{children}</PageTransition>
-                </main>
+          <LanguageProvider initialLocale={locale}>
+            <TaskRegistryProvider>
+              <div className="flex min-h-screen flex-col">
+                <TopNav email={user?.email ?? null} role={user?.role ?? null} />
+                <div className="flex flex-1">
+                  <Sidebar />
+                  <main
+                    id="main-content"
+                    className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10"
+                  >
+                    <PageTransition>{children}</PageTransition>
+                  </main>
+                </div>
               </div>
-            </div>
-          </TaskRegistryProvider>
+            </TaskRegistryProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

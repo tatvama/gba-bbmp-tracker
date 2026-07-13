@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { UserMenu, type UserMenuProps } from "./user-menu";
 import { Sidebar } from "./sidebar";
 import { TaskCenter } from "./task-center";
@@ -13,9 +14,11 @@ import { NotificationsBell } from "./notifications-bell";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { KbdShortcut } from "@/components/kbd-shortcut";
+import { useTranslation } from "@/lib/i18n/client";
 
 export function TopNav({ email, role }: UserMenuProps) {
   const router = useRouter();
+  const { t } = useTranslation("navigation");
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   function openPalette() {
@@ -33,14 +36,14 @@ export function TopNav({ email, role }: UserMenuProps) {
             variant="ghost"
             size="icon"
             className="lg:hidden h-9 w-9 cursor-pointer hover:bg-muted/80"
-            aria-label="Open navigation"
+            aria-label={t("nav.openNavigation")}
             onClick={() => setMobileOpen(true)}
           >
             <Menu className="h-4 w-4 text-foreground/80" />
           </Button>
           <SheetContent side="left" className="p-0 flex flex-col h-full w-72 bg-card border-r border-border/80">
             <SheetTitle className="border-b border-border/60 px-4 py-3.5 text-sm font-semibold text-foreground/90">
-              Navigation
+              {t("nav.mobileTitle")}
             </SheetTitle>
             <div className="flex-1 overflow-y-auto animate-page-slide" onClick={() => setMobileOpen(false)}>
               <Sidebar isMobile />
@@ -83,10 +86,10 @@ export function TopNav({ email, role }: UserMenuProps) {
         <button
           onClick={openPalette}
           className="h-9 w-[320px] flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 text-xs text-muted-foreground transition-all duration-200 hover:border-muted-foreground/30 hover:bg-muted/50 hover:text-foreground/80 focus:outline-none focus:ring-2 focus:ring-primary/45"
-          aria-label="Open command palette"
+          aria-label={t("nav.openCommandPalette")}
         >
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-          <span className="flex-1 text-left font-medium">Search wards, contacts…</span>
+          <span className="flex-1 text-left font-medium">{t("nav.searchPlaceholder")}</span>
           <KbdShortcut className="hidden sm:inline-flex" />
         </button>
       </div>
@@ -97,7 +100,7 @@ export function TopNav({ email, role }: UserMenuProps) {
         variant="ghost"
         size="icon"
         className="flex sm:hidden h-9 w-9 hover:bg-muted transition-colors cursor-pointer"
-        aria-label="Search"
+        aria-label={t("nav.search")}
       >
         <Link href="/search">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -107,6 +110,7 @@ export function TopNav({ email, role }: UserMenuProps) {
       <div className="flex items-center gap-1.5">
         <TaskCenter />
         <NotificationsBell />
+        <LanguageSwitcher />
         <ModeToggle />
         <UserMenu email={email} role={role} />
       </div>

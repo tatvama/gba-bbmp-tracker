@@ -7,8 +7,10 @@ import { Search, ArrowRight, CornerDownLeft, ArrowUp, ArrowDown } from "lucide-r
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav/nav-items";
 import { KbdShortcut } from "@/components/kbd-shortcut";
+import { useTranslation } from "@/lib/i18n/client";
 
 export function CommandPalette() {
+  const { t } = useTranslation("navigation");
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
   const [cursor, setCursor] = React.useState(0);
@@ -37,12 +39,15 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  /* Filtered nav items */
+  /* Filtered nav items — matches either the English default or the
+   *  currently-displayed translated label, so search works in either script. */
   const items = React.useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return NAV_ITEMS;
-    return NAV_ITEMS.filter((i) => i.label.toLowerCase().includes(needle));
-  }, [q]);
+    return NAV_ITEMS.filter(
+      (i) => i.label.toLowerCase().includes(needle) || t(i.labelKey).toLowerCase().includes(needle),
+    );
+  }, [q, t]);
 
   const showGlobalSearch = q.trim().length > 0;
   const total = items.length + (showGlobalSearch ? 1 : 0);
@@ -76,10 +81,10 @@ export function CommandPalette() {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
-          aria-label="Command palette"
+          aria-label={t("commandPalette.title")}
           className="fixed left-1/2 top-[12%] z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-2xl border bg-card shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[4%] data-[state=open]:slide-in-from-top-[4%]"
         >
-          <Dialog.Title className="sr-only">Command Palette</Dialog.Title>
+          <Dialog.Title className="sr-only">{t("commandPalette.title")}</Dialog.Title>
           {/* Search input */}
           <div className="flex items-center gap-3 border-b px-4 py-3.5">
             <Search className="h-4.5 w-4.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -91,7 +96,7 @@ export function CommandPalette() {
                 setCursor(0);
               }}
               onKeyDown={onKeyDown}
-              placeholder="Search or jump to a page…"
+              placeholder={t("commandPalette.placeholder")}
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               role="combobox"
               aria-expanded={open}
@@ -126,7 +131,7 @@ export function CommandPalette() {
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-                  <span className="flex-1 font-medium">{item.label}</span>
+                  <span className="flex-1 font-medium">{t(item.labelKey)}</span>
                   {isActive && (
                     <ArrowRight className="h-3.5 w-3.5 shrink-0 text-primary" />
                   )}
@@ -148,7 +153,7 @@ export function CommandPalette() {
               >
                 <Search className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
                 <span>
-                  Search everywhere for{" "}
+                  {t("commandPalette.searchEverywhereFor")}{" "}
                   <strong className="font-semibold">&ldquo;{q.trim()}&rdquo;</strong>
                 </span>
                 {active === items.length && (
@@ -159,7 +164,7 @@ export function CommandPalette() {
 
             {items.length === 0 && !showGlobalSearch && (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                No pages found for &ldquo;{q}&rdquo;
+                {t("commandPalette.noPagesFoundFor")} &ldquo;{q}&rdquo;
               </p>
             )}
           </div>
@@ -173,17 +178,17 @@ export function CommandPalette() {
               <kbd className="flex h-4 w-4 items-center justify-center rounded border bg-card">
                 <ArrowDown className="h-2.5 w-2.5" />
               </kbd>
-              <span>navigate</span>
+              <span>{t("commandPalette.navigate")}</span>
             </span>
             <span className="flex items-center gap-1">
               <kbd className="flex h-4 items-center justify-center rounded border bg-card px-1">
                 <CornerDownLeft className="h-2.5 w-2.5" />
               </kbd>
-              <span>open</span>
+              <span>{t("commandPalette.open")}</span>
             </span>
             <span className="ml-auto">
-              Press{" "}
-              <KbdShortcut className="px-1" /> anytime
+              {t("commandPalette.press")}{" "}
+              <KbdShortcut className="px-1" /> {t("commandPalette.anytime")}
             </span>
           </div>
         </Dialog.Content>
