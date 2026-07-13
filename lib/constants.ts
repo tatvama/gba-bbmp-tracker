@@ -652,6 +652,31 @@ export const INSTITUTIONAL_RECIPIENTS: Record<
   },
 };
 
+// =============================================================================
+// BBMP work-registry search (lib/bbmp-works/*)
+// =============================================================================
+
+/** Descriptive work-progress states, richer than the bare 0/mid/100 bucketing
+ *  in lib/bbmp-works/status.ts's getWorkStatus (which can't express e.g.
+ *  "Tender Pending" from a percentage alone). */
+export const WORK_STATUSES = [
+  "Tender Pending",
+  "Tender Published",
+  "Tender Awarded",
+  "Work Order Issued",
+  "Not Started",
+  "In Progress",
+  "Temporarily Stopped",
+  "Delayed",
+  "Completed",
+  "Bill Pending",
+  "Payment Partially Completed",
+  "Payment Completed",
+  "Cancelled",
+  "Status Unknown",
+] as const;
+export type WorkStatus = (typeof WORK_STATUSES)[number];
+
 /** AI draft kinds produced by the Audit & Draft wizard (persisted via saveAiDraft). */
 export const AUDIT_DRAFT_KINDS = {
   road_work_audit_rti: "Road-work audit RTI",

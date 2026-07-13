@@ -13,13 +13,14 @@ import type { JobType } from "./types";
  *  list. ai_draft/ocr are a single streaming/OCR call with no clean midpoint
  *  to stop, so they're deliberately absent — vision_scan checks between every
  *  photo pair. */
-export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan"];
+export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan", "source_fetch"];
 
 export const MODULE_LABEL: Record<JobType, string> = {
   ai_draft: "AI Drafting",
   ocr: "OCR",
   vision_scan: "Vision Scan",
   export: "Export",
+  source_fetch: "Source Search",
 };
 
 /** Where "Open Result" should take the user once a background_jobs-sourced
@@ -33,6 +34,8 @@ export function resultLinkForRow(type: string, entityType: string | null, entity
       return entityType === "complaint" && entityId ? `/complaints/${entityId}` : null;
     case "vision_scan":
       return "/complaints/duplicate-photos";
+    case "source_fetch":
+      return "/bbmp-works/search";
     default:
       return null;
   }

@@ -51,6 +51,8 @@ export interface Division {
   address: string | null;
   notes: string | null;
   created_at: string;
+  /** Old/historical division names — mirrors wards.old_wards. */
+  old_names: string[];
 }
 
 export interface EngSubDivision {

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, value, defaultValue, onChange, onClick, onFocus, ...props }, ref) => {
+  ({ className, type, value, defaultValue, onChange, onClick, onFocus, name, disabled, ...props }, ref) => {
     const isDateType = type === "date";
     const [showCalendar, setShowCalendar] = React.useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -178,6 +178,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
             placeholder="Select date..."
             onClick={() => setShowCalendar(true)}
             onFocus={() => setShowCalendar(true)}
+            disabled={disabled}
             value={
               resolvedRef.current?.value
                 ? resolvedRef.current.value.split("-").reverse().join("-")
@@ -197,13 +198,17 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
             )}
             {...props}
           />
-          {/* Hidden real date input to store actual value for forms */}
+          {/* Hidden real date input holds the canonical ISO value AND carries
+              `name` so this — not the reversed DD-MM-YYYY display field above —
+              is what FormData submits to Server Actions. */}
           <input
             type="hidden"
             ref={resolvedRef}
+            name={name}
             value={value}
             defaultValue={defaultValue}
             onChange={onChange}
+            disabled={disabled}
           />
           
           <CalendarIcon className="h-4 w-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -327,6 +332,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className,
         )}
         ref={ref}
+        name={name}
+        disabled={disabled}
         value={value}
         defaultValue={defaultValue}
         onChange={onChange}

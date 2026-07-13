@@ -49,6 +49,12 @@ export default async function SearchPage({
           Search across wards, contacts, divisions, sub-divisions and complaints.
         </p>
         <SearchBox initial={term} />
+        <p className="mt-2 text-xs text-muted-foreground">
+          Looking for a BBMP work/tender by job number, ward, or contractor?{" "}
+          <Link href="/bbmp-works/search" className="text-primary hover:underline">
+            Try Work Search →
+          </Link>
+        </p>
       </div>
 
       {!results && (

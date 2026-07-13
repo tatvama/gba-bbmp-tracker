@@ -16,7 +16,7 @@ export const ACTIVE_JOB_STATUSES: ReadonlySet<JobStatus> = new Set(["queued", "r
 /** Every job type the framework knows about. Add a new one here + register a
  *  handler and config in registry.ts — that's the only place a new module
  *  plugs in (no feature-specific background systems). */
-export type JobType = "ai_draft" | "ocr" | "vision_scan" | "export";
+export type JobType = "ai_draft" | "ocr" | "vision_scan" | "export" | "source_fetch";
 
 /** What a handler is given to report progress and check for cancellation.
  *  `updateProgress`'s stage/message land in result.stage/result.message —

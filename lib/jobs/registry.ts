@@ -18,6 +18,11 @@ export const JOB_CONFIG: Record<JobType, JobConfig> = {
   ocr: { maxDurationMs: 5 * 60_000, maxRetries: 2, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 2 },
   vision_scan: { maxDurationMs: 15 * 60_000, maxRetries: 1, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 1 },
   export: { maxDurationMs: 3 * 60_000, maxRetries: 2, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 2 },
+  // account.bbmpgov.in is a single shared government server — concurrencyLimit
+  // 1 for the same politeness reasoning vision_scan uses for its own single
+  // shared (AI vision) endpoint. A ward+year expansion can walk up to 2000
+  // serials (lib/ifms/downloader.ts's expandWardYear), hence the long budget.
+  source_fetch: { maxDurationMs: 20 * 60_000, maxRetries: 1, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 1 },
 };
 
 const handlers: Partial<Record<JobType, JobHandler>> = {};

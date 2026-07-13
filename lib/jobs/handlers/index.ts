@@ -9,6 +9,7 @@
 import "./ai-draft";
 import "./ocr";
 import "./vision-scan";
+import "./source-fetch";
 // Stage 7: import "./export";
 
 export {};

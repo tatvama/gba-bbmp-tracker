@@ -35,12 +35,15 @@ export default async function AuditPage({
         title="Audit logs"
         description="Every mutation to a contact or ward is recorded here — field, old value, new value, who and when."
       />
-      <div className="mb-3 flex gap-2">
-        {["", "contact", "ward", "complaint"].map((e) => (
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {["", "contact", "ward", "complaint", "bbmp_work"].map((e) => (
           <Button key={e || "all"} asChild size="sm" variant={(entity ?? "") === e ? "default" : "outline"}>
             <Link href={e ? `/audit?entity=${e}` : "/audit"}>{e || "All"}</Link>
           </Button>
         ))}
+        <Button asChild size="sm" variant="ghost" className="ml-auto">
+          <Link href="/bbmp-works/recent-searches">Recent BBMP searches</Link>
+        </Button>
       </div>
       {logs.length === 0 ? (
         <EmptyState title="No audit entries yet" description="Edits will appear here once the app has data and edits are made." />
