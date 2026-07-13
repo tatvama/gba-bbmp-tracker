@@ -388,6 +388,10 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
   const [subDivision, setSubDivision] = React.useState(() => searchParams.get("subDivision") ?? "all");
   const [ward, setWard] = React.useState(() => searchParams.get("ward") ?? "all");
 
+  const statusOpts = React.useMemo(
+    () => COMPLAINT_STATUSES.filter((s) => data.some((c) => c.status === s)),
+    [data],
+  );
   const divisionOpts = React.useMemo(
     () => [...new Set(data.map((c) => c.division?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
     [data],
@@ -621,6 +625,9 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
         r.title,
         r.location,
         r.assigned_engineer?.full_name,
+        r.assigned_officer?.full_name,
+        r.ack_officer_name,
+        r.contractor,
         r.latest_reply_summary,
         r.latest_action_taken_summary
       ].filter(Boolean).join(" ").toLowerCase();
@@ -888,7 +895,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
               {/* Advanced select dropdowns */}
               <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status filter">
                 <option value="all">Any status</option>
-                {COMPLAINT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {statusOpts.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
 
               <select className={selectCls} value={type} onChange={(e) => setType(e.target.value)} aria-label="Type filter">
