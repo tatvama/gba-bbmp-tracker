@@ -63,7 +63,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/complaints/import", label: "Upload (ZIP or letter)", labelKey: "nav.uploadZipOrLetter", icon: Upload, group: "complaints" },
   { href: "/complaints/acknowledgments", label: "Attach Acknowledgments", labelKey: "nav.attachAcknowledgments", icon: Stamp, group: "complaints" },
   { href: "/complaints/print-queue", label: "Print Queue", labelKey: "nav.printQueue", icon: Printer, group: "complaints" },
-  { href: "/complaints/process-flow", label: "Escalation Flow", labelKey: "nav.escalationFlow", icon: Workflow, group: "complaints" },
   { href: "/complaints/duplicate-photos", label: "Duplicate Photos", labelKey: "nav.duplicatePhotos", icon: Images, group: "complaints" },
   { href: "/complaints/contractors", label: "Contractor Intelligence", labelKey: "nav.contractorIntelligence", icon: Building2, group: "complaints" },
   { href: "/complaints/oversight", label: "Forensic Oversight", labelKey: "nav.forensicOversight", icon: Gauge, group: "complaints" },
