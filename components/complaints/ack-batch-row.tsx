@@ -109,10 +109,10 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
             variant="outline"
             onClick={handleDelete}
             disabled={loading}
-            className={`h-8 text-xs font-bold px-3 gap-1 rounded-lg border-slate-205 dark:border-slate-800 dark:bg-slate-955 cursor-pointer transition-colors duration-200 ${
+            className={`h-8 text-xs font-bold px-3 gap-1 rounded-lg border cursor-pointer transition-all duration-200 ${
               isActive
-                ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50/50 dark:hover:bg-amber-955/20 border-amber-200/50 dark:border-amber-950/30"
-                : "text-rose-600 hover:text-rose-700 hover:bg-rose-50/50 dark:hover:bg-rose-955/20 border-rose-200/50 dark:border-rose-950/30"
+                ? "border-amber-200 text-amber-600 bg-amber-50/10 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 dark:hover:bg-amber-950/20"
+                : "border-rose-200 text-rose-600 bg-rose-50/10 hover:bg-rose-50 dark:border-rose-900/50 dark:text-rose-400 dark:hover:bg-rose-950/20"
             }`}
           >
             {loading ? (
@@ -125,7 +125,12 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
             {isActive ? t("advanced.ack.stopButton") : tc("action.delete")}
           </Button>
 
-          <Button size="sm" variant="outline" className="h-8 text-xs font-bold px-3 gap-1.5 rounded-lg shadow-3xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850" asChild>
+          <Button
+            size="sm"
+            variant="default"
+            className="h-8 text-xs font-extrabold px-3.5 gap-1.5 rounded-lg shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
+            asChild
+          >
             <Link href={`/complaints/acknowledgments/${b.id}`}>
               {b.status === "committed" ? t("advanced.ack.viewBatch") : t("advanced.ack.reviewAndMatch")}
               <ArrowRight className="h-3.5 w-3.5" />
