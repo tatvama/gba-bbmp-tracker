@@ -1185,11 +1185,12 @@ export function ComplaintTable({
                 size="sm"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
-                className="h-9 sm:h-8 px-4 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                className="h-8 text-xs font-bold px-3 gap-1 rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 shadow-3xs cursor-pointer disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
               >
+                <ChevronLeft className="h-4 w-4 shrink-0" />
                 Previous
               </Button>
-              <span className="text-xs font-bold px-3 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-700">
+              <span className="text-xs font-extrabold px-3.5 py-1.5 rounded-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 text-slate-500 dark:text-slate-400 select-none">
                 Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
               </span>
               <Button
@@ -1197,9 +1198,10 @@ export function ComplaintTable({
                 size="sm"
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
-                className="h-9 sm:h-8 px-4 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                className="h-8 text-xs font-bold px-3 gap-1 rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 shadow-3xs cursor-pointer disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
               >
                 Next
+                <ChevronRight className="h-4 w-4 shrink-0" />
               </Button>
             </div>
           </div>
