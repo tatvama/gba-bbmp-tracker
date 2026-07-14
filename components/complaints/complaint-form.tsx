@@ -472,7 +472,14 @@ export function ComplaintForm({
             required
           >
             <option value="">—</option>
-            <option value="BBMP">{translateEnum("workflow", "BBMP", locale)}</option>
+            <option value="GBA">{translateEnum("workflow", "GBA", locale)}</option>
+            {/* Every existing complaint on file is ward_type="BBMP" — keep this
+                option available ONLY when editing one of those, so its edit
+                page doesn't show a <select> whose current value matches no
+                option. New complaints (no `comp`) never see it. */}
+            {comp?.ward_type === "BBMP" && (
+              <option value="BBMP">{translateEnum("workflow", "BBMP", locale)}</option>
+            )}
           </select>
         </Field>
 

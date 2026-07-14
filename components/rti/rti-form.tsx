@@ -443,7 +443,14 @@ function RtiFormInner({
             required
           >
             <option value="">{tc("common.na")}</option>
-            <option value="BBMP">{t("form.bbmpWards")}</option>
+            <option value="GBA">{t("form.gbaWards")}</option>
+            {/* Every existing RTI on file is ward_type="BBMP" — keep this option
+                available ONLY when editing one of those, so its edit page
+                doesn't show a <select> whose current value matches no option.
+                New RTIs (no `initial`) never see it. */}
+            {rti?.ward_type === "BBMP" && (
+              <option value="BBMP">{t("form.bbmpWards")}</option>
+            )}
           </select>
         </Field>
 
