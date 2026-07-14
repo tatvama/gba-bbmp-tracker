@@ -111,8 +111,8 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
             disabled={loading}
             className={`h-8 text-xs font-bold px-3 gap-1 rounded-lg border cursor-pointer transition-all duration-200 ${
               isActive
-                ? "border-amber-200 text-amber-600 bg-amber-50/10 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 dark:hover:bg-amber-950/20"
-                : "border-rose-200 text-rose-600 bg-rose-50/10 hover:bg-rose-50 dark:border-rose-900/50 dark:text-rose-400 dark:hover:bg-rose-950/20"
+                ? "border-amber-200 bg-amber-50/65 text-amber-700 hover:bg-amber-100/80 dark:border-amber-900/55 dark:bg-amber-950/25 dark:text-amber-400 dark:hover:bg-amber-955/45"
+                : "border-rose-200 bg-rose-50/65 text-rose-700 hover:bg-rose-100/80 dark:border-rose-900/55 dark:bg-rose-950/25 dark:text-rose-400 dark:hover:bg-rose-955/45"
             }`}
           >
             {loading ? (
@@ -128,7 +128,7 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
           <Button
             size="sm"
             variant="default"
-            className="h-8 text-xs font-extrabold px-3.5 gap-1.5 rounded-lg shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
+            className="h-8 text-xs font-extrabold px-3.5 gap-1.5 rounded-lg shadow-sm bg-primary/95 text-primary-foreground hover:bg-primary/100 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
             asChild
           >
             <Link href={`/complaints/acknowledgments/${b.id}`}>
