@@ -480,9 +480,10 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
               <Card
                 key={it.id}
                 className={cn(
-                  "group relative flex flex-col justify-between rounded-2xl border bg-white dark:bg-slate-900 shadow-3xs hover:shadow-2xs transition-all duration-200 p-4",
-                  isConfirmed || isCommitted ? "border-emerald-250 dark:border-emerald-950/50 bg-emerald-50/5 dark:bg-emerald-950/2" : "border-slate-200 dark:border-slate-805",
-                  isSkipped ? "opacity-75 border-slate-350 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40" : ""
+                  "group relative flex flex-col justify-between rounded-2xl border bg-white dark:bg-slate-900 shadow-3xs hover:shadow-2xs p-4 transition-[background-color,border-color,box-shadow,transform] duration-200 ease-in-out cursor-pointer",
+                  isSelected
+                    ? "border-primary bg-primary/[0.02] dark:bg-primary/[0.01]"
+                    : "border-slate-200 dark:border-slate-805"
                 )}
               >
                 <div>
