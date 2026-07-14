@@ -30,8 +30,8 @@ import { useTranslation } from "@/lib/i18n/client";
  *
  * Responsive Behavior:
  *   - Mobile/Tablet: Hidden by default, nested inside a slide-out drawer.
- *     - Desktop: Displayed side-by-side with main page content. Supports collapsing
- *       width from w-64 (256px) down to w-16 (64px) to maximize screen width.
+ *   - Desktop: Displayed side-by-side with main page content. Supports collapsing
+ *     width from w-64 (256px) down to w-16 (64px) to maximize screen width.
  *
  * Accessibility:
  *   - Uses semantic <nav> container.
@@ -82,7 +82,7 @@ export function Sidebar({
     };
 
     return (
-      <li className="relative px-1.5">
+      <li className="relative px-1.5 font-sans">
         {active && (
           <span
             aria-hidden
@@ -116,60 +116,34 @@ export function Sidebar({
     );
   };
 
-  const navContent = (
-    <nav
-      className={cn("flex flex-1 flex-col justify-between overflow-y-auto px-1 py-4 bg-card", className)}
-      aria-label="Primary navigation"
-    >
-      <div className="space-y-4">
-        {NAV_SECTIONS.map((section, i) => {
-          const items = NAV_ITEMS.filter((it) => it.group === section.group);
-          if (items.length === 0) return null;
-          return (
-            <div key={section.group} className="flex flex-col gap-0.5">
-              {section.labelKey && (!collapsed || isMobile) && (
-                <p className="mb-1 px-4.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
-                  {t(section.labelKey)}
-                </p>
-              )}
-              {section.labelKey && collapsed && !isMobile && (
-                <div className="mx-2 border-t border-border/40 my-1" />
-              )}
-              <ul className="space-y-0.5">
-                {items.map((item) => (
-                  <NavLink key={item.href} item={item} />
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Collapse Trigger at bottom */}
-      {!isMobile && (
-        <div className="mt-auto pt-4 px-1.5 border-t border-border/40">
-          <button
-            type="button"
-            onClick={() => setCollapsed(!collapsed)}
-            className="w-full flex items-center justify-center rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-all duration-200"
-            aria-label={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-            ) : (
-              <div className="flex items-center gap-2.5 w-full">
-                <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                <span className="font-semibold truncate">{t("nav.collapseSidebar")}</span>
-              </div>
-            )}
-          </button>
-        </div>
-      )}
-    </nav>
-  );
-
   if (isMobile) {
-    return navContent;
+    return (
+      <nav
+        className={cn("flex flex-1 flex-col overflow-y-auto px-1 py-4 bg-card", className)}
+        aria-label="Primary navigation"
+      >
+        <div className="space-y-4">
+          {NAV_SECTIONS.map((section, i) => {
+            const items = NAV_ITEMS.filter((it) => it.group === section.group);
+            if (items.length === 0) return null;
+            return (
+              <div key={section.group} className="flex flex-col gap-0.5">
+                {section.labelKey && (
+                  <p className="mb-1 px-4.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                    {t(section.labelKey)}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {items.map((item) => (
+                    <NavLink key={item.href} item={item} />
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </nav>
+    );
   }
 
   return (
@@ -179,7 +153,54 @@ export function Sidebar({
         collapsed ? "w-16" : "w-64"
       )}
     >
-      {navContent}
+      {/* Scrollable list of items */}
+      <nav
+        className={cn("flex-1 overflow-y-auto px-1 py-4 bg-card scrollbar-none", className)}
+        aria-label="Primary navigation"
+      >
+        <div className="space-y-4">
+          {NAV_SECTIONS.map((section, i) => {
+            const items = NAV_ITEMS.filter((it) => it.group === section.group);
+            if (items.length === 0) return null;
+            return (
+              <div key={section.group} className="flex flex-col gap-0.5">
+                {section.labelKey && !collapsed && (
+                  <p className="mb-1 px-4.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                    {t(section.labelKey)}
+                  </p>
+                )}
+                {section.labelKey && collapsed && (
+                  <div className="mx-2 border-t border-border/40 my-1" />
+                )}
+                <ul className="space-y-0.5">
+                  {items.map((item) => (
+                    <NavLink key={item.href} item={item} />
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Sticky Collapse toggle pinned at the bottom of aside */}
+      <div className="p-2 border-t border-border/40 bg-card/85 backdrop-blur-xs select-none">
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="w-full flex items-center justify-center rounded-lg h-9 px-3 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-all duration-200 cursor-pointer"
+          aria-label={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+          ) : (
+            <div className="flex items-center gap-2.5 w-full">
+              <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+              <span className="font-semibold truncate">{t("nav.collapseSidebar")}</span>
+            </div>
+          )}
+        </button>
+      </div>
     </aside>
   );
 }
