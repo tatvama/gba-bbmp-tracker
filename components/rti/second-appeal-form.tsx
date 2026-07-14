@@ -14,6 +14,8 @@ import { SECOND_APPEAL_REASONS } from "@/lib/constants";
 import { generateSecondAppealDraft } from "@/lib/actions/ai";
 import type { ActionState } from "@/lib/actions/contacts";
 import type { RtiWithRelations, RtiFirstAppeal } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 export function SecondAppealForm({
   rti,
@@ -29,6 +31,8 @@ export function SecondAppealForm({
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, {});
   const [reasons, setReasons] = React.useState<string[]>([]);
+  const { t, locale } = useTranslation("rti");
+  const { t: tc } = useTranslation("common");
 
   React.useEffect(() => {
     if (state.success) router.push(`/rti/${rti.id}`);
@@ -49,7 +53,7 @@ export function SecondAppealForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Second appeal / complaint record</CardTitle>
+          <CardTitle className="text-base">{t("form.secondAppealRecordTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
@@ -60,7 +64,7 @@ export function SecondAppealForm({
             )}
 
             <div>
-              <Label className="mb-1.5 block">Reasons</Label>
+              <Label className="mb-1.5 block">{t("form.reasonsLabel")}</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {SECOND_APPEAL_REASONS.map((r) => (
                   <label key={r} className="flex items-center gap-2 text-sm">
@@ -70,7 +74,7 @@ export function SecondAppealForm({
                       checked={reasons.includes(r)}
                       onCheckedChange={(c) => toggle(r, c === true)}
                     />
-                    {r}
+                    {translateEnum("workflow", r, locale)}
                   </label>
                 ))}
               </div>
@@ -78,53 +82,53 @@ export function SecondAppealForm({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Linked first appeal</Label>
+                <Label>{t("form.linkedFirstAppeal")}</Label>
                 <select name="firstAppealId" defaultValue={latestFa?.id ?? ""} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <option value="">—</option>
+                  <option value="">{tc("common.na")}</option>
                   {firstAppeals.map((fa) => (
                     <option key={fa.id} value={fa.id}>
-                      {fa.date_filed ? `Filed ${fa.date_filed}` : "Draft"} · {fa.grounds.join(", ").slice(0, 40)}
+                      {fa.date_filed ? `${translateEnum("status", "Filed", locale)} ${fa.date_filed}` : translateEnum("status", "Draft", locale)} · {fa.grounds.map((g) => translateEnum("workflow", g, locale)).join(", ").slice(0, 40)}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>Commission</Label>
+                <Label>{t("form.commission")}</Label>
                 <Input name="commissionName" defaultValue="Karnataka Information Commission" />
               </div>
               <div className="space-y-1.5">
-                <Label>Filing date</Label>
+                <Label>{t("form.filingDateLabel")}</Label>
                 <Input type="date" name="filingDate" />
               </div>
               <div className="space-y-1.5">
-                <Label>Diary number</Label>
+                <Label>{t("form.diaryNumber")}</Label>
                 <Input name="diaryNumber" />
               </div>
               <div className="space-y-1.5">
-                <Label>Hearing date</Label>
+                <Label>{t("form.hearingDate")}</Label>
                 <Input type="date" name="hearingDate" />
               </div>
               <div className="space-y-1.5">
-                <Label>Compliance due date</Label>
+                <Label>{t("form.complianceDueDate")}</Label>
                 <Input type="date" name="complianceDueDate" />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Reason detail</Label>
+              <Label>{t("form.reasonDetailLabel")}</Label>
               <Textarea name="reasonDetail" rows={2} />
             </div>
             <div className="space-y-1.5">
-              <Label>Notes</Label>
+              <Label>{t("form.notesLabel")}</Label>
               <Textarea name="notes" rows={2} />
             </div>
 
             <div className="flex gap-2">
               <Button type="submit" disabled={pending}>
-                {pending ? "Saving…" : "Save second appeal"}
+                {pending ? t("form.saving") : t("form.saveSecondAppeal")}
               </Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>
-                Cancel
+                {tc("action.cancel")}
               </Button>
             </div>
           </form>
@@ -133,7 +137,7 @@ export function SecondAppealForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">AI second-appeal draft</CardTitle>
+          <CardTitle className="text-base">{t("form.aiSecondAppealDraftTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <AiDraftPanel
@@ -152,12 +156,12 @@ export function SecondAppealForm({
             }
             inputs={
               <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground">Context sent to AI</p>
-                <p className="mt-1">RTI: {rti.subject}</p>
-                <p>Ref: {rti.internal_ref ?? "—"}</p>
+                <p className="font-semibold text-foreground">{t("form.contextSentToAiLabel")}</p>
+                <p className="mt-1">{t("form.rtiSubjectPrefix", { subject: rti.subject })}</p>
+                <p>{t("form.refPrefix", { ref: rti.internal_ref ?? "—" })}</p>
                 <p className="mt-1">{firstAppealSummary}</p>
                 <p className="mt-1">
-                  Reasons: {reasons.length ? reasons.join(", ") : "none selected yet"}
+                  {t("form.reasonsPrefix", { reasons: reasons.length ? reasons.join(", ") : t("form.noneSelectedYet") })}
                 </p>
               </div>
             }

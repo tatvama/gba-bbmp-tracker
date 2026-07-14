@@ -5,12 +5,8 @@ import { getGbaTree, getBbmpTree, listComplaints, countPrintPendingLetters, list
 import { OrgTreemap } from "@/components/complaints/org-treemap";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-
-const STAGE_LABEL: Record<string, string> = {
-  awaiting_reply: "awaiting reply",
-  reminder_sent: "awaiting reply to reminder",
-  legal_notice_sent: "awaiting reply to legal notice",
-};
+import { getTranslations } from "@/lib/i18n/server";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +15,12 @@ export const metadata = {
 };
 
 export default async function ComplaintDashboard() {
+  const { t, locale } = await getTranslations("complaints");
   const user = await getSessionUser();
   if (!hasRole(user, ["ADMIN", "COMPLAINT_MANAGER", "FIELD_OFFICER"])) {
     return (
       <div className="mx-auto max-w-5xl px-3 md:px-4 lg:px-6">
-        <EmptyState title="Access restricted" description="You do not have the required permissions to view this dashboard." />
+        <EmptyState title={t("list.dashboard.accessRestrictedTitle")} description={t("list.dashboard.accessRestrictedDescription")} />
       </div>
     );
   }
@@ -39,9 +36,9 @@ export default async function ComplaintDashboard() {
   return (
     <div className="max-w-[1600px] mx-auto px-6 py-8 bg-[#F8FAFC] dark:bg-slate-950 min-h-screen">
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Complaint Dashboard</h1>
+        <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">{t("page.dashboardTitle")}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-450 mt-1.5 font-semibold">
-          Premium enterprise analytics visualizer. Toggle GBA/BBMP layers to trace complaints across corporations, divisions, sub-divisions, wards, and assigned field officers.
+          {t("list.dashboard.description")}
         </p>
       </div>
 
@@ -50,7 +47,7 @@ export default async function ComplaintDashboard() {
           <Clock className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
           <div className="min-w-0 flex-1 text-xs">
             <p className="font-medium text-amber-700 dark:text-amber-400">
-              {dueSoon.length} complaint{dueSoon.length === 1 ? "" : "s"} due to reply within 5 days — coming up:
+              {t("list.dashboard.dueSoonBanner", { count: dueSoon.length, plural: dueSoon.length === 1 ? "" : "s" })}
             </p>
             <ul className="mt-1.5 flex flex-col gap-1">
               {dueSoon.map((r) => (
@@ -59,7 +56,7 @@ export default async function ComplaintDashboard() {
                     {r.caseNumber ?? r.complaintId.slice(0, 8)}
                   </Link>
                   <span className="text-amber-700 dark:text-amber-400">
-                    {" "}— {STAGE_LABEL[r.escalationStage] ?? r.escalationStage}, due {formatDate(r.deadline)}
+                    {" "}— {translateEnum("status", r.escalationStage, locale)}, due {formatDate(r.deadline)}
                   </span>
                 </li>
               ))}
@@ -70,8 +67,8 @@ export default async function ComplaintDashboard() {
 
       {gbaCorps.length === 0 ? (
         <EmptyState
-          title="No GBA data loaded"
-          description="Run npm run db:seed-gba to load the 369-ward breakdown, then refresh."
+          title={t("list.dashboard.noGbaDataTitle")}
+          description={t("list.dashboard.noGbaDataDescription")}
         />
       ) : (
         <OrgTreemap

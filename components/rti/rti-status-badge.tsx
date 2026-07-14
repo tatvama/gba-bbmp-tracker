@@ -1,5 +1,9 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 const VARIANT: Record<string, BadgeProps["variant"]> = {
   Draft: "muted",
@@ -20,13 +24,14 @@ const VARIANT: Record<string, BadgeProps["variant"]> = {
 };
 
 export function RtiStatusBadge({ status }: { status: string }) {
+  const { locale } = useTranslation("rti");
   return (
     <Badge
       variant={VARIANT[status] ?? "outline"}
       className="text-[11px] px-2.5 h-6 rounded-md font-bold tracking-wide select-none inline-flex items-center gap-1.5 leading-none"
       dot
     >
-      {status}
+      {translateEnum("status", status, locale)}
     </Badge>
   );
 }

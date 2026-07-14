@@ -16,6 +16,7 @@ import {
 import { updateRtiFilingDateAction } from "@/lib/actions/rti";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/client";
 
 function fmt(d: string | null): string {
   if (!d) return "—";
@@ -48,6 +49,8 @@ export function FilingDateEditor({
   const triggerContainerRef = React.useRef<HTMLSpanElement>(null);
   const triggerInputWrapperRef = React.useRef<HTMLDivElement>(null);
   const portalRef = React.useRef<HTMLDivElement>(null);
+  const { t } = useTranslation("rti");
+  const { t: tc } = useTranslation("common");
 
   React.useEffect(() => {
     setMounted(true);
@@ -132,7 +135,7 @@ export function FilingDateEditor({
             setEditing(true);
           }}
           className="text-muted-foreground hover:text-foreground cursor-pointer"
-          aria-label="Edit filing date"
+          aria-label={t("form.editFilingDateAriaLabel")}
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
@@ -170,10 +173,10 @@ export function FilingDateEditor({
           type="text"
           readOnly
           value={value ? formatDate(value) : ""}
-          placeholder="Select date"
+          placeholder={t("form.selectDatePlaceholder")}
           onClick={() => setShowCalendar(!showCalendar)}
           className="h-8 w-40 cursor-pointer pr-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-          aria-label="Filing date"
+          aria-label={t("form.filingDateLabel")}
         />
         <Calendar className="absolute right-2.5 top-2 h-4 w-4 text-muted-foreground pointer-events-none" />
       </div>      {/* Portal Date Picker Popover */}
@@ -247,7 +250,7 @@ export function FilingDateEditor({
                 size="icon"
                 onClick={prevMonth}
                 className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer shrink-0"
-                aria-label="Previous month"
+                aria-label={t("form.previousMonthAriaLabel")}
               >
                 <ChevronLeft className="h-4 w-4 text-slate-500" />
               </Button>
@@ -256,7 +259,7 @@ export function FilingDateEditor({
                 size="icon"
                 onClick={nextMonth}
                 className="h-7 w-7 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer shrink-0"
-                aria-label="Next month"
+                aria-label={t("form.nextMonthAriaLabel")}
               >
                 <ChevronRight className="h-4 w-4 text-slate-500" />
               </Button>
@@ -324,7 +327,7 @@ export function FilingDateEditor({
                 setShowCalendar(false);
               }}
             >
-              Clear
+              {t("form.clear")}
             </Button>
             <Button
               variant="ghost"
@@ -335,7 +338,7 @@ export function FilingDateEditor({
                 setShowCalendar(false);
               }}
             >
-              Today
+              {tc("common.today")}
             </Button>
           </div>
         </div>,

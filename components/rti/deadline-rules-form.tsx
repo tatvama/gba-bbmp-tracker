@@ -32,16 +32,22 @@ import {
 import type { DeadlineRules } from "@/lib/constants";
 import type { ActionState } from "@/lib/actions/contacts";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/client";
 
 interface FieldMeta {
   key: keyof DeadlineRules;
+  /** i18n key for the card title */
   label: string;
   unit: "Days" | "Hours";
   defaultValue: number;
-  defaultValueLabel: string;
+  /** i18n key for the helper explanation */
   explanation: string;
+  /** i18n key for the worked example */
   example: string;
+  /** Legal citation — kept in English regardless of locale (statute references
+   *  are conventionally cited in English even in Kannada-language contexts). */
   legalReference: string;
+  /** i18n keys for the "Affects:" chip list */
   impacts: string[];
   icon: React.ReactNode;
 }
@@ -49,98 +55,90 @@ interface FieldMeta {
 const FIELD_METAS: Record<keyof DeadlineRules, FieldMeta> = {
   normalDays: {
     key: "normalDays",
-    label: "Normal RTI Response",
+    label: "form.deadlineNormalDaysLabel",
     unit: "Days",
     defaultValue: 30,
-    defaultValueLabel: "30 Days",
-    explanation: "Controls the statutory deadline to respond to a standard RTI application.",
-    example: "Application Date + 30 Days.",
+    explanation: "form.deadlineNormalDaysExplanation",
+    example: "form.deadlineNormalDaysExample",
     legalReference: "RTI Act Section 7(1)",
-    impacts: ["Dashboard countdown", "Calendar view", "Reports status mapping", "Oversight audits"],
+    impacts: ["form.impactDashboardCountdown", "form.impactCalendarView", "form.impactReportsStatusMapping", "form.impactOversightAudits"],
     icon: <FileText className="h-4.5 w-4.5 text-blue-500" />,
   },
   lifeLibertyHours: {
     key: "lifeLibertyHours",
-    label: "Life & Liberty Response",
+    label: "form.deadlineLifeLibertyLabel",
     unit: "Hours",
     defaultValue: 48,
-    defaultValueLabel: "48 Hours",
-    explanation: "Controls the emergency deadline when information concerns a person's life or liberty.",
-    example: "Receipt Date/Time + 48 Hours.",
+    explanation: "form.deadlineLifeLibertyExplanation",
+    example: "form.deadlineLifeLibertyExample",
     legalReference: "RTI Act Section 7(1) Proviso",
-    impacts: ["Immediate priority badges", "Life/safety escalations", "Calendar alerts"],
+    impacts: ["form.impactImmediatePriorityBadges", "form.impactLifeSafetyEscalations", "form.impactCalendarAlerts"],
     icon: <Clock className="h-4.5 w-4.5 text-rose-500" />,
   },
   firstAppealDays: {
     key: "firstAppealDays",
-    label: "First Appeal Filing Window",
+    label: "form.deadlineFirstAppealLabel",
     unit: "Days",
     defaultValue: 30,
-    defaultValueLabel: "30 Days",
-    explanation: "The statutory period (in days) during which an applicant can file a First Appeal after response deadline expiry.",
-    example: "SLA Expiry Date + 30 Days.",
+    explanation: "form.deadlineFirstAppealExplanation",
+    example: "form.deadlineFirstAppealExample",
     legalReference: "RTI Act Section 19(1)",
-    impacts: ["First appeal filing countdowns", "First appeal warning indicators", "Statutory SLA reports"],
+    impacts: ["form.impactFirstAppealFilingCountdowns", "form.impactFirstAppealWarningIndicators", "form.impactStatutorySlaReports"],
     icon: <Scale className="h-4.5 w-4.5 text-purple-500" />,
   },
   secondAppealDays: {
     key: "secondAppealDays",
-    label: "Second Appeal Filing Window",
+    label: "form.deadlineSecondAppealLabel",
     unit: "Days",
     defaultValue: 90,
-    defaultValueLabel: "90 Days",
-    explanation: "The statutory period (in days) to file a Second Appeal to the Central/State Information Commission.",
-    example: "FAA Order Date + 90 Days.",
+    explanation: "form.deadlineSecondAppealExplanation",
+    example: "form.deadlineSecondAppealExample",
     legalReference: "RTI Act Section 19(3)",
-    impacts: ["Commission escalation warnings", "Second appeal tracking ledger", "Legal audit reports"],
+    impacts: ["form.impactCommissionEscalationWarnings", "form.impactSecondAppealTrackingLedger", "form.impactLegalAuditReports"],
     icon: <Building className="h-4.5 w-4.5 text-purple-500" />,
   },
   faaDisposalDays: {
     key: "faaDisposalDays",
-    label: "FAA Disposal Target",
+    label: "form.deadlineFaaDisposalLabel",
     unit: "Days",
     defaultValue: 30,
-    defaultValueLabel: "30 Days",
-    explanation: "Standard statutory period for the First Appellate Authority (FAA) to resolve and dispose of an appeal.",
-    example: "Appeal Filing Date + 30 Days.",
+    explanation: "form.deadlineFaaDisposalExplanation",
+    example: "form.deadlineFaaDisposalExample",
     legalReference: "RTI Act Section 19(6)",
-    impacts: ["FAA countdown timers", "Appeals reports", "Oversight dashboards"],
+    impacts: ["form.impactFaaCountdownTimers", "form.impactAppealsReports", "form.impactOversightDashboards"],
     icon: <Landmark className="h-4.5 w-4.5 text-amber-500" />,
   },
   faaDisposalMaxDays: {
     key: "faaDisposalMaxDays",
-    label: "FAA Disposal Max Limit",
+    label: "form.deadlineFaaDisposalMaxLabel",
     unit: "Days",
     defaultValue: 45,
-    defaultValueLabel: "45 Days",
-    explanation: "Maximum extendable period for the FAA to resolve an appeal for reasons recorded in writing.",
-    example: "Appeal Filing Date + 45 Days.",
+    explanation: "form.deadlineFaaDisposalMaxExplanation",
+    example: "form.deadlineFaaDisposalMaxExample",
     legalReference: "RTI Act Section 19(6) Proviso",
-    impacts: ["FAA limit warning flags", "Extension indicators", "Audit summaries"],
+    impacts: ["form.impactFaaLimitWarningFlags", "form.impactExtensionIndicators", "form.impactAuditSummaries"],
     icon: <Landmark className="h-4.5 w-4.5 text-amber-600" />,
   },
   dueSoonDays: {
     key: "dueSoonDays",
-    label: "Due Soon Threshold",
+    label: "form.deadlineDueSoonLabel",
     unit: "Days",
     defaultValue: 5,
-    defaultValueLabel: "5 Days",
-    explanation: "Timeline warning threshold. Active cases turn yellow when remaining days are below this limit.",
-    example: "Alert badge turns yellow at 5 days remaining.",
+    explanation: "form.deadlineDueSoonExplanation",
+    example: "form.deadlineDueSoonExample",
     legalReference: "System Administrative Rule",
-    impacts: ["Interactive status badges", "Dashboard oversight warning", "Calendar notification flags"],
+    impacts: ["form.impactInteractiveStatusBadges", "form.impactDashboardOversightWarning", "form.impactCalendarNotificationFlags"],
     icon: <AlertTriangle className="h-4.5 w-4.5 text-amber-500" />,
   },
   criticalOverdueDays: {
     key: "criticalOverdueDays",
-    label: "Critical Overdue Threshold",
+    label: "form.deadlineCriticalOverdueLabel",
     unit: "Days",
     defaultValue: 10,
-    defaultValueLabel: "10 Days",
-    explanation: "Timelines escalation threshold. Cases turn red and flag as critical after being overdue by this limit.",
-    example: "Alert badge turns red after 10 days overdue.",
+    explanation: "form.deadlineCriticalOverdueExplanation",
+    example: "form.deadlineCriticalOverdueExample",
     legalReference: "System Administrative Rule",
-    impacts: ["Critical overdue filters", "Urgency overview alerts", "Automatic notifications"],
+    impacts: ["form.impactCriticalOverdueFilters", "form.impactUrgencyOverviewAlerts", "form.impactAutomaticNotifications"],
     icon: <AlertCircle className="h-4.5 w-4.5 text-rose-500" />,
   }
 };
@@ -155,6 +153,8 @@ export function DeadlineRulesForm({
   const [state, formAction, pending] = useActionState(action, {});
   const [formValues, setFormValues] = React.useState<DeadlineRules>({ ...initial });
   const [activeHelp, setActiveHelp] = React.useState<string | null>(null);
+  const { t } = useTranslation("rti");
+  const { t: tc } = useTranslation("common");
 
   // Check if any field differs from initial
   const isDirty = React.useMemo(() => {
@@ -192,6 +192,8 @@ export function DeadlineRulesForm({
   const renderConfigurationCard = (key: keyof DeadlineRules) => {
     const meta = FIELD_METAS[key];
     const isHelpOpen = activeHelp === key;
+    const unitLabel = meta.unit === "Days" ? t("form.unitDays") : t("form.unitHours");
+    const defaultValueDisplay = `${meta.defaultValue} ${unitLabel}`;
 
     return (
       <Card key={key} className="overflow-hidden border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-2xs hover:shadow-xs transition-all duration-200 flex flex-col justify-between">
@@ -230,7 +232,7 @@ export function DeadlineRulesForm({
             </div>
 
             <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-bold bg-slate-100 text-slate-500 border dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 whitespace-nowrap">
-              SLA: {meta.defaultValueLabel}
+              SLA: {`${meta.defaultValue} ${meta.unit}`}
             </Badge>
           </div>
 
@@ -267,7 +269,7 @@ export function DeadlineRulesForm({
               </div>
             </div>
             <div className="flex justify-between items-center text-[10px] text-muted-foreground font-bold">
-              <span>Standard: {meta.defaultValueLabel}</span>
+              <span>Standard: {`${meta.defaultValue} ${meta.unit}`}</span>
               {formValues[key] === meta.defaultValue ? (
                 <span className="text-emerald-600 flex items-center gap-0.5"><Check className="h-3 w-3" /> Recommended value</span>
               ) : (

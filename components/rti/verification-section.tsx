@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import type { RtiApplication } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 interface VerificationSectionProps {
   rti: RtiApplication;
@@ -11,6 +13,7 @@ interface VerificationSectionProps {
 }
 
 export function VerificationSection({ rti, isPending }: VerificationSectionProps) {
+  const { t, locale } = useTranslation("rti");
   const getDisplayValueAndPage = React.useCallback((field: any) => {
     if (field && typeof field === "object") {
       return {
@@ -34,15 +37,15 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
             <span className="font-semibold text-slate-700 dark:text-slate-300 block">{label}</span>
             <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5 font-sans leading-relaxed">
               <div className="break-words whitespace-normal min-w-0 overflow-wrap-anywhere">
-                <span className="font-medium text-slate-400">Extracted:</span>{" "}
+                <span className="font-medium text-slate-400">{t("advanced.verificationSection.extractedLabel")}</span>{" "}
                 <span className="text-slate-600 dark:text-slate-400 font-mono">
                   {extractedVal || "—"}
-                  {page !== undefined ? ` (Page ${page})` : ""}
+                  {page !== undefined ? ` ${t("advanced.verificationSection.pageSuffix", { page })}` : ""}
                 </span>
               </div>
               {dbVal !== undefined && (
                 <div className="break-words whitespace-normal min-w-0 overflow-wrap-anywhere">
-                  <span className="font-medium text-slate-400">Record Value:</span>{" "}
+                  <span className="font-medium text-slate-400">{t("advanced.verificationSection.recordValueLabel")}</span>{" "}
                   <span className="text-slate-600 dark:text-slate-400 font-mono">{dbVal || "—"}</span>
                 </div>
               )}
@@ -55,7 +58,7 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
                 className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                <span>Matches</span>
+                <span>{t("advanced.verificationSection.matches")}</span>
               </Badge>
             ) : (
               <Badge
@@ -63,14 +66,14 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
                 className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50"
               >
                 <XCircle className="h-3.5 w-3.5 shrink-0" />
-                <span>Mismatch</span>
+                <span>{t("advanced.verificationSection.mismatch")}</span>
               </Badge>
             )}
           </div>
         </div>
       );
     },
-    [getDisplayValueAndPage]
+    [getDisplayValueAndPage, t]
   );
 
   const info = rti.ack_extracted_info as any;
@@ -97,7 +100,7 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
     return (
       <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
         {renderVerificationRow(
-          "Public Authority",
+          t("advanced.verificationSection.publicAuthority"),
           !!info.verifications?.publicAuthorityMatches ||
             extPublicAuth.value.toLowerCase().includes("bbmp") ||
             extPublicAuth.value.toLowerCase().includes("gba"),
@@ -105,48 +108,48 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
           rti.public_authority || ""
         )}
         {renderVerificationRow(
-          "Department",
+          t("field.department"),
           !!info.verifications?.departmentMatches ||
             extDept.value.toLowerCase().includes(rti.department?.toLowerCase() || "empty"),
           info.extractedInfo?.department,
           rti.department || ""
         )}
         {renderVerificationRow(
-          "RTI / Application Number",
+          t("advanced.verificationSection.rtiApplicationNumber"),
           !!info.verifications?.applicationNumberMatches ||
             extAppNo.value.toLowerCase().includes(rti.internal_ref?.toLowerCase() || "empty"),
           info.extractedInfo?.applicationNumber,
           rti.internal_ref || ""
         )}
         {renderVerificationRow(
-          "Filing Date",
+          t("advanced.verificationSection.filingDate"),
           !!info.verifications?.filingDateMatches || extFilingDate.value === rti.date_filed,
           info.extractedInfo?.filingDate,
           rti.date_filed || ""
         )}
         {rti.applicant_name &&
           renderVerificationRow(
-            "Applicant Name",
+            t("field.applicantName"),
             !!info.verifications?.applicantNameMatches ||
               extApplicantName.value.toLowerCase().includes(rti.applicant_name?.toLowerCase() || "empty"),
             info.extractedInfo?.applicantName,
             rti.applicant_name
           )}
         {extAckNo.value &&
-          renderVerificationRow("Acknowledgement Number", true, info.extractedInfo?.acknowledgementNumber)}
-        {extDiaryNo.value && renderVerificationRow("Diary Number", true, info.extractedInfo?.diaryNumber)}
-        {extInwardNo.value && renderVerificationRow("Inward Number", true, info.extractedInfo?.inwardNumber)}
+          renderVerificationRow(t("advanced.verificationSection.acknowledgementNumber"), true, info.extractedInfo?.acknowledgementNumber)}
+        {extDiaryNo.value && renderVerificationRow(t("advanced.verificationSection.diaryNumber"), true, info.extractedInfo?.diaryNumber)}
+        {extInwardNo.value && renderVerificationRow(t("advanced.verificationSection.inwardNumber"), true, info.extractedInfo?.inwardNumber)}
         {extOfficeAddr.value &&
           renderVerificationRow(
-            "Office Address",
+            t("advanced.verificationSection.officeAddress"),
             true,
             info.extractedInfo?.officeAddress,
             rti.office_address || ""
           )}
-        {extOfficerName.value && renderVerificationRow("Officer Name", true, info.extractedInfo?.officerName)}
+        {extOfficerName.value && renderVerificationRow(t("advanced.verificationSection.officerName"), true, info.extractedInfo?.officerName)}
         {extOfficerDesig.value &&
-          renderVerificationRow("Officer Designation", true, info.extractedInfo?.officerDesignation)}
-        {extRefNo.value && renderVerificationRow("Reference Number", true, info.extractedInfo?.referenceNumber)}
+          renderVerificationRow(t("advanced.verificationSection.officerDesignation"), true, info.extractedInfo?.officerDesignation)}
+        {extRefNo.value && renderVerificationRow(t("field.referenceNumber"), true, info.extractedInfo?.referenceNumber)}
       </div>
     );
   }, [info, rti, renderVerificationRow, getDisplayValueAndPage]);

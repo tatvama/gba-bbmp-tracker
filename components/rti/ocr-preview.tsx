@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/client";
 
 interface OcrPreviewProps {
   ocrText: string | null | undefined;
@@ -13,6 +14,7 @@ interface OcrPreviewProps {
 export function OcrPreview({ ocrText, isLoading = false, className }: OcrPreviewProps) {
   const [expanded, setExpanded] = React.useState(false);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const { t } = useTranslation("rti");
 
   const cleanText = React.useMemo(() => (ocrText || "").trim(), [ocrText]);
   const lines = React.useMemo(() => (cleanText ? cleanText.split("\n") : []), [cleanText]);
@@ -29,7 +31,7 @@ export function OcrPreview({ ocrText, isLoading = false, className }: OcrPreview
       <div className="space-y-3 w-full">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block font-mono">
-            Extracted OCR Text Snippet
+            {t("advanced.ocrPreview.label")}
           </span>
         </div>
         <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 dark:border-slate-800/80 dark:bg-slate-900/10 space-y-2">
@@ -46,12 +48,12 @@ export function OcrPreview({ ocrText, isLoading = false, className }: OcrPreview
       <div className="space-y-3 w-full">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block font-mono">
-            Extracted OCR Text Snippet
+            {t("advanced.ocrPreview.label")}
           </span>
         </div>
         <div className="border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 dark:border-slate-800 dark:text-slate-600 bg-slate-50/20">
           <FileText className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-          <span className="text-xs font-medium">No OCR text extracted yet</span>
+          <span className="text-xs font-medium">{t("advanced.ocrPreview.noText")}</span>
         </div>
       </div>
     );
@@ -76,12 +78,12 @@ export function OcrPreview({ ocrText, isLoading = false, className }: OcrPreview
             {expanded ? (
               <>
                 <ChevronUp className="h-3.5 w-3.5" />
-                <span>Show Less</span>
+                <span>{t("advanced.ocrPreview.showLess")}</span>
               </>
             ) : (
               <>
                 <ChevronDown className="h-3.5 w-3.5" />
-                <span>Show More</span>
+                <span>{t("advanced.ocrPreview.showMore")}</span>
               </>
             )}
           </Button>

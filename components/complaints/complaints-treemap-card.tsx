@@ -7,6 +7,7 @@ import type { OrgTreemapRow } from "@/components/complaints/org-treemap";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Map as MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/client";
 
 interface StatusCounts {
   total: number;
@@ -163,6 +164,7 @@ export function ComplaintsTreemapCard({
   bbmpTree: GbaTreeCorp[];
   complaints: OrgTreemapRow[];
 }) {
+  const { t } = useTranslation("complaints");
   const [treeType, setTreeType] = React.useState<"GBA" | "BBMP">("GBA");
 
   const rawTree = treeType === "GBA" ? gbaTree : bbmpTree;
@@ -175,10 +177,10 @@ export function ComplaintsTreemapCard({
       <CardHeader className="flex flex-col md:flex-row md:items-center justify-between pb-3 pt-4 border-b border-slate-100 dark:border-slate-800 gap-4">
         <div className="space-y-1">
           <CardTitle className="text-sm font-bold text-foreground flex items-center gap-1.5">
-            <MapIcon className="h-4.5 w-4.5 text-primary" /> Complaints by Area
+            <MapIcon className="h-4.5 w-4.5 text-primary" /> {t("list.treemapCard.title")}
           </CardTitle>
           <CardDescription>
-            Interactive geographic Treemap visualizing complaint workload distribution by administrative boundaries. Click any region to drill down.
+            {t("list.treemapCard.description")}
           </CardDescription>
         </div>
 

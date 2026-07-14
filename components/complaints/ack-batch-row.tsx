@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FileText, Calendar, ArrowRight, Trash2, StopCircle, Loader2 } from "lucide-react";
 import { deleteAckBatchAction } from "@/lib/actions/ack-import";
 import { type AckBatchListRow } from "@/lib/complaints/ack-reconcile";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 const STATUS_VARIANT: Record<string, string> = {
   processing: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200/50",
@@ -15,15 +17,9 @@ const STATUS_VARIANT: Record<string, string> = {
   failed: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200/50",
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  processing: "Processing",
-  review: "Needs Review",
-  committing: "Attaching",
-  committed: "Attached",
-  failed: "Failed",
-};
-
 export function AckBatchRow({ b }: { b: AckBatchListRow }) {
+  const { t, locale } = useTranslation("complaints");
+  const { t: tc } = useTranslation("common");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -38,9 +34,10 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
   const isActive = b.status === "processing" || b.status === "committing";
 
   const handleDelete = async () => {
+    const name = b.originalName || "acknowledgments.pdf";
     const confirmMsg = isActive
-      ? `Are you sure you want to stop processing and delete "${b.originalName || "acknowledgments.pdf"}"?`
-      : `Are you sure you want to delete "${b.originalName || "acknowledgments.pdf"}" from history?`;
+      ? t("advanced.ack.deleteConfirmActive", { name })
+      : t("advanced.ack.deleteConfirmInactive", { name });
 
     if (!window.confirm(confirmMsg)) return;
 
@@ -49,11 +46,11 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
     try {
       const res = await deleteAckBatchAction(b.id);
       if (!res.ok) {
-        setError(res.error || "Failed to delete batch");
+        setError(res.error || t("advanced.ack.deleteFailed"));
         setLoading(false);
       }
     } catch (e) {
-      setError("An unexpected error occurred");
+      setError(tc("message.somethingWentWrong"));
       setLoading(false);
     }
   };
@@ -80,7 +77,7 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
       {/* Middle Left: Status Badge */}
       <div className="shrink-0 flex items-center">
         <span className={`rounded-full border px-2.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider ${STATUS_VARIANT[b.status] || "bg-slate-100 border-slate-200"}`}>
-          {STATUS_LABEL[b.status] || b.status}
+          {translateEnum("status", b.status, locale)}
         </span>
       </div>
 

@@ -16,6 +16,8 @@ import {
   type ActionState,
 } from "@/lib/actions/complaints";
 import { COMMUNICATION_TYPES } from "@/lib/constants";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 const selectCls =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -44,24 +46,25 @@ function Err({ state }: { state: ActionState }) {
 export function ReplyForm({ complaintId, documents }: { complaintId: string; documents: DocOpt[] }) {
   const [state, action, pending] = useActionState(addComplaintReply.bind(null, complaintId), {} as ActionState);
   const ref = useFormReset(state);
+  const { t } = useTranslation("complaints");
   return (
     <form ref={ref} action={action} className="space-y-3 rounded-lg border p-4">
-      <p className="text-sm font-semibold">Record a reply</p>
+      <p className="text-sm font-semibold">{t("form.recordAReplyHeading")}</p>
       <Err state={state} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <L label="Reply date"><Input type="date" name="replyDate" /></L>
-        <L label="Replied by"><Input name="repliedByName" /></L>
-        <L label="Designation"><Input name="repliedByDesignation" /></L>
-        <L label="Department"><Input name="department" /></L>
-        <L label="Reply mode"><Input name="replyMode" placeholder="Letter / Email / Portal" /></L>
-        <L label="Linked document">
+        <L label={t("form.fieldReplyDate")}><Input type="date" name="replyDate" /></L>
+        <L label={t("form.fieldRepliedBy")}><Input name="repliedByName" /></L>
+        <L label={t("form.fieldDesignation")}><Input name="repliedByDesignation" /></L>
+        <L label={t("form.fieldDepartment")}><Input name="department" /></L>
+        <L label={t("form.fieldReplyMode")}><Input name="replyMode" placeholder={t("form.placeholderReplyMode")} /></L>
+        <L label={t("form.fieldLinkedDocument")}>
           <select name="documentId" className={selectCls}><option value="">—</option>{documents.map((d) => <option key={d.id} value={d.id}>{d.title ?? d.id.slice(0, 8)}</option>)}</select>
         </L>
       </div>
-      <L label="Reply summary"><Textarea name="replySummary" rows={2} /></L>
-      <L label="Issues remaining"><Textarea name="issuesRemaining" rows={2} /></L>
-      <label className="flex items-center gap-2 text-sm"><Checkbox name="isSatisfactory" /> Reply is satisfactory</label>
-      <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving…" : "Add reply"}</Button>
+      <L label={t("form.fieldReplySummary")}><Textarea name="replySummary" rows={2} /></L>
+      <L label={t("form.fieldIssuesRemaining")}><Textarea name="issuesRemaining" rows={2} /></L>
+      <label className="flex items-center gap-2 text-sm"><Checkbox name="isSatisfactory" /> {t("form.replyIsSatisfactory")}</label>
+      <Button type="submit" size="sm" disabled={pending}>{pending ? t("form.saving") : t("form.addReplyButton")}</Button>
     </form>
   );
 }
@@ -69,27 +72,28 @@ export function ReplyForm({ complaintId, documents }: { complaintId: string; doc
 export function ActionForm({ complaintId, documents }: { complaintId: string; documents: DocOpt[] }) {
   const [state, action, pending] = useActionState(addComplaintActionTaken.bind(null, complaintId), {} as ActionState);
   const ref = useFormReset(state);
+  const { t } = useTranslation("complaints");
   return (
     <form ref={ref} action={action} className="space-y-3 rounded-lg border p-4">
-      <p className="text-sm font-semibold">Record action taken</p>
+      <p className="text-sm font-semibold">{t("action.recordActionTaken")}</p>
       <Err state={state} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <L label="Action taken date"><Input type="date" name="actionTakenDate" /></L>
-        <L label="Action by"><Input name="actionTakenByName" /></L>
-        <L label="Designation"><Input name="actionTakenByDesignation" /></L>
-        <L label="Department"><Input name="department" /></L>
-        <L label="Linked document">
+        <L label={t("form.fieldActionTakenDate")}><Input type="date" name="actionTakenDate" /></L>
+        <L label={t("form.fieldActionBy")}><Input name="actionTakenByName" /></L>
+        <L label={t("form.fieldDesignation")}><Input name="actionTakenByDesignation" /></L>
+        <L label={t("form.fieldDepartment")}><Input name="department" /></L>
+        <L label={t("form.fieldLinkedDocument")}>
           <select name="documentId" className={selectCls}><option value="">—</option>{documents.map((d) => <option key={d.id} value={d.id}>{d.title ?? d.id.slice(0, 8)}</option>)}</select>
         </L>
       </div>
-      <L label="Action summary"><Textarea name="actionSummary" rows={2} /></L>
-      <L label="Pending work"><Textarea name="pendingWork" rows={2} /></L>
+      <L label={t("form.fieldActionSummary")}><Textarea name="actionSummary" rows={2} /></L>
+      <L label={t("form.fieldPendingWork")}><Textarea name="pendingWork" rows={2} /></L>
       <div className="flex flex-wrap gap-4 text-sm">
-        <label className="flex items-center gap-2"><Checkbox name="workCompleted" /> Work completed</label>
-        <label className="flex items-center gap-2"><Checkbox name="siteVisited" /> Site visited</label>
-        <label className="flex items-center gap-2"><Checkbox name="photoEvidenceAvailable" /> Photo evidence</label>
+        <label className="flex items-center gap-2"><Checkbox name="workCompleted" /> {t("form.workCompletedLabel")}</label>
+        <label className="flex items-center gap-2"><Checkbox name="siteVisited" /> {t("form.siteVisitedLabel")}</label>
+        <label className="flex items-center gap-2"><Checkbox name="photoEvidenceAvailable" /> {t("form.photoEvidenceLabel")}</label>
       </div>
-      <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving…" : "Add action taken"}</Button>
+      <Button type="submit" size="sm" disabled={pending}>{pending ? t("form.saving") : t("form.addActionTakenButton")}</Button>
     </form>
   );
 }
@@ -97,25 +101,27 @@ export function ActionForm({ complaintId, documents }: { complaintId: string; do
 export function CommunicationForm({ complaintId, officers }: { complaintId: string; officers: OfficerOpt[] }) {
   const [state, action, pending] = useActionState(addComplaintCommunication.bind(null, complaintId), {} as ActionState);
   const ref = useFormReset(state);
+  const { t, locale } = useTranslation("complaints");
+  const { t: tc } = useTranslation("common");
   return (
     <form ref={ref} action={action} className="space-y-3 rounded-lg border p-4">
-      <p className="text-sm font-semibold">Log a communication</p>
+      <p className="text-sm font-semibold">{t("form.logCommunicationHeading")}</p>
       <Err state={state} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <L label="Type">
-          <select name="communicationType" className={selectCls} defaultValue="Phone Call">{COMMUNICATION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+        <L label={tc("table.type")}>
+          <select name="communicationType" className={selectCls} defaultValue="Phone Call">{COMMUNICATION_TYPES.map((ct) => <option key={ct} value={ct}>{translateEnum("workflow", ct, locale)}</option>)}</select>
         </L>
-        <L label="Date"><Input type="date" name="communicationDate" /></L>
-        <L label="Officer">
+        <L label={tc("table.date")}><Input type="date" name="communicationDate" /></L>
+        <L label={t("form.fieldOfficer")}>
           <select name="officerId" className={selectCls}><option value="">—</option>{officers.map((o) => <option key={o.id} value={o.id}>{o.full_name} — {o.designation}</option>)}</select>
         </L>
-        <L label="Contact person"><Input name="contactPerson" /></L>
-        <L label="Phone / email"><Input name="phoneOrEmail" /></L>
-        <L label="Next action date"><Input type="date" name="nextActionDate" /></L>
+        <L label={t("form.fieldContactPerson")}><Input name="contactPerson" /></L>
+        <L label={t("form.fieldPhoneEmail")}><Input name="phoneOrEmail" /></L>
+        <L label={t("form.fieldNextActionDate")}><Input type="date" name="nextActionDate" /></L>
       </div>
-      <L label="Summary"><Textarea name="summary" rows={2} /></L>
-      <L label="Outcome / next action"><Input name="nextAction" /></L>
-      <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving…" : "Add communication"}</Button>
+      <L label={t("form.fieldSummary")}><Textarea name="summary" rows={2} /></L>
+      <L label={t("form.fieldOutcomeNextAction")}><Input name="nextAction" /></L>
+      <Button type="submit" size="sm" disabled={pending}>{pending ? t("form.saving") : t("form.addCommunicationButton")}</Button>
     </form>
   );
 }
@@ -123,20 +129,21 @@ export function CommunicationForm({ complaintId, officers }: { complaintId: stri
 export function EscalationForm({ complaintId }: { complaintId: string }) {
   const [state, action, pending] = useActionState(addComplaintEscalation.bind(null, complaintId), {} as ActionState);
   const ref = useFormReset(state);
+  const { t, locale } = useTranslation("complaints");
   return (
     <form ref={ref} action={action} className="space-y-3 rounded-lg border p-4">
-      <p className="text-sm font-semibold">Escalate</p>
+      <p className="text-sm font-semibold">{t("action.escalate")}</p>
       <Err state={state} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <L label="To level">
+        <L label={t("form.fieldToLevel")}>
           <select name="toLevel" className={selectCls} defaultValue="AEE">
-            {["AEE", "EE", "SE", "CE", "Commissioner", "Lokayukta / Legal"].map((x) => <option key={x} value={x}>{x}</option>)}
+            {["AEE", "EE", "SE", "CE", "Commissioner", "Lokayukta / Legal"].map((x) => <option key={x} value={x}>{translateEnum("workflow", x, locale)}</option>)}
           </select>
         </L>
-        <L label="To officer"><Input name="toOfficer" /></L>
+        <L label={t("form.fieldToOfficer")}><Input name="toOfficer" /></L>
       </div>
-      <L label="Reason"><Textarea name="reason" rows={2} /></L>
-      <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving…" : "Record escalation"}</Button>
+      <L label={t("form.fieldReason")}><Textarea name="reason" rows={2} /></L>
+      <Button type="submit" size="sm" disabled={pending}>{pending ? t("form.saving") : t("form.recordEscalationButton")}</Button>
     </form>
   );
 }

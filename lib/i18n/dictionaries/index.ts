@@ -8,6 +8,13 @@ import "./navigation";
 import "./status";
 import "./workflow";
 import "./complaints";
+import "./complaints-list";
+import "./complaints-detail";
+import "./complaints-forms";
+import "./complaints-advanced";
 import "./rti";
+import "./rti-advanced";
+import "./rti-forms";
+import "./rti-list";
 
 export {};

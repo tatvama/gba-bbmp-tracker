@@ -6,6 +6,7 @@ import { getRti, getRtiFormOptions, listKnownJobCodes } from "@/lib/queries";
 import { updateRti } from "@/lib/actions/rti";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Edit RTI" };
@@ -17,11 +18,12 @@ export default async function EditRtiPage({
 }) {
   const { id } = await params;
   const user = await getSessionUser();
+  const { t } = await getTranslations("rti");
   if (!hasRole(user, RTI_WRITE_ROLES)) {
     return (
       <div>
-        <PageHeader title="Edit RTI" />
-        <EmptyState title="Not permitted" description="Your role cannot edit RTIs." />
+        <PageHeader title={t("page.editTitle")} />
+        <EmptyState title={t("form.notPermittedTitle")} description={t("form.notPermittedEditRti")} />
       </div>
     );
   }
@@ -33,7 +35,7 @@ export default async function EditRtiPage({
 
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title="Edit RTI" description={rti.internal_ref ?? rti.subject} />
+      <PageHeader title={t("page.editTitle")} description={rti.internal_ref ?? rti.subject} />
       <RtiForm action={action} options={options} initial={rti} jobCodes={jobCodes} />
     </div>
   );

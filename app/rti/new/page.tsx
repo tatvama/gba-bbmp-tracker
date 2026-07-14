@@ -5,6 +5,7 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { RtiBulkImport } from "@/components/rti/rti-bulk-import";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
+import { getTranslations } from "@/lib/i18n/server";
 import { Scale, Calendar } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -12,13 +13,14 @@ export const metadata = { title: "New RTI" };
 
 export default async function NewRtiPage() {
   const user = await getSessionUser();
+  const { t } = await getTranslations("rti");
   if (!hasRole(user, RTI_WRITE_ROLES)) {
     return (
       <div>
-        <PageHeader title="New RTI" />
+        <PageHeader title={t("page.createTitle")} />
         <EmptyState
-          title="Not permitted"
-          description="Your role cannot create RTIs. Ask an admin for the RTI Manager or Editor role."
+          title={t("form.notPermittedTitle")}
+          description={t("form.notPermittedCreateRti")}
         />
       </div>
     );
@@ -43,7 +45,7 @@ export default async function NewRtiPage() {
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <Scale className="h-4.5 w-4.5 text-primary shrink-0" />
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">RTI Lifecycle</h4>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">{t("form.rtiLifecycleHeading")}</h4>
               </div>
               <div className="relative pl-5 space-y-4 text-xs font-medium text-slate-600 dark:text-slate-400">
                 {/* Timeline Line */}
@@ -54,7 +56,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-primary dark:border-slate-900">
                     <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
                   </div>
-                  <span className="font-bold text-primary">Draft (Form Saved)</span>
+                  <span className="font-bold text-primary">{t("form.lifecycleDraftFormSaved")}</span>
                 </div>
 
                 {/* Step: Acknowledgement Uploaded */}
@@ -62,7 +64,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
                     <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
-                  <span>Acknowledgement Uploaded</span>
+                  <span>{t("form.lifecycleAckUploaded")}</span>
                 </div>
 
                 {/* Step: Reply Countdown Starts */}
@@ -70,7 +72,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
                     <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
-                  <span>Reply Countdown Starts</span>
+                  <span>{t("form.lifecycleReplyCountdownStarts")}</span>
                 </div>
 
                 {/* Step: PIO Reply */}
@@ -78,7 +80,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
                     <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
-                  <span>PIO Reply</span>
+                  <span>{t("form.lifecyclePioReply")}</span>
                 </div>
 
                 {/* Step: First Appeal */}
@@ -86,7 +88,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
                     <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
-                  <span>First Appeal (if required)</span>
+                  <span>{t("form.lifecycleFirstAppealIfRequired")}</span>
                 </div>
 
                 {/* Step: FAA Order */}
@@ -94,7 +96,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
                     <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
-                  <span>FAA Order</span>
+                  <span>{t("form.lifecycleFaaOrder")}</span>
                 </div>
 
                 {/* Step: Second Appeal */}
@@ -102,7 +104,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
                     <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
-                  <span>Second Appeal (if required)</span>
+                  <span>{t("form.lifecycleSecondAppealIfRequired")}</span>
                 </div>
 
                 {/* Step: Case Closed */}
@@ -110,7 +112,7 @@ export default async function NewRtiPage() {
                   <div className="absolute -left-[21px] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-800">
                     <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                   </div>
-                  <span>Case Closed</span>
+                  <span>{t("form.lifecycleCaseClosed")}</span>
                 </div>
               </div>
             </CardContent>

@@ -9,6 +9,7 @@ import { getFraudAnalytics, getLocationOverlaps } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { BarChart3 } from "lucide-react";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Fraud Analytics" };
@@ -17,14 +18,22 @@ const money = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDi
 const BENFORD_VARIANT: Record<string, "success" | "warning" | "destructive" | "muted"> = {
   close: "success", acceptable: "success", marginal: "warning", nonconforming: "destructive", insufficient: "muted",
 };
+const BENFORD_LABEL_KEY: Record<string, string> = {
+  close: "list.analytics.benfordClose",
+  acceptable: "list.analytics.benfordAcceptable",
+  marginal: "list.analytics.benfordMarginal",
+  nonconforming: "list.analytics.benfordNonconforming",
+  insufficient: "list.analytics.benfordInsufficient",
+};
 
 export default async function FraudAnalyticsPage() {
+  const { t } = await getTranslations("complaints");
   const user = await getSessionUser();
   if (!hasRole(user, COMPLAINT_VERIFY_ROLES)) {
     return (
       <div>
-        <PageHeader title="Fraud Analytics" />
-        <EmptyState title="Not permitted" description="Your role cannot view fraud analytics. Ask an admin for a Verifier / Complaint Manager / Editor role." />
+        <PageHeader title={t("list.analytics.pageTitleCaps")} />
+        <EmptyState title={t("list.notPermittedTitle")} description={t("list.analytics.notPermittedDescription")} />
       </div>
     );
   }
@@ -35,19 +44,19 @@ export default async function FraudAnalyticsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Fraud analytics"
-        description="Portfolio-wide statistical signals across all audited bills. Patterns here (digit anomalies, threshold clustering, outliers, collusion, location overlap) are leads for investigation, not proof."
+        title={t("list.analytics.pageTitle")}
+        description={t("list.analytics.description")}
       />
 
       {/* Benford */}
       <Card>
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Benford&apos;s Law — first digit of bill amounts</CardTitle>
-          <Badge variant={BENFORD_VARIANT[a.benford.conformity]}>{a.benford.conformity} (MAD {a.benford.mad.toFixed(4)}, n={a.benford.n})</Badge>
+          <CardTitle>{t("list.analytics.benfordCardTitle")}</CardTitle>
+          <Badge variant={BENFORD_VARIANT[a.benford.conformity]}>{t(BENFORD_LABEL_KEY[a.benford.conformity] ?? "list.analytics.benfordInsufficient")} (MAD {a.benford.mad.toFixed(4)}, n={a.benford.n})</Badge>
         </CardHeader>
         <CardContent>
           {a.benford.n < 50 ? (
-            <p className="text-sm text-muted-foreground">Need ≥50 audited bills for a meaningful test. Run structured bill audits to populate this ({a.benford.n} so far).</p>
+            <p className="text-sm text-muted-foreground">{t("list.analytics.benfordNeedMore", { count: a.benford.n })}</p>
           ) : (
             <svg viewBox="0 0 460 160" className="w-full max-w-xl">
               {a.benford.observedPct.map((o, i) => {
@@ -64,21 +73,21 @@ export default async function FraudAnalyticsPage() {
               })}
             </svg>
           )}
-          <p className="mt-1 text-xs text-muted-foreground">Bars = observed, red line = Benford-expected. Large gaps suggest manipulated figures.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("list.analytics.benfordCaption")}</p>
         </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Thresholds */}
         <Card>
-          <CardHeader><CardTitle>Just below approval limits (splitting)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t("list.analytics.thresholdsCardTitle")}</CardTitle></CardHeader>
           <CardContent>
-            {a.thresholds.length === 0 ? <p className="text-sm text-muted-foreground">No clustering detected.</p> : (
+            {a.thresholds.length === 0 ? <p className="text-sm text-muted-foreground">{t("list.analytics.noClustering")}</p> : (
               <ul className="space-y-1 text-sm">
-                {a.thresholds.map((t) => (
-                  <li key={t.threshold} className="flex justify-between">
-                    <span>Within 3% below {money(t.threshold)}</span>
-                    <Badge variant={t.count > 1 ? "warning" : "muted"}>{t.count} bill{t.count === 1 ? "" : "s"}</Badge>
+                {a.thresholds.map((th) => (
+                  <li key={th.threshold} className="flex justify-between">
+                    <span>{t("list.analytics.withinPctBelow", { amount: money(th.threshold) })}</span>
+                    <Badge variant={th.count > 1 ? "warning" : "muted"}>{t("list.analytics.billCount", { count: th.count, plural: th.count === 1 ? "" : "s" })}</Badge>
                   </li>
                 ))}
               </ul>
@@ -88,10 +97,10 @@ export default async function FraudAnalyticsPage() {
 
         {/* Outliers */}
         <Card>
-          <CardHeader><CardTitle>High-amount outliers</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t("list.analytics.outliersCardTitle")}</CardTitle></CardHeader>
           <CardContent>
-            {a.outliers.high === null ? <p className="text-sm text-muted-foreground">Need ≥8 audited bills.</p>
-              : a.outliers.values.length === 0 ? <p className="text-sm text-muted-foreground">No outliers above {money(a.outliers.high)}.</p>
+            {a.outliers.high === null ? <p className="text-sm text-muted-foreground">{t("list.analytics.needMoreBills8")}</p>
+              : a.outliers.values.length === 0 ? <p className="text-sm text-muted-foreground">{t("list.analytics.noOutliersAbove", { amount: money(a.outliers.high) })}</p>
               : <ul className="space-y-1 text-sm">{a.outliers.values.slice(0, 10).map((v, i) => <li key={i} className="font-medium text-destructive">{money(v)}</li>)}</ul>}
           </CardContent>
         </Card>
@@ -99,11 +108,11 @@ export default async function FraudAnalyticsPage() {
 
       {/* Collusion */}
       <Card>
-        <CardHeader><CardTitle>Officer ↔ contractor (repeated flagged bills)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("list.analytics.collusionCardTitle")}</CardTitle></CardHeader>
         <CardContent>
-          {a.collusion.length === 0 ? <p className="text-sm text-muted-foreground">No officer–contractor pair has ≥2 flagged bills yet.</p> : (
+          {a.collusion.length === 0 ? <p className="text-sm text-muted-foreground">{t("list.analytics.noCollusion")}</p> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Contractor</TableHead><TableHead>Certifying officer</TableHead><TableHead className="text-right">Flagged bills</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>{t("detail.contractor")}</TableHead><TableHead>{t("list.analytics.colCertifyingOfficer")}</TableHead><TableHead className="text-right">{t("list.analytics.colFlaggedBills")}</TableHead></TableRow></TableHeader>
               <TableBody>
                 {a.collusion.map((c, i) => (
                   <TableRow key={i}>
@@ -120,16 +129,16 @@ export default async function FraudAnalyticsPage() {
 
       {/* Location overlap */}
       <Card>
-        <CardHeader><CardTitle>Overlapping work locations (possible double-work)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("list.analytics.overlapCardTitle")}</CardTitle></CardHeader>
         <CardContent>
-          {overlaps.length === 0 ? <p className="text-sm text-muted-foreground">No different jobs reported within 60 m of each other.</p> : (
+          {overlaps.length === 0 ? <p className="text-sm text-muted-foreground">{t("list.analytics.noOverlap")}</p> : (
             <ul className="space-y-2 text-sm">
               {overlaps.slice(0, 25).map((o, i) => (
                 <li key={i} className="rounded-md border p-2">
-                  <span className="font-medium text-destructive">{o.meters} m apart</span> —{" "}
-                  <Link href={`/complaints/${o.a.complaintId}`} className="text-primary hover:underline">{o.a.jobNumber ?? o.a.caseNumber ?? "Case A"}</Link>
+                  <span className="font-medium text-destructive">{t("list.analytics.metersApart", { meters: o.meters })}</span> —{" "}
+                  <Link href={`/complaints/${o.a.complaintId}`} className="text-primary hover:underline">{o.a.jobNumber ?? o.a.caseNumber ?? t("list.analytics.caseAFallback")}</Link>
                   {o.a.contractor ? ` (${o.a.contractor})` : ""} ↔{" "}
-                  <Link href={`/complaints/${o.b.complaintId}`} className="text-primary hover:underline">{o.b.jobNumber ?? o.b.caseNumber ?? "Case B"}</Link>
+                  <Link href={`/complaints/${o.b.complaintId}`} className="text-primary hover:underline">{o.b.jobNumber ?? o.b.caseNumber ?? t("list.analytics.caseBFallback")}</Link>
                   {o.b.contractor ? ` (${o.b.contractor})` : ""}
                 </li>
               ))}
@@ -142,7 +151,7 @@ export default async function FraudAnalyticsPage() {
       <MaterialCalculator />
 
       {a.amountCount === 0 && overlaps.length === 0 && (
-        <EmptyState icon={BarChart3} title="No analytics data yet" description="Run structured bill audits (and add lat/lon to complaints) to populate these signals." />
+        <EmptyState icon={BarChart3} title={t("list.analytics.noAnalyticsTitle")} description={t("list.analytics.noAnalyticsDescription")} />
       )}
     </div>
   );

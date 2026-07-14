@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import type { RtiDeadlineFields } from "@/lib/rti-deadlines";
 import type { DeadlineRules } from "@/lib/constants";
 import { DEFAULT_DEADLINE_RULES } from "@/lib/constants";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 export function DeadlineBadge({
   rti,
@@ -17,18 +19,20 @@ export function DeadlineBadge({
   rules?: DeadlineRules;
   withLabel?: boolean;
 }) {
+  const { t, locale } = useTranslation("rti");
+
   if (rti.status === "Closed") {
     return (
       <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400">
         <CheckCircle2 className="h-3.5 w-3.5" />
-        Closed
+        {translateEnum("status", "Closed", locale)}
       </div>
     );
   }
 
   const active = activeDeadline(rti, new Date(), rules);
   if (!active) {
-    return <span className="text-xs text-muted-foreground italic">Pending</span>;
+    return <span className="text-xs text-muted-foreground italic">{t("list.pending")}</span>;
   }
 
   const days = daysBetween(new Date(), active.due);
@@ -46,7 +50,7 @@ export function DeadlineBadge({
   }
 
   const number = absDays;
-  const text = isOverdue ? "Days Overdue" : days === 1 ? "Day Left" : "Days Left";
+  const text = isOverdue ? t("list.daysOverdue") : days === 1 ? t("list.dayLeft") : t("list.daysLeft");
 
   return (
     <div

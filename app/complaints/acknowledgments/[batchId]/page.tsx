@@ -4,6 +4,7 @@ import { AckReview } from "@/components/complaints/ack-review";
 import { getAckBatchAction } from "@/lib/actions/ack-import";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review acknowledgments" };
@@ -11,11 +12,12 @@ export const metadata = { title: "Review acknowledgments" };
 export default async function AckReviewPage({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params;
   const user = await getSessionUser();
+  const { t } = await getTranslations("complaints");
   if (!hasRole(user, COMPLAINT_FIELD_ROLES)) {
     return (
       <div>
-        <PageHeader title="Not Permitted" />
-        <EmptyState title="Not permitted" description="Your role cannot review acknowledgments." />
+        <PageHeader title={t("advanced.shared.notPermittedTitle")} />
+        <EmptyState title={t("advanced.shared.notPermittedTitle")} description={t("advanced.ack.notPermittedDesc")} />
       </div>
     );
   }
@@ -24,8 +26,8 @@ export default async function AckReviewPage({ params }: { params: Promise<{ batc
   if ("error" in res) {
     return (
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <PageHeader title="Acknowledgment batch" breadcrumbs={[{ label: "Attach Acknowledgments", href: "/complaints/acknowledgments" }, { label: "Review" }]} />
-        <EmptyState title="Batch not found" description={res.error} />
+        <PageHeader title={t("advanced.ack.batchFallbackTitle")} breadcrumbs={[{ label: t("page.acknowledgmentsTitle"), href: "/complaints/acknowledgments" }, { label: t("advanced.ack.reviewBreadcrumb") }]} />
+        <EmptyState title={t("advanced.ack.batchNotFoundTitle")} description={res.error} />
       </div>
     );
   }
@@ -34,9 +36,9 @@ export default async function AckReviewPage({ params }: { params: Promise<{ batc
   return (
     <div className="mx-auto max-w-6xl space-y-5 px-4 sm:px-6 lg:px-8">
       <PageHeader
-        title={batch.originalName || "Acknowledgment batch"}
-        description="Confirm which complaint each acknowledgment belongs to. Job-code and complaint-number matches are the most reliable; adjust boundaries on the page strip if a section groups the wrong pages."
-        breadcrumbs={[{ label: "Attach Acknowledgments", href: "/complaints/acknowledgments" }, { label: "Review" }]}
+        title={batch.originalName || t("advanced.ack.batchFallbackTitle")}
+        description={t("advanced.ack.reviewPageDescription")}
+        breadcrumbs={[{ label: t("page.acknowledgmentsTitle"), href: "/complaints/acknowledgments" }, { label: t("advanced.ack.reviewBreadcrumb") }]}
       />
       <AckReview initial={batch} />
     </div>

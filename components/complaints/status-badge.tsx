@@ -31,9 +31,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 // Helper to compute relative time / duration since status change
-function getRelativeTime(dateInput: string | Date | null | undefined): string {
+function getRelativeTime(dateInput: string | Date | null | undefined, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (!dateInput) return "";
   const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
   const now = new Date();
@@ -42,11 +44,11 @@ function getRelativeTime(dateInput: string | Date | null | undefined): string {
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
-  if (diffDays === 1) return "yesterday";
-  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  if (diffMins < 1) return t("list.relTime.justNow");
+  if (diffMins < 60) return t("list.relTime.minutesAgo", { count: diffMins, plural: diffMins === 1 ? "" : "s" });
+  if (diffHours < 24) return t("list.relTime.hoursAgo", { count: diffHours, plural: diffHours === 1 ? "" : "s" });
+  if (diffDays === 1) return t("list.relTime.yesterday");
+  return t("list.relTime.daysAgo", { count: diffDays, plural: diffDays === 1 ? "" : "s" });
 }
 
 type StatusConfig = {
@@ -149,6 +151,7 @@ const STATUS_CONFIGS: Record<string, StatusConfig> = {
 };
 
 export function StatusBadge({ status, date }: { status: string; date?: string | Date | null }) {
+  const { t, locale } = useTranslation("complaints");
   const config = STATUS_CONFIGS[status] || {
     icon: HelpCircle,
     colors: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-400 dark:border-slate-800",
@@ -156,7 +159,8 @@ export function StatusBadge({ status, date }: { status: string; date?: string | 
   };
 
   const Icon = config.icon;
-  const timeText = React.useMemo(() => getRelativeTime(date), [date]);
+  const timeText = React.useMemo(() => getRelativeTime(date, t), [date, t]);
+  const label = translateEnum("status", status, locale);
 
   return (
     <TooltipProvider>
@@ -171,14 +175,14 @@ export function StatusBadge({ status, date }: { status: string; date?: string | 
             )}
           >
             <Icon className="h-3.5 w-3.5 shrink-0 opacity-90" />
-            <span>{status}</span>
+            <span>{label}</span>
           </Badge>
         </TooltipTrigger>
         <TooltipContent side="top" className="p-2 text-xs">
-          <p className="font-semibold">{status}</p>
+          <p className="font-semibold">{label}</p>
           {timeText && (
             <p className="text-[10px] text-muted-foreground mt-0.5 capitalize-first">
-              Active since {timeText}
+              {t("list.statusBadge.activeSince", { time: timeText })}
             </p>
           )}
         </TooltipContent>

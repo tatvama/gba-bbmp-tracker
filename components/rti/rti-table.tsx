@@ -27,16 +27,21 @@ import {
   PRIORITIES,
 } from "@/lib/constants";
 import type { DeadlineRules } from "@/lib/constants";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
+import type { Locale } from "@/lib/i18n/types";
 
 const selectCls =
   "h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350 dark:hover:bg-slate-800 dark:focus:ring-slate-800 cursor-pointer";
 
-const DEADLINE_OPTIONS = [
-  { value: "all", label: "Any deadline" },
-  { value: "overdue", label: "Overdue" },
-  { value: "due-soon", label: "Due Soon" },
-  { value: "due-today", label: "Due Today" },
-];
+function getDeadlineOptions(t: (key: string) => string) {
+  return [
+    { value: "all", label: t("list.filter.deadlineAny") },
+    { value: "overdue", label: t("list.filter.deadlineOverdue") },
+    { value: "due-soon", label: t("list.filter.deadlineDueSoon") },
+    { value: "due-today", label: t("list.filter.deadlineDueToday") },
+  ];
+}
 
 function getRelativeTime(dateInput: string | Date | null): string {
   if (!dateInput) return "";
@@ -64,34 +69,35 @@ function orDash(val: any, fallback: string = "—") {
   );
 }
 
-function getWorkflowStage(status: string): string {
+function getWorkflowStage(status: string, t: (key: string) => string): string {
   switch (status) {
     case "Draft":
     case "Ready to File":
-      return "Draft";
+      return t("list.stage.draft");
     case "Filed":
     case "Awaiting Reply":
-      return "PIO Reply";
+      return t("list.stage.pioReply");
     case "Reply Received":
     case "Partial Reply":
     case "Rejected":
     case "No Reply":
     case "First Appeal Drafted":
     case "First Appeal Filed":
-      return "First Appeal";
+      return t("list.stage.firstAppeal");
     case "FAA Order Received":
     case "Second Appeal Drafted":
     case "Second Appeal Filed":
     case "Complaint Filed":
-      return "Second Appeal";
+      return t("list.stage.secondAppeal");
     case "Closed":
-      return "Closed";
+      return t("list.stage.closed");
     default:
-      return "Pending";
+      return t("list.pending");
   }
 }
 
 function CategoryChip({ category }: { category: string | null }) {
+  const { locale } = useTranslation("rti");
   if (!category) return orDash(category);
   let Icon = Folder;
   switch (category) {
@@ -104,12 +110,13 @@ function CategoryChip({ category }: { category: string | null }) {
   return (
     <Badge variant="outline" className="inline-flex items-center gap-1.5 px-2 py-0.5 h-5.5 rounded-md border-slate-200 bg-slate-50/60 text-slate-800 font-extrabold text-[11px] dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300">
       <Icon className="h-3 w-3 text-slate-400 shrink-0" />
-      {category}
+      {translateEnum("workflow", category, locale)}
     </Badge>
   );
 }
 
 function PriorityChip({ priority }: { priority: string }) {
+  const { locale } = useTranslation("rti");
   let Icon = Minus;
   let cls = "";
   switch (priority) {
@@ -135,7 +142,7 @@ function PriorityChip({ priority }: { priority: string }) {
   return (
     <Badge variant="outline" className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 h-5.5 rounded-md font-black text-[11px] border", cls)}>
       <Icon className="h-3 w-3 shrink-0 opacity-80" />
-      {priority}
+      {translateEnum("workflow", priority, locale)}
     </Badge>
   );
 }
@@ -150,6 +157,9 @@ export function RtiTable({
   canEdit?: boolean;
 }) {
   const router = useRouter();
+  const { t, locale } = useTranslation("rti");
+  const { t: tc } = useTranslation("common");
+  const DEADLINE_OPTIONS = React.useMemo(() => getDeadlineOptions(t), [t]);
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [status, setStatus] = React.useState("all");
   const [category, setCategory] = React.useState("all");
@@ -318,12 +328,12 @@ export function RtiTable({
         >
           <CardContent className="p-5 space-y-2.5">
             <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              <span>Total Applications</span>
+              <span>{t("list.kpi.totalApplications")}</span>
               <FileText className="h-4 w-4 text-slate-400" />
             </div>
             <div className="space-y-0.5">
               <span className="text-3xl font-black text-slate-900 dark:text-slate-100 block tracking-tight">{stats.total}</span>
-              <span className="text-[11px] font-semibold text-slate-450 dark:text-slate-500">All-time active records</span>
+              <span className="text-[11px] font-semibold text-slate-450 dark:text-slate-500">{t("list.kpi.totalApplicationsHelper")}</span>
             </div>
             <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-primary w-full" />
@@ -338,12 +348,12 @@ export function RtiTable({
         >
           <CardContent className="p-5 space-y-2.5">
             <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              <span>Awaiting Reply</span>
+              <span>{t("list.kpi.awaitingReply")}</span>
               <Hourglass className="h-4 w-4 text-blue-500" />
             </div>
             <div className="space-y-0.5">
               <span className="text-3xl font-black text-slate-900 dark:text-slate-100 block tracking-tight">{stats.awaiting}</span>
-              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">Within statutory terms</span>
+              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">{t("list.kpi.awaitingReplyHelper")}</span>
             </div>
             <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-blue-500" style={{ width: `${stats.total ? (stats.awaiting / stats.total) * 100 : 0}%` }} />
@@ -358,12 +368,12 @@ export function RtiTable({
         >
           <CardContent className="p-5 space-y-2.5">
             <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              <span>Overdue Applications</span>
+              <span>{t("list.kpi.overdueApplications")}</span>
               <AlertOctagon className="h-4 w-4 text-rose-500 animate-pulse" />
             </div>
             <div className="space-y-0.5">
               <span className="text-3xl font-black text-rose-600 dark:text-rose-400 block tracking-tight">{stats.overdueCount}</span>
-              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">Action required immediately</span>
+              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">{t("list.kpi.overdueApplicationsHelper")}</span>
             </div>
             <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-rose-500" style={{ width: `${stats.total ? (stats.overdueCount / stats.total) * 100 : 0}%` }} />
@@ -378,12 +388,12 @@ export function RtiTable({
         >
           <CardContent className="p-5 space-y-2.5">
             <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              <span>Active Appeals</span>
+              <span>{t("list.kpi.activeAppeals")}</span>
               <Scale className="h-4 w-4 text-amber-500" />
             </div>
             <div className="space-y-0.5">
               <span className="text-3xl font-black text-slate-900 dark:text-slate-100 block tracking-tight">{stats.activeAppeals}</span>
-              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">FAA &amp; Commission level</span>
+              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">{t("list.kpi.activeAppealsHelper")}</span>
             </div>
             <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-amber-500" style={{ width: `${stats.total ? (stats.activeAppeals / stats.total) * 100 : 0}%` }} />
@@ -398,12 +408,12 @@ export function RtiTable({
         >
           <CardContent className="p-5 space-y-2.5">
             <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              <span>Closed Applications</span>
+              <span>{t("list.kpi.closedApplications")}</span>
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </div>
             <div className="space-y-0.5">
               <span className="text-3xl font-black text-slate-900 dark:text-slate-100 block tracking-tight">{stats.closedCount}</span>
-              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">Fully resolved audits</span>
+              <span className="text-[11px] font-semibold text-slate-455 dark:text-slate-500">{t("list.kpi.closedApplicationsHelper")}</span>
             </div>
             <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-emerald-500" style={{ width: `${stats.total ? (stats.closedCount / stats.total) * 100 : 0}%` }} />
@@ -415,19 +425,19 @@ export function RtiTable({
       {/* Top Operational Insight Strip */}
       <div className="flex flex-wrap gap-2.5 items-center bg-slate-50/45 dark:bg-slate-950/20 border border-slate-150 dark:border-slate-850 p-3 rounded-xl text-xs font-semibold text-slate-550 dark:text-slate-400 select-none">
         <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mr-1.5 flex items-center gap-1">
-          <Info className="h-3.5 w-3.5 text-primary" /> Active Alerts:
+          <Info className="h-3.5 w-3.5 text-primary" /> {t("list.insight.activeAlerts")}
         </span>
         <button onClick={() => { reset(); setDeadline("overdue"); }} className="flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-rose-700 cursor-pointer dark:bg-slate-900 dark:border-slate-800">
-          <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" /> {insightStats.overdue} Overdue
+          <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" /> {t("list.insight.overdueCount", { count: insightStats.overdue })}
         </button>
         <button onClick={() => { reset(); setDeadline("due-soon"); }} className="flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-amber-700 cursor-pointer dark:bg-slate-900 dark:border-slate-800">
-          <span className="h-2 w-2 rounded-full bg-amber-500" /> {insightStats.dueSoon} Due within 7d
+          <span className="h-2 w-2 rounded-full bg-amber-500" /> {t("list.insight.dueSoonCount", { count: insightStats.dueSoon })}
         </button>
         <button onClick={() => { reset(); setStatus("First Appeal Filed"); }} className="flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-blue-700 cursor-pointer dark:bg-slate-900 dark:border-slate-800">
-          <span className="h-2 w-2 rounded-full bg-blue-500" /> {insightStats.awaitingFaa} Awaiting FAA Order
+          <span className="h-2 w-2 rounded-full bg-blue-500" /> {t("list.insight.awaitingFaaCount", { count: insightStats.awaitingFaa })}
         </button>
         <button onClick={() => { reset(); setStatus("No Reply"); }} className="flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-indigo-700 cursor-pointer dark:bg-slate-900 dark:border-slate-800">
-          <span className="h-2 w-2 rounded-full bg-indigo-500" /> {insightStats.requireEscalation} Require FAA Escalation
+          <span className="h-2 w-2 rounded-full bg-indigo-500" /> {t("list.insight.requireEscalationCount", { count: insightStats.requireEscalation })}
         </button>
       </div>
 
@@ -440,7 +450,7 @@ export function RtiTable({
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 shrink-0 pointer-events-none" />
                 <Input
-                  placeholder="Search ref, subject, authority…"
+                  placeholder={t("list.searchPlaceholder")}
                   value={globalFilter}
                   onChange={(e) => setGlobalFilter(e.target.value)}
                   className="h-9 w-64 text-xs pl-9 bg-white dark:bg-slate-955/40 border-slate-250 dark:border-slate-800"
@@ -448,43 +458,43 @@ export function RtiTable({
               </div>
 
               {/* Status Select */}
-              <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status filter">
-                <option value="all">Any Status</option>
-                {RTI_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={t("list.aria.statusFilter")}>
+                <option value="all">{t("list.filter.anyStatus")}</option>
+                {RTI_STATUSES.map((s) => <option key={s} value={s}>{translateEnum("status", s, locale)}</option>)}
               </select>
 
               {/* Category Select */}
-              <select className={selectCls} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category filter">
-                <option value="all">Any Category</option>
-                {RTI_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <select className={selectCls} value={category} onChange={(e) => setCategory(e.target.value)} aria-label={t("list.aria.categoryFilter")}>
+                <option value="all">{t("list.filter.anyCategory")}</option>
+                {RTI_CATEGORIES.map((c) => <option key={c} value={c}>{translateEnum("workflow", c, locale)}</option>)}
               </select>
 
               {/* Priority Select */}
-              <select className={selectCls} value={priority} onChange={(e) => setPriority(e.target.value)} aria-label="Priority filter">
-                <option value="all">Any Priority</option>
-                {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+              <select className={selectCls} value={priority} onChange={(e) => setPriority(e.target.value)} aria-label={t("list.aria.priorityFilter")}>
+                <option value="all">{t("list.filter.anyPriority")}</option>
+                {PRIORITIES.map((p) => <option key={p} value={p}>{translateEnum("workflow", p, locale)}</option>)}
               </select>
 
               {/* Deadline Select */}
-              <select className={selectCls} value={deadline} onChange={(e) => setDeadline(e.target.value)} aria-label="Deadline filter">
+              <select className={selectCls} value={deadline} onChange={(e) => setDeadline(e.target.value)} aria-label={t("list.aria.deadlineFilter")}>
                 {DEADLINE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
 
               {/* Officer Select */}
-              <select className={selectCls} value={officer} onChange={(e) => setOfficer(e.target.value)} aria-label="Officer filter">
-                <option value="all">Any Officer</option>
+              <select className={selectCls} value={officer} onChange={(e) => setOfficer(e.target.value)} aria-label={t("list.aria.officerFilter")}>
+                <option value="all">{t("list.filter.anyOfficer")}</option>
                 {officersList.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
 
               {/* Ward Select */}
-              <select className={selectCls} value={ward} onChange={(e) => setWard(e.target.value)} aria-label="Ward filter">
-                <option value="all">Any Ward</option>
+              <select className={selectCls} value={ward} onChange={(e) => setWard(e.target.value)} aria-label={t("list.aria.wardFilter")}>
+                <option value="all">{t("list.filter.anyWard")}</option>
                 {wardsList.map((w) => <option key={w} value={w}>{w}</option>)}
               </select>
 
               {/* Authority Select */}
-              <select className={selectCls} value={authority} onChange={(e) => setAuthority(e.target.value)} aria-label="Authority filter">
-                <option value="all">Any Authority</option>
+              <select className={selectCls} value={authority} onChange={(e) => setAuthority(e.target.value)} aria-label={t("list.aria.authorityFilter")}>
+                <option value="all">{t("list.filter.anyAuthority")}</option>
                 {authoritiesList.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
@@ -493,16 +503,16 @@ export function RtiTable({
             <div className="flex items-center gap-2 self-end lg:self-auto shrink-0">
               {hasFilters && (
                 <Button variant="ghost" size="sm" onClick={reset} className="h-9 px-2 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer">
-                  <X className="h-4 w-4 mr-1.5" /> Clear
+                  <X className="h-4 w-4 mr-1.5" /> {t("list.clear")}
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={() => doExport("csv")} className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 rounded-lg cursor-pointer">
-                Export CSV
+                {tc("action.exportCsv")}
               </Button>
               <Button variant="outline" size="sm" onClick={() => doExport("xlsx")} className="h-9 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 rounded-lg cursor-pointer">
-                Export Excel
+                {tc("action.exportExcel")}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => router.refresh()} className="h-9 w-9 shrink-0 dark:border-slate-800 dark:bg-slate-900 rounded-lg flex items-center justify-center cursor-pointer" aria-label="Refresh data">
+              <Button variant="outline" size="sm" onClick={() => router.refresh()} className="h-9 w-9 shrink-0 dark:border-slate-800 dark:bg-slate-900 rounded-lg flex items-center justify-center cursor-pointer" aria-label={t("list.aria.refreshData")}>
                 <RefreshCw className="h-4 w-4 text-slate-500" />
               </Button>
             </div>
@@ -511,52 +521,52 @@ export function RtiTable({
           {/* Active Filter Pills Row (Row 2) */}
           {hasFilters && (
             <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100/50 dark:border-slate-850/50 pt-3">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mr-1.5 select-none">Active Filters:</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mr-1.5 select-none">{t("list.pill.activeFiltersLabel")}</span>
               {globalFilter && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Search: &quot;{globalFilter}&quot;
+                  {t("list.pill.search", { value: globalFilter })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setGlobalFilter("")} />
                 </Badge>
               )}
               {status !== "all" && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Status: {status}
+                  {t("list.pill.status", { value: translateEnum("status", status, locale) })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setStatus("all")} />
                 </Badge>
               )}
               {category !== "all" && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Category: {category}
+                  {t("list.pill.category", { value: translateEnum("workflow", category, locale) })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setCategory("all")} />
                 </Badge>
               )}
               {priority !== "all" && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Priority: {priority}
+                  {t("list.pill.priority", { value: translateEnum("workflow", priority, locale) })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setPriority("all")} />
                 </Badge>
               )}
               {deadline !== "all" && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Deadline: {deadline}
+                  {t("list.pill.deadline", { value: DEADLINE_OPTIONS.find((o) => o.value === deadline)?.label ?? deadline })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setDeadline("all")} />
                 </Badge>
               )}
               {officer !== "all" && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Officer: {officer}
+                  {t("list.pill.officer", { value: officer })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setOfficer("all")} />
                 </Badge>
               )}
               {ward !== "all" && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Ward: {ward}
+                  {t("list.pill.ward", { value: ward })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setWard("all")} />
                 </Badge>
               )}
               {authority !== "all" && (
                 <Badge variant="outline" className="flex items-center gap-1 bg-slate-50 text-[10px] font-bold py-0.5 rounded px-2 text-slate-650">
-                  Authority: {authority}
+                  {t("list.pill.authority", { value: authority })}
                   <X className="h-3 w-3 hover:text-slate-900 cursor-pointer shrink-0" onClick={() => setAuthority("all")} />
                 </Badge>
               )}
@@ -574,19 +584,19 @@ export function RtiTable({
               <ClipboardCheck className="h-6 w-6" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-250">No RTIs match your filters</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-250">{t("list.emptyFilters.title")}</h3>
               <p className="text-xs text-slate-550 dark:text-slate-455 leading-relaxed">
-                Try changing filters or create a new RTI.
+                {t("list.emptyFilters.description")}
               </p>
             </div>
             <div className="flex gap-2">
               <Button type="button" size="sm" onClick={reset} variant="outline" className="h-9 font-bold bg-white dark:bg-slate-900 dark:border-slate-855">
-                Reset filters
+                {t("list.resetFilters")}
               </Button>
               {canEdit && (
                 <Button type="button" size="sm" asChild className="h-9 font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs">
                   <Link href="/rti/new">
-                    <Plus className="h-4 w-4 mr-1" /> Create RTI
+                    <Plus className="h-4 w-4 mr-1" /> {t("list.createRti")}
                   </Link>
                 </Button>
               )}
@@ -603,14 +613,14 @@ export function RtiTable({
                 {/* TABLE HEADERS */}
                 <thead className="bg-slate-100/90 dark:bg-slate-900/80 border-b border-border select-none">
                   <tr>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-6 w-[140px]">Ref &amp; Date</th>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[280px]">Subject &amp; Authority</th>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[160px]">Workflow Status</th>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[120px]">Category</th>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[100px]">Priority</th>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[150px]">Deadline</th>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[140px]">Assigned Officer</th>
-                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-6 text-right w-[110px]">Actions</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-6 w-[140px]">{t("list.table.refDate")}</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[280px]">{t("list.table.subjectAuthority")}</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[160px]">{t("list.table.workflowStatus")}</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[120px]">{t("filter.category")}</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[100px]">{t("list.table.priority")}</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[150px]">{t("list.table.deadline")}</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-4 w-[140px]">{t("list.table.assignedOfficer")}</th>
+                    <th className="text-[11.5px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-350 py-3.5 px-6 text-right w-[110px]">{tc("table.actions")}</th>
                   </tr>
                 </thead>
 
@@ -622,9 +632,9 @@ export function RtiTable({
                     const remainingDays = active ? daysBetween(new Date(), active.due) : null;
                     const dueInText = remainingDays !== null
                       ? remainingDays < 0
-                        ? `${Math.abs(remainingDays)}d overdue`
-                        : `${remainingDays}d left`
-                      : "No deadline";
+                        ? t("list.dueInOverdue", { days: Math.abs(remainingDays) })
+                        : t("list.dueInLeft", { days: remainingDays })
+                      : t("list.noDeadline");
 
                     return (
                       <React.Fragment key={r.id}>
@@ -644,7 +654,7 @@ export function RtiTable({
                             )} />
                             <div className="space-y-1.5 pl-1.5">
                               <span className="font-mono text-[13px] font-black text-slate-900 dark:text-slate-100">
-                                {r.internal_ref || "PENDING"}
+                                {r.internal_ref || t("list.refPending")}
                               </span>
                               <span className="text-[11.5px] text-slate-750 dark:text-slate-300 font-extrabold block leading-none">
                                 {formatDate(r.created_at)}
@@ -659,7 +669,7 @@ export function RtiTable({
                                 {r.subject}
                               </h3>
                               <div className="text-[11.5px] text-slate-700 dark:text-slate-300 font-extrabold truncate leading-none" title={r.public_authority || ""}>
-                                {orDash(r.public_authority)} {r.ward ? `· Ward ${r.ward.new_no}` : ""}
+                                {orDash(r.public_authority)} {r.ward ? `· ${translateEnum("workflow", "Ward", locale)} ${r.ward.new_no}` : ""}
                               </div>
                             </div>
                           </td>
@@ -669,7 +679,7 @@ export function RtiTable({
                             <div className="space-y-1">
                               <RtiStatusBadge status={r.status} />
                               <div className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 leading-none pl-0.5">
-                                {r.status === "Closed" ? "Closed" : `Next: ${getWorkflowStage(r.status)}`}
+                                {r.status === "Closed" ? translateEnum("status", "Closed", locale) : t("list.nextStage", { stage: getWorkflowStage(r.status, t) })}
                               </div>
                             </div>
                           </td>
@@ -692,7 +702,7 @@ export function RtiTable({
                               </Badge>
                               {r.normal_due && (
                                 <span className="text-[11px] text-slate-700 dark:text-slate-300 font-extrabold block leading-none pl-0.5">
-                                  Due: {formatDate(r.normal_due)}
+                                  {t("list.dueLabel", { date: formatDate(r.normal_due) })}
                                 </span>
                               )}
                             </div>
@@ -702,7 +712,7 @@ export function RtiTable({
                           <td className="py-4 px-4">
                             <div className="space-y-1">
                               <span className="text-[13px] font-extrabold text-slate-900 dark:text-slate-100 block truncate" title={r.contact?.full_name || ""}>
-                                {r.contact ? r.contact.full_name : "Unassigned"}
+                                {r.contact ? r.contact.full_name : t("list.unassignedOfficer")}
                               </span>
                               <span className="text-[11.5px] text-slate-700 dark:text-slate-300 font-extrabold block leading-none">
                                 {getRelativeTime(r.updated_at)}
@@ -716,13 +726,13 @@ export function RtiTable({
                               <button
                                 onClick={() => setExpandedId(isExpanded ? null : r.id)}
                                 className="rounded-lg p-1.5 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 transition-colors cursor-pointer"
-                                aria-label="Toggle details"
+                                aria-label={t("list.aria.toggleDetails")}
                               >
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                               </button>
                               <Button asChild size="sm" className="h-8 font-bold shadow-2xs hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer text-xs px-2.5">
                                 <Link href={`/rti/${r.id}`}>
-                                  View
+                                  {tc("action.view")}
                                 </Link>
                               </Button>
                             </div>

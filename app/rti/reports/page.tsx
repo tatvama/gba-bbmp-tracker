@@ -6,6 +6,7 @@ import {
   listAllSecondAppeals,
 } from "@/lib/queries";
 import { getDeadlineRules } from "@/lib/settings";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "RTI Reports" };
@@ -17,12 +18,13 @@ export default async function RtiReportsPage() {
     listAllSecondAppeals(),
     getDeadlineRules(),
   ]);
+  const { t } = await getTranslations("rti");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="RTI Reports"
-        description="Statutory compliance and deadline tracking dashboard."
+        title={t("page.reportsTitle")}
+        description={t("advanced.reportsPage.description")}
       />
       <RtiReportsDashboard
         rtis={rtis}

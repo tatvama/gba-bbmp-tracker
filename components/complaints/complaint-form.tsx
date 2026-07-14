@@ -25,6 +25,8 @@ import {
   getWardsAction,
   getContactsAction,
 } from "@/lib/actions/complaints";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 export type ComplaintFormOptions = {
   corporations: { id: string; code: string; name: string }[];
@@ -48,6 +50,8 @@ export function ComplaintForm({
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, {});
+  const { t, locale } = useTranslation("complaints");
+  const { t: tc } = useTranslation("common");
 
   React.useEffect(() => {
     if (state.success && state.id) router.push(`/complaints/${state.id}`);
@@ -343,106 +347,106 @@ export function ComplaintForm({
         <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{state.error}</div>
       )}
 
-      <Section title="Complaint">
-        <Field label="Title" error={fe.title} required className="sm:col-span-2">
+      <Section title={t("form.sectionComplaint")}>
+        <Field label={t("form.fieldTitle")} error={fe.title} required className="sm:col-span-2">
           <Input name="title" defaultValue={initial?.title ?? ""} required />
         </Field>
-        <Field label="Type" error={fe.type} required>
+        <Field label={tc("table.type")} error={fe.type} required>
           <select name="type" defaultValue={initial?.type ?? "Other"} className={selectCls} required>
-            {COMPLAINT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            {COMPLAINT_TYPES.map((ty) => <option key={ty} value={ty}>{translateEnum("workflow", ty, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Sub-type" error={fe.complaintSubtype}>
+        <Field label={t("form.fieldSubtype")} error={fe.complaintSubtype}>
           <Input name="complaintSubtype" defaultValue={initial?.complaint_subtype ?? ""} />
         </Field>
-        <Field label="Status" error={fe.status}>
+        <Field label={t("filter.status")} error={fe.status}>
           <select name="status" defaultValue={initial?.status ?? "Draft"} className={selectCls}>
-            {COMPLAINT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {COMPLAINT_STATUSES.map((s) => <option key={s} value={s}>{translateEnum("status", s, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Priority" error={fe.priority}>
+        <Field label={t("filter.priority")} error={fe.priority}>
           <select name="priority" defaultValue={initial?.priority ?? "Medium"} className={selectCls}>
-            {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            {PRIORITIES.map((p) => <option key={p} value={p}>{translateEnum("workflow", p, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Public impact" error={fe.publicImpact}>
+        <Field label={t("form.fieldPublicImpact")} error={fe.publicImpact}>
           <select name="publicImpact" defaultValue={initial?.public_impact ?? ""} className={selectCls}>
             <option value="">—</option>
-            {PUBLIC_IMPACT_LEVELS.map((p) => <option key={p} value={p}>{p}</option>)}
+            {PUBLIC_IMPACT_LEVELS.map((p) => <option key={p} value={p}>{translateEnum("workflow", p, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Description" error={fe.description} className="sm:col-span-2">
+        <Field label={t("detail.description")} error={fe.description} className="sm:col-span-2">
           <Textarea name="description" defaultValue={initial?.description ?? ""} rows={3} />
         </Field>
-        <Field label="Requested action" error={fe.requestedAction} className="sm:col-span-2">
+        <Field label={t("form.fieldRequestedAction")} error={fe.requestedAction} className="sm:col-span-2">
           <Textarea name="requestedAction" defaultValue={initial?.requested_action ?? ""} rows={2} />
         </Field>
       </Section>
 
-      <Section title="Filing">
-        <Field label="External complaint no." error={fe.externalComplaintNumber}>
-          <Input name="externalComplaintNumber" defaultValue={initial?.complaint_number ?? ""} placeholder="From the portal / acknowledgement" />
+      <Section title={t("form.sectionFiling")}>
+        <Field label={t("form.fieldExternalComplaintNo")} error={fe.externalComplaintNumber}>
+          <Input name="externalComplaintNumber" defaultValue={initial?.complaint_number ?? ""} placeholder={t("form.placeholderFromPortal")} />
         </Field>
-        <Field label="Job / work-order no." error={fe.jobNumber}>
-          <Input name="jobNumber" defaultValue={initial?.job_number ?? ""} placeholder="Govt contract job code, e.g. RR-2026-0456" />
+        <Field label={t("form.fieldJobWorkOrderNo")} error={fe.jobNumber}>
+          <Input name="jobNumber" defaultValue={initial?.job_number ?? ""} placeholder={t("form.placeholderJobNumberExample")} />
         </Field>
-        <Field label="Contractor" error={fe.contractor}>
-          <Input name="contractor" defaultValue={initial?.contractor ?? ""} placeholder="Contractor / agency name" />
+        <Field label={t("detail.contractor")} error={fe.contractor}>
+          <Input name="contractor" defaultValue={initial?.contractor ?? ""} placeholder={t("form.placeholderContractorAgency")} />
         </Field>
-        <Field label="RTI no. (if any)" error={fe.rtiNumber}>
+        <Field label={t("form.fieldRtiNumber")} error={fe.rtiNumber}>
           <Input name="rtiNumber" defaultValue={initial?.rti_number ?? ""} />
         </Field>
-        <Field label="Filed mode" error={fe.complaintFiledMode}>
+        <Field label={t("form.fieldFiledMode")} error={fe.complaintFiledMode}>
           <select name="complaintFiledMode" defaultValue={initial?.complaint_mode ?? ""} className={selectCls}>
             <option value="">—</option>
-            {COMPLAINT_FILED_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+            {COMPLAINT_FILED_MODES.map((m) => <option key={m} value={m}>{translateEnum("workflow", m, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Filed to" error={fe.complaintFiledTo}>
+        <Field label={t("form.fieldFiledTo")} error={fe.complaintFiledTo}>
           <Input name="complaintFiledTo" defaultValue={initial?.complaint_filed_to ?? ""} />
         </Field>
-        <Field label="Filed by" error={fe.complaintFiledBy}>
+        <Field label={t("form.fieldFiledBy")} error={fe.complaintFiledBy}>
           <Input name="complaintFiledBy" defaultValue={initial?.complaint_filed_by ?? ""} />
         </Field>
-        <Field label="Responsible department" error={fe.responsibleDepartment}>
+        <Field label={t("detail.responsibleDepartment")} error={fe.responsibleDepartment}>
           <Input name="responsibleDepartment" defaultValue={initial?.responsible_department ?? ""} />
         </Field>
-        <Field label="Complaint given date" error={fe.complaintGivenDate}>
+        <Field label={t("detail.complaintGivenDate")} error={fe.complaintGivenDate}>
           <Input type="date" name="complaintGivenDate" defaultValue={initial?.date_submitted ?? ""} />
         </Field>
-        <Field label="Acknowledgement date" error={fe.acknowledgementDate}>
+        <Field label={t("form.fieldAcknowledgementDate")} error={fe.acknowledgementDate}>
           <Input type="date" name="acknowledgementDate" defaultValue={initial?.acknowledgment_date ?? ""} />
         </Field>
-        <Field label="Expected resolution date" error={fe.expectedResolutionDate}>
+        <Field label={t("form.fieldExpectedResolutionDate")} error={fe.expectedResolutionDate}>
           <Input type="date" name="expectedResolutionDate" defaultValue={initial?.expected_resolution_date ?? ""} />
         </Field>
-        <Field label="Next follow-up date" error={fe.nextFollowUpDate}>
+        <Field label={t("form.fieldNextFollowUpDate")} error={fe.nextFollowUpDate}>
           <Input type="date" name="nextFollowUpDate" defaultValue={initial?.next_follow_up_date ?? ""} />
         </Field>
       </Section>
 
-      <Section title="Location & assignment">
+      <Section title={t("form.sectionLocationAssignment")}>
         {/* Selected Path Breadcrumb */}
         {wardType && (
           <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground bg-muted/30 border border-muted/50 p-2.5 rounded-md sm:col-span-2">
-            <span className="font-medium text-foreground">Hierarchy:</span>
-            <span>{wardType === "GBA" ? "GBA Wards" : "BBMP Wards"}</span>
+            <span className="font-medium text-foreground">{t("form.hierarchyLabel")}</span>
+            <span>{translateEnum("workflow", wardType, locale)}</span>
             {corpId && (
               <>
                 <span className="text-muted-foreground/60">&gt;</span>
-                <span>{corporations.find((c) => c.id === corpId)?.name || (loadingCorps ? "Loading..." : corpId)}</span>
+                <span>{corporations.find((c) => c.id === corpId)?.name || (loadingCorps ? t("form.loadingGeneric") : corpId)}</span>
               </>
             )}
             {divId && (
               <>
                 <span className="text-muted-foreground/60">&gt;</span>
-                <span>{divisions.find((d) => d.id === divId)?.name || (loadingDivs ? "Loading..." : divId)}</span>
+                <span>{divisions.find((d) => d.id === divId)?.name || (loadingDivs ? t("form.loadingGeneric") : divId)}</span>
               </>
             )}
             {subDivId && (
               <>
                 <span className="text-muted-foreground/60">&gt;</span>
-                <span>{subdivisions.find((s) => s.id === subDivId)?.name || (loadingSubs ? "Loading..." : subDivId)}</span>
+                <span>{subdivisions.find((s) => s.id === subDivId)?.name || (loadingSubs ? t("form.loadingGeneric") : subDivId)}</span>
               </>
             )}
             {wardId && (
@@ -451,7 +455,7 @@ export function ComplaintForm({
                 <span>
                   {(() => {
                     const w = wards.find((w) => w.id === wardId);
-                    return w ? `${w.new_no} · ${w.new_name}` : (loadingWards ? "Loading..." : "Selected Ward");
+                    return w ? `${w.new_no} · ${w.new_name}` : (loadingWards ? t("form.loadingGeneric") : t("form.selectedWardFallback"));
                   })()}
                 </span>
               </>
@@ -459,7 +463,7 @@ export function ComplaintForm({
           </div>
         )}
 
-        <Field label="Ward Type" error={fe.wardType} required>
+        <Field label={t("filter.wardType")} error={fe.wardType} required>
           <select
             name="wardType"
             value={wardType}
@@ -468,12 +472,12 @@ export function ComplaintForm({
             required
           >
             <option value="">—</option>
-            <option value="BBMP">BBMP Wards</option>
-            <option value="GBA">GBA Wards</option>
+            <option value="BBMP">{translateEnum("workflow", "BBMP", locale)}</option>
+            <option value="GBA">{translateEnum("workflow", "GBA", locale)}</option>
           </select>
         </Field>
 
-        <Field label="Corporation" error={fe.corporationId}>
+        <Field label={t("filter.corporation")} error={fe.corporationId}>
           <select
             name="corporationId"
             value={corpId}
@@ -482,11 +486,11 @@ export function ComplaintForm({
             className={selectCls}
           >
             {loadingCorps ? (
-              <option value="">Loading Corporations...</option>
+              <option value="">{t("form.loadingCorporations")}</option>
             ) : !wardType ? (
-              <option value="">Select Ward Type First</option>
+              <option value="">{t("form.selectWardTypeFirst")}</option>
             ) : corporations.length === 0 ? (
-              <option value="">No Corporations Found</option>
+              <option value="">{t("form.noCorporationsFound")}</option>
             ) : (
               <>
                 <option value="">—</option>
@@ -500,7 +504,7 @@ export function ComplaintForm({
           </select>
         </Field>
 
-        <Field label="Division" error={fe.divisionId}>
+        <Field label={t("filter.division")} error={fe.divisionId}>
           <select
             name="divisionId"
             value={divId}
@@ -509,11 +513,11 @@ export function ComplaintForm({
             className={selectCls}
           >
             {loadingDivs ? (
-              <option value="">Loading Divisions...</option>
+              <option value="">{t("form.loadingDivisions")}</option>
             ) : !corpId ? (
-              <option value="">Select Corporation First</option>
+              <option value="">{t("form.selectCorporationFirst")}</option>
             ) : divisions.length === 0 ? (
-              <option value="">No Divisions Found</option>
+              <option value="">{t("form.noDivisionsFound")}</option>
             ) : (
               <>
                 <option value="">—</option>
@@ -527,7 +531,7 @@ export function ComplaintForm({
           </select>
         </Field>
 
-        <Field label="Sub-division" error={fe.engSubDivisionId}>
+        <Field label={t("filter.subDivision")} error={fe.engSubDivisionId}>
           <select
             name="engSubDivisionId"
             value={subDivId}
@@ -536,11 +540,11 @@ export function ComplaintForm({
             className={selectCls}
           >
             {loadingSubs ? (
-              <option value="">Loading Sub-Divisions...</option>
+              <option value="">{t("form.loadingSubDivisions")}</option>
             ) : !divId ? (
-              <option value="">Select Division First</option>
+              <option value="">{t("form.selectDivisionFirst")}</option>
             ) : subdivisions.length === 0 ? (
-              <option value="">No Sub-Divisions Found</option>
+              <option value="">{t("form.noSubDivisionsFound")}</option>
             ) : (
               <>
                 <option value="">—</option>
@@ -554,7 +558,7 @@ export function ComplaintForm({
           </select>
         </Field>
 
-        <Field label="Ward" error={fe.wardId}>
+        <Field label={t("filter.ward")} error={fe.wardId}>
           <select
             name="wardId"
             value={wardId}
@@ -563,11 +567,11 @@ export function ComplaintForm({
             className={selectCls}
           >
             {loadingWards ? (
-              <option value="">Loading Wards...</option>
+              <option value="">{t("form.loadingWards")}</option>
             ) : !subDivId ? (
-              <option value="">Select Sub-Division First</option>
+              <option value="">{t("form.selectSubDivisionFirst")}</option>
             ) : wards.length === 0 ? (
-              <option value="">No Wards Found</option>
+              <option value="">{t("form.noWardsFound")}</option>
             ) : (
               <>
                 <option value="">—</option>
@@ -581,7 +585,7 @@ export function ComplaintForm({
           </select>
         </Field>
 
-        <Field label="Assigned engineer" error={fe.assignedEngineerId}>
+        <Field label={t("detail.assignedEngineer")} error={fe.assignedEngineerId}>
           <select
             name="assignedEngineerId"
             value={engId}
@@ -590,11 +594,11 @@ export function ComplaintForm({
             className={selectCls}
           >
             {loadingContacts ? (
-              <option value="">Loading Engineers...</option>
+              <option value="">{t("form.loadingEngineers")}</option>
             ) : !wardId ? (
-              <option value="">Select Ward First</option>
+              <option value="">{t("form.selectWardFirst")}</option>
             ) : engineers.length === 0 ? (
-              <option value="">No Engineers Found</option>
+              <option value="">{t("form.noEngineersFound")}</option>
             ) : (
               <>
                 <option value="">—</option>
@@ -608,7 +612,7 @@ export function ComplaintForm({
           </select>
         </Field>
 
-        <Field label="Assigned officer" error={fe.assignedOfficerId}>
+        <Field label={t("detail.assignedOfficer")} error={fe.assignedOfficerId}>
           <select
             name="assignedOfficerId"
             value={offId}
@@ -617,11 +621,11 @@ export function ComplaintForm({
             className={selectCls}
           >
             {loadingContacts ? (
-              <option value="">Loading Officers...</option>
+              <option value="">{t("form.loadingOfficers")}</option>
             ) : !wardId ? (
-              <option value="">Select Ward First</option>
+              <option value="">{t("form.selectWardFirst")}</option>
             ) : officers.length === 0 ? (
-              <option value="">No Officers Found</option>
+              <option value="">{t("form.noOfficersFound")}</option>
             ) : (
               <>
                 <option value="">—</option>
@@ -635,35 +639,35 @@ export function ComplaintForm({
           </select>
         </Field>
 
-        <Field label="Location" error={fe.locationText} className="sm:col-span-2">
+        <Field label={t("detail.location")} error={fe.locationText} className="sm:col-span-2">
           <Input name="locationText" defaultValue={initial?.location ?? ""} />
         </Field>
-        <Field label="Landmark" error={fe.landmark}>
+        <Field label={t("form.fieldLandmark")} error={fe.landmark}>
           <Input name="landmark" defaultValue={initial?.landmark ?? ""} />
         </Field>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Field label="Latitude" error={fe.latitude}>
+          <Field label={t("form.fieldLatitude")} error={fe.latitude}>
             <Input name="latitude" defaultValue={initial?.latitude ?? ""} placeholder="12.97" />
           </Field>
-          <Field label="Longitude" error={fe.longitude}>
+          <Field label={t("form.fieldLongitude")} error={fe.longitude}>
             <Input name="longitude" defaultValue={initial?.longitude ?? ""} placeholder="77.59" />
           </Field>
         </div>
       </Section>
 
-      <Section title="Notes & reminders">
-        <Field label="Internal notes" error={fe.notes} className="sm:col-span-2">
+      <Section title={t("form.sectionNotesReminders")}>
+        <Field label={t("form.fieldInternalNotes")} error={fe.notes} className="sm:col-span-2">
           <Textarea name="notes" defaultValue={initial?.notes ?? ""} rows={2} />
         </Field>
         <div className="flex items-center gap-2 sm:col-span-2">
           <Checkbox id="reminderEnabled" name="reminderEnabled" defaultChecked={initial?.reminder_flag ?? true} />
-          <Label htmlFor="reminderEnabled" className="font-normal">Enable follow-up reminders</Label>
+          <Label htmlFor="reminderEnabled" className="font-normal">{t("form.enableFollowUpReminders")}</Label>
         </div>
       </Section>
 
       <div className="sticky bottom-0 z-10 flex gap-2 rounded-lg border bg-card/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/85">
-        <Button type="submit" disabled={pending}>{pending ? "Saving…" : initial ? "Save changes" : "Create complaint"}</Button>
-        <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+        <Button type="submit" disabled={pending}>{pending ? t("form.saving") : initial ? t("form.saveChangesButton") : t("action.createComplaint")}</Button>
+        <Button type="button" variant="outline" onClick={() => router.back()}>{tc("action.cancel")}</Button>
       </div>
     </form>
   );

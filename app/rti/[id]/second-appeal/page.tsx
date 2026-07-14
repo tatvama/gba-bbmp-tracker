@@ -10,6 +10,7 @@ import { createSecondAppeal } from "@/lib/actions/rti";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Second appeal" };
@@ -21,11 +22,12 @@ export default async function SecondAppealPage({
 }) {
   const { id } = await params;
   const user = await getSessionUser();
+  const { t } = await getTranslations("rti");
   if (!hasRole(user, RTI_WRITE_ROLES)) {
     return (
       <div>
-        <PageHeader title="Second appeal" />
-        <EmptyState title="Not permitted" description="Your role cannot draft appeals." />
+        <PageHeader title={t("page.secondAppealTitle")} />
+        <EmptyState title={t("form.notPermittedTitle")} description={t("form.notPermittedDraftAppeal")} />
       </div>
     );
   }
@@ -37,11 +39,11 @@ export default async function SecondAppealPage({
   return (
     <div className="mx-auto max-w-4xl">
       <Button asChild variant="ghost" size="sm" className="mb-3 -ml-2">
-        <Link href={`/rti/${id}`}><ArrowLeft className="h-4 w-4" /> Back to RTI</Link>
+        <Link href={`/rti/${id}`}><ArrowLeft className="h-4 w-4" /> {t("form.backToRti")}</Link>
       </Button>
       <PageHeader
-        title="Second appeal — Section 19(3)"
-        description={`For: ${rti.subject}`}
+        title={t("form.secondAppealPageTitle")}
+        description={t("form.forSubject", { subject: rti.subject })}
       />
       <SecondAppealForm
         rti={rti}

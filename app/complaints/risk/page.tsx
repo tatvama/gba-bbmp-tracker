@@ -8,6 +8,8 @@ import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { ShieldAlert, Copy, MapPin, ScanEye, Clock, GitMerge, Gavel } from "lucide-react";
 import Link from "next/link";
+import { getTranslations } from "@/lib/i18n/server";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 const inr = (n: number) => (n > 0 ? `₹${Math.round(n).toLocaleString("en-IN")}` : "—");
 
@@ -27,12 +29,13 @@ function Stat({ icon: Icon, label, value, danger }: { icon: React.ComponentType<
 }
 
 export default async function RiskPage() {
+  const { t, locale } = await getTranslations("complaints");
   const user = await getSessionUser();
   if (!hasRole(user, COMPLAINT_VERIFY_ROLES)) {
     return (
       <div>
-        <PageHeader title="Risk & Red Flags" />
-        <EmptyState title="Not permitted" description="Your role cannot view the risk dashboard. Ask an admin for a Verifier / Complaint Manager / Editor role." />
+        <PageHeader title={t("list.risk.title")} />
+        <EmptyState title={t("list.notPermittedTitle")} description={t("list.risk.notPermittedDescription")} />
       </div>
     );
   }
@@ -42,30 +45,30 @@ export default async function RiskPage() {
   return (
     <div>
       <PageHeader
-        title="Risk & Red Flags"
-        description="Fraud signals aggregated across all cases — and contractors ranked by a combined risk score (forensic bill-stop audits, duplicate photos, off-site GPS, vision flags, overdue follow-ups). Signals are for review, not proof."
-        badge={<Badge variant={summary.contractorsAtRisk > 0 ? "destructive" : "success"}>{summary.contractorsAtRisk} contractor(s) at risk</Badge>}
+        title={t("list.risk.title")}
+        description={t("list.risk.description")}
+        badge={<Badge variant={summary.contractorsAtRisk > 0 ? "destructive" : "success"}>{t("list.risk.contractorsAtRiskBadge", { count: summary.contractorsAtRisk })}</Badge>}
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat icon={Copy} label="Duplicate photos" value={summary.duplicateDocs} danger />
-        <Stat icon={MapPin} label="Off-site photos" value={summary.offSitePhotos} danger />
-        <Stat icon={ScanEye} label="Vision flags" value={summary.visionFlags} danger />
-        <Stat icon={Clock} label="Overdue follow-ups" value={summary.overdueComplaints} danger />
+        <Stat icon={Copy} label={t("list.risk.statDuplicatePhotos")} value={summary.duplicateDocs} danger />
+        <Stat icon={MapPin} label={t("list.risk.statOffSitePhotos")} value={summary.offSitePhotos} danger />
+        <Stat icon={ScanEye} label={t("list.risk.statVisionFlags")} value={summary.visionFlags} danger />
+        <Stat icon={Clock} label={t("list.risk.statOverdueFollowUps")} value={summary.overdueComplaints} danger />
       </div>
 
       {/* Cross-job repeat patterns — the strongest corruption signal. */}
       <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <GitMerge className="h-4 w-4" /> Cross-job repeat patterns
+        <GitMerge className="h-4 w-4" /> {t("list.risk.crossJobHeading")}
       </h2>
       {patterns.length === 0 ? (
-        <p className="mb-6 text-sm text-muted-foreground">No repeat patterns across audited jobs yet. Run the Job Forensic Audit on more jobs to surface contractors / finding-types that recur across job codes.</p>
+        <p className="mb-6 text-sm text-muted-foreground">{t("list.risk.noRepeatPatterns")}</p>
       ) : (
         <div className="mb-6 space-y-2">
           {patterns.map((p) => (
             <Card key={p.code} className="p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={p.severity === "High" ? "destructive" : "warning"}>{p.severity}</Badge>
+                <Badge variant={p.severity === "High" ? "destructive" : "warning"}>{translateEnum("workflow", p.severity, locale)}</Badge>
                 <span className="text-sm font-semibold">{p.title}</span>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{p.detail}</p>
@@ -82,23 +85,23 @@ export default async function RiskPage() {
       )}
 
       <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <ShieldAlert className="h-4 w-4" /> Contractor risk ranking
+        <ShieldAlert className="h-4 w-4" /> {t("list.risk.contractorRankingHeading")}
       </h2>
       {contractors.length === 0 ? (
-        <EmptyState title="No contractor signals yet" description="Add a contractor on complaints and run the photo/vision/forensic checks to populate this ranking." />
+        <EmptyState title={t("list.risk.noContractorSignalsTitle")} description={t("list.risk.noContractorSignalsDescription")} />
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Contractor</TableHead>
-              <TableHead className="text-right">Risk</TableHead>
-              <TableHead className="text-right">Bill-stop</TableHead>
-              <TableHead className="text-right">Exposure</TableHead>
-              <TableHead className="text-right">Cases</TableHead>
-              <TableHead className="text-right">Dup photos</TableHead>
-              <TableHead className="text-right">Off-site</TableHead>
-              <TableHead className="text-right">Vision</TableHead>
-              <TableHead className="text-right">Overdue</TableHead>
+              <TableHead>{t("detail.contractor")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colRisk")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colBillStop")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colExposure")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colCases")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colDupPhotos")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colOffSite")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colVision")}</TableHead>
+              <TableHead className="text-right">{t("list.risk.colOverdue")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

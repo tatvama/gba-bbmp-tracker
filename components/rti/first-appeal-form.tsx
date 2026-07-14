@@ -14,6 +14,8 @@ import { FIRST_APPEAL_GROUNDS } from "@/lib/constants";
 import { generateFirstAppealDraft } from "@/lib/actions/ai";
 import type { ActionState } from "@/lib/actions/contacts";
 import type { RtiWithRelations } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 export function FirstAppealForm({
   rti,
@@ -27,6 +29,8 @@ export function FirstAppealForm({
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, {});
   const [grounds, setGrounds] = React.useState<string[]>([]);
+  const { t, locale } = useTranslation("rti");
+  const { t: tc } = useTranslation("common");
 
   React.useEffect(() => {
     if (state.success) router.push(`/rti/${rti.id}`);
@@ -40,7 +44,7 @@ export function FirstAppealForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Appeal record</CardTitle>
+          <CardTitle className="text-base">{t("form.appealRecordTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
@@ -51,7 +55,7 @@ export function FirstAppealForm({
             )}
 
             <div>
-              <Label className="mb-1.5 block">Grounds of appeal</Label>
+              <Label className="mb-1.5 block">{t("form.groundsOfAppealLabel")}</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {FIRST_APPEAL_GROUNDS.map((g) => (
                   <label key={g} className="flex items-center gap-2 text-sm">
@@ -61,55 +65,55 @@ export function FirstAppealForm({
                       checked={grounds.includes(g)}
                       onCheckedChange={(c) => toggle(g, c === true)}
                     />
-                    {g}
+                    {translateEnum("workflow", g, locale)}
                   </label>
                 ))}
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Grounds detail</Label>
-              <Textarea name="groundsDetail" rows={2} placeholder="Any specifics to add to the grounds above." />
+              <Label>{t("form.groundsDetailLabel")}</Label>
+              <Textarea name="groundsDetail" rows={2} placeholder={t("form.groundsDetailPlaceholder")} />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>FAA name</Label>
+                <Label>{t("field.faaName")}</Label>
                 <Input name="faaName" defaultValue={rti.faa_name ?? ""} />
               </div>
               <div className="space-y-1.5">
-                <Label>FAA designation</Label>
+                <Label>{t("field.faaDesignation")}</Label>
                 <Input name="faaDesignation" defaultValue={rti.faa_designation ?? ""} />
               </div>
               <div className="space-y-1.5">
-                <Label>Date drafted</Label>
+                <Label>{t("form.dateDrafted")}</Label>
                 <Input type="date" name="dateDrafted" />
               </div>
               <div className="space-y-1.5">
-                <Label>Date filed</Label>
+                <Label>{t("field.dateFiled")}</Label>
                 <Input type="date" name="dateFiled" />
               </div>
               <div className="space-y-1.5">
-                <Label>FAA order date</Label>
+                <Label>{t("form.faaOrderDate")}</Label>
                 <Input type="date" name="faaOrderDate" />
               </div>
               <div className="space-y-1.5">
-                <Label>Decision summary</Label>
+                <Label>{t("form.decisionSummary")}</Label>
                 <Input name="decisionSummary" />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Notes</Label>
+              <Label>{t("form.notesLabel")}</Label>
               <Textarea name="notes" rows={2} />
             </div>
 
             <div className="flex gap-2">
               <Button type="submit" disabled={pending}>
-                {pending ? "Saving…" : "Save first appeal"}
+                {pending ? t("form.saving") : t("form.saveFirstAppeal")}
               </Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>
-                Cancel
+                {tc("action.cancel")}
               </Button>
             </div>
           </form>
@@ -118,7 +122,7 @@ export function FirstAppealForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">AI first-appeal draft</CardTitle>
+          <CardTitle className="text-base">{t("form.aiFirstAppealDraftTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <AiDraftPanel
@@ -138,11 +142,11 @@ export function FirstAppealForm({
             }
             inputs={
               <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground">Context sent to AI</p>
-                <p className="mt-1">RTI: {rti.subject}</p>
-                <p>Ref: {rti.internal_ref ?? "—"}</p>
+                <p className="font-semibold text-foreground">{t("form.contextSentToAiLabel")}</p>
+                <p className="mt-1">{t("form.rtiSubjectPrefix", { subject: rti.subject })}</p>
+                <p>{t("form.refPrefix", { ref: rti.internal_ref ?? "—" })}</p>
                 <p className="mt-1">
-                  Grounds: {grounds.length ? grounds.join(", ") : "none selected yet"}
+                  {t("form.groundsPrefix", { grounds: grounds.length ? grounds.join(", ") : t("form.noneSelectedYet") })}
                 </p>
               </div>
             }

@@ -5,19 +5,21 @@ import { getComplaintFormOptions, listRecipientOfficers } from "@/lib/queries";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_WRITE_ROLES } from "@/lib/constants";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Audit & Draft Wizard" };
 
 export default async function AuditComplaintPage() {
+  const { t } = await getTranslations("complaints");
   const user = await getSessionUser();
   if (!hasRole(user, COMPLAINT_WRITE_ROLES)) {
     return (
       <div>
-        <PageHeader title="Audit & Draft Wizard" />
+        <PageHeader title={t("list.audit.title")} />
         <EmptyState
-          title="Not permitted"
-          description="Your role cannot create complaints. Ask an admin for the Complaint Manager or Editor role."
+          title={t("list.notPermittedTitle")}
+          description={t("list.audit.notPermittedDescription")}
         />
       </div>
     );
@@ -28,8 +30,8 @@ export default async function AuditComplaintPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="Audit & Draft Wizard"
-        description="A guided BBMP road-work forensic audit: describe the issue, smart-select suspicions from the 180-point bank, choose To Whom (officer escalation chain) and From Whom (signatory), then generate a complaint / bill-stop notice. Every point is framed as a suspicion, never an accusation; nothing is filed automatically."
+        title={t("list.audit.title")}
+        description={t("list.audit.description")}
       />
       <AuditWizard defaultOutputType="complaint" wards={options.wards} officers={officers} aiConfigured={isAiConfigured()} />
     </div>

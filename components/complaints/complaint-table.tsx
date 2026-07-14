@@ -33,13 +33,16 @@ import { formatDate, orDash } from "@/lib/format";
 import { exportRows } from "@/lib/export";
 import { cn } from "@/lib/utils";
 import type { ComplaintWithRelations } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
+import type { Locale } from "@/lib/i18n/types";
 
 const selectCls =
   "h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:focus:ring-slate-800 cursor-pointer";
 
 const today = new Date().toISOString().slice(0, 10);
 
-function getRelativeTime(dateInput: string | Date | null | undefined): string {
+function getRelativeTime(dateInput: string | Date | null | undefined, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (!dateInput) return "";
   const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
   const now = new Date();
@@ -48,32 +51,33 @@ function getRelativeTime(dateInput: string | Date | null | undefined): string {
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return "Yesterday";
-  return `${diffDays}d ago`;
+  if (diffMins < 1) return t("list.time.justNow");
+  if (diffMins < 60) return t("list.time.minsAgo", { mins: diffMins });
+  if (diffHours < 24) return t("list.time.hoursAgo", { hours: diffHours });
+  if (diffDays === 1) return t("list.time.yesterday");
+  return t("list.time.daysAgo", { days: diffDays });
 }
 
-function getNextActionForStatus(status: string): string {
+function getNextActionKeyForStatus(status: string): string {
   const s = status.toLowerCase();
-  if (s === "draft") return "NEXT: FILE COMPLAINT";
-  if (s === "filed") return "NEXT: ACKNOWLEDGEMENT";
+  if (s === "draft") return "list.nextAction.fileComplaint";
+  if (s === "filed") return "list.nextAction.acknowledgement";
   if (s === "acknowledged" || s.includes("review") || s.includes("assigned") || s.includes("site visit") || s.includes("work in progress")) {
-    return "NEXT: REPLY / ATR";
+    return "list.nextAction.replyAtr";
   }
   if (s.includes("reply") || s.includes("action taken") || s === "reopened") {
-    return "NEXT: RESOLUTION / ESCALATE";
+    return "list.nextAction.resolutionEscalate";
   }
   if (s === "resolved" || s === "closed") {
-    return "CASE CLOSED";
+    return "list.nextAction.caseClosed";
   }
-  if (s === "escalated") return "NEXT: SENIOR OFFICER REPLY";
-  if (s.includes("rti")) return "NEXT: RTI REPLY";
-  return "NEXT: REVIEW";
+  if (s === "escalated") return "list.nextAction.seniorOfficerReply";
+  if (s.includes("rti")) return "list.nextAction.rtiReply";
+  return "list.nextAction.review";
 }
 
 function TypeChip({ type }: { type: string | null }) {
+  const { locale } = useTranslation("complaints");
   if (!type) return orDash(type);
 
   let Icon = Folder;
@@ -109,12 +113,13 @@ function TypeChip({ type }: { type: string | null }) {
       className="inline-flex items-center gap-1.5 px-2.5 py-1 whitespace-nowrap rounded-md border-slate-200 bg-slate-50 text-slate-700 font-medium text-xs dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300 animate-fade-in"
     >
       <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-      {type}
+      {translateEnum("workflow", type, locale)}
     </Badge>
   );
 }
 
 function PriorityChip({ priority }: { priority: string | null }) {
+  const { locale } = useTranslation("complaints");
   if (!priority) return orDash(priority);
 
   let Icon = Minus;
@@ -151,7 +156,7 @@ function PriorityChip({ priority }: { priority: string | null }) {
       className={cn("inline-flex items-center gap-1 px-2 py-0.5 h-6 rounded-md font-semibold text-xs border animate-fade-in", cls)}
     >
       <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
-      {priority}
+      {translateEnum("workflow", priority, locale)}
     </Badge>
   );
 }
@@ -163,17 +168,18 @@ function FollowUpDeadlineBadge({
   date: string | Date | null | undefined;
   status: string;
 }) {
+  const { t, locale } = useTranslation("complaints");
   if (status === "Closed" || status === "Resolved") {
     return (
       <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400">
         <CheckCircle2 className="h-3.5 w-3.5" />
-        Closed
+        {translateEnum("status", "Closed", locale)}
       </div>
     );
   }
 
   if (!date) {
-    return <span className="text-xs text-slate-400 italic font-medium">Pending</span>;
+    return <span className="text-xs text-slate-400 italic font-medium">{t("list.pendingFallback")}</span>;
   }
 
   const d = typeof date === "string" ? new Date(date) : new Date(date);
@@ -194,7 +200,7 @@ function FollowUpDeadlineBadge({
     variant = "success";
   }
 
-  const text = isOverdue ? "Overdue" : days === 1 ? "Day Left" : "Days Left";
+  const text = isOverdue ? t("list.table.overdueLabel") : days === 1 ? t("list.table.dayLeft") : t("list.table.daysLeft");
 
   return (
     <div
@@ -222,7 +228,7 @@ function FollowUpDeadlineBadge({
           <span className="text-[9px] font-bold uppercase tracking-wider opacity-90">{text}</span>
         </div>
         <span className="text-[8px] font-bold opacity-80 mt-0.5 tracking-wider uppercase">
-          Follow-up
+          {t("list.table.followUpLabel")}
         </span>
       </div>
     </div>
@@ -263,6 +269,8 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 };
 
 function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }) {
+  const { t } = useTranslation("complaints");
+  const { t: tCommon } = useTranslation("common");
   const [expanded, setExpanded] = React.useState(false);
   return (
     <Card className="border border-slate-200 bg-white shadow-xs rounded-xl overflow-hidden hover:border-blue-200 dark:bg-slate-900/40 dark:border-slate-800 transition-all duration-205 group animate-fade-in">
@@ -271,11 +279,11 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col">
             <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
-              {c.internal_case_number || "Pending"}
+              {c.internal_case_number || t("list.pendingFallback")}
             </span>
             {c.job_number && (
               <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
-                Job {c.job_number}
+                {t("list.table.jobLabel", { number: c.job_number })}
               </span>
             )}
             <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
@@ -299,20 +307,20 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
         {expanded && (
           <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-400">
             <div>
-              <span className="font-semibold text-slate-500 mr-1.5">Ward:</span>
-              <span>{c.ward ? `Ward ${c.ward.new_no} · ${c.ward.new_name}` : "—"}</span>
+              <span className="font-semibold text-slate-500 mr-1.5">{t("list.table.cardWardLabel")}</span>
+              <span>{c.ward ? `${t("list.wardNo", { no: c.ward.new_no })} · ${c.ward.new_name}` : "—"}</span>
             </div>
             <div>
-              <span className="font-semibold text-slate-500 mr-1.5">Engineer:</span>
+              <span className="font-semibold text-slate-500 mr-1.5">{t("list.table.cardEngineerLabel")}</span>
               <span>{c.assigned_engineer?.full_name ?? "—"}</span>
             </div>
             <div>
-              <span className="font-semibold text-slate-500 mr-1.5">Division:</span>
+              <span className="font-semibold text-slate-500 mr-1.5">{t("list.table.cardDivisionLabel")}</span>
               <span>{c.division?.name ?? "—"}</span>
             </div>
             {c.eng_subdivision && (
               <div>
-                <span className="font-semibold text-slate-500 mr-1.5">Sub-division:</span>
+                <span className="font-semibold text-slate-500 mr-1.5">{t("list.table.cardSubDivisionLabel")}</span>
                 <span>{c.eng_subdivision.name}</span>
               </div>
             )}
@@ -327,7 +335,7 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
               onClick={() => setExpanded(!expanded)}
               className="text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1 cursor-pointer h-9 px-2 border border-slate-200 dark:border-slate-800 rounded-md bg-slate-50/50 dark:bg-slate-900"
             >
-              {expanded ? "Less" : "Details"}
+              {expanded ? t("list.table.cardLess") : t("list.table.cardDetails")}
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </button>
             <FollowUpDeadlineBadge date={c.next_follow_up_date} status={c.status} />
@@ -340,7 +348,7 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
               className="h-9 gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer border dark:border-slate-800 px-2"
             >
               <Link href={`/complaints/${c.id}`}>
-                View Details <ArrowRight className="h-3.5 w-3.5" />
+                {t("list.table.viewDetails")} <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
             <DropdownMenu>
@@ -351,16 +359,16 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="dark:bg-slate-900 dark:border-slate-800">
                 <DropdownMenuItem asChild className="cursor-pointer text-xs">
-                  <Link href={`/complaints/${c.id}/edit`}>Edit</Link>
+                  <Link href={`/complaints/${c.id}/edit`}>{tCommon("action.edit")}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer text-xs">
-                  <Link href={`/complaints/${c.id}/escalation`}>Assign / Escalate</Link>
+                  <Link href={`/complaints/${c.id}/escalation`}>{t("list.table.assignEscalate")}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer text-xs">
-                  <Link href={`/complaints/${c.id}`}>History</Link>
+                  <Link href={`/complaints/${c.id}`}>{t("list.table.history")}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer text-xs">
-                  <Link href={`/complaints/${c.id}/print`}>Print</Link>
+                  <Link href={`/complaints/${c.id}/print`}>{tCommon("action.print")}</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -372,6 +380,8 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
 }
 
 export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithRelations[]; canEdit?: boolean }) {
+  const { t, locale } = useTranslation("complaints");
+  const { t: tCommon } = useTranslation("common");
   const router = useRouter();
   const searchParams = useSearchParams();
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "updated_at", desc: true }]);
@@ -457,7 +467,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "Bengaluru Central";
   }, [data]);
 
-  const aiRecommendation = `Most complaints originate from ${topDivision}. Recommend allocating 2 additional field supervisors for accelerated resolutions.`;
+  const aiRecommendation = t("list.table.aiRecommendation", { division: topDivision });
 
   // Activity timeline dynamic data
   const recentActivities = React.useMemo(() => {
@@ -465,34 +475,34 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
       .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
       .slice(0, 5)
       .map((c) => {
-        let label = "Details Updated";
+        let label = t("list.table.actDetailsUpdated");
         let color = "text-slate-600 bg-slate-100 dark:bg-slate-800";
         let IconCls: React.ComponentType<any> = HistoryIcon;
 
         if (c.status === "Draft" || c.status === "Filed") {
-          label = "Complaint Intake Filed";
+          label = t("list.table.actComplaintIntakeFiled");
           color = "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30";
           IconCls = Plus;
         } else if (c.status === "Resolved" || c.status === "Closed") {
-          label = "Complaint Resolved";
+          label = t("list.table.actComplaintResolved");
           color = "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30";
           IconCls = CheckCircle2;
         } else if (c.status.includes("Reply")) {
-          label = "Reply Received";
+          label = t("list.table.actReplyReceived");
           color = "text-amber-600 bg-amber-50 dark:bg-amber-950/30";
           IconCls = Mail;
         } else if (c.status.includes("Action")) {
-          label = "Action Taken Recorded";
+          label = t("list.table.actActionTakenRecorded");
           color = "text-teal bg-teal/10";
           IconCls = Sparkles;
         }
 
         return {
           id: c.id,
-          ref: c.internal_case_number || "Pending",
+          ref: c.internal_case_number || t("list.pendingFallback"),
           title: c.title,
           label,
-          time: getRelativeTime(c.updated_at),
+          time: getRelativeTime(c.updated_at, t),
           color,
           IconCls,
         };
@@ -502,15 +512,15 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
   const columns = React.useMemo<ColumnDef<ComplaintWithRelations>[]>(() => [
     {
       accessorKey: "internal_case_number",
-      header: ({ column }) => <SortBtn column={column} label="Ref" />,
+      header: ({ column }) => <SortBtn column={column} label={t("list.table.colRef")} />,
       cell: ({ row }) => (
         <div className="flex flex-col">
           <span className="font-mono text-xs font-bold text-foreground">
-            {row.original.internal_case_number || "Pending"}
+            {row.original.internal_case_number || t("list.pendingFallback")}
           </span>
           {row.original.job_number && (
             <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
-              Job {row.original.job_number}
+              {t("list.table.jobLabel", { number: row.original.job_number })}
             </span>
           )}
           <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
@@ -522,11 +532,11 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     },
     {
       accessorKey: "title",
-      header: ({ column }) => <SortBtn column={column} label="Subject" />,
+      header: ({ column }) => <SortBtn column={column} label={t("list.table.colSubject")} />,
       cell: ({ row }) => {
         const c = row.original;
         const subtext = [
-          c.ward ? `Ward ${c.ward.new_no} · ${c.ward.new_name}` : null,
+          c.ward ? `${t("list.wardNo", { no: c.ward.new_no })} · ${c.ward.new_name}` : null,
           c.division ? c.division.name : null,
           c.eng_subdivision ? c.eng_subdivision.name : null
         ].filter(Boolean).join(" • ");
@@ -545,12 +555,12 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     },
     {
       accessorKey: "status",
-      header: "Status",
+      header: tCommon("table.status"),
       cell: ({ row }) => (
         <div className="flex flex-col items-start gap-1 min-w-[180px]">
           <StatusBadge status={row.original.status} date={row.original.updated_at} />
           <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider pl-0.5 whitespace-nowrap">
-            {getNextActionForStatus(row.original.status)}
+            {t(getNextActionKeyForStatus(row.original.status))}
           </span>
         </div>
       ),
@@ -558,26 +568,26 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     },
     {
       accessorKey: "type",
-      header: "Category",
+      header: t("list.table.colCategory"),
       cell: ({ row }) => <TypeChip type={row.original.type} />
     },
     {
       accessorKey: "priority",
-      header: ({ column }) => <SortBtn column={column} label="Priority" />,
+      header: ({ column }) => <SortBtn column={column} label={t("filter.priority")} />,
       cell: ({ row }) => <PriorityChip priority={row.original.priority} />,
       size: 95
     },
     {
       id: "deadline",
-      header: "Deadline",
+      header: t("list.table.colDeadline"),
       cell: ({ row }) => <FollowUpDeadlineBadge date={row.original.next_follow_up_date} status={row.original.status} />,
       enableSorting: false,
     },
     {
       accessorKey: "updated_at",
-      header: ({ column }) => <SortBtn column={column} label="Updated" />,
+      header: ({ column }) => <SortBtn column={column} label={t("list.table.colUpdated")} />,
       cell: ({ row }) => {
-        const rel = getRelativeTime(row.original.updated_at);
+        const rel = getRelativeTime(row.original.updated_at, t);
         return (
           <div className="flex flex-col">
             <span className="whitespace-nowrap text-xs font-semibold text-slate-800 dark:text-slate-200">
@@ -595,16 +605,16 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     },
     {
       id: "actions",
-      header: () => <span className="sr-only">Actions</span>,
+      header: () => <span className="sr-only">{tCommon("table.actions")}</span>,
       cell: ({ row }) => (
         <div className="flex justify-end pr-2">
-          <ViewButton href={`/complaints/${row.original.id}`} caseNumber={row.original.internal_case_number ?? "Complaint"} />
+          <ViewButton href={`/complaints/${row.original.id}`} caseNumber={row.original.internal_case_number ?? t("list.table.complaintFallback")} />
         </div>
       ),
       size: 70,
       enableSorting: false,
     },
-  ], []);
+  ], [t, tCommon]);
 
   const table = useReactTable({
     data: filtered,
@@ -665,25 +675,25 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
   // Removable filters calculation
   const activeFiltersList = React.useMemo(() => {
     const list = [];
-    if (globalFilter) list.push({ key: "search", label: `Search: "${globalFilter}"`, reset: () => setGlobalFilter("") });
-    if (status !== "all") list.push({ key: "status", label: `Status: ${status}`, reset: () => setStatus("all") });
-    if (type !== "all") list.push({ key: "type", label: `Type: ${type}`, reset: () => setType("all") });
-    if (priority !== "all") list.push({ key: "priority", label: `Priority: ${priority}`, reset: () => setPriority("all") });
+    if (globalFilter) list.push({ key: "search", label: t("list.table.filterChipSearch", { value: globalFilter }), reset: () => setGlobalFilter("") });
+    if (status !== "all") list.push({ key: "status", label: t("list.table.filterChipStatus", { value: translateEnum("status", status, locale) }), reset: () => setStatus("all") });
+    if (type !== "all") list.push({ key: "type", label: t("list.table.filterChipType", { value: translateEnum("workflow", type, locale) }), reset: () => setType("all") });
+    if (priority !== "all") list.push({ key: "priority", label: t("list.table.filterChipPriority", { value: translateEnum("workflow", priority, locale) }), reset: () => setPriority("all") });
     if (flag !== "all") {
-      let label = `Flag: ${flag}`;
-      if (flag === "open") label = "Flag: Open Cases";
-      if (flag === "today") label = "Flag: Due Today";
-      if (flag === "overdue") label = "Flag: Overdue";
-      if (flag === "reply") label = "Flag: Reply Received";
-      if (flag === "action") label = "Flag: Action Taken";
-      if (flag === "noreply") label = "Flag: No Reply";
+      let label = t("list.table.filterChipFlag", { value: flag });
+      if (flag === "open") label = t("list.table.filterChipFlagOpenCases");
+      if (flag === "today") label = t("list.table.filterChipFlagDueToday");
+      if (flag === "overdue") label = t("list.table.filterChipFlagOverdue");
+      if (flag === "reply") label = t("list.table.filterChipFlagReplyReceived");
+      if (flag === "action") label = t("list.table.filterChipFlagActionTaken");
+      if (flag === "noreply") label = t("list.table.filterChipFlagNoReply");
       list.push({ key: "flag", label, reset: () => setFlag("all") });
     }
-    if (division !== "all") list.push({ key: "division", label: `Division: ${division}`, reset: () => setDivision("all") });
-    if (subDivision !== "all") list.push({ key: "subDivision", label: `Sub-division: ${subDivision}`, reset: () => setSubDivision("all") });
-    if (ward !== "all") list.push({ key: "ward", label: `Ward: ${ward}`, reset: () => setWard("all") });
+    if (division !== "all") list.push({ key: "division", label: t("list.table.filterChipDivision", { value: division }), reset: () => setDivision("all") });
+    if (subDivision !== "all") list.push({ key: "subDivision", label: t("list.table.filterChipSubDivision", { value: subDivision }), reset: () => setSubDivision("all") });
+    if (ward !== "all") list.push({ key: "ward", label: t("list.table.filterChipWard", { value: ward }), reset: () => setWard("all") });
     return list;
-  }, [globalFilter, status, type, priority, flag, division, subDivision, ward]);
+  }, [globalFilter, status, type, priority, flag, division, subDivision, ward, t, locale]);
 
   // Sidebar triggers mapping to set corresponding filter states
   const applyQuickFilter = (typeStr: string) => {
@@ -700,20 +710,20 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
   return (
     <div className="space-y-6">
       {/* Breadcrumb Navigation */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground/80 font-medium no-print">
-        <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
+      <nav aria-label={t("list.table.breadcrumbAria")} className="flex items-center gap-1.5 text-xs text-muted-foreground/80 font-medium no-print">
+        <Link href="/" className="hover:text-foreground transition-colors">{t("list.breadcrumbHome")}</Link>
         <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/45" />
-        <span className="text-foreground font-semibold">Complaints</span>
+        <span className="text-foreground font-semibold">{t("page.listTitle")}</span>
       </nav>
 
       {/* Modern Large Page Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border/40 pb-5 no-print">
         <div className="space-y-1.5">
           <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl leading-none">
-            Complaint Tracker
+            {t("list.table.pageTitle")}
           </h1>
           <p className="max-w-3xl text-xs sm:text-sm leading-relaxed text-muted-foreground/95 font-medium">
-            Every civic complaint with internal case number, replies, action taken, documents (OCR/AI), and follow-up reminders.
+            {t("list.table.pageDescription")}
           </p>
         </div>
 
@@ -721,28 +731,28 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Button asChild size="sm" variant="outline" className="h-9 font-semibold hover:scale-[1.01] transition-all cursor-pointer">
             <Link href="/complaints/dashboard">
-              <LayoutDashboard className="h-4 w-4 mr-1.5" /> Dashboard
+              <LayoutDashboard className="h-4 w-4 mr-1.5" /> {t("list.table.dashboardBtn")}
             </Link>
           </Button>
 
           <Button asChild size="sm" variant="outline" className="h-9 font-semibold hover:scale-[1.01] transition-all cursor-pointer">
             <Link href="/complaints/reports">
-              <BarChart3 className="h-4 w-4 mr-1.5" /> Reports
+              <BarChart3 className="h-4 w-4 mr-1.5" /> {t("list.table.reportsBtn")}
             </Link>
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 font-semibold hover:scale-[1.01] transition-all cursor-pointer">
-                <Download className="h-4 w-4 mr-1.5" /> Export <ChevronDown className="h-3 w-3 ml-1" />
+                <Download className="h-4 w-4 mr-1.5" /> {tCommon("action.export")} <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="dark:bg-slate-900 dark:border-slate-800">
               <DropdownMenuItem onClick={() => doExport("csv")} className="cursor-pointer text-xs flex items-center gap-2">
-                <FileText className="h-3.5 w-3.5" /> Export CSV
+                <FileText className="h-3.5 w-3.5" /> {tCommon("action.exportCsv")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => doExport("xlsx")} className="cursor-pointer text-xs flex items-center gap-2">
-                <FileText className="h-3.5 w-3.5" /> Export Excel
+                <FileText className="h-3.5 w-3.5" /> {tCommon("action.exportExcel")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -750,7 +760,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           {canEdit && (
             <Button asChild size="sm" className="h-9 font-semibold hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm">
               <Link href="/complaints/import">
-                <Plus className="h-4 w-4 mr-1" /> New Complaint
+                <Plus className="h-4 w-4 mr-1" /> {t("list.table.newComplaintBtn")}
               </Link>
             </Button>
           )}
@@ -760,7 +770,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
       {/* Executive KPI Grid Section */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 no-print">
         <KpiCard
-          label="Total complaints"
+          label={t("list.totalComplaints")}
           value={totalCount}
           icon={Database}
           colorClass="text-slate-600 bg-slate-50 dark:bg-slate-800/40"
@@ -771,12 +781,12 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           }
           trend={
             <div className="flex items-center gap-0.5 text-[10px] font-semibold text-slate-500">
-              <Clock className="h-3 w-3" /> Live
+              <Clock className="h-3 w-3" /> {t("list.table.kpiLive")}
             </div>
           }
         />
         <KpiCard
-          label="Open"
+          label={t("list.kpiOpen")}
           value={openCount}
           icon={Activity}
           colorClass="text-blue-600 bg-blue-50 dark:bg-blue-950/20"
@@ -787,12 +797,12 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           }
           trend={
             <div className="flex items-center gap-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-              <TrendingUp className="h-3 w-3" /> Active
+              <TrendingUp className="h-3 w-3" /> {t("list.table.kpiActive")}
             </div>
           }
         />
         <KpiCard
-          label="Awaiting Reply"
+          label={t("list.table.kpiAwaitingReply")}
           value={awaitingReplyCount}
           icon={MailIconPlaceholder}
           colorClass="text-amber-600 bg-amber-50 dark:bg-amber-950/20"
@@ -803,12 +813,12 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           }
           trend={
             <div className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-              <TrendingDown className="h-3 w-3" /> In progress
+              <TrendingDown className="h-3 w-3" /> {t("list.table.kpiInProgress")}
             </div>
           }
         />
         <KpiCard
-          label="Overdue Follow-up"
+          label={t("list.table.kpiOverdueFollowUp")}
           value={overdueCount}
           icon={ShieldAlert}
           colorClass="text-rose-600 bg-rose-50 dark:bg-rose-950/20"
@@ -819,12 +829,12 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           }
           trend={
             <div className="flex items-center gap-0.5 text-[10px] font-semibold text-rose-600 dark:text-rose-400">
-              <AlertTriangle className="h-3 w-3" /> Action required
+              <AlertTriangle className="h-3 w-3" /> {t("list.table.kpiActionRequired")}
             </div>
           }
         />
         <KpiCard
-          label="Resolved / Closed"
+          label={t("list.table.kpiResolvedClosed")}
           value={resolvedCount}
           icon={CheckCircle2}
           colorClass="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20"
@@ -835,12 +845,12 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           }
           trend={
             <div className="flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-              <Check className="h-3.5 w-3.5" /> Completed
+              <Check className="h-3.5 w-3.5" /> {t("list.table.kpiCompleted")}
             </div>
           }
         />
         <KpiCard
-          label="Printing queue"
+          label={t("list.table.kpiPrintingQueue")}
           value={printQueueCount}
           icon={Printer}
           colorClass="text-indigo-600 bg-indigo-50 dark:bg-indigo-950/20"
@@ -851,12 +861,12 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           }
           trend={
             <div className="flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
-              <Clock className="h-3 w-3" /> Draft stage
+              <Clock className="h-3 w-3" /> {t("list.table.kpiDraftStage")}
             </div>
           }
         />
         <KpiCard
-          label="AI Review Pending"
+          label={t("list.table.kpiAiReviewPending")}
           value={aiReviewPendingCount}
           icon={Sparkles}
           colorClass="text-teal bg-teal/10"
@@ -867,7 +877,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
           }
           trend={
             <div className="flex items-center gap-0.5 text-[10px] font-semibold text-teal-600 dark:text-teal-400 animate-pulse">
-              <Sparkles className="h-3 w-3" /> OCR processing
+              <Sparkles className="h-3 w-3" /> {t("list.table.kpiOcrProcessing")}
             </div>
           }
         />
@@ -885,7 +895,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
               <div className="relative flex-1 min-w-[240px]">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 shrink-0" />
                 <Input
-                  placeholder="Search case no, title, officer, contractor..."
+                  placeholder={t("search.placeholder")}
                   value={globalFilter}
                   onChange={(e) => setGlobalFilter(e.target.value)}
                   className="h-9 pl-9 bg-white dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 text-sm font-medium w-full"
@@ -893,49 +903,49 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
               </div>
 
               {/* Advanced select dropdowns */}
-              <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status filter">
-                <option value="all">Any status</option>
-                {statusOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+              <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={t("list.table.ariaStatusFilter")}>
+                <option value="all">{t("list.table.optAnyStatus")}</option>
+                {statusOpts.map((s) => <option key={s} value={s}>{translateEnum("status", s, locale)}</option>)}
               </select>
 
-              <select className={selectCls} value={type} onChange={(e) => setType(e.target.value)} aria-label="Type filter">
-                <option value="all">Any type</option>
-                {COMPLAINT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <select className={selectCls} value={type} onChange={(e) => setType(e.target.value)} aria-label={t("list.table.ariaTypeFilter")}>
+                <option value="all">{t("list.table.optAnyType")}</option>
+                {COMPLAINT_TYPES.map((typeVal) => <option key={typeVal} value={typeVal}>{translateEnum("workflow", typeVal, locale)}</option>)}
               </select>
 
-              <select className={selectCls} value={priority} onChange={(e) => setPriority(e.target.value)} aria-label="Priority filter">
-                <option value="all">Any priority</option>
-                {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+              <select className={selectCls} value={priority} onChange={(e) => setPriority(e.target.value)} aria-label={t("list.table.ariaPriorityFilter")}>
+                <option value="all">{t("list.table.optAnyPriority")}</option>
+                {PRIORITIES.map((p) => <option key={p} value={p}>{translateEnum("workflow", p, locale)}</option>)}
               </select>
 
-              <select className={selectCls} value={flag} onChange={(e) => setFlag(e.target.value)} aria-label="Quick flag filter">
-                <option value="all">All Flags</option>
-                <option value="open">Open (not resolved)</option>
-                <option value="today">Follow-up due today</option>
-                <option value="overdue">Overdue follow-up</option>
-                <option value="reply">Reply received</option>
-                <option value="action">Action taken</option>
-                <option value="noreply">No reply</option>
+              <select className={selectCls} value={flag} onChange={(e) => setFlag(e.target.value)} aria-label={t("list.table.ariaFlagFilter")}>
+                <option value="all">{t("list.table.optAllFlags")}</option>
+                <option value="open">{t("list.table.optOpenNotResolved")}</option>
+                <option value="today">{t("list.table.optFollowUpDueToday")}</option>
+                <option value="overdue">{t("list.table.optOverdueFollowUp")}</option>
+                <option value="reply">{t("list.table.optReplyReceived")}</option>
+                <option value="action">{t("list.table.optActionTaken")}</option>
+                <option value="noreply">{t("list.table.optNoReply")}</option>
               </select>
 
               {divisionOpts.length > 0 && (
-                <select className={selectCls} value={division} onChange={(e) => setDivision(e.target.value)} aria-label="Division filter">
-                  <option value="all">Any division</option>
+                <select className={selectCls} value={division} onChange={(e) => setDivision(e.target.value)} aria-label={t("list.table.ariaDivisionFilter")}>
+                  <option value="all">{t("list.table.optAnyDivision")}</option>
                   {divisionOpts.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               )}
 
               {subDivisionOpts.length > 0 && (
-                <select className={selectCls} value={subDivision} onChange={(e) => setSubDivision(e.target.value)} aria-label="Sub-division filter">
-                  <option value="all">Any sub-division</option>
+                <select className={selectCls} value={subDivision} onChange={(e) => setSubDivision(e.target.value)} aria-label={t("list.table.ariaSubDivisionFilter")}>
+                  <option value="all">{t("list.table.optAnySubDivision")}</option>
                   {subDivisionOpts.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
 
               {wardOpts.length > 0 && (
-                <select className={selectCls} value={ward} onChange={(e) => setWard(e.target.value)} aria-label="Ward filter">
-                  <option value="all">Any ward</option>
-                  {wardOpts.map((w) => <option key={w} value={w}>Ward {w}</option>)}
+                <select className={selectCls} value={ward} onChange={(e) => setWard(e.target.value)} aria-label={t("list.table.ariaWardFilter")}>
+                  <option value="all">{t("list.table.optAnyWard")}</option>
+                  {wardOpts.map((w) => <option key={w} value={w}>{t("list.table.wardOptionLabel", { no: w })}</option>)}
                 </select>
               )}
             </div>
@@ -944,7 +954,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               {activeFiltersList.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1">Active filters:</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1">{t("list.table.activeFiltersLabel")}</span>
                   {activeFiltersList.map((f) => (
                     <Badge
                       key={f.key}
@@ -955,7 +965,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
                       <button
                         onClick={f.reset}
                         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-muted p-0.5 transition-colors"
-                        aria-label={`Remove filter ${f.label}`}
+                        aria-label={t("list.table.removeFilterAria", { label: f.label })}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -967,11 +977,11 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
                     onClick={reset}
                     className="h-6 px-2 text-xs text-rose-500 font-bold hover:bg-rose-50 dark:hover:bg-rose-950/20"
                   >
-                    Clear All
+                    {t("list.table.clearAll")}
                   </Button>
                 </div>
               ) : (
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">No active filter queries</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">{t("list.table.noActiveFilters")}</span>
               )}
 
               {/* Action buttons on the right */}
@@ -982,7 +992,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
                   onClick={() => router.refresh()}
                   className="h-8 text-xs font-semibold dark:border-slate-800 dark:bg-slate-900 dark:text-slate-350 cursor-pointer"
                 >
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t("list.table.refresh")}
                 </Button>
               </div>
             </div>
@@ -995,7 +1005,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
                 <Sparkles className="h-4 w-4" />
               </div>
               <div className="space-y-0.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Intelligence & Recommendation</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary">{t("list.table.intelligenceHeading")}</h4>
                 <p className="text-sm text-foreground/90 font-medium">
                   {aiRecommendation}
                 </p>
@@ -1004,15 +1014,15 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
             <div className="flex flex-wrap gap-4 shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-slate-400" />
-                <span>{totalRows} Complaints</span>
+                <span>{t("list.table.complaintsCountLabel", { count: totalRows })}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                <span>{overdueCount} Overdue</span>
+                <span>{t("list.table.overdueCountLabel", { count: overdueCount })}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <span>{awaitingReplyCount} Awaiting Reply</span>
+                <span>{t("list.table.awaitingReplyCountLabel", { count: awaitingReplyCount })}</span>
               </div>
             </div>
           </div>
@@ -1039,7 +1049,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
                   {table.getRowModel().rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground py-3 px-4">
-                        No complaints match these filters.
+                        {t("list.table.noComplaintsMatchFilters")}
                       </TableCell>
                     </TableRow>
                   ) : (

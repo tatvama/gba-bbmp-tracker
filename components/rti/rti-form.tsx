@@ -25,6 +25,8 @@ import {
   getWardsAction,
   getContactsAction,
 } from "@/lib/actions/complaints";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 import { RtiWizardProvider, useRtiWizard } from "./rti-wizard-context";
 
@@ -65,6 +67,8 @@ function RtiFormInner({
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, {});
+  const { t, locale } = useTranslation("rti");
+  const { t: tc } = useTranslation("common");
 
   React.useEffect(() => {
     if (state.success && state.id) router.push(`/rti/${state.id}`);
@@ -319,8 +323,8 @@ function RtiFormInner({
         </div>
       )}
 
-      <Section title="Request">
-        <Field label="Subject" error={fe.subject} required className="sm:col-span-2">
+      <Section title={t("form.sectionRequest")}>
+        <Field label={t("field.subject")} error={fe.subject} required className="sm:col-span-2">
           <Input
             name="subject"
             value={formData.subject || ""}
@@ -328,55 +332,55 @@ function RtiFormInner({
             required
           />
         </Field>
-        <Field label="Category" error={fe.category}>
+        <Field label={t("field.category")} error={fe.category}>
           <select
             name="category"
             value={formData.category || ""}
             onChange={(e) => updateField("category", e.target.value)}
             className={selectCls}
           >
-            <option value="">—</option>
-            {RTI_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            <option value="">{tc("common.na")}</option>
+            {RTI_CATEGORIES.map((c) => <option key={c} value={c}>{translateEnum("workflow", c, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Priority" error={fe.priority}>
+        <Field label={t("form.priority")} error={fe.priority}>
           <select
             name="priority"
             value={formData.priority || "Medium"}
             onChange={(e) => updateField("priority", e.target.value)}
             className={selectCls}
           >
-            {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            {PRIORITIES.map((p) => <option key={p} value={p}>{translateEnum("workflow", p, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Status" error={fe.status}>
+        <Field label={t("form.status")} error={fe.status}>
           <select
             name="status"
             value={formData.status || "Draft"}
             onChange={(e) => updateField("status", e.target.value)}
             className={selectCls}
           >
-            {RTI_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {RTI_STATUSES.map((s) => <option key={s} value={s}>{translateEnum("status", s, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Filing mode" error={fe.filingMode}>
+        <Field label={t("field.filingMode")} error={fe.filingMode}>
           <select
             name="filingMode"
             value={formData.filingMode || ""}
             onChange={(e) => updateField("filingMode", e.target.value)}
             className={selectCls}
           >
-            <option value="">—</option>
-            {RTI_FILING_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+            <option value="">{tc("common.na")}</option>
+            {RTI_FILING_MODES.map((m) => <option key={m} value={m}>{translateEnum("workflow", m, locale)}</option>)}
           </select>
         </Field>
-        <Field label="Information requested" error={fe.infoRequested} className="sm:col-span-2">
+        <Field label={t("form.informationRequested")} error={fe.infoRequested} className="sm:col-span-2">
           <Textarea
             name="infoRequested"
             value={formData.infoRequested || ""}
             onChange={(e) => updateField("infoRequested", e.target.value)}
             rows={4}
-            placeholder="One information request per line."
+            placeholder={t("form.oneInfoRequestPerLine")}
           />
         </Field>
         <div className="flex items-center gap-2 sm:col-span-2">
@@ -387,33 +391,33 @@ function RtiFormInner({
             onCheckedChange={(checked) => updateField("isLifeLiberty", !!checked)}
           />
           <Label htmlFor="isLifeLiberty" className="font-normal">
-            Life / liberty case (48-hour reply deadline)
+            {t("form.lifeLibertyCaseLabel")}
           </Label>
         </div>
       </Section>
 
-      <Section title="Jurisdiction">
+      <Section title={t("form.sectionJurisdiction")}>
         {/* Selected Path Breadcrumb */}
         {wardType && (
           <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground bg-muted/30 border border-muted/50 p-2.5 rounded-md sm:col-span-2">
-            <span className="font-medium text-foreground">Hierarchy:</span>
-            <span>{wardType === "GBA" ? "GBA Wards" : "BBMP Wards"}</span>
+            <span className="font-medium text-foreground">{t("form.hierarchyLabel")}</span>
+            <span>{wardType === "GBA" ? t("form.gbaWards") : t("form.bbmpWards")}</span>
             {corpId && (
               <>
                 <span className="text-muted-foreground/60">&gt;</span>
-                <span>{corporations.find((c) => c.id === corpId)?.name || (loadingCorps ? "Loading..." : corpId)}</span>
+                <span>{corporations.find((c) => c.id === corpId)?.name || (loadingCorps ? t("form.loadingShort") : corpId)}</span>
               </>
             )}
             {divId && (
               <>
                 <span className="text-muted-foreground/60">&gt;</span>
-                <span>{divisions.find((d) => d.id === divId)?.name || (loadingDivs ? "Loading..." : divId)}</span>
+                <span>{divisions.find((d) => d.id === divId)?.name || (loadingDivs ? t("form.loadingShort") : divId)}</span>
               </>
             )}
             {subDivId && (
               <>
                 <span className="text-muted-foreground/60">&gt;</span>
-                <span>{subdivisions.find((s) => s.id === subDivId)?.name || (loadingSubs ? "Loading..." : subDivId)}</span>
+                <span>{subdivisions.find((s) => s.id === subDivId)?.name || (loadingSubs ? t("form.loadingShort") : subDivId)}</span>
               </>
             )}
             {wardId && (
@@ -422,7 +426,7 @@ function RtiFormInner({
                 <span>
                   {(() => {
                     const w = wards.find((w) => w.id === wardId);
-                    return w ? `${w.new_no} · ${w.new_name}` : (loadingWards ? "Loading..." : "Selected Ward");
+                    return w ? `${w.new_no} · ${w.new_name}` : (loadingWards ? t("form.loadingShort") : t("form.selectedWardFallback"));
                   })()}
                 </span>
               </>
@@ -430,7 +434,7 @@ function RtiFormInner({
           </div>
         )}
 
-        <Field label="Ward Type" error={fe.wardType} required>
+        <Field label={t("form.wardType")} error={fe.wardType} required>
           <select
             name="wardType"
             value={wardType}
@@ -438,13 +442,13 @@ function RtiFormInner({
             className={selectCls}
             required
           >
-            <option value="">—</option>
-            <option value="BBMP">BBMP Wards</option>
-            <option value="GBA">GBA Wards</option>
+            <option value="">{tc("common.na")}</option>
+            <option value="BBMP">{t("form.bbmpWards")}</option>
+            <option value="GBA">{t("form.gbaWards")}</option>
           </select>
         </Field>
 
-        <Field label="Corporation" error={fe.corporationId}>
+        <Field label={t("form.corporation")} error={fe.corporationId}>
           <select
             name="corporationId"
             value={corpId}
@@ -453,14 +457,14 @@ function RtiFormInner({
             className={selectCls}
           >
             {loadingCorps ? (
-              <option value="">Loading Corporations...</option>
+              <option value="">{t("form.loadingCorporations")}</option>
             ) : !wardType ? (
-              <option value="">Select Ward Type First</option>
+              <option value="">{t("form.selectWardTypeFirst")}</option>
             ) : corporations.length === 0 ? (
-              <option value="">No Corporations Found</option>
+              <option value="">{t("form.noCorporationsFound")}</option>
             ) : (
               <>
-                <option value="">—</option>
+                <option value="">{tc("common.na")}</option>
                 {corporations.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -471,7 +475,7 @@ function RtiFormInner({
           </select>
         </Field>
 
-        <Field label="Division" error={fe.divisionId}>
+        <Field label={t("form.division")} error={fe.divisionId}>
           <select
             name="divisionId"
             value={divId}
@@ -480,14 +484,14 @@ function RtiFormInner({
             className={selectCls}
           >
             {loadingDivs ? (
-              <option value="">Loading Divisions...</option>
+              <option value="">{t("form.loadingDivisions")}</option>
             ) : !corpId ? (
-              <option value="">Select Corporation First</option>
+              <option value="">{t("form.selectCorporationFirst")}</option>
             ) : divisions.length === 0 ? (
-              <option value="">No Divisions Found</option>
+              <option value="">{t("form.noDivisionsFound")}</option>
             ) : (
               <>
-                <option value="">—</option>
+                <option value="">{tc("common.na")}</option>
                 {divisions.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
@@ -498,7 +502,7 @@ function RtiFormInner({
           </select>
         </Field>
 
-        <Field label="Engineering sub-division" error={fe.engSubDivisionId}>
+        <Field label={t("form.engineeringSubDivision")} error={fe.engSubDivisionId}>
           <select
             name="engSubDivisionId"
             value={subDivId}
@@ -507,14 +511,14 @@ function RtiFormInner({
             className={selectCls}
           >
             {loadingSubs ? (
-              <option value="">Loading Sub-Divisions...</option>
+              <option value="">{t("form.loadingSubDivisions")}</option>
             ) : !divId ? (
-              <option value="">Select Division First</option>
+              <option value="">{t("form.selectDivisionFirst")}</option>
             ) : subdivisions.length === 0 ? (
-              <option value="">No Sub-Divisions Found</option>
+              <option value="">{t("form.noSubDivisionsFound")}</option>
             ) : (
               <>
-                <option value="">—</option>
+                <option value="">{tc("common.na")}</option>
                 {subdivisions.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -525,7 +529,7 @@ function RtiFormInner({
           </select>
         </Field>
 
-        <Field label="Ward" error={fe.wardId}>
+        <Field label={t("form.ward")} error={fe.wardId}>
           <select
             name="wardId"
             value={wardId}
@@ -534,14 +538,14 @@ function RtiFormInner({
             className={selectCls}
           >
             {loadingWards ? (
-              <option value="">Loading Wards...</option>
+              <option value="">{t("form.loadingWards")}</option>
             ) : !subDivId ? (
-              <option value="">Select Sub-Division First</option>
+              <option value="">{t("form.selectSubDivisionFirst")}</option>
             ) : wards.length === 0 ? (
-              <option value="">No Wards Found</option>
+              <option value="">{t("form.noWardsFound")}</option>
             ) : (
               <>
-                <option value="">—</option>
+                <option value="">{tc("common.na")}</option>
                 {wards.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.new_no} · {w.new_name}
@@ -552,7 +556,7 @@ function RtiFormInner({
           </select>
         </Field>
 
-        <Field label="Officer on record" error={fe.contactId} className="sm:col-span-2">
+        <Field label={t("form.officerOnRecord")} error={fe.contactId} className="sm:col-span-2">
           <select
             name="contactId"
             value={contactId}
@@ -561,14 +565,14 @@ function RtiFormInner({
             className={selectCls}
           >
             {loadingContacts ? (
-              <option value="">Loading Officers...</option>
+              <option value="">{t("form.loadingOfficers")}</option>
             ) : !wardId ? (
-              <option value="">Select Ward First</option>
+              <option value="">{t("form.selectWardFirst")}</option>
             ) : contacts.length === 0 ? (
-              <option value="">No Officers Found</option>
+              <option value="">{t("form.noOfficersFound")}</option>
             ) : (
               <>
-                <option value="">—</option>
+                <option value="">{tc("common.na")}</option>
                 {contacts.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.full_name} — {c.designation}
@@ -580,22 +584,22 @@ function RtiFormInner({
         </Field>
       </Section>
 
-      <Section title="Public authority / PIO / FAA">
-        <Field label="Public authority" error={fe.publicAuthority}>
+      <Section title={t("form.sectionAuthorityPioFaa")}>
+        <Field label={t("form.publicAuthority")} error={fe.publicAuthority}>
           <Input
             name="publicAuthority"
             value={formData.publicAuthority || ""}
             onChange={(e) => updateField("publicAuthority", e.target.value)}
           />
         </Field>
-        <Field label="Department" error={fe.department}>
+        <Field label={t("field.department")} error={fe.department}>
           <Input
             name="department"
             value={formData.department || ""}
             onChange={(e) => updateField("department", e.target.value)}
           />
         </Field>
-        <Field label="Office address" error={fe.officeAddress} className="sm:col-span-2">
+        <Field label={t("form.officeAddress")} error={fe.officeAddress} className="sm:col-span-2">
           <Textarea
             name="officeAddress"
             value={formData.officeAddress || ""}
@@ -603,28 +607,28 @@ function RtiFormInner({
             rows={2}
           />
         </Field>
-        <Field label="PIO name" error={fe.pioName}>
+        <Field label={t("field.pioName")} error={fe.pioName}>
           <Input
             name="pioName"
             value={formData.pioName || ""}
             onChange={(e) => updateField("pioName", e.target.value)}
           />
         </Field>
-        <Field label="PIO designation" error={fe.pioDesignation}>
+        <Field label={t("field.pioDesignation")} error={fe.pioDesignation}>
           <Input
             name="pioDesignation"
             value={formData.pioDesignation || ""}
             onChange={(e) => updateField("pioDesignation", e.target.value)}
           />
         </Field>
-        <Field label="PIO phone" error={fe.pioPhone}>
+        <Field label={t("form.pioPhone")} error={fe.pioPhone}>
           <Input
             name="pioPhone"
             value={formData.pioPhone || ""}
             onChange={(e) => updateField("pioPhone", e.target.value)}
           />
         </Field>
-        <Field label="PIO email" error={fe.pioEmail}>
+        <Field label={t("form.pioEmail")} error={fe.pioEmail}>
           <Input
             name="pioEmail"
             type="email"
@@ -632,28 +636,28 @@ function RtiFormInner({
             onChange={(e) => updateField("pioEmail", e.target.value)}
           />
         </Field>
-        <Field label="FAA name" error={fe.faaName}>
+        <Field label={t("field.faaName")} error={fe.faaName}>
           <Input
             name="faaName"
             value={formData.faaName || ""}
             onChange={(e) => updateField("faaName", e.target.value)}
           />
         </Field>
-        <Field label="FAA designation" error={fe.faaDesignation}>
+        <Field label={t("field.faaDesignation")} error={fe.faaDesignation}>
           <Input
             name="faaDesignation"
             value={formData.faaDesignation || ""}
             onChange={(e) => updateField("faaDesignation", e.target.value)}
           />
         </Field>
-        <Field label="FAA phone" error={fe.faaPhone}>
+        <Field label={t("form.faaPhone")} error={fe.faaPhone}>
           <Input
             name="faaPhone"
             value={formData.faaPhone || ""}
             onChange={(e) => updateField("faaPhone", e.target.value)}
           />
         </Field>
-        <Field label="FAA email" error={fe.faaEmail}>
+        <Field label={t("form.faaEmail")} error={fe.faaEmail}>
           <Input
             name="faaEmail"
             type="email"
@@ -663,22 +667,22 @@ function RtiFormInner({
         </Field>
       </Section>
 
-      <Section title="Applicant">
-        <Field label="Applicant name" error={fe.applicantName}>
+      <Section title={t("form.sectionApplicant")}>
+        <Field label={t("field.applicantName")} error={fe.applicantName}>
           <Input
             name="applicantName"
             value={formData.applicantName || ""}
             onChange={(e) => updateField("applicantName", e.target.value)}
           />
         </Field>
-        <Field label="Applicant phone" error={fe.applicantPhone}>
+        <Field label={t("form.applicantPhone")} error={fe.applicantPhone}>
           <Input
             name="applicantPhone"
             value={formData.applicantPhone || ""}
             onChange={(e) => updateField("applicantPhone", e.target.value)}
           />
         </Field>
-        <Field label="Applicant email" error={fe.applicantEmail}>
+        <Field label={t("form.applicantEmail")} error={fe.applicantEmail}>
           <Input
             name="applicantEmail"
             type="email"
@@ -686,7 +690,7 @@ function RtiFormInner({
             onChange={(e) => updateField("applicantEmail", e.target.value)}
           />
         </Field>
-        <Field label="Applicant address" error={fe.applicantAddress}>
+        <Field label={t("form.applicantAddress")} error={fe.applicantAddress}>
           <Input
             name="applicantAddress"
             value={formData.applicantAddress || ""}
@@ -695,8 +699,8 @@ function RtiFormInner({
         </Field>
       </Section>
 
-      <Section title="Filing details & dates">
-        <Field label="Date drafted" error={fe.dateDrafted}>
+      <Section title={t("form.sectionFilingDetailsDates")}>
+        <Field label={t("form.dateDrafted")} error={fe.dateDrafted}>
           <Input
             type="date"
             name="dateDrafted"
@@ -704,7 +708,7 @@ function RtiFormInner({
             onChange={(e) => updateField("dateDrafted", e.target.value)}
           />
         </Field>
-        <Field label="Date filed" error={fe.dateFiled}>
+        <Field label={t("field.dateFiled")} error={fe.dateFiled}>
           <Input
             type="date"
             name="dateFiled"
@@ -712,7 +716,7 @@ function RtiFormInner({
             onChange={(e) => updateField("dateFiled", e.target.value)}
           />
         </Field>
-        <Field label="Date received by authority" error={fe.dateReceived}>
+        <Field label={t("form.dateReceivedByAuthority")} error={fe.dateReceived}>
           <Input
             type="date"
             name="dateReceived"
@@ -720,7 +724,7 @@ function RtiFormInner({
             onChange={(e) => updateField("dateReceived", e.target.value)}
           />
         </Field>
-        <Field label="Reply date" error={fe.replyDate}>
+        <Field label={t("form.replyDate")} error={fe.replyDate}>
           <Input
             type="date"
             name="replyDate"
@@ -728,27 +732,27 @@ function RtiFormInner({
             onChange={(e) => updateField("replyDate", e.target.value)}
           />
         </Field>
-        <Field label="Postal receipt no." error={fe.postalReceiptNo}>
+        <Field label={t("form.postalReceiptNo")} error={fe.postalReceiptNo}>
           <Input
             name="postalReceiptNo"
             value={formData.postalReceiptNo || ""}
             onChange={(e) => updateField("postalReceiptNo", e.target.value)}
           />
         </Field>
-        <Field label="Online registration no." error={fe.onlineRegNo}>
+        <Field label={t("form.onlineRegistrationNo")} error={fe.onlineRegNo}>
           <Input
             name="onlineRegNo"
             value={formData.onlineRegNo || ""}
             onChange={(e) => updateField("onlineRegNo", e.target.value)}
           />
         </Field>
-        <Field label="Job / work-order code" error={fe.jobNumber}>
+        <Field label={t("form.jobWorkOrderCode")} error={fe.jobNumber}>
           <Input
             name="jobNumber"
             list="rti-job-codes"
             value={formData.jobNumber || ""}
             onChange={(e) => updateField("jobNumber", e.target.value)}
-            placeholder="Link to a job code, e.g. 225-25-001234"
+            placeholder={t("form.jobCodePlaceholder")}
             pattern="\d{3}-\d{2}-\d{6}"
           />
           {jobCodes.length > 0 && (
@@ -759,23 +763,23 @@ function RtiFormInner({
             </datalist>
           )}
         </Field>
-        <Field label="Fee mode" error={fe.feeMode}>
+        <Field label={t("form.feeMode")} error={fe.feeMode}>
           <Input
             name="feeMode"
             value={formData.feeMode || ""}
             onChange={(e) => updateField("feeMode", e.target.value)}
-            placeholder="IPO / DD / Online / Court fee stamp"
+            placeholder={t("form.feeModePlaceholder")}
           />
         </Field>
-        <Field label="Satisfaction" error={fe.satisfactionStatus}>
+        <Field label={t("form.satisfaction")} error={fe.satisfactionStatus}>
           <select
             name="satisfactionStatus"
             value={formData.satisfactionStatus || ""}
             onChange={(e) => updateField("satisfactionStatus", e.target.value)}
             className={selectCls}
           >
-            <option value="">—</option>
-            {RTI_SATISFACTION.map((s) => <option key={s} value={s}>{s}</option>)}
+            <option value="">{tc("common.na")}</option>
+            {RTI_SATISFACTION.map((s) => <option key={s} value={s}>{translateEnum("workflow", s, locale)}</option>)}
           </select>
         </Field>
         <div className="flex items-center gap-2">
@@ -785,12 +789,12 @@ function RtiFormInner({
             checked={formData.applicationFeePaid || false}
             onCheckedChange={(checked) => updateField("applicationFeePaid", !!checked)}
           />
-          <Label htmlFor="applicationFeePaid" className="font-normal">Application fee paid</Label>
+          <Label htmlFor="applicationFeePaid" className="font-normal">{t("form.applicationFeePaidLabel")}</Label>
         </div>
       </Section>
 
-      <Section title="Reply, workflow & notes">
-        <Field label="Reply summary" error={fe.replySummary} className="sm:col-span-2">
+      <Section title={t("form.sectionReplyWorkflowNotes")}>
+        <Field label={t("form.replySummary")} error={fe.replySummary} className="sm:col-span-2">
           <Textarea
             name="replySummary"
             value={formData.replySummary || ""}
@@ -798,14 +802,14 @@ function RtiFormInner({
             rows={2}
           />
         </Field>
-        <Field label="Next action" error={fe.nextAction}>
+        <Field label={t("form.nextAction")} error={fe.nextAction}>
           <Input
             name="nextAction"
             value={formData.nextAction || ""}
             onChange={(e) => updateField("nextAction", e.target.value)}
           />
         </Field>
-        <Field label="Next action date" error={fe.nextActionDate}>
+        <Field label={t("form.nextActionDate")} error={fe.nextActionDate}>
           <Input
             type="date"
             name="nextActionDate"
@@ -813,7 +817,7 @@ function RtiFormInner({
             onChange={(e) => updateField("nextActionDate", e.target.value)}
           />
         </Field>
-        <Field label="Tags (comma-separated)" error={fe.tags} className="sm:col-span-2">
+        <Field label={t("form.tagsCommaSeparated")} error={fe.tags} className="sm:col-span-2">
           <Input
             name="tags"
             value={formData.tags || ""}
@@ -827,9 +831,9 @@ function RtiFormInner({
             checked={formData.reminderEnabled || false}
             onCheckedChange={(checked) => updateField("reminderEnabled", !!checked)}
           />
-          <Label htmlFor="reminderEnabled" className="font-normal">Enable deadline reminders</Label>
+          <Label htmlFor="reminderEnabled" className="font-normal">{t("form.enableDeadlineRemindersLabel")}</Label>
         </div>
-        <Field label="Public notes" error={fe.publicNotes} className="sm:col-span-2">
+        <Field label={t("form.publicNotes")} error={fe.publicNotes} className="sm:col-span-2">
           <Textarea
             name="publicNotes"
             value={formData.publicNotes || ""}
@@ -837,7 +841,7 @@ function RtiFormInner({
             rows={2}
           />
         </Field>
-        <Field label="Internal notes (not shown to viewers)" error={fe.internalNotes} className="sm:col-span-2">
+        <Field label={t("form.internalNotesLabel")} error={fe.internalNotes} className="sm:col-span-2">
           <Textarea
             name="internalNotes"
             value={formData.internalNotes || ""}
@@ -849,10 +853,10 @@ function RtiFormInner({
 
       <div className="sticky bottom-0 z-10 flex gap-2 rounded-lg border bg-card/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/85">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : initial ? "Save changes" : "Create RTI"}
+          {pending ? t("form.saving") : initial ? t("form.saveChanges") : t("form.createRti")}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
-          Cancel
+          {tc("action.cancel")}
         </Button>
       </div>
     </form>

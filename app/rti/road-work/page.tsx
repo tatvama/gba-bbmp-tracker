@@ -5,19 +5,21 @@ import { getRtiFormOptions } from "@/lib/queries";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Road Work RTI" };
 
 export default async function RoadWorkRtiPage() {
   const user = await getSessionUser();
+  const { t } = await getTranslations("rti");
   if (!hasRole(user, RTI_WRITE_ROLES)) {
     return (
       <div>
-        <PageHeader title="Road Work RTI" />
+        <PageHeader title={t("advanced.roadWorkPage.shortTitle")} />
         <EmptyState
-          title="Not permitted"
-          description="Your role cannot create RTIs. Ask an admin for the RTI Manager or Editor role."
+          title={t("advanced.notPermittedTitle")}
+          description={t("advanced.roadWorkPage.notPermittedDescription")}
         />
       </div>
     );
@@ -28,8 +30,8 @@ export default async function RoadWorkRtiPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="Road Work RTI generator"
-        description="Give a short summary or upload a work order. AI drafts a road-work RTI from the standard inspection framework (insurance, trip sheets, royalty, MB book, road thickness, geo-tag photos). Review, edit, then approve to create the RTI case."
+        title={t("advanced.roadWorkPage.generatorTitle")}
+        description={t("advanced.roadWorkPage.generatorDescription")}
       />
       <RoadWorkGenerator outputType="rti" options={options} aiConfigured={isAiConfigured()} />
     </div>

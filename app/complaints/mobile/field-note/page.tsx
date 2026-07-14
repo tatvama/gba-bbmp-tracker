@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { listComplaints } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Field note" };
@@ -12,13 +13,14 @@ export const metadata = { title: "Field note" };
 /** Pick a complaint to add a field note / communication / photo to (mobile). */
 export default async function MobileFieldNotePage() {
   const complaints = (await listComplaints()).slice(0, 30);
+  const { t } = await getTranslations("complaints");
   return (
     <div className="mx-auto max-w-lg">
-      <PageHeader title="Add a field note" description="Pick a complaint to log a call, note, or upload a site photo.">
-        <Button asChild size="sm" variant="outline"><Link href="/complaints/mobile/new"><Plus className="h-4 w-4" /> New</Link></Button>
+      <PageHeader title={t("form.addFieldNoteTitle")} description={t("form.addFieldNoteDesc")}>
+        <Button asChild size="sm" variant="outline"><Link href="/complaints/mobile/new"><Plus className="h-4 w-4" /> {t("form.newButton")}</Link></Button>
       </PageHeader>
       {complaints.length === 0 ? (
-        <EmptyState title="No complaints" description="Create a complaint first." />
+        <EmptyState title={t("form.noComplaintsTitle")} description={t("form.createComplaintFirstDesc")} />
       ) : (
         <ul className="space-y-2">
           {complaints.map((c) => (

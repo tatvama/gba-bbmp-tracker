@@ -33,12 +33,15 @@ import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
 import { formatNumber, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "RTI Dashboard" };
 
 export default async function RtiDashboard() {
+  const { t } = await getTranslations("rti");
+  const { t: tc } = await getTranslations("common");
   const [stats, rtis, reminders, rules, user] = await Promise.all([
     rtiDashboardStats(),
     listRtis(),
@@ -51,135 +54,135 @@ export default async function RtiDashboard() {
 
   const cards = [
     {
-      label: "Total RTIs",
+      label: t("list.dashboard.totalRtis"),
       value: stats.total,
       icon: FileText,
       href: "/rti/all",
       iconCls: "text-slate-600 dark:text-slate-400",
       bgCls: "bg-slate-100 dark:bg-slate-800",
       borderCls: "border-t-2 border-t-slate-400 dark:border-t-slate-500",
-      helperText: "All-time tracking",
+      helperText: t("list.dashboard.totalRtisHelper"),
       type: "informational",
     },
     {
-      label: "Drafts",
+      label: t("list.dashboard.drafts"),
       value: stats.draft,
       icon: FilePlus2,
       href: "/rti/all",
       iconCls: "text-slate-600 dark:text-slate-400",
       bgCls: "bg-slate-100 dark:bg-slate-800",
       borderCls: "border-t-2 border-t-slate-300 dark:border-t-slate-500",
-      helperText: "Not yet filed",
+      helperText: t("list.dashboard.draftsHelper"),
       type: "informational",
     },
     {
-      label: "Filed",
+      label: t("list.dashboard.filed"),
       value: stats.filed,
       icon: Send,
       href: "/rti/all",
       iconCls: "text-teal-600 dark:text-teal-400",
       bgCls: "bg-teal-50 dark:bg-teal-950/30",
       borderCls: "border-t-2 border-t-teal-500",
-      helperText: "Submitted to PIO",
+      helperText: t("list.dashboard.filedHelper"),
       type: "operational",
     },
     {
-      label: "Awaiting reply",
+      label: t("list.dashboard.awaitingReply"),
       value: stats.awaitingReply,
       icon: Hourglass,
       href: "/rti/all",
       iconCls: "text-blue-600 dark:text-blue-400",
       bgCls: "bg-blue-50 dark:bg-blue-950/30",
       borderCls: "border-t-2 border-t-blue-500",
-      helperText: "Within timeline",
+      helperText: t("list.dashboard.awaitingReplyHelper"),
       type: "operational",
     },
     {
-      label: "Reply received",
+      label: t("list.dashboard.replyReceived"),
       value: stats.replyReceived,
       icon: MailCheck,
       href: "/rti/all",
       iconCls: "text-emerald-600 dark:text-emerald-500",
       bgCls: "bg-emerald-50 dark:bg-emerald-950/30",
       borderCls: "border-t-2 border-t-emerald-500",
-      helperText: "Awaiting review",
+      helperText: t("list.dashboard.replyReceivedHelper"),
       type: "operational",
     },
     {
-      label: "First appeals due",
+      label: t("list.dashboard.firstAppealsDue"),
       value: stats.firstAppealsDue,
       icon: Scale,
       href: "/rti/reports",
       iconCls: "text-slate-600 dark:text-slate-400",
       bgCls: "bg-slate-100 dark:bg-slate-800",
       borderCls: "border-t-2 border-t-slate-400 dark:border-t-slate-500",
-      helperText: "FAA level pending",
+      helperText: t("list.dashboard.firstAppealsDueHelper"),
       type: "informational",
     },
     {
-      label: "Second appeals due",
+      label: t("list.dashboard.secondAppealsDue"),
       value: stats.secondAppealsDue,
       icon: Gavel,
       href: "/rti/reports",
       iconCls: "text-slate-600 dark:text-slate-400",
       bgCls: "bg-slate-100 dark:bg-slate-800",
       borderCls: "border-t-2 border-t-slate-400 dark:border-t-slate-500",
-      helperText: "Commission level",
+      helperText: t("list.dashboard.secondAppealsDueHelper"),
       type: "informational",
     },
     {
-      label: "Overdue",
+      label: t("list.dashboard.overdue"),
       value: stats.overdue,
       icon: AlertOctagon,
       href: "/rti/reports",
       iconCls: "text-rose-600 dark:text-rose-400",
       bgCls: "bg-rose-50 dark:bg-rose-950/30",
       borderCls: "border-t-2 border-t-rose-500",
-      helperText: "Requires action",
+      helperText: t("list.dashboard.overdueHelper"),
       type: "critical",
     },
     {
-      label: "Life/liberty",
+      label: t("list.dashboard.lifeLiberty"),
       value: stats.urgentLifeLiberty,
       icon: Siren,
       href: "/rti/all",
       iconCls: "text-rose-600 dark:text-rose-400",
       bgCls: "bg-rose-50 dark:bg-rose-950/30",
       borderCls: "border-t-2 border-t-rose-500",
-      helperText: "48-hour deadline",
+      helperText: t("list.dashboard.lifeLibertyHelper"),
       type: "critical",
     },
     {
-      label: "Needs review",
+      label: t("list.dashboard.needsReview"),
       value: stats.needsReview,
       icon: ClipboardCheck,
       href: "/rti/all",
       iconCls: "text-rose-600 dark:text-rose-400",
       bgCls: "bg-rose-50 dark:bg-rose-950/30",
       borderCls: "border-t-2 border-t-rose-500",
-      helperText: "Officer action",
+      helperText: t("list.dashboard.needsReviewHelper"),
       type: "critical",
     },
     {
-      label: "Incomplete reply",
+      label: t("list.dashboard.incompleteReply"),
       value: stats.incompleteReply,
       icon: FileWarning,
       href: "/rti/reports",
       iconCls: "text-slate-600 dark:text-slate-400",
       bgCls: "bg-slate-100 dark:bg-slate-800",
       borderCls: "border-t-2 border-t-slate-400 dark:border-t-slate-500",
-      helperText: "Review for appeal",
+      helperText: t("list.dashboard.incompleteReplyHelper"),
       type: "informational",
     },
     {
-      label: "Closed",
+      label: t("list.dashboard.closed"),
       value: stats.closed,
       icon: CheckCircle2,
       href: "/rti/all",
       iconCls: "text-slate-600 dark:text-slate-400",
       bgCls: "bg-slate-100 dark:bg-slate-800",
       borderCls: "border-t-2 border-t-slate-400 dark:border-t-slate-500",
-      helperText: "Completed cases",
+      helperText: t("list.dashboard.closedHelper"),
       type: "informational",
     },
   ];
@@ -187,13 +190,13 @@ export default async function RtiDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="RTI Dashboard"
-        description="Track every Right to Information application across its lifecycle — drafting, filing, statutory deadlines, replies, and appeals."
+        title={t("page.dashboardTitle")}
+        description={t("list.dashboardDescription")}
       >
         {canEdit && (
           <Button asChild size="sm" className="rounded-lg">
             <Link href="/rti/new">
-              <Plus className="h-4 w-4 mr-1" /> New RTI
+              <Plus className="h-4 w-4 mr-1" /> {t("list.newRti")}
             </Link>
           </Button>
         )}
@@ -203,14 +206,14 @@ export default async function RtiDashboard() {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200/60 dark:border-slate-800/60 pb-3 -mt-3">
         <span className="flex items-center gap-1.5 font-semibold">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          System Status: Active
+          {t("list.systemStatusActive")}
         </span>
         <span className="text-slate-300 dark:text-slate-700">•</span>
-        <span>Last Updated: Today</span>
+        <span>{t("list.lastUpdatedToday")}</span>
         <span className="text-slate-300 dark:text-slate-700">•</span>
-        <span>Active Cases: {stats.total - stats.closed}</span>
+        <span>{t("list.activeCases", { count: stats.total - stats.closed })}</span>
         <span className="text-slate-300 dark:text-slate-700">•</span>
-        <span>Date: {formatDate(new Date().toISOString())}</span>
+        <span>{t("list.dateLabel", { date: formatDate(new Date().toISOString()) })}</span>
       </div>
 
       {/* KPI Cards Grid */}
@@ -258,13 +261,13 @@ export default async function RtiDashboard() {
         <Card className="shadow-sm rounded-xl overflow-hidden">
           <SectionHeader
             icon={FileText}
-            title="Recently updated RTIs"
+            title={t("list.recentlyUpdated")}
             actions={
               <Link
                 href="/rti/all"
                 className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
               >
-                View all <ArrowRight className="h-3 w-3" />
+                {tc("action.viewAll")} <ArrowRight className="h-3 w-3" />
               </Link>
             }
           />
@@ -272,8 +275,8 @@ export default async function RtiDashboard() {
             {recent.length === 0 ? (
               <EmptyState
                 icon={FileWarning}
-                title="No RTIs yet"
-                description="Create your first RTI or run seed scripts for sample data."
+                title={t("list.dashboardEmptyTitle")}
+                description={t("list.dashboardEmptyDescription")}
               />
             ) : (
               <div className="space-y-3">
@@ -305,13 +308,13 @@ export default async function RtiDashboard() {
         <Card className="shadow-sm rounded-xl overflow-hidden">
           <SectionHeader
             icon={Bell}
-            title="Upcoming follow-ups"
+            title={t("list.upcomingFollowUps")}
             actions={
               <Link
                 href="/rti/calendar"
                 className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
               >
-                Calendar <ArrowRight className="h-3 w-3" />
+                {t("list.calendarLink")} <ArrowRight className="h-3 w-3" />
               </Link>
             }
           />
@@ -322,10 +325,10 @@ export default async function RtiDashboard() {
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  ✓ No reminders
+                  {t("list.noRemindersTitle")}
                 </h4>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                  All follow-ups are completed or cleared.
+                  {t("list.noRemindersDescription")}
                 </p>
               </div>
             ) : (

@@ -6,17 +6,19 @@ import { getForensicMapPoints } from "@/lib/queries";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { MapPin } from "lucide-react";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Complaint Map" };
 
 export default async function ComplaintMapPage() {
+  const { t } = await getTranslations("complaints");
   const user = await getSessionUser();
   if (!hasRole(user, COMPLAINT_FIELD_ROLES)) {
     return (
       <div>
-        <PageHeader title="Complaint Map" />
-        <EmptyState title="Not permitted" description="Your role cannot view the map. Ask an admin for a Field Officer / Complaint Manager / Editor role." />
+        <PageHeader title={t("list.map.title")} />
+        <EmptyState title={t("list.notPermittedTitle")} description={t("list.map.notPermittedDescription")} />
       </div>
     );
   }
@@ -27,19 +29,19 @@ export default async function ComplaintMapPage() {
   return (
     <div>
       <PageHeader
-        title="Complaint & photo map"
-        description="Complaint reported locations and the GPS where each photo was actually taken. Red photo markers are 'off-site' — taken far from the reported work location."
-        badge={offSite > 0 ? <Badge variant="destructive">{offSite} off-site photo{offSite === 1 ? "" : "s"}</Badge> : undefined}
+        title={t("list.map.mainTitle")}
+        description={t("list.map.mainDescription")}
+        badge={offSite > 0 ? <Badge variant="destructive">{t("list.map.offSiteBadge", { count: offSite, plural: offSite === 1 ? "" : "s" })}</Badge> : undefined}
       />
       {points.length === 0 ? (
-        <EmptyState icon={MapPin} title="No mapped locations yet" description="Complaints need a latitude/longitude, and photos need EXIF GPS, to appear here." />
+        <EmptyState icon={MapPin} title={t("list.map.noMappedTitle")} description={t("list.map.noMappedDescription")} />
       ) : (
         <>
           <div className="mb-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#3A6EA5" }} /> Complaint</span>
-            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#1F7A6E" }} /> Photo (on-site)</span>
-            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#C04A4A" }} /> Photo (off-site)</span>
-            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#E0922F" }} /> Photo (no reference loc.)</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#3A6EA5" }} /> {t("list.map.legendComplaint")}</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#1F7A6E" }} /> {t("list.map.legendPhotoOnSite")}</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#C04A4A" }} /> {t("list.map.legendPhotoOffSite")}</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ background: "#E0922F" }} /> {t("list.map.legendPhotoNoRef")}</span>
           </div>
           <ForensicMap points={points} />
         </>

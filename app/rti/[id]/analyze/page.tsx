@@ -9,6 +9,7 @@ import { getRti, listRtiDocuments } from "@/lib/queries";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES } from "@/lib/constants";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "RTI reply analyzer" };
@@ -20,11 +21,12 @@ export default async function AnalyzePage({
 }) {
   const { id } = await params;
   const user = await getSessionUser();
+  const { t } = await getTranslations("rti");
   if (!hasRole(user, RTI_WRITE_ROLES)) {
     return (
       <div>
-        <PageHeader title="Reply analyzer" />
-        <EmptyState title="Not permitted" description="Your role cannot use the analyzer." />
+        <PageHeader title={t("form.replyAnalyzerTitle")} />
+        <EmptyState title={t("form.notPermittedTitle")} description={t("form.notPermittedAnalyzer")} />
       </div>
     );
   }
@@ -37,9 +39,9 @@ export default async function AnalyzePage({
 
   const applicationText = applicationDoc?.ocr_text?.trim() || rti.info_requested?.trim() || "";
   const applicationSource = applicationDoc
-    ? `Application document (${applicationDoc.page_count} pg)`
+    ? t("form.applicationDocumentSource", { pageCount: applicationDoc.page_count })
     : rti.info_requested
-      ? "RTI “information requested” field"
+      ? t("form.infoRequestedFieldSource")
       : null;
 
   // Response documents = everything except Application / Acknowledgement, grouped by type.
@@ -67,7 +69,7 @@ export default async function AnalyzePage({
   return (
     <div className="mx-auto max-w-5xl">
       <Button asChild variant="ghost" size="sm" className="mb-3 -ml-2 no-print">
-        <Link href={`/rti/${id}`}><ArrowLeft className="h-4 w-4" /> Back to RTI</Link>
+        <Link href={`/rti/${id}`}><ArrowLeft className="h-4 w-4" /> {t("form.backToRti")}</Link>
       </Button>
       <ReplyAnalyzer
         rtiId={id}

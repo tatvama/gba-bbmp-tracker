@@ -19,6 +19,8 @@ import { RTI_CATEGORIES, PRIORITIES } from "@/lib/constants";
 import { createRti } from "@/lib/actions/rti";
 import type { ActionState } from "@/lib/actions/contacts";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
 
 const selectCls =
   "flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-700 shadow-2xs hover:bg-slate-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-150";
@@ -29,6 +31,7 @@ export function RtiQuickCreateForm() {
     createRti,
     {} as ActionState,
   );
+  const { t, locale } = useTranslation("rti");
 
   React.useEffect(() => {
     if (state?.success && state.id) router.push(`/rti/${state.id}`);
@@ -47,14 +50,14 @@ export function RtiQuickCreateForm() {
           {/* 7. REFERENCE NUMBER PREVIEW */}
           <div className="p-3.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 dark:border-slate-800 dark:bg-slate-950/30">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Reference Number
+              {t("field.referenceNumber")}
             </span>
             <div className="flex items-center justify-between mt-1">
               <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
                 RTI-2026-XXXXX
               </span>
               <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">
-                Generated automatically after saving
+                {t("form.generatedAutomaticallyAfterSaving")}
               </span>
             </div>
           </div>
@@ -62,7 +65,7 @@ export function RtiQuickCreateForm() {
           {/* SECTION 1: REQUEST DETAILS */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
-              1. Request Details
+              {t("form.requestDetailsStepTitle")}
             </h3>
 
             {/* Priority */}
@@ -72,7 +75,7 @@ export function RtiQuickCreateForm() {
                 className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300"
               >
                 <AlertTriangle className="h-3.5 w-3.5 text-slate-400" />
-                Priority
+                {t("form.priority")}
               </Label>
               <select
                 id="priority"
@@ -82,7 +85,7 @@ export function RtiQuickCreateForm() {
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {translateEnum("workflow", p, locale)}
                   </option>
                 ))}
               </select>
@@ -96,21 +99,21 @@ export function RtiQuickCreateForm() {
           <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 dark:border-slate-800/80 dark:bg-slate-950/20 space-y-2.5">
             <h5 className="text-xs font-bold text-blue-800 dark:text-blue-400 flex items-center gap-1.5">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
-              Next Step
+              {t("form.nextStepHeading")}
             </h5>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              After creating this RTI, you will upload:
+              {t("form.afterCreatingRtiUploadIntro")}
             </p>
             <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 pl-1 font-semibold">
               <li className="flex items-center gap-1.5">
-                <span className="text-blue-500 font-bold text-xs">✔</span> RTI Application
+                <span className="text-blue-500 font-bold text-xs">✔</span> {t("form.rtiApplicationListItem")}
               </li>
               <li className="flex items-center gap-1.5">
-                <span className="text-blue-500 font-bold text-xs">✔</span> Filing Acknowledgement
+                <span className="text-blue-500 font-bold text-xs">✔</span> {t("form.filingAcknowledgementListItem")}
               </li>
             </ul>
             <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal italic pt-2 border-t border-blue-100/40 dark:border-slate-800/40">
-              The 30-day statutory reply countdown begins only after acknowledgement confirmation.
+              {t("form.statutoryCountdownNote")}
             </p>
           </div>
 
@@ -122,9 +125,9 @@ export function RtiQuickCreateForm() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
                 <p className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
-                  RTI Creation
+                  {t("form.rtiCreationHeading")}
                 </p>
-                Once this RTI is created, you will immediately upload the RTI Application &amp; Filing Acknowledgement.
+                {t("form.rtiCreationDescription")}
               </div>
               <div className="shrink-0">
                 <Button
@@ -133,12 +136,12 @@ export function RtiQuickCreateForm() {
                   className="w-full sm:w-auto px-5 h-10 font-bold shadow-xs rounded-lg"
                 >
                   {pending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                  Create RTI &amp; Continue
+                  {t("form.createRtiAndContinue")}
                 </Button>
               </div>
             </div>
             <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center sm:text-left select-none">
-              You can edit these details later from the RTI Details page.
+              {t("form.editLaterNote")}
             </p>
           </div>
         </form>

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Printer, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/client";
 
 interface PrintControlBarProps {
   id: string;
@@ -10,6 +11,7 @@ interface PrintControlBarProps {
 }
 
 export function PrintControlBar({ id, downloadUrl }: PrintControlBarProps) {
+  const { t } = useTranslation("rti");
   return (
     <div className="no-print sticky top-0 z-50 flex items-center justify-end border-b bg-background/95 p-3 shadow-sm backdrop-blur">
       <div className="flex items-center gap-2">
@@ -20,13 +22,13 @@ export function PrintControlBar({ id, downloadUrl }: PrintControlBarProps) {
             if (typeof window !== "undefined") window.print();
           }}
         >
-          <Printer className="h-4 w-4 mr-1" /> Print Document
+          <Printer className="h-4 w-4 mr-1" /> {t("list.printDocumentButton")}
         </Button>
 
         {/* Server-side PDF download trigger */}
         <Button asChild size="sm" variant="outline">
           <a href={downloadUrl} download>
-            <FileDown className="h-4 w-4 mr-1" /> Download PDF
+            <FileDown className="h-4 w-4 mr-1" /> {t("action.downloadPdf")}
           </a>
         </Button>
       </div>

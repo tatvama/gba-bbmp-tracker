@@ -5,6 +5,7 @@ import { getRti, getFirstAppeal, getSecondAppeal } from "@/lib/queries";
 import { documentRegistry } from "@/lib/pdf/document-registry";
 import { GovernmentDocumentView } from "@/components/rti/government-document-view";
 import { PrintControlBar } from "@/components/rti/print-control-bar";
+import { getTranslations } from "@/lib/i18n/server";
 
 // Import stylesheet to activate it inside this bundle
 import "@/app/styles/government-document.css";
@@ -17,11 +18,12 @@ interface PrintPageProps {
 export const dynamic = "force-dynamic";
 
 export default async function PrintPage({ params, searchParams }: PrintPageProps) {
+  const { t } = await getTranslations("rti");
   const user = await getSessionUser();
   if (!user) {
     return (
       <div className="p-8 text-center text-destructive font-semibold">
-        Not authorized. Please log in first.
+        {t("list.printNotAuthorized")}
       </div>
     );
   }
@@ -38,14 +40,14 @@ export default async function PrintPage({ params, searchParams }: PrintPageProps
     docData = documentRegistry.map("rti", rti);
     downloadUrl = `/api/rti/${id}/pdf`;
   } else if (type === "first_appeal") {
-    if (!appealId) return <div className="p-8 text-center text-destructive">Missing appealId query parameter.</div>;
+    if (!appealId) return <div className="p-8 text-center text-destructive">{t("list.printMissingAppealId")}</div>;
     const appeal = await getFirstAppeal(appealId);
     const rti = await getRti(id);
     if (!appeal || !rti) notFound();
     docData = documentRegistry.map("first_appeal", appeal, { rti });
     downloadUrl = `/api/rti/${id}/first-appeal/pdf?appealId=${appealId}`;
   } else if (type === "second_appeal") {
-    if (!appealId) return <div className="p-8 text-center text-destructive">Missing appealId query parameter.</div>;
+    if (!appealId) return <div className="p-8 text-center text-destructive">{t("list.printMissingAppealId")}</div>;
     const appeal = await getSecondAppeal(appealId);
     const rti = await getRti(id);
     if (!appeal || !rti) notFound();
@@ -58,7 +60,7 @@ export default async function PrintPage({ params, searchParams }: PrintPageProps
     docData = documentRegistry.map("second_appeal", appeal, { rti, firstAppeal });
     downloadUrl = `/api/rti/${id}/second-appeal/pdf?appealId=${appealId}`;
   } else {
-    return <div className="p-8 text-center text-destructive">Unsupported document type: {type}</div>;
+    return <div className="p-8 text-center text-destructive">{t("list.printUnsupportedType", { type })}</div>;
   }
 
   return (

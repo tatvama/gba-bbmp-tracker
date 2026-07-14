@@ -142,6 +142,15 @@ const en = {
   // ESCALATION_CHAIN (AE/AEE/EE/CE/Commissioner shared with ROLE_LEVELS)
   "Lokayukta": "Lokayukta",
   "ACB": "Anti-Corruption Bureau (ACB)",
+  // components/complaints/complaint-forms.tsx's EscalationForm "To level"
+  // picker uses its own local list (not the ESCALATION_CHAIN export above);
+  // this is the one option value/label from that list not already covered.
+  "Lokayukta / Legal": "Lokayukta / Legal",
+
+  // Ward-type toggle (complaint-form.tsx, rti-form.tsx, contact-form.tsx all
+  // hardcode this same BBMP/GBA pair inline rather than from a shared array).
+  "BBMP": "BBMP Wards",
+  "GBA": "GBA Wards",
 
   // TIMELINE_EVENT_TYPES (Filed/Acknowledged/Reply Received/Reopened shared with status.ts's own namespace — this is workflow's own copy)
   "Created": "Created",
@@ -210,6 +219,53 @@ const en = {
   "Defect liability / handover": "Defect liability / handover",
   "C&D waste / dumping-yard / salvage register": "C&D waste / dumping-yard / salvage register",
   "Other evidence": "Other evidence",
+
+  // Acknowledgment match-confidence (lib/complaints/ack-reconcile.ts's MatchConfidence —
+  // deliberately lowercase; kept in THIS namespace rather than "status" because lib/
+  // constants.ts's RISK_BANDS already claims a bare "low" key over there with different text).
+  "high": "High Confidence",
+  "medium": "Needs Review",
+  "low": "Low Confidence",
+  "none": "No Match",
+
+  // Forensic letter variants (lib/constants.ts's LETTER_VARIANTS / letter_drafts.variant
+  // for the job-audit letter drafter — distinct from the risk-band "status" namespace
+  // entries that happen to share the "bill_stop" raw string).
+  "bill_stop": "Bill-stop letter",
+  "lokayukta": "Lokayukta letter",
+  "rti": "RTI letter",
+  "bilingual_summary": "Bilingual summary",
+
+  // COMPLAINT_DRAFT_KINDS (lib/constants.ts) — AI draft kinds shown as badges in the
+  // print queue; English text mirrors the existing constant exactly.
+  "followup_letter": "Follow-up letter",
+  "whatsapp": "WhatsApp message to officer",
+  "escalation_letter": "Escalation letter (next authority)",
+  "reminder_email": "Reminder email",
+  "rti_from_complaint": "RTI based on this complaint",
+  "action_taken_request": "Action Taken Report request",
+  "site_inspection_request": "Site inspection request",
+  "lokayukta_complaint": "Lokayukta complaint",
+  "chief_secretary_letter": "Chief Secretary / UDD letter",
+  "cm_office_letter": "Chief Minister's office letter",
+  "records_preservation": "Records-preservation request",
+  "counter_reply": "Counter-reply to department reply",
+  "clarification_request": "Clarification request to department",
+  "reminder_letter": "Reminder letter (no reply received)",
+  "legal_notice": "Legal notice (failure to reply/act)",
+
+  // DRAFT_LANGUAGES (lib/constants.ts) — the language a drafted letter is
+  // written in (letter_drafts.language), shown as a small inline label.
+  "English": "English",
+  "Kannada": "Kannada",
+  "Bilingual": "Bilingual",
+
+  // Submission channel (components/complaints/case-workflow.tsx's
+  // SUBMIT_CHANNELS — how the filed letter was physically/digitally handed
+  // over; distinct from COMPLAINT_FILED_MODES above, its own fixed set).
+  "By hand (acknowledged copy)": "By hand (acknowledged copy)",
+  "RPAD / Speed post": "RPAD / Speed post",
+  "PGR / Sahaaya portal": "PGR / Sahaaya portal",
 } as const satisfies Record<string, string>;
 
 const kn: Record<keyof typeof en, string> = {
@@ -326,6 +382,10 @@ const kn: Record<keyof typeof en, string> = {
 
   "Lokayukta": "ಲೋಕಾಯುಕ್ತ",
   "ACB": "ಭ್ರಷ್ಟಾಚಾರ ನಿಗ್ರಹ ದಳ (ACB)",
+  "Lokayukta / Legal": "ಲೋಕಾಯುಕ್ತ / ಕಾನೂನು",
+
+  "BBMP": "BBMP ವಾರ್ಡ್‌ಗಳು",
+  "GBA": "GBA ವಾರ್ಡ್‌ಗಳು",
 
   "Created": "ರಚಿಸಲಾಗಿದೆ",
   "Action Taken": "ಕ್ರಮ ಕೈಗೊಳ್ಳಲಾಗಿದೆ",
@@ -390,6 +450,40 @@ const kn: Record<keyof typeof en, string> = {
   "Defect liability / handover": "ದೋಷ ಹೊಣೆಗಾರಿಕೆ / ಹಸ್ತಾಂತರ",
   "C&D waste / dumping-yard / salvage register": "C&D ತ್ಯಾಜ್ಯ / ಡಂಪಿಂಗ್ ಯಾರ್ಡ್ / ಸಾಲ್ವೇಜ್ ರಿಜಿಸ್ಟರ್",
   "Other evidence": "ಇತರೆ ಸಾಕ್ಷ್ಯ",
+
+  "high": "ಹೆಚ್ಚಿನ ವಿಶ್ವಾಸಾರ್ಹತೆ",
+  "medium": "ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ",
+  "low": "ಕಡಿಮೆ ವಿಶ್ವಾಸಾರ್ಹತೆ",
+  "none": "ಹೊಂದಾಣಿಕೆ ಇಲ್ಲ",
+
+  "bill_stop": "ಬಿಲ್ ತಡೆ ಪತ್ರ",
+  "lokayukta": "ಲೋಕಾಯುಕ್ತ ಪತ್ರ",
+  "rti": "ಮಾಹಿತಿ ಹಕ್ಕು ಪತ್ರ",
+  "bilingual_summary": "ದ್ವಿಭಾಷಾ ಸಾರಾಂಶ",
+
+  "followup_letter": "ಅನುಸರಣಾ ಪತ್ರ",
+  "whatsapp": "ಅಧಿಕಾರಿಗೆ WhatsApp ಸಂದೇಶ",
+  "escalation_letter": "ಆದ್ಯತಾ ಹೆಚ್ಚಳ ಪತ್ರ (ಮುಂದಿನ ಅಧಿಕಾರಿ)",
+  "reminder_email": "ಜ್ಞಾಪನಾ ಇಮೇಲ್",
+  "rti_from_complaint": "ಈ ದೂರಿನ ಆಧಾರದ ಮೇಲೆ ಮಾಹಿತಿ ಹಕ್ಕು ಅರ್ಜಿ",
+  "action_taken_request": "ಕ್ರಮ ವರದಿ ಕೋರಿಕೆ",
+  "site_inspection_request": "ಸ್ಥಳ ಪರಿಶೀಲನಾ ಕೋರಿಕೆ",
+  "lokayukta_complaint": "ಲೋಕಾಯುಕ್ತ ದೂರು",
+  "chief_secretary_letter": "ಮುಖ್ಯ ಕಾರ್ಯದರ್ಶಿ / UDD ಪತ್ರ",
+  "cm_office_letter": "ಮುಖ್ಯಮಂತ್ರಿಗಳ ಕಚೇರಿ ಪತ್ರ",
+  "records_preservation": "ದಾಖಲೆ ಸಂರಕ್ಷಣಾ ಕೋರಿಕೆ",
+  "counter_reply": "ಇಲಾಖೆಯ ಉತ್ತರಕ್ಕೆ ಪ್ರತಿ-ಉತ್ತರ",
+  "clarification_request": "ಇಲಾಖೆಗೆ ಸ್ಪಷ್ಟೀಕರಣ ಕೋರಿಕೆ",
+  "reminder_letter": "ಜ್ಞಾಪನಾ ಪತ್ರ (ಉತ್ತರ ಬಂದಿಲ್ಲ)",
+  "legal_notice": "ಕಾನೂನು ನೋಟಿಸ್ (ಉತ್ತರಿಸಲು/ಕ್ರಮಕ್ಕೆ ವಿಫಲತೆ)",
+
+  "English": "ಇಂಗ್ಲಿಷ್",
+  "Kannada": "ಕನ್ನಡ",
+  "Bilingual": "ದ್ವಿಭಾಷಾ",
+
+  "By hand (acknowledged copy)": "ಕೈಯಿಂದ (ಸ್ವೀಕೃತಿ ಪ್ರತಿಯೊಂದಿಗೆ)",
+  "RPAD / Speed post": "RPAD / ಸ್ಪೀಡ್ ಪೋಸ್ಟ್",
+  "PGR / Sahaaya portal": "PGR / ಸಹಾಯ ಪೋರ್ಟಲ್",
 };
 
 registerNamespace("workflow", { en, kn } as NamespaceDictionaries);

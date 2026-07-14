@@ -17,6 +17,10 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { RTI_DOCUMENT_TYPES } from "@/lib/constants";
 import { uploadRtiDocumentAction } from "@/lib/actions/rti";
+import { useTranslation } from "@/lib/i18n/client";
+import { translateEnum } from "@/lib/i18n/translate-enum";
+
+type CaptureStage = "" | "merging" | "ocr" | "summarizing" | "finishing";
 
 const selectCls =
   "flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -47,6 +51,8 @@ export function DocumentCapture({
 }) {
   const router = useRouter();
   const idRef = React.useRef(0);
+  const { t, locale } = useTranslation("rti");
+  const { t: tCommon } = useTranslation("common");
 
   // Reply / FAA Order / etc. stay locked until the Acknowledgement has been uploaded
   // (which establishes the case + filing clock).
@@ -66,8 +72,28 @@ export function DocumentCapture({
   const [docDate, setDocDate] = React.useState(todayLocal());
   const [pages, setPages] = React.useState<Page[]>([]);
   const [busy, setBusy] = React.useState(false);
-  const [statusMsg, setStatusMsg] = React.useState("");
+  // Tracked as a stable stage key (not the translated text itself) so the
+  // interval below can keep advancing the sequence regardless of locale.
+  const [statusStage, setStatusStage] = React.useState<CaptureStage>("");
   const [error, setError] = React.useState<string | null>(null);
+
+  const statusText = React.useCallback(
+    (stage: CaptureStage) => {
+      switch (stage) {
+        case "merging":
+          return t("advanced.documentCapture.statusMerging");
+        case "ocr":
+          return t("advanced.documentCapture.statusOcr");
+        case "summarizing":
+          return t("advanced.documentCapture.statusAiSummary");
+        case "finishing":
+          return t("advanced.documentCapture.statusFinishing");
+        default:
+          return "";
+      }
+    },
+    [t],
+  );
 
   // Live camera state
   const [cameraOn, setCameraOn] = React.useState(false);
@@ -126,7 +152,7 @@ export function DocumentCapture({
   async function startCamera() {
     setError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError("Live camera is not available on this device. Use “Scan / choose files” instead.");
+      setError(t("advanced.documentCapture.liveCameraUnavailable"));
       return;
     }
     try {
@@ -144,7 +170,7 @@ export function DocumentCapture({
         }
       });
     } catch {
-      setError("Could not access the camera. Check permissions or use “Scan / choose files”.");
+      setError(t("advanced.documentCapture.cameraAccessError"));
     }
   }
 
@@ -183,7 +209,7 @@ export function DocumentCapture({
     stopCamera();
     setBusy(true);
     setError(null);
-    setStatusMsg("Merging pages into a PDF…");
+    setStatusStage("merging");
 
     const fd = new FormData();
     fd.set("docType", docType);
@@ -193,12 +219,8 @@ export function DocumentCapture({
     pages.forEach((p) => fd.append("files", p.file));
 
     const interval = setInterval(() => {
-      setStatusMsg((prev) =>
-        prev.includes("Merging")
-          ? "Running OCR text extraction…"
-          : prev.includes("OCR")
-            ? "Summarising with AI…"
-            : "Finishing up…",
+      setStatusStage((prev) =>
+        prev === "merging" ? "ocr" : prev === "ocr" ? "summarizing" : "finishing",
       );
     }, 3000);
 
@@ -206,7 +228,7 @@ export function DocumentCapture({
       const res = await uploadRtiDocumentAction(rtiId, fd);
       clearInterval(interval);
       setBusy(false);
-      setStatusMsg("");
+      setStatusStage("");
       if (res.error) {
         setError(res.error);
         return;
@@ -219,8 +241,8 @@ export function DocumentCapture({
     } catch (e) {
       clearInterval(interval);
       setBusy(false);
-      setStatusMsg("");
-      setError(e instanceof Error ? e.message : "Upload failed");
+      setStatusStage("");
+      setError(e instanceof Error ? e.message : t("advanced.documentCapture.uploadFailed"));
     }
   }
 
@@ -228,10 +250,10 @@ export function DocumentCapture({
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
         <Spinner size="lg" className="text-primary" />
-        <p className="animate-pulse text-sm font-medium">{statusMsg || "Processing…"}</p>
-        <p className="text-xs text-muted-foreground">
-          Pages are merged into one PDF, then OCR and AI summary run on the server.
+        <p className="animate-pulse text-sm font-medium">
+          {statusText(statusStage) || t("advanced.documentCapture.processingDefault")}
         </p>
+        <p className="text-xs text-muted-foreground">{t("advanced.documentCapture.processingHint")}</p>
       </div>
     );
   }
@@ -240,29 +262,32 @@ export function DocumentCapture({
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
-          <Label>Document type</Label>
+          <Label>{t("advanced.documentCapture.documentType")}</Label>
           <select className={selectCls} value={docType} onChange={(e) => setDocType(e.target.value)}>
-            {RTI_DOCUMENT_TYPES.filter((t) => t !== "Application").map((t) => {
-              const gated = t !== "Acknowledgement";
+            {RTI_DOCUMENT_TYPES.filter((docTypeOption) => docTypeOption !== "Application").map((docTypeOption) => {
+              const gated = docTypeOption !== "Acknowledgement";
               return (
-                <option key={t} value={t} disabled={gated && !unlocked}>
-                  {t}
+                <option key={docTypeOption} value={docTypeOption} disabled={gated && !unlocked}>
+                  {translateEnum("workflow", docTypeOption, locale)}
                 </option>
               );
             })}
           </select>
           {!unlocked && (
-            <p className="text-[11px] text-muted-foreground">
-              Upload the Acknowledgement first — Reply, FAA Order and others unlock once it is present.
-            </p>
+            <p className="text-[11px] text-muted-foreground">{t("advanced.documentCapture.unlockNotice")}</p>
           )}
         </div>
         <div className="space-y-1.5">
-          <Label>Title (optional)</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ack receipt 26-Jun" className="h-11" />
+          <Label>{t("advanced.documentCapture.titleOptional")}</Label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={t("advanced.documentCapture.titlePlaceholder")}
+            className="h-11"
+          />
         </div>
         <div className="space-y-1.5">
-          <Label>Document date</Label>
+          <Label>{t("advanced.documentCapture.documentDate")}</Label>
           <Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} className="h-11" />
         </div>
       </div>
@@ -274,23 +299,23 @@ export function DocumentCapture({
           <video ref={videoRef} playsInline muted className="mx-auto max-h-80 w-full rounded-lg bg-black object-contain" />
           <div className="flex flex-wrap justify-center gap-2">
             <Button type="button" onClick={capturePage}>
-              <Camera className="h-4 w-4" /> Capture page
+              <Camera className="h-4 w-4" /> {t("advanced.documentCapture.capturePage")}
             </Button>
             <Button type="button" variant="outline" onClick={stopCamera}>
-              Done capturing
+              {t("advanced.documentCapture.doneCapturing")}
             </Button>
           </div>
         </div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           <Button type="button" variant="outline" className="h-auto py-4" onClick={startCamera}>
-            <Camera className="h-5 w-5" /> Use live camera
+            <Camera className="h-5 w-5" /> {t("advanced.documentCapture.useLiveCamera")}
           </Button>
           <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 py-4 text-center hover:bg-primary/10">
             <span className="flex items-center gap-2 text-sm font-medium text-primary">
-              <Upload className="h-5 w-5" /> Scan / choose files
+              <Upload className="h-5 w-5" /> {t("advanced.documentCapture.scanOrChooseFiles")}
             </span>
-            <span className="text-xs text-muted-foreground">JPEG, PNG, WebP or PDF · multiple allowed</span>
+            <span className="text-xs text-muted-foreground">{t("advanced.documentCapture.fileHint")}</span>
             <input
               type="file"
               accept="image/*,application/pdf"
@@ -313,7 +338,7 @@ export function DocumentCapture({
       {pages.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            {pages.length} page{pages.length > 1 ? "s" : ""} · they will be merged into one PDF in this order.
+            {t("advanced.documentCapture.pagesCount", { count: pages.length, plural: pages.length > 1 ? "s" : "" })}
           </p>
           <div className="flex flex-wrap gap-2">
             {pages.map((p, i) => (
@@ -321,7 +346,7 @@ export function DocumentCapture({
                 <div className="flex h-24 items-center justify-center">
                   {p.url ? (
                     // eslint-disable-next-line @next/next/no-img-element -- local object-URL preview
-                    <img src={p.url} alt={`Page ${i + 1}`} className="h-full w-full object-cover" />
+                    <img src={p.url} alt={t("advanced.documentCapture.pageAlt", { index: i + 1 })} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex flex-col items-center text-[10px] text-muted-foreground">
                       <FileText className="h-6 w-6" />
@@ -332,13 +357,13 @@ export function DocumentCapture({
                 <div className="flex items-center justify-between bg-background/90 px-1 py-0.5">
                   <span className="text-[10px] text-muted-foreground">#{i + 1}</span>
                   <div className="flex items-center gap-0.5">
-                    <button type="button" aria-label="Move left" onClick={() => move(p.id, -1)} className="rounded p-0.5 hover:bg-muted">
+                    <button type="button" aria-label={t("advanced.documentCapture.moveLeftAria")} onClick={() => move(p.id, -1)} className="rounded p-0.5 hover:bg-muted">
                       <ArrowUp className="h-3 w-3 -rotate-90" />
                     </button>
-                    <button type="button" aria-label="Move right" onClick={() => move(p.id, 1)} className="rounded p-0.5 hover:bg-muted">
+                    <button type="button" aria-label={t("advanced.documentCapture.moveRightAria")} onClick={() => move(p.id, 1)} className="rounded p-0.5 hover:bg-muted">
                       <ArrowDown className="h-3 w-3 -rotate-90" />
                     </button>
-                    <button type="button" aria-label="Remove page" onClick={() => removePage(p.id)} className="rounded p-0.5 text-destructive hover:bg-muted">
+                    <button type="button" aria-label={t("advanced.documentCapture.removePageAria")} onClick={() => removePage(p.id)} className="rounded p-0.5 text-destructive hover:bg-muted">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
@@ -351,11 +376,11 @@ export function DocumentCapture({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={submit} disabled={pages.length === 0}>
-          <Upload className="h-4 w-4" /> Create document ({pages.length})
+          <Upload className="h-4 w-4" /> {t("advanced.documentCapture.createDocument", { count: pages.length })}
         </Button>
         {onDone && (
           <Button type="button" variant="ghost" onClick={onDone}>
-            Cancel
+            {tCommon("action.cancel")}
           </Button>
         )}
       </div>

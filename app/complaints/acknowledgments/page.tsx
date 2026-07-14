@@ -13,6 +13,7 @@ import { isAiConfigured } from "@/lib/ai/provider";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { FileText, Calendar, Clock, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 import { formatDate } from "@/lib/format";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Attach Acknowledgments" };
@@ -34,11 +35,12 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default async function AcknowledgmentsPage() {
   const user = await getSessionUser();
+  const { t } = await getTranslations("complaints");
   if (!hasRole(user, COMPLAINT_FIELD_ROLES)) {
     return (
       <div>
-        <PageHeader title="Not Permitted" />
-        <EmptyState title="Not permitted" description="Your role cannot review acknowledgments." />
+        <PageHeader title={t("advanced.shared.notPermittedTitle")} />
+        <EmptyState title={t("advanced.shared.notPermittedTitle")} description={t("advanced.ack.notPermittedDesc")} />
       </div>
     );
   }
@@ -48,15 +50,15 @@ export default async function AcknowledgmentsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
       <PageHeader
-        title="Attach Acknowledgments"
-        description="Upload scanned PDF receipt batches. The AI splits them page-by-page, extracts details, and links them to cases."
+        title={t("page.acknowledgmentsTitle")}
+        description={t("advanced.ack.pageDescription")}
       />
 
       {!isAiConfigured() && (
         <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50/20 p-3.5 text-xs text-amber-700 dark:border-slate-800 dark:bg-slate-950/35 dark:text-amber-400">
           <AlertCircle className="h-4.5 w-4.5 shrink-0" />
           <p>
-            AI is not configured on the server. Acknowledgments will default to one section per page and exact matches, but semantic understanding requires an API key.
+            {t("advanced.ack.aiNotConfigured")}
           </p>
         </div>
       )}
@@ -71,7 +73,7 @@ export default async function AcknowledgmentsPage() {
             <div className="space-y-3.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                  Recent Upload History ({batches.length})
+                  {t("advanced.ack.recentUploadHistory", { count: batches.length })}
                 </h3>
                 <AckClearCompletedButton
                   clearableCount={batches.filter((b) => b.status === "committed" || b.status === "failed").length}
