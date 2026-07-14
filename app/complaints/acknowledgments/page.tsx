@@ -54,7 +54,7 @@ export default async function AcknowledgmentsPage() {
       />
 
       {!isAiConfigured() && (
-        <div className="flex gap-2.5 rounded-xl border border-amber-250 bg-amber-50/20 p-3.5 text-xs text-amber-700 dark:border-slate-800 dark:bg-slate-950/35 dark:text-amber-400 shadow-3xs">
+        <div className="flex gap-2.5 rounded-xl border border-amber-250 bg-amber-50/20 p-3.5 text-xs text-amber-700 dark:border-slate-800 dark:bg-slate-955/35 dark:text-amber-400 shadow-3xs">
           <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
           <p className="font-semibold leading-normal">
             {t("advanced.ack.aiNotConfigured")}
@@ -80,8 +80,8 @@ export default async function AcknowledgmentsPage() {
                 </div>
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-3xs ${
                   m.alert 
-                    ? "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-950/30 dark:bg-amber-955/20" 
-                    : "border-slate-100 bg-slate-50 dark:border-slate-850 dark:bg-slate-950 text-slate-455"
+                    ? "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-955/30 dark:bg-amber-955/20" 
+                    : "border-slate-100 bg-slate-50 dark:border-slate-850 dark:bg-slate-955 text-slate-455"
                 }`}>
                   <Icon className="h-4.5 w-4.5" />
                 </div>
@@ -91,57 +91,48 @@ export default async function AcknowledgmentsPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left Column: Upload Workspaces */}
-        <div className="lg:col-span-2 space-y-6">
-          <AckReconcileUpload />
+      <div className="space-y-6">
+        {/* Primary Upload (Full Width) */}
+        <AckReconcileUpload />
 
-          <div className="relative flex py-2 items-center select-none">
-            <div className="flex-grow border-t border-slate-200/60 dark:border-slate-850"></div>
-            <span className="flex-shrink mx-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Alternative Matching Path</span>
-            <div className="flex-grow border-t border-slate-200/60 dark:border-slate-850"></div>
-          </div>
-
+        {/* Secondary Upload & Guidelines (2 Columns) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <AckByFilenameUpload />
-
-          {/* Recent Upload History Section */}
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between select-none">
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                {t("advanced.ack.recentUploadHistory", { count: batches.length }).replace(`(${batches.length})`, "")}
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-extrabold">
-                  {batches.length}
-                </span>
-              </h3>
-              <AckClearCompletedButton
-                clearableCount={batches.filter((b) => b.status === "committed" || b.status === "failed").length}
-              />
-            </div>
-
-            {batches.length > 0 ? (
-              <div className="space-y-3">
-                {batches.map((b) => (
-                  <AckBatchRow key={b.id} b={b} />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/15 py-14 text-center dark:border-slate-800 dark:bg-slate-950/10">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-900 border text-slate-400 mb-4 shadow-3xs">
-                  <FileText className="h-5.5 w-5.5" />
-                </div>
-                <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">No acknowledgement uploads yet</h4>
-                <p className="text-[10.5px] text-slate-450 dark:text-slate-500 mt-2 max-w-[280px] font-medium leading-relaxed">
-                  Upload scanned documents above to begin automatic OCR text splitting and complaint matching.
-                </p>
-              </div>
-            )}
-          </div>
+          <AckHelpPanel />
         </div>
 
-        {/* Right Column: Information panel & guides */}
-        <div className="space-y-6">
-          <AckHelpPanel />
+        {/* Recent Upload History Section (Full Width) */}
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center justify-between select-none">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              {t("advanced.ack.recentUploadHistory", { count: batches.length }).replace(`(${batches.length})`, "")}
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-extrabold">
+                {batches.length}
+              </span>
+            </h3>
+            <AckClearCompletedButton
+              clearableCount={batches.filter((b) => b.status === "committed" || b.status === "failed").length}
+            />
+          </div>
+
+          {batches.length > 0 ? (
+            <div className="space-y-3">
+              {batches.map((b) => (
+                <AckBatchRow key={b.id} b={b} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/15 py-14 text-center dark:border-slate-800 dark:bg-slate-950/10">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-900 border text-slate-400 mb-4 shadow-3xs">
+                <FileText className="h-5.5 w-5.5" />
+              </div>
+              <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">No acknowledgement uploads yet</h4>
+              <p className="text-[10.5px] text-slate-455 dark:text-slate-500 mt-2 max-w-[280px] font-medium leading-relaxed">
+                Upload scanned documents above to begin automatic OCR text splitting and complaint matching.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
