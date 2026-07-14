@@ -471,7 +471,8 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
             const ex = it.extracted as Record<string, unknown>;
             const assigned = it.assigned;
             const conf = CONF[it.matchConfidence];
-            const isConfirmed = it.decision === "confirmed" || it.decision === "committed";
+            const isCommitted = it.decision === "committed";
+            const isConfirmed = it.decision === "confirmed";
             const isSkipped = it.decision === "skipped";
             const isSelected = selectedIds.has(it.id);
 
@@ -480,8 +481,8 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                 key={it.id}
                 className={cn(
                   "group relative flex flex-col justify-between rounded-2xl border bg-white dark:bg-slate-900 shadow-3xs hover:shadow-2xs transition-all duration-200 p-4",
-                  isConfirmed ? "border-emerald-250 dark:border-emerald-950/50" : "border-slate-200 dark:border-slate-805",
-                  isSkipped ? "opacity-60" : ""
+                  isConfirmed || isCommitted ? "border-emerald-250 dark:border-emerald-950/50 bg-emerald-50/5 dark:bg-emerald-950/2" : "border-slate-200 dark:border-slate-805",
+                  isSkipped ? "opacity-75 border-slate-350 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40" : ""
                 )}
               >
                 <div>
@@ -523,7 +524,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                         <img
                           src={it.thumbUrls[0]}
                           alt="Ack page 1"
-                          className="h-20 w-full object-cover rounded-lg border border-slate-200 dark:border-slate-800 shadow-3xs"
+                          className="h-20 w-full object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-3xs"
                         />
                       ) : (
                         <div className="flex h-20 w-full items-center justify-center rounded-lg bg-slate-50 border text-slate-400">
@@ -540,7 +541,7 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                       <h4 className="font-bold text-slate-800 dark:text-slate-250 truncate line-clamp-1">
                         {String(ex.subject || "Subject not identified")}
                       </h4>
-                      <div className="flex flex-col gap-0.5 text-[10.5px] text-slate-450 dark:text-slate-500">
+                      <div className="flex flex-col gap-0.5 text-[10.5px] text-slate-455 dark:text-slate-500">
                         {!!ex.referenceNumber && (
                           <div className="truncate">Ref: <span className="font-mono text-slate-700 dark:text-slate-300 font-semibold">{String(ex.referenceNumber)}</span></div>
                         )}
@@ -554,107 +555,166 @@ export function AckReview({ initial }: { initial: AckBatchView }) {
                     </div>
                   </div>
 
-                  {/* Matched Case Card */}
-                  <div className="mt-3.5 space-y-2 rounded-xl border border-slate-100 bg-slate-50/50 p-2.5 dark:border-slate-850 dark:bg-slate-950/20 text-xs">
-                    {assigned ? (
-                      <div className="flex items-start gap-2">
-                        <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-650" />
+                  {/* Matched Case Card & Decisions */}
+                  {isCommitted ? (
+                    <div className="mt-3.5 rounded-xl border border-blue-100 bg-blue-50/30 p-3 dark:border-blue-950/30 dark:bg-blue-950/10 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <Link2 className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
                         <div className="min-w-0 flex-1">
-                          <Link href={`/complaints/${assigned.id}`} target="_blank" className="block truncate font-bold text-slate-800 hover:underline dark:text-slate-150">
-                            {complaintLabel(assigned)}
-                          </Link>
-                          <p className="truncate text-[10px] text-slate-450">{assigned.title || "(no subject)"}</p>
-                          {it.candidates[0]?.reasons?.length ? (
-                            <p className="mt-0.5 text-[9px] text-slate-400 truncate">
-                              {it.candidates.find((c) => c.complaintId === assigned.id)?.reasons.join(" · ") || it.candidates[0].reasons.join(" · ")}
-                            </p>
-                          ) : null}
+                          <span className="font-bold text-slate-850 dark:text-slate-100 block">Attached & Saved</span>
+                          {assigned && (
+                            <Link href={`/complaints/${assigned.id}`} target="_blank" className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline dark:text-blue-400 truncate mt-0.5 font-mono">
+                              {complaintLabel(assigned)}
+                            </Link>
+                          )}
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10px] font-semibold text-rose-500 flex items-center gap-1">
-                          <XCircle className="h-3.5 w-3.5" />
-                          No matched case. Search and link target.
-                        </p>
-                        {it.decision !== "committed" && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={creatingId === it.id}
-                            onClick={() => createComplaintForItem(it)}
-                            title="No complaint exists for this acknowledgment yet — create one (no files) from its extracted details."
-                            className="h-7 shrink-0 gap-1 rounded-lg text-[10px] font-bold"
-                          >
-                            {creatingId === it.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FilePlus className="h-3 w-3" />}
-                            Create Complaint
-                          </Button>
+                      <span className="text-[10px] font-extrabold uppercase text-blue-600 dark:text-blue-400 tracking-wider shrink-0 bg-blue-100/50 dark:bg-blue-950/50 px-2 py-0.5 rounded">Committed</span>
+                    </div>
+                  ) : isConfirmed ? (
+                    <div className="mt-3.5 rounded-xl border border-emerald-100 bg-emerald-50/30 p-3 dark:border-emerald-950/30 dark:bg-emerald-950/10 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-655 dark:text-emerald-400 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-slate-850 dark:text-slate-100 block">Confirmed Match</span>
+                          {assigned && (
+                            <Link href={`/complaints/${assigned.id}`} target="_blank" className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline dark:text-emerald-400 truncate mt-0.5 font-mono">
+                              {complaintLabel(assigned)}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDecision(it, "pending")}
+                        className="h-7 text-[11px] font-bold rounded-lg border-emerald-250/50 hover:bg-emerald-50 dark:border-slate-800 dark:hover:bg-slate-800 shrink-0"
+                      >
+                        Modify
+                      </Button>
+                    </div>
+                  ) : isSkipped ? (
+                    <div className="mt-3.5 rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/40 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <XCircle className="h-4 w-4 shrink-0 text-slate-450 dark:text-slate-550" />
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-slate-500 dark:text-slate-400 block">Skipped</span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">This acknowledgment will not be attached</span>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDecision(it, "pending")}
+                        className="h-7 text-[11px] font-bold rounded-lg shrink-0"
+                      >
+                        Modify
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Matched Case Card (Pending State) */}
+                      <div className="mt-3.5 space-y-2 rounded-xl border border-slate-100 bg-slate-50/50 p-2.5 dark:border-slate-850 dark:bg-slate-950/20 text-xs">
+                        {assigned ? (
+                          <div className="flex items-start gap-2">
+                            <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-650" />
+                            <div className="min-w-0 flex-1">
+                              <Link href={`/complaints/${assigned.id}`} target="_blank" className="block truncate font-bold text-slate-800 hover:underline dark:text-slate-150">
+                                {complaintLabel(assigned)}
+                              </Link>
+                              <p className="truncate text-[10px] text-slate-455">{assigned.title || "(no subject)"}</p>
+                              {it.candidates[0]?.reasons?.length ? (
+                                <p className="mt-0.5 text-[9px] text-slate-400 truncate">
+                                  {it.candidates.find((c) => c.complaintId === assigned.id)?.reasons.join(" · ") || it.candidates[0].reasons.join(" · ")}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-semibold text-rose-500 flex items-center gap-1">
+                              <XCircle className="h-3.5 w-3.5" />
+                              No matched case. Search and link target.
+                            </p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={creatingId === it.id}
+                              onClick={() => createComplaintForItem(it)}
+                              title="No complaint exists for this acknowledgment yet — create one (no files) from its extracted details."
+                              className="h-7 shrink-0 gap-1 rounded-lg text-[10px] font-bold cursor-pointer"
+                            >
+                              {creatingId === it.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FilePlus className="h-3 w-3" />}
+                              Create Complaint
+                            </Button>
+                          </div>
                         )}
-                      </div>
-                    )}
 
-                    {/* Candidate Pick list */}
-                    {it.decision !== "committed" && it.candidates.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/80">
-                        {it.candidates.slice(0, 3).map((c) => (
-                          <button
-                            key={c.complaintId}
-                            type="button"
-                            onClick={() => assign(it, { id: c.complaintId, caseNumber: c.caseNumber, complaintNumber: c.complaintNumber, jobNumber: c.jobNumber, title: c.title, location: c.location, status: c.status })}
-                            className={cn(
-                              "rounded-full border px-2 py-0.5 text-[9.5px] font-semibold transition-colors cursor-pointer",
-                              it.assignedComplaintId === c.complaintId
-                                ? "border-emerald-350 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40"
-                                : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400 hover:border-slate-350"
-                            )}
-                            title={c.reasons.join(" · ")}
-                          >
-                            {c.caseNumber || c.jobNumber || c.title?.slice(0, 16) || c.complaintId.slice(0, 6)} ({Math.round(c.score * 100)}%)
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                        {/* Candidate Pick list */}
+                        {it.candidates.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                            {it.candidates.slice(0, 3).map((c) => (
+                              <button
+                                key={c.complaintId}
+                                type="button"
+                                onClick={() => assign(it, { id: c.complaintId, caseNumber: c.caseNumber, complaintNumber: c.complaintNumber, jobNumber: c.jobNumber, title: c.title, location: c.location, status: c.status })}
+                                className={cn(
+                                  "rounded-full border px-2 py-0.5 text-[9.5px] font-semibold transition-colors cursor-pointer",
+                                  it.assignedComplaintId === c.complaintId
+                                    ? "border-emerald-350 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40"
+                                    : "border-slate-200 text-slate-650 dark:border-slate-700 dark:text-slate-400 hover:border-slate-350"
+                                )}
+                                title={c.reasons.join(" · ")}
+                              >
+                                {c.caseNumber || c.jobNumber || c.title?.slice(0, 16) || c.complaintId.slice(0, 6)} ({Math.round(c.score * 100)}%)
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
-                    {it.decision !== "committed" && <ComplaintPicker onPick={(c) => assign(it, c)} />}
-                  </div>
+                        <ComplaintPicker onPick={(c) => assign(it, c)} />
+                      </div>
+
+                      {/* Card Action footer (Pending State Only) */}
+                      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-850">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openDrawer(it, it.originalIndex)}
+                          className="h-8 text-xs font-bold gap-1 rounded-lg cursor-pointer"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Review
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!it.assignedComplaintId}
+                          onClick={() => setDecision(it, "confirmed")}
+                          className="h-8 text-xs font-bold gap-1 rounded-lg cursor-pointer text-emerald-650 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Confirm
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDecision(it, "skipped")}
+                          className="h-8 text-xs font-bold ml-auto rounded-lg text-slate-455 hover:text-rose-500 cursor-pointer"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          Skip
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {/* Card Action footer */}
-                {it.decision !== "committed" && (
-                  <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-850">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openDrawer(it, it.originalIndex)}
-                      className="h-8 text-xs font-bold gap-1 rounded-lg"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Review
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={it.decision === "confirmed" ? "default" : "outline"}
-                      disabled={!it.assignedComplaintId}
-                      onClick={() => setDecision(it, it.decision === "confirmed" ? "pending" : "confirmed")}
-                      className="h-8 text-xs font-bold gap-1 rounded-lg"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {it.decision === "confirmed" ? "Confirmed" : "Confirm"}
-                    </Button>
-                    
-                    {it.decision === "skipped" ? (
-                      <Button size="sm" variant="ghost" onClick={() => setDecision(it, "pending")} className="h-8 text-xs font-bold ml-auto rounded-lg text-slate-500">
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="ghost" onClick={() => setDecision(it, "skipped")} className="h-8 text-xs font-bold ml-auto rounded-lg text-slate-450 hover:text-rose-500">
-                        <XCircle className="h-3.5 w-3.5" />
-                        Skip
-                      </Button>
-                    )}
-                  </div>
-                )}
               </Card>
             );
           })}
