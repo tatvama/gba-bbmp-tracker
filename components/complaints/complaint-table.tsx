@@ -1117,7 +1117,7 @@ export function ComplaintTable({
                       {hg.headers.map((h) => (
                         <TableHead
                           key={h.id}
-                          className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 py-3.5 px-4"
+                          className="text-[11px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 py-3.5 px-4"
                         >
                           {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                         </TableHead>
@@ -1390,7 +1390,7 @@ function SortBtn({
     <button
       type="button"
       className={cn(
-        "inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors font-extrabold uppercase text-[11px] tracking-wider",
+        "inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors font-black uppercase text-[11px] tracking-wider text-slate-800 dark:text-slate-205",
         isSorted && "text-primary dark:text-primary"
       )}
       onClick={() => column.toggleSorting(isSorted === "asc")}
