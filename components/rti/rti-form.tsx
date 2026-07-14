@@ -444,7 +444,6 @@ function RtiFormInner({
           >
             <option value="">{tc("common.na")}</option>
             <option value="BBMP">{t("form.bbmpWards")}</option>
-            <option value="GBA">{t("form.gbaWards")}</option>
           </select>
         </Field>
 

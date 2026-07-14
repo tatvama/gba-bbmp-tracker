@@ -473,7 +473,6 @@ export function ComplaintForm({
           >
             <option value="">—</option>
             <option value="BBMP">{translateEnum("workflow", "BBMP", locale)}</option>
-            <option value="GBA">{translateEnum("workflow", "GBA", locale)}</option>
           </select>
         </Field>
 
