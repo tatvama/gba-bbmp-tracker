@@ -56,89 +56,81 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
   };
 
   return (
-    <div className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-805 dark:bg-slate-900 shadow-3xs hover:shadow-2xs hover:border-slate-350 dark:hover:border-slate-700 transition-all duration-300 p-4.5">
-      {/* Left: Icon + File Details */}
-      <div className="flex items-center gap-3.5 min-w-[200px] flex-1">
+    <div className="group grid grid-cols-1 sm:grid-cols-12 items-center gap-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-805 dark:bg-slate-900 shadow-3xs hover:shadow-2xs hover:border-slate-350 dark:hover:border-slate-700 transition-all duration-300 p-4">
+      {/* Col 1 (Info details) - Takes 6/12 width on desktop (50%) */}
+      <div className="sm:col-span-6 flex items-center gap-3.5 min-w-0">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 text-slate-455 shadow-3xs group-hover:scale-102 transition-transform">
           <FileText className="h-5 w-5" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate group-hover:text-primary transition-colors duration-200" title={b.originalName || "acknowledgments.pdf"}>
             {b.originalName || "acknowledgments.pdf"}
           </h4>
-          <div className="flex items-center gap-2 text-[10px] text-slate-450 dark:text-slate-500 mt-1 font-bold whitespace-nowrap">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>{dateStr}</span>
-            {error && <span className="text-rose-600 font-extrabold">• {error}</span>}
+          <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-455 dark:text-slate-500 font-bold leading-none">
+            <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <span className="whitespace-nowrap">{dateStr}</span>
+            <span className="text-slate-350 dark:text-slate-800">•</span>
+            <span className="whitespace-nowrap text-slate-500 dark:text-slate-450">{b.pageCount} {t("advanced.ack.pagesLabel").toLowerCase()}</span>
+            <span className="text-slate-355 dark:text-slate-800">•</span>
+            <span className="whitespace-nowrap text-slate-500 dark:text-slate-450">{b.itemCount} {t("advanced.ack.extractedLabel").toLowerCase()}</span>
+            {error && (
+              <>
+                <span className="text-slate-355 dark:text-slate-800">•</span>
+                <span className="text-rose-650 font-extrabold">{error}</span>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Middle Left: Status Badge */}
-      <div className="shrink-0 flex items-center">
-        <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${STATUS_VARIANT[b.status] || "bg-slate-100 border-slate-200"}`}>
+      {/* Col 2 (Status & Progress) - Takes 3/12 width (25%) and stacks vertically on tablet/small screen */}
+      <div className="sm:col-span-3 flex flex-row sm:flex-col lg:flex-row items-center sm:items-start lg:items-center gap-2.5 sm:gap-2 lg:gap-2.5">
+        {/* Status Badge */}
+        <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider whitespace-nowrap ${STATUS_VARIANT[b.status] || "bg-slate-100 border-slate-200"}`}>
           {translateEnum("status", b.status, locale)}
+        </span>
+
+        {/* Progress Badge */}
+        <span className="text-[9px] text-slate-500 dark:text-slate-450 font-extrabold whitespace-nowrap bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 px-2.5 py-0.5 rounded-full">
+          {b.committedCount}/{b.itemCount} {t("advanced.ack.attachedLabel").toLowerCase()}
         </span>
       </div>
 
-      {/* Middle Right: Stats indicators */}
-      <div className="flex items-center gap-5 text-center sm:text-left shrink-0">
-        <div className="min-w-[48px]">
-          <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">{t("advanced.ack.pagesLabel")}</div>
-          <div className="text-xs font-extrabold text-slate-700 dark:text-slate-350 mt-1">{b.pageCount}</div>
-        </div>
-        <div className="h-8 w-px bg-slate-150 dark:bg-slate-800" />
-        <div className="min-w-[48px]">
-          <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">{t("advanced.ack.extractedLabel")}</div>
-          <div className="text-xs font-extrabold text-slate-700 dark:text-slate-350 mt-1">{b.itemCount}</div>
-        </div>
-        <div className="h-8 w-px bg-slate-150 dark:bg-slate-800" />
-        <div className="min-w-[48px]">
-          <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">{t("advanced.ack.attachedLabel")}</div>
-          <div className="text-xs font-extrabold text-slate-700 dark:text-slate-355 mt-1">{b.committedCount}</div>
-        </div>
-      </div>
-
-      {/* Right: Actions */}
-      <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-0 border-slate-50 dark:border-slate-855 pt-3.5 sm:pt-0 shrink-0">
+      {/* Col 3 (Actions) - Takes 3/12 width (25%) and aligns right */}
+      <div className="sm:col-span-3 flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 border-slate-100 dark:border-slate-850 pt-3 sm:pt-0">
         <span className="text-[10px] text-slate-455 font-bold sm:hidden">
           {pending > 0 ? t("advanced.ack.itemsPending", { count: pending }) : t("advanced.ack.allItemsProcessed")}
         </span>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] text-slate-455 font-bold hidden sm:inline">
-            {pending > 0 ? t("advanced.ack.itemsPending", { count: pending }) : t("advanced.ack.allItemsProcessed")}
-          </span>
+        
+        <div className="flex items-center gap-2">
+          {/* Delete / Stop button */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            disabled={loading}
+            className={`h-8 text-xs font-bold px-3 gap-1 rounded-lg border-slate-205 dark:border-slate-800 dark:bg-slate-950 cursor-pointer transition-colors duration-200 ${
+              isActive
+                ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50/50 dark:hover:bg-amber-955/20 border-amber-200/50 dark:border-amber-950/30"
+                : "text-rose-600 hover:text-rose-700 hover:bg-rose-50/50 dark:hover:bg-rose-955/20 border-rose-200/50 dark:border-rose-950/30"
+            }`}
+          >
+            {loading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : isActive ? (
+              <StopCircle className="h-3.5 w-3.5" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            {isActive ? t("advanced.ack.stopButton") : tc("action.delete")}
+          </Button>
 
-          <div className="flex items-center gap-2">
-            {/* Delete / Stop button */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleDelete}
-              disabled={loading}
-              className={`h-8 text-xs font-bold px-3 gap-1 rounded-lg border-slate-200 dark:border-slate-800 dark:bg-slate-950 cursor-pointer transition-colors duration-200 ${
-                isActive
-                  ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50/50 dark:hover:bg-amber-955/20 border-amber-200/50 dark:border-amber-950/30"
-                  : "text-rose-600 hover:text-rose-700 hover:bg-rose-50/50 dark:hover:bg-rose-955/20 border-rose-200/50 dark:border-rose-950/30"
-              }`}
-            >
-              {loading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : isActive ? (
-                <StopCircle className="h-3.5 w-3.5" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
-              )}
-              {isActive ? t("advanced.ack.stopButton") : tc("action.delete")}
-            </Button>
-
-            <Button size="sm" variant="outline" className="h-8 text-xs font-bold px-3 gap-1.5 rounded-lg shadow-3xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850" asChild>
-              <Link href={`/complaints/acknowledgments/${b.id}`}>
-                {b.status === "committed" ? t("advanced.ack.viewBatch") : t("advanced.ack.reviewAndMatch")}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </div>
+          <Button size="sm" variant="outline" className="h-8 text-xs font-bold px-3 gap-1.5 rounded-lg shadow-3xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850" asChild>
+            <Link href={`/complaints/acknowledgments/${b.id}`}>
+              {b.status === "committed" ? t("advanced.ack.viewBatch") : t("advanced.ack.reviewAndMatch")}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
         </div>
       </div>
     </div>
