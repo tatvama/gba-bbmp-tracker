@@ -58,15 +58,15 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
   return (
     <div className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-805 dark:bg-slate-900 shadow-3xs hover:shadow-2xs hover:border-slate-350 dark:hover:border-slate-700 transition-all duration-300 p-4.5">
       {/* Left: Icon + File Details */}
-      <div className="flex items-center gap-3.5 min-w-0 flex-1 sm:max-w-xs md:max-w-md lg:max-w-lg">
+      <div className="flex items-center gap-3.5 min-w-[200px] flex-1">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 text-slate-455 shadow-3xs group-hover:scale-102 transition-transform">
           <FileText className="h-5 w-5" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate group-hover:text-primary transition-colors duration-200" title={b.originalName || "acknowledgments.pdf"}>
             {b.originalName || "acknowledgments.pdf"}
           </h4>
-          <div className="flex items-center gap-2 text-[10px] text-slate-450 dark:text-slate-500 mt-1 font-bold">
+          <div className="flex items-center gap-2 text-[10px] text-slate-450 dark:text-slate-500 mt-1 font-bold whitespace-nowrap">
             <Calendar className="h-3.5 w-3.5" />
             <span>{dateStr}</span>
             {error && <span className="text-rose-600 font-extrabold">• {error}</span>}
