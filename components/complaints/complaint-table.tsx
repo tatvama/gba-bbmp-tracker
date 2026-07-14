@@ -32,7 +32,7 @@ import { COMPLAINT_TYPES, COMPLAINT_STATUSES, PRIORITIES, COMPLAINT_OPEN_STATUSE
 import { formatDate, orDash } from "@/lib/format";
 import { exportRows } from "@/lib/export";
 import { cn } from "@/lib/utils";
-import type { ComplaintWithRelations } from "@/lib/types";
+import type { ComplaintWithRelations, Division, EngSubDivision, WardWithRelations } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/client";
 import { translateEnum } from "@/lib/i18n/translate-enum";
 import type { Locale } from "@/lib/i18n/types";
@@ -379,7 +379,22 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
   );
 }
 
-export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithRelations[]; canEdit?: boolean }) {
+export function ComplaintTable({
+  data,
+  canEdit = false,
+  allDivisions = [],
+  allSubDivisions = [],
+  allWards = [],
+}: {
+  data: ComplaintWithRelations[];
+  canEdit?: boolean;
+  /** Master BBMP-225 hierarchy (NOT derived from `data`) — division/sub-division/
+   *  ward filter options must reflect every real division/sub-division/ward,
+   *  including ones with zero complaints on file, not just what's in use today. */
+  allDivisions?: Division[];
+  allSubDivisions?: (EngSubDivision & { division?: Pick<Division, "id" | "name"> | null })[];
+  allWards?: WardWithRelations[];
+}) {
   const { t, locale } = useTranslation("complaints");
   const { t: tCommon } = useTranslation("common");
   const router = useRouter();
@@ -402,16 +417,25 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     () => COMPLAINT_STATUSES.filter((s) => data.some((c) => c.status === s)),
     [data],
   );
+  // Division/sub-division/ward options are sourced from the MASTER hierarchy
+  // (allDivisions/allSubDivisions/allWards — the real BBMP-225 tables), never
+  // from `data` (complaints). A division/sub-division/ward with zero
+  // complaints on file is still real and must still be a selectable filter —
+  // deriving options from complaints alone made 19 of 30 divisions show an
+  // incomplete sub-division list (5 divisions vanished entirely), which is
+  // not acceptable in a civic-data application. The complaint ROW filter
+  // below still matches each complaint's own tagged division/sub-division/
+  // ward, unchanged.
   const divisionOpts = React.useMemo(
-    () => [...new Set(data.map((c) => c.division?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
-    [data],
+    () => [...new Set(allDivisions.map((d) => d.name))].sort((a, b) => a.localeCompare(b)),
+    [allDivisions],
   );
-  // Whether the dataset has ANY sub-division/ward data at all — decides
-  // whether to render that filter slot in the bar in the first place,
-  // independent of the current selection (so the bar doesn't jump around as
-  // the user drills down).
-  const hasAnySubDivision = React.useMemo(() => data.some((c) => c.eng_subdivision?.name), [data]);
-  const hasAnyWard = React.useMemo(() => data.some((c) => c.ward), [data]);
+  // Whether the master hierarchy has ANY sub-division/ward data at all —
+  // decides whether to render that filter slot in the bar in the first
+  // place, independent of the current selection (so the bar doesn't jump
+  // around as the user drills down).
+  const hasAnySubDivision = allSubDivisions.length > 0;
+  const hasAnyWard = allWards.length > 0;
 
   // STRICT drill-down: sub-division only offers options once a division is
   // picked (no "jump straight to a sub-division" — it would mix sub-divisions
@@ -419,25 +443,24 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
   // full list) is what locks the control below.
   const subDivisionOpts = React.useMemo(() => {
     if (division === "all") return [];
-    return [...new Set(data.filter((c) => c.division?.name === division).map((c) => c.eng_subdivision?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b));
-  }, [data, division]);
+    return [...new Set(allSubDivisions.filter((s) => s.division?.name === division).map((s) => s.name))].sort((a, b) => a.localeCompare(b));
+  }, [allSubDivisions, division]);
   // Ward only offers options once BOTH division and sub-division are picked —
   // every ward that actually belongs to that exact sub-division. Each option
   // carries the ward NAME with its number for display; the value stays the
   // bare number so the row filter (String(c.ward.new_no) === ward) is unchanged.
   const wardOpts = React.useMemo(() => {
     if (division === "all" || subDivision === "all") return [];
-    const scoped = data.filter((c) => c.division?.name === division && c.eng_subdivision?.name === subDivision);
+    const scoped = allWards.filter((w) => w.division?.name === division && w.eng_subdivision?.name === subDivision);
     const byNo = new Map<string, string>();
-    for (const c of scoped) {
-      if (!c.ward) continue;
-      const value = String(c.ward.new_no);
-      if (!byNo.has(value)) byNo.set(value, `${c.ward.new_no} · ${c.ward.new_name}`);
+    for (const w of scoped) {
+      const value = String(w.new_no);
+      if (!byNo.has(value)) byNo.set(value, `${w.new_no} · ${w.new_name}`);
     }
     return [...byNo.entries()]
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => Number(a.value) - Number(b.value));
-  }, [data, division, subDivision]);
+  }, [allWards, division, subDivision]);
 
   // Keep the cascade coherent: when the higher-level selection changes, drop a
   // now-invalid child selection so it can't silently filter everything out.
