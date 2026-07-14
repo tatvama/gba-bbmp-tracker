@@ -974,16 +974,6 @@ export function ComplaintTable({
                 {PRIORITIES.map((p) => <option key={p} value={p}>{translateEnum("workflow", p, locale)}</option>)}
               </select>
 
-              <select className={selectCls} value={flag} onChange={(e) => setFlag(e.target.value)} aria-label={t("list.table.ariaFlagFilter")}>
-                <option value="all">{t("list.table.optAllFlags")}</option>
-                <option value="open">{t("list.table.optOpenNotResolved")}</option>
-                <option value="today">{t("list.table.optFollowUpDueToday")}</option>
-                <option value="overdue">{t("list.table.optOverdueFollowUp")}</option>
-                <option value="reply">{t("list.table.optReplyReceived")}</option>
-                <option value="action">{t("list.table.optActionTaken")}</option>
-                <option value="noreply">{t("list.table.optNoReply")}</option>
-              </select>
-
               {divisionOpts.length > 0 && (
                 <select className={selectCls} value={division} onChange={(e) => setDivision(e.target.value)} aria-label={t("list.table.ariaDivisionFilter")}>
                   <option value="all">{t("list.table.optAnyDivision")}</option>
