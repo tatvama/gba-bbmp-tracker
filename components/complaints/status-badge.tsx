@@ -173,8 +173,8 @@ export function StatusBadge({ status, date }: { status: string; date?: string | 
               config.colors,
               config.isAttention && "animate-pulse-subtle hover:animate-none"
             )}
+            dot={true}
           >
-            <Icon className="h-3.5 w-3.5 shrink-0 opacity-90" />
             <span>{label}</span>
           </Badge>
         </TooltipTrigger>
