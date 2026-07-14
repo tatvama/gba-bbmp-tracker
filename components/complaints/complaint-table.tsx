@@ -406,14 +406,38 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     () => [...new Set(data.map((c) => c.division?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
     [data],
   );
-  const subDivisionOpts = React.useMemo(
-    () => [...new Set(data.map((c) => c.eng_subdivision?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
-    [data],
-  );
-  const wardOpts = React.useMemo(
-    () => [...new Set(data.map((c) => (c.ward ? String(c.ward.new_no) : null)).filter(Boolean) as string[])].sort((a, b) => Number(a) - Number(b)),
-    [data],
-  );
+  // Sub-division options cascade from the selected division — only the
+  // sub-divisions that actually appear on complaints in that division.
+  const subDivisionOpts = React.useMemo(() => {
+    const scoped = division === "all" ? data : data.filter((c) => c.division?.name === division);
+    return [...new Set(scoped.map((c) => c.eng_subdivision?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b));
+  }, [data, division]);
+  // Ward options cascade from the selected division + sub-division. Each option
+  // carries the ward NAME with its number for display; the value stays the bare
+  // number so the row filter (String(c.ward.new_no) === ward) is unchanged.
+  const wardOpts = React.useMemo(() => {
+    let scoped = data;
+    if (division !== "all") scoped = scoped.filter((c) => c.division?.name === division);
+    if (subDivision !== "all") scoped = scoped.filter((c) => c.eng_subdivision?.name === subDivision);
+    const byNo = new Map<string, string>();
+    for (const c of scoped) {
+      if (!c.ward) continue;
+      const value = String(c.ward.new_no);
+      if (!byNo.has(value)) byNo.set(value, `${c.ward.new_no} · ${c.ward.new_name}`);
+    }
+    return [...byNo.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => Number(a.value) - Number(b.value));
+  }, [data, division, subDivision]);
+
+  // Keep the cascade coherent: when the higher-level selection changes, drop a
+  // now-invalid child selection so it can't silently filter everything out.
+  React.useEffect(() => {
+    if (subDivision !== "all" && !subDivisionOpts.includes(subDivision)) setSubDivision("all");
+  }, [subDivisionOpts, subDivision]);
+  React.useEffect(() => {
+    if (ward !== "all" && !wardOpts.some((w) => w.value === ward)) setWard("all");
+  }, [wardOpts, ward]);
 
   const filtered = React.useMemo(
     () => data.filter((c) => {
@@ -945,7 +969,7 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
               {wardOpts.length > 0 && (
                 <select className={selectCls} value={ward} onChange={(e) => setWard(e.target.value)} aria-label={t("list.table.ariaWardFilter")}>
                   <option value="all">{t("list.table.optAnyWard")}</option>
-                  {wardOpts.map((w) => <option key={w} value={w}>{t("list.table.wardOptionLabel", { no: w })}</option>)}
+                  {wardOpts.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
                 </select>
               )}
             </div>
