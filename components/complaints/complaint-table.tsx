@@ -110,9 +110,9 @@ function TypeChip({ type }: { type: string | null }) {
   return (
     <Badge
       variant="outline"
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 h-5.5 whitespace-nowrap rounded-md border-slate-200 bg-slate-50/60 text-slate-800 font-extrabold text-[11px] dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300 animate-fade-in"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 whitespace-nowrap rounded-md border-slate-200 bg-slate-50 text-slate-700 font-medium text-xs dark:bg-slate-900/30 dark:border-slate-800 dark:text-slate-300 animate-fade-in"
     >
-      <Icon className="h-3 w-3 text-slate-400 shrink-0" />
+      <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
       {translateEnum("workflow", type, locale)}
     </Badge>
   );
@@ -153,9 +153,9 @@ function PriorityChip({ priority }: { priority: string | null }) {
   return (
     <Badge
       variant="outline"
-      className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 h-5.5 rounded-md font-black text-[11px] border animate-fade-in shadow-3xs hover:shadow-2xs hover:scale-[1.02] transition-all duration-200 select-none", cls)}
+      className={cn("inline-flex items-center gap-1 px-2 py-0.5 h-6 rounded-md font-semibold text-xs border animate-fade-in shadow-3xs hover:shadow-2xs hover:scale-[1.02] transition-all duration-200 select-none", cls)}
     >
-      <Icon className="h-3 w-3 shrink-0 opacity-80" />
+      <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
       {translateEnum("workflow", priority, locale)}
     </Badge>
   );
@@ -272,15 +272,9 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
   const { t } = useTranslation("complaints");
   const { t: tCommon } = useTranslation("common");
   const [expanded, setExpanded] = React.useState(false);
-  const isClosed = c.status === "Resolved" || c.status === "Closed";
-  const isOverdue = !isClosed && !!c.next_follow_up_date && c.next_follow_up_date < today;
   return (
-    <Card className="relative border border-slate-200 bg-white shadow-xs rounded-xl overflow-hidden hover:border-blue-200 dark:bg-slate-900/40 dark:border-slate-800 transition-all duration-205 group animate-fade-in">
-      <div className={cn(
-        "absolute inset-y-0 left-0 w-1.5",
-        isClosed ? "bg-slate-300 dark:bg-slate-700" : isOverdue ? "bg-rose-500" : "bg-primary"
-      )} />
-      <CardContent className="p-3.5 space-y-3 pl-4">
+    <Card className="border border-slate-200 bg-white shadow-xs rounded-xl overflow-hidden hover:border-blue-200 dark:bg-slate-900/40 dark:border-slate-800 transition-all duration-205 group animate-fade-in">
+      <CardContent className="p-3.5 space-y-3">
         {/* Header: Complaint ID & Badges */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col">
@@ -576,16 +570,16 @@ export function ComplaintTable({
       accessorKey: "internal_case_number",
       header: ({ column }) => <SortBtn column={column} label={t("list.table.colRef")} />,
       cell: ({ row }) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-mono text-[13px] font-black text-foreground">
+        <div className="flex flex-col">
+          <span className="font-mono text-xs font-bold text-foreground">
             {row.original.internal_case_number || t("list.pendingFallback")}
           </span>
           {row.original.job_number && (
-            <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+            <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
               {t("list.table.jobLabel", { number: row.original.job_number })}
             </span>
           )}
-          <span className="text-[11.5px] text-slate-700 dark:text-slate-300 font-extrabold leading-none">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
             {formatDate(row.original.date_submitted)}
           </span>
         </div>
@@ -604,11 +598,11 @@ export function ComplaintTable({
         ].filter(Boolean).join(" • ");
 
         return (
-          <div className="flex flex-col gap-1.5 py-1">
-            <span className="font-extrabold text-[13px] text-slate-900 dark:text-slate-100 line-clamp-2 max-w-md leading-normal group-hover:text-primary transition-colors">
+          <div className="flex flex-col py-1">
+            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 line-clamp-2 max-w-md leading-relaxed group-hover:text-primary transition-colors">
               {c.title}
             </span>
-            <div className="flex items-center gap-2 text-[11.5px] font-extrabold text-slate-700 dark:text-slate-300 truncate leading-none">
+            <div className="flex items-center gap-2 mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
               <span>{subtext}</span>
             </div>
           </div>
@@ -621,7 +615,7 @@ export function ComplaintTable({
       cell: ({ row }) => (
         <div className="flex flex-col items-start gap-1 min-w-[180px]">
           <StatusBadge status={row.original.status} date={row.original.updated_at} />
-          <span className="text-[11px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider pl-0.5 whitespace-nowrap">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider pl-0.5 whitespace-nowrap">
             {t(getNextActionKeyForStatus(row.original.status))}
           </span>
         </div>
@@ -651,12 +645,12 @@ export function ComplaintTable({
       cell: ({ row }) => {
         const rel = getRelativeTime(row.original.updated_at, t);
         return (
-          <div className="flex flex-col gap-0.5">
-            <span className="whitespace-nowrap text-[13px] font-extrabold text-slate-900 dark:text-slate-100">
+          <div className="flex flex-col">
+            <span className="whitespace-nowrap text-xs font-semibold text-slate-800 dark:text-slate-200">
               {formatDate(row.original.updated_at)}
             </span>
             {rel && (
-              <span className="text-[11.5px] text-slate-700 dark:text-slate-300 font-extrabold leading-none">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                 {rel}
               </span>
             )}
@@ -1104,16 +1098,16 @@ export function ComplaintTable({
           </div>
 
           {/* Premium Data Table Workspace */}
-          <div className="hidden md:block rounded-xl border border-border bg-card shadow-xs overflow-hidden">
-            <div className="overflow-auto max-h-[calc(100vh-280px)] scrollbar-thin">
+          <div className="hidden md:block rounded-xl border border-border/85 bg-gradient-to-br from-card via-card to-muted/15 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/65 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden animate-page-slide">
+            <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
               <Table className="w-full text-left border-collapse">
-                <TableHeader className="sticky top-0 bg-slate-50 dark:bg-slate-900 border-b border-border/80 z-20 shadow-xs">
+                <TableHeader className="sticky top-0 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-border/80 z-10 shadow-2xs">
                   {table.getHeaderGroups().map((hg) => (
                     <TableRow key={hg.id} className="hover:bg-transparent border-none">
                       {hg.headers.map((h) => (
                         <TableHead
                           key={h.id}
-                          className="py-3.5 px-4 bg-slate-50 dark:bg-slate-900 sticky top-0 z-20"
+                          className="py-3.5 px-4"
                         >
                           {h.isPlaceholder ? null : (
                             <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 block">
@@ -1133,36 +1127,28 @@ export function ComplaintTable({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    table.getRowModel().rows.map((row) => {
-                      const c = row.original;
-                      const isClosed = c.status === "Resolved" || c.status === "Closed";
-                      const isOverdue = !isClosed && !!c.next_follow_up_date && c.next_follow_up_date < today;
-                      return (
-                        <TableRow
-                          key={row.id}
-                          className="group hover:bg-slate-50/40 dark:hover:bg-slate-900/10 transition-colors border-b border-border/40 relative"
-                        >
-                          {row.getVisibleCells().map((cell, idx) => (
-                            <TableCell
-                              key={cell.id}
-                              className={cn(
-                                "align-middle py-4 px-4 relative",
-                                idx === 0 && "pl-4"
-                              )}
-                            >
-                              {/* Status-coded accent bar, always visible (matches RTI table) */}
-                              {idx === 0 && (
-                                <div className={cn(
-                                  "absolute inset-y-0 left-0 w-1",
-                                  isClosed ? "bg-slate-300 dark:bg-slate-700" : isOverdue ? "bg-rose-500" : "bg-primary"
-                                )} />
-                              )}
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      );
-                    })
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow
+                        key={row.id}
+                        className="group h-[76px] odd:bg-card/35 dark:odd:bg-slate-900/35 even:bg-muted/10 dark:even:bg-slate-950/10 hover:bg-primary/[0.03] dark:hover:bg-primary/[0.04] transition-all duration-150 border-b border-border/40 hover:shadow-3xs relative overflow-hidden"
+                      >
+                        {row.getVisibleCells().map((cell, idx) => (
+                          <TableCell
+                            key={cell.id}
+                            className={cn(
+                              "align-middle py-3 px-4 relative",
+                              idx === 0 && "pl-4"
+                            )}
+                          >
+                            {/* Accent bar on left boundary for hovered rows */}
+                            {idx === 0 && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+                            )}
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
