@@ -12,6 +12,7 @@ import type { NamespaceDictionaries } from "../types";
  */
 const en = {
   // ── Detail page header (app/complaints/[id]/page.tsx) ──
+  "detailPage.breadcrumbComplaints": "Complaints",
   "detailPage.breadcrumbCaseDetails": "Case Details",
   "detailPage.action.caseFile": "Case file",
   "detailPage.action.forensicAudit": "Forensic audit",
@@ -497,6 +498,7 @@ const en = {
 } as const satisfies Record<string, string>;
 
 const kn: Record<keyof typeof en, string> = {
+  "detailPage.breadcrumbComplaints": "ದೂರುಗಳು",
   "detailPage.breadcrumbCaseDetails": "ಪ್ರಕರಣದ ವಿವರಗಳು",
   "detailPage.action.caseFile": "ಪ್ರಕರಣ ಫೈಲ್",
   "detailPage.action.forensicAudit": "ಫೊರೆನ್ಸಿಕ್ ಆಡಿಟ್",
