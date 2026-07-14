@@ -443,14 +443,11 @@ function RtiFormInner({
             required
           >
             <option value="">{tc("common.na")}</option>
-            <option value="GBA">{t("form.gbaWards")}</option>
-            {/* Every existing RTI on file is ward_type="BBMP" — keep this option
-                available ONLY when editing one of those, so its edit page
-                doesn't show a <select> whose current value matches no option.
-                New RTIs (no `initial`) never see it. */}
-            {rti?.ward_type === "BBMP" && (
-              <option value="BBMP">{t("form.bbmpWards")}</option>
-            )}
+            {/* BBMP-225 only. GBA-369 is out of scope: every RTI on file is
+                tagged in BBMP-225, and the two systems have no 1:1 crosswalk,
+                so mixing them would produce filters that can't find real
+                records. Revisit only alongside a reviewed data migration. */}
+            <option value="BBMP">{t("form.bbmpWards")}</option>
           </select>
         </Field>
 

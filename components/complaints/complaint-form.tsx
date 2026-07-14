@@ -472,14 +472,13 @@ export function ComplaintForm({
             required
           >
             <option value="">—</option>
-            <option value="GBA">{translateEnum("workflow", "GBA", locale)}</option>
-            {/* Every existing complaint on file is ward_type="BBMP" — keep this
-                option available ONLY when editing one of those, so its edit
-                page doesn't show a <select> whose current value matches no
-                option. New complaints (no `comp`) never see it. */}
-            {comp?.ward_type === "BBMP" && (
-              <option value="BBMP">{translateEnum("workflow", "BBMP", locale)}</option>
-            )}
+            {/* BBMP-225 only. GBA-369 is out of scope: every complaint on file
+                is tagged in BBMP-225, and the two systems have no 1:1 crosswalk
+                (e.g. BBMP bundles J P Nagar/Koramangala under the BTM Layout
+                division, whereas GBA splits them into their own divisions), so
+                mixing them would produce filters that can't find real records.
+                Revisit only alongside a reviewed BBMP->GBA data migration. */}
+            <option value="BBMP">{translateEnum("workflow", "BBMP", locale)}</option>
           </select>
         </Field>
 
