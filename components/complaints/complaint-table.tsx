@@ -153,7 +153,7 @@ function PriorityChip({ priority }: { priority: string | null }) {
   return (
     <Badge
       variant="outline"
-      className={cn("inline-flex items-center gap-1 px-2 py-0.5 h-6 rounded-md font-semibold text-xs border animate-fade-in", cls)}
+      className={cn("inline-flex items-center gap-1 px-2 py-0.5 h-6 rounded-md font-semibold text-xs border animate-fade-in shadow-3xs hover:shadow-2xs hover:scale-[1.02] transition-all duration-200 select-none", cls)}
     >
       <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
       {translateEnum("workflow", priority, locale)}

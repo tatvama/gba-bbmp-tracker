@@ -169,7 +169,7 @@ export function StatusBadge({ status, date }: { status: string; date?: string | 
           <Badge
             variant="outline"
             className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 py-0.5 h-6 rounded-md font-semibold text-xs border select-none transition-all duration-200 hover:scale-[1.03] hover:shadow-xs cursor-help whitespace-nowrap",
+              "inline-flex items-center gap-1.5 px-2.5 py-0.5 h-6 rounded-md font-semibold text-xs border select-none transition-all duration-200 hover:scale-[1.03] shadow-3xs hover:shadow-xs cursor-help whitespace-nowrap",
               config.colors,
               config.isAttention && "animate-pulse-subtle hover:animate-none"
             )}
