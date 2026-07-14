@@ -56,57 +56,57 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
   };
 
   return (
-    <div className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-3xs hover:shadow-2xs hover:border-slate-350 dark:hover:border-slate-700 transition-all duration-200 p-4">
+    <div className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-805 dark:bg-slate-900 shadow-3xs hover:shadow-2xs hover:border-slate-350 dark:hover:border-slate-700 transition-all duration-300 p-4.5">
       {/* Left: Icon + File Details */}
       <div className="flex items-center gap-3.5 min-w-0 flex-1 sm:max-w-xs md:max-w-md lg:max-w-lg">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 text-slate-455">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 text-slate-455 shadow-3xs group-hover:scale-102 transition-transform">
           <FileText className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <h4 className="text-xs font-bold text-slate-850 dark:text-slate-250 truncate group-hover:text-primary transition-colors" title={b.originalName || "acknowledgments.pdf"}>
+          <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate group-hover:text-primary transition-colors duration-200" title={b.originalName || "acknowledgments.pdf"}>
             {b.originalName || "acknowledgments.pdf"}
           </h4>
-          <div className="flex items-center gap-2 text-[10px] text-slate-455 dark:text-slate-500 mt-1 font-semibold">
-            <Calendar className="h-3 w-3" />
+          <div className="flex items-center gap-2 text-[10px] text-slate-450 dark:text-slate-500 mt-1 font-bold">
+            <Calendar className="h-3.5 w-3.5" />
             <span>{dateStr}</span>
-            {error && <span className="text-rose-600 font-bold">• {error}</span>}
+            {error && <span className="text-rose-600 font-extrabold">• {error}</span>}
           </div>
         </div>
       </div>
 
       {/* Middle Left: Status Badge */}
       <div className="shrink-0 flex items-center">
-        <span className={`rounded-full border px-2.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider ${STATUS_VARIANT[b.status] || "bg-slate-100 border-slate-200"}`}>
+        <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${STATUS_VARIANT[b.status] || "bg-slate-100 border-slate-200"}`}>
           {translateEnum("status", b.status, locale)}
         </span>
       </div>
 
       {/* Middle Right: Stats indicators */}
-      <div className="flex items-center gap-6 text-center sm:text-left shrink-0">
-        <div>
-          <div className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pages</div>
-          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">{b.pageCount}</div>
+      <div className="flex items-center gap-5 text-center sm:text-left shrink-0">
+        <div className="min-w-[48px]">
+          <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">{t("advanced.ack.pagesLabel")}</div>
+          <div className="text-xs font-extrabold text-slate-700 dark:text-slate-350 mt-1">{b.pageCount}</div>
         </div>
-        <div className="h-8 w-px bg-slate-100 dark:bg-slate-800" />
-        <div>
-          <div className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Extracted</div>
-          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">{b.itemCount}</div>
+        <div className="h-8 w-px bg-slate-150 dark:bg-slate-800" />
+        <div className="min-w-[48px]">
+          <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">{t("advanced.ack.extractedLabel")}</div>
+          <div className="text-xs font-extrabold text-slate-700 dark:text-slate-350 mt-1">{b.itemCount}</div>
         </div>
-        <div className="h-8 w-px bg-slate-100 dark:bg-slate-800" />
-        <div>
-          <div className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Attached</div>
-          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">{b.committedCount}</div>
+        <div className="h-8 w-px bg-slate-150 dark:bg-slate-800" />
+        <div className="min-w-[48px]">
+          <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">{t("advanced.ack.attachedLabel")}</div>
+          <div className="text-xs font-extrabold text-slate-700 dark:text-slate-355 mt-1">{b.committedCount}</div>
         </div>
       </div>
 
       {/* Right: Actions */}
-      <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-0 border-slate-50 pt-3 sm:pt-0 shrink-0">
+      <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-0 border-slate-50 dark:border-slate-855 pt-3.5 sm:pt-0 shrink-0">
         <span className="text-[10px] text-slate-455 font-bold sm:hidden">
-          {pending > 0 ? `${pending} items pending` : "All items processed"}
+          {pending > 0 ? t("advanced.ack.itemsPending", { count: pending }) : t("advanced.ack.allItemsProcessed")}
         </span>
         <div className="flex items-center gap-3">
           <span className="text-[10px] text-slate-455 font-bold hidden sm:inline">
-            {pending > 0 ? `${pending} items pending` : "All items processed"}
+            {pending > 0 ? t("advanced.ack.itemsPending", { count: pending }) : t("advanced.ack.allItemsProcessed")}
           </span>
 
           <div className="flex items-center gap-2">
@@ -116,10 +116,10 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
               variant="outline"
               onClick={handleDelete}
               disabled={loading}
-              className={`h-8 text-xs font-bold px-3 gap-1 rounded-lg border-slate-200 dark:border-slate-800 dark:bg-slate-900 cursor-pointer ${
+              className={`h-8 text-xs font-bold px-3 gap-1 rounded-lg border-slate-200 dark:border-slate-800 dark:bg-slate-950 cursor-pointer transition-colors duration-200 ${
                 isActive
-                  ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-955/20"
-                  : "text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-955/20"
+                  ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50/50 dark:hover:bg-amber-955/20 border-amber-200/50 dark:border-amber-950/30"
+                  : "text-rose-600 hover:text-rose-700 hover:bg-rose-50/50 dark:hover:bg-rose-955/20 border-rose-200/50 dark:border-rose-950/30"
               }`}
             >
               {loading ? (
@@ -129,12 +129,12 @@ export function AckBatchRow({ b }: { b: AckBatchListRow }) {
               ) : (
                 <Trash2 className="h-3.5 w-3.5" />
               )}
-              {isActive ? "Stop" : "Delete"}
+              {isActive ? t("advanced.ack.stopButton") : tc("action.delete")}
             </Button>
 
-            <Button size="sm" variant="outline" className="h-8 text-xs font-bold px-3 gap-1 rounded-lg" asChild>
+            <Button size="sm" variant="outline" className="h-8 text-xs font-bold px-3 gap-1.5 rounded-lg shadow-3xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850" asChild>
               <Link href={`/complaints/acknowledgments/${b.id}`}>
-                {b.status === "committed" ? "View Batch" : "Review & Match"}
+                {b.status === "committed" ? t("advanced.ack.viewBatch") : t("advanced.ack.reviewAndMatch")}
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
