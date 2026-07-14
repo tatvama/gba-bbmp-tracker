@@ -1117,9 +1117,13 @@ export function ComplaintTable({
                       {hg.headers.map((h) => (
                         <TableHead
                           key={h.id}
-                          className="text-[11px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 py-3.5 px-4"
+                          className="py-3.5 px-4"
                         >
-                          {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                          {h.isPlaceholder ? null : (
+                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 block">
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                            </span>
+                          )}
                         </TableHead>
                       ))}
                     </TableRow>
