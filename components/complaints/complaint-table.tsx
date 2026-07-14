@@ -406,19 +406,28 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
     () => [...new Set(data.map((c) => c.division?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
     [data],
   );
-  // Sub-division options cascade from the selected division — only the
-  // sub-divisions that actually appear on complaints in that division.
+  // Whether the dataset has ANY sub-division/ward data at all — decides
+  // whether to render that filter slot in the bar in the first place,
+  // independent of the current selection (so the bar doesn't jump around as
+  // the user drills down).
+  const hasAnySubDivision = React.useMemo(() => data.some((c) => c.eng_subdivision?.name), [data]);
+  const hasAnyWard = React.useMemo(() => data.some((c) => c.ward), [data]);
+
+  // STRICT drill-down: sub-division only offers options once a division is
+  // picked (no "jump straight to a sub-division" — it would mix sub-divisions
+  // from every division under the same name). Empty (not a fallback to the
+  // full list) is what locks the control below.
   const subDivisionOpts = React.useMemo(() => {
-    const scoped = division === "all" ? data : data.filter((c) => c.division?.name === division);
-    return [...new Set(scoped.map((c) => c.eng_subdivision?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b));
+    if (division === "all") return [];
+    return [...new Set(data.filter((c) => c.division?.name === division).map((c) => c.eng_subdivision?.name).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b));
   }, [data, division]);
-  // Ward options cascade from the selected division + sub-division. Each option
-  // carries the ward NAME with its number for display; the value stays the bare
-  // number so the row filter (String(c.ward.new_no) === ward) is unchanged.
+  // Ward only offers options once BOTH division and sub-division are picked —
+  // every ward that actually belongs to that exact sub-division. Each option
+  // carries the ward NAME with its number for display; the value stays the
+  // bare number so the row filter (String(c.ward.new_no) === ward) is unchanged.
   const wardOpts = React.useMemo(() => {
-    let scoped = data;
-    if (division !== "all") scoped = scoped.filter((c) => c.division?.name === division);
-    if (subDivision !== "all") scoped = scoped.filter((c) => c.eng_subdivision?.name === subDivision);
+    if (division === "all" || subDivision === "all") return [];
+    const scoped = data.filter((c) => c.division?.name === division && c.eng_subdivision?.name === subDivision);
     const byNo = new Map<string, string>();
     for (const c of scoped) {
       if (!c.ward) continue;
@@ -959,17 +968,41 @@ export function ComplaintTable({ data, canEdit = false }: { data: ComplaintWithR
                 </select>
               )}
 
-              {subDivisionOpts.length > 0 && (
-                <select className={selectCls} value={subDivision} onChange={(e) => setSubDivision(e.target.value)} aria-label={t("list.table.ariaSubDivisionFilter")}>
-                  <option value="all">{t("list.table.optAnySubDivision")}</option>
-                  {subDivisionOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+              {hasAnySubDivision && (
+                <select
+                  className={cn(selectCls, division === "all" && "cursor-not-allowed opacity-50")}
+                  value={subDivision}
+                  disabled={division === "all"}
+                  onChange={(e) => setSubDivision(e.target.value)}
+                  aria-label={t("list.table.ariaSubDivisionFilter")}
+                >
+                  {division === "all" ? (
+                    <option value="all">{t("list.table.selectDivisionFirst")}</option>
+                  ) : (
+                    <>
+                      <option value="all">{t("list.table.optAnySubDivision")}</option>
+                      {subDivisionOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </>
+                  )}
                 </select>
               )}
 
-              {wardOpts.length > 0 && (
-                <select className={selectCls} value={ward} onChange={(e) => setWard(e.target.value)} aria-label={t("list.table.ariaWardFilter")}>
-                  <option value="all">{t("list.table.optAnyWard")}</option>
-                  {wardOpts.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
+              {hasAnyWard && (
+                <select
+                  className={cn(selectCls, subDivision === "all" && "cursor-not-allowed opacity-50")}
+                  value={ward}
+                  disabled={subDivision === "all"}
+                  onChange={(e) => setWard(e.target.value)}
+                  aria-label={t("list.table.ariaWardFilter")}
+                >
+                  {subDivision === "all" ? (
+                    <option value="all">{t("list.table.selectSubDivisionFirst")}</option>
+                  ) : (
+                    <>
+                      <option value="all">{t("list.table.optAnyWard")}</option>
+                      {wardOpts.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
+                    </>
+                  )}
                 </select>
               )}
             </div>
