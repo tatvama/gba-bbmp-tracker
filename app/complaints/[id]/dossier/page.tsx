@@ -12,9 +12,23 @@ import { getDivisionResponsibleOfficers } from "@/lib/dedupe-photos";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { formatDate, orDash } from "@/lib/format";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { CaseIntelligence } from "@/lib/intelligence/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Evidence Dossier" };
+
+const REFERENCE_LABELS = [
+  "Administrative Approval (AA)", "Technical Sanction (TS)", "Agreement (KW-4)",
+  "Work Order", "Tender Notification", "Mineral Dispatch Permit (MDP)",
+  "Royalty Challan", "Insurance Policy",
+];
+
+const SEVERITY_BADGE = {
+  High: "destructive",
+  Medium: "warning",
+  Low: "muted",
+} as const;
 
 export default async function DossierPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,14 +43,20 @@ export default async function DossierPage({ params }: { params: Promise<{ id: st
   }
   if (!complaint) notFound();
 
-  const [docs, officers] = await Promise.all([
+  const [docs, officers, intelRow] = await Promise.all([
     listComplaintDocuments(id),
     complaint.division_id ? getDivisionResponsibleOfficers(complaint.division_id) : Promise.resolve([]),
+    createAdminClient().from("case_intelligence").select("artifact, build_status").eq("complaint_id", id).maybeSingle(),
   ]);
 
   const flagged = docs.filter(
     (d) => d.is_duplicate || (d.vision_verdict && d.vision_verdict !== "ok") || d.geo_flag === "far",
   );
+  const intel = (intelRow.data?.artifact as CaseIntelligence | null) ?? null;
+  const intelBuilding = !intel && (intelRow.data?.build_status === "queued" || intelRow.data?.build_status === "running");
+
+  const references = intel ? REFERENCE_LABELS.map((label) => ({ label, refs: intel.references.filter((r) => r.label === label) })).filter((r) => r.refs.length) : [];
+  const keyFindings = intel ? [...intel.findings, ...intel.correlations].sort((a, b) => ({ High: 0, Medium: 1, Low: 2 }[a.severity] - { High: 0, Medium: 1, Low: 2 }[b.severity])) : [];
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -80,6 +100,79 @@ export default async function DossierPage({ params }: { params: Promise<{ id: st
               <li key={o.id}>
                 <span className="font-medium">{o.role_level ? `${o.role_level} · ` : ""}{o.full_name}</span>
                 {o.designation ? <span className="text-muted-foreground"> — {o.designation}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Legal & administrative references (Case Intelligence Engine) */}
+      <section className="mb-6 rounded-xl border bg-card p-4">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Legal &amp; administrative references
+        </h2>
+        {!intel ? (
+          <EmptyState
+            compact
+            title={intelBuilding ? "Case analysis in progress" : "Case analysis not yet generated"}
+            description={
+              intelBuilding
+                ? "Administrative Approval, Technical Sanction, KW-4 agreement, tender, MDP, royalty and insurance references are being extracted from this case's documents — refresh in a moment."
+                : "Generate a draft letter for this case (or run the forensic audit) to extract Administrative Approval, Technical Sanction, KW-4 agreement, tender, MDP, royalty and insurance references from its documents."
+            }
+          />
+        ) : references.length === 0 ? (
+          <EmptyState compact title="No references found" description="No AA / TS / KW-4 / tender / MDP / royalty / insurance references were found in this case's documents." />
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {references.map((r) => (
+              <li key={r.label}>
+                <span className="font-semibold">{r.label}:</span>{" "}
+                {r.refs.map((ref, i) => (
+                  <span key={i} className="text-muted-foreground">
+                    {i > 0 ? "; " : ""}{ref.value}
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Documented suspicions / findings */}
+      {intel && keyFindings.length > 0 && (
+        <section className="mb-6 rounded-xl border bg-card p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Documented suspicions ({keyFindings.length})
+          </h2>
+          <ol className="space-y-3 text-sm">
+            {keyFindings.map((f) => (
+              <li key={f.id} className="border-b border-border/50 pb-2 last:border-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  {f.code && <span className="font-mono text-xs text-muted-foreground">[{f.code}]</span>}
+                  <Badge variant={SEVERITY_BADGE[f.severity]}>{f.severity}</Badge>
+                  <span className="font-medium">{f.statement}</span>
+                </div>
+                {f.recordToDemand && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">Record to demand: {f.recordToDemand}</div>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {/* Applicable legal framework */}
+      {intel && intel.legalFramework.length > 0 && (
+        <section className="mb-6 rounded-xl border bg-card p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Applicable legal framework
+          </h2>
+          <ul className="space-y-1 text-sm">
+            {intel.legalFramework.map((l, i) => (
+              <li key={i}>
+                <span className="font-medium">{l.instrument}</span>
+                <span className="text-muted-foreground"> — {l.relevance}</span>
               </li>
             ))}
           </ul>
