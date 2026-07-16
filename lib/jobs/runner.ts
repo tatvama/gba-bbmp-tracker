@@ -98,8 +98,16 @@ async function findInFlightJob(admin: SupabaseClient, type: JobType, entityType:
  */
 export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise<void> {
   const admin = createAdminClient();
+  let handler = getJobHandler(meta.type);
+  if (!handler) {
+    try {
+      await import("@/lib/jobs/handlers");
+      handler = getJobHandler(meta.type);
+    } catch (e) {
+      console.error(`[runner] failed to dynamically load job handlers for type "${meta.type}":`, e);
+    }
+  }
   const config = getJobConfig(meta.type);
-  const handler = getJobHandler(meta.type);
   if (!config) return; // unknown type — nothing this runner can do
   if (!handler) {
     await admin.from("background_jobs").update({ status: "failed", error: `No handler registered for job type "${meta.type}".`, finished_at: nowISO() }).eq("id", jobId);
