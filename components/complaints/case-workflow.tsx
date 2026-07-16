@@ -977,8 +977,9 @@ function CounterReplyPanel({
   let legalState: "locked" | "waiting" | "active" | "completed" = "locked";
   if (hasLegalNoticeSent) {
     legalState = "completed";
-  } else if (effectiveStage === "reminder_sent" && !hasInboundReply) {
-    legalState = diffDays <= 0 ? "active" : "waiting";
+  } else {
+    // Force active for testing as requested by the user (using 'as any' to prevent type-narrowing error)
+    legalState = "active" as any;
   }
 
   // Tooltip content & label builders
@@ -1042,7 +1043,7 @@ function CounterReplyPanel({
     legalLabel = `Legal Notice (in ${diffDays > 0 ? diffDays : 0}d)`;
   } else if (legalState === "active") {
     legalTooltip = "Generate a formal legal notice before escalating the complaint. Available now (0 days remaining).";
-    legalLabel = "Legal Notice 🔵";
+    legalLabel = "Legal Notice (Active for test) 🔵";
   } else if (legalState === "completed") {
     legalTooltip = "Legal Notice has already been generated and filed.";
     legalLabel = "Legal Notice ✓";
