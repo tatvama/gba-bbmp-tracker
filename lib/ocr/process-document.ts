@@ -8,6 +8,7 @@ import { analyzeComplaintDocument } from "@/lib/ai/complaint-document-analyzer";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { getComplaintSettings } from "@/lib/settings";
 import { STORAGE_BUCKETS } from "@/lib/constants";
+import { buildCaseIntelligence } from "@/lib/intelligence/engine";
 import type { ComplaintExtraction } from "@/lib/types";
 
 /**
@@ -197,6 +198,22 @@ export async function analyzeDocumentById(
     ai_summary_generated_at: new Date().toISOString(),
     ...verificationUpdate,
   }).eq("id", documentId);
+
+  // This is the single funnel every document-analysis path lands in (direct
+  // upload, OCR-then-analyze, "Re-run AI") — and the point where BOTH the OCR
+  // text and ai_extracted_json are persisted, i.e. everything the Case
+  // Intelligence extract / document-facts stages read. Refresh the artifact now
+  // so the Evidence Dossier / Case File reflect this document immediately and
+  // letter drafting later reuses the warm cache instead of running the full
+  // analysis at draft time. Called directly (not triggerCaseIntelligenceRebuild,
+  // whose next/server after() needs a request scope — this also runs inside the
+  // background OCR job). Best-effort: never fail the summary over it. The
+  // engine's context-hash gate keeps a no-change re-entry cheap.
+  if (doc.complaint_id) {
+    await buildCaseIntelligence(admin, doc.complaint_id as string).catch((e) =>
+      console.warn("[ai] case intelligence rebuild after document analysis failed", e),
+    );
+  }
 
   return { ok: result.ok, extraction: ex, error: result.error };
 }

@@ -19,6 +19,7 @@ import {
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { convertJobCaseCore } from "@/lib/forensic/convert-job-case";
 import { runAdvisorAnalysis } from "@/lib/ai/advisor/recommendation-engine";
+import { buildCaseIntelligence } from "@/lib/intelligence/engine";
 import { notifyUser } from "@/lib/notifications";
 import type { CommitForensicResult, ForensicFileRole, ForensicJobResult } from "@/lib/forensic/skill-output";
 
@@ -526,8 +527,13 @@ export async function commitForensicJobs(
 
   // Fire-and-forget follow-ups (never block or fail the commit):
   //  • cross-job duplicate-photo scan per affected division
-  //  • AI advisor analysis per created complaint, so "what to do next" is
-  //    ready the moment the user opens it. Sequential — no AI hammering.
+  //  • AI advisor analysis + Case Intelligence Engine build per created
+  //    complaint, so the Evidence Dossier / Case File are already populated
+  //    and letter drafting (runComplaintDraft -> buildCaseIntelligence) hits
+  //    a warm cache instead of running the full analysis at draft time.
+  //    Sequential — no AI hammering. Can't use triggerCaseIntelligenceRebuild
+  //    (a "use server" action, next/server's after()) here: this runs from
+  //    the import worker and the CLI script too, not just a request scope.
   const divisions = [...new Set(selected.map((j) => j.dataset?.division?.trim()).filter(Boolean) as string[])];
   void (async () => {
     for (const d of divisions) {
@@ -542,6 +548,11 @@ export async function commitForensicJobs(
         await runAdvisorAnalysis(admin, id);
       } catch (e) {
         console.warn("[commitForensicJobs] advisor analysis", id, e);
+      }
+      try {
+        await buildCaseIntelligence(admin, id);
+      } catch (e) {
+        console.warn("[commitForensicJobs] case intelligence build", id, e);
       }
     }
   })();
