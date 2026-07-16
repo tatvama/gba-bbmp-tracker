@@ -316,8 +316,15 @@ export async function commitForensicJobs(
             file_size: f.size,
             source: "forensic_zip",
             is_blank_template: isBlankTemplate(name),
-            ocr_status: role === "portal_pdf" ? "Queued" : "Skipped",
+            // The skill's own combined extracted/OCR text (role "text") is already
+            // fully processed — persist it into ocr_clean_text so downstream AI
+            // (document-facts, forensic extractors, the Case Intelligence Engine)
+            // can actually read it. Previously this file was uploaded to R2 but its
+            // content was never written to any queryable column, so every reader
+            // that looks at ocr_clean_text saw nothing for it.
+            ocr_status: role === "portal_pdf" ? "Queued" : role === "text" ? "Completed" : "Skipped",
             ocr_language: "eng+kan",
+            ocr_clean_text: role === "text" ? (job.extractedText || null) : null,
             ai_extracted_json: role === "min_json" || role === "rich_json" ? (job.dataset ?? null) : null,
             file_sha256: fp?.sha256 ?? null,
             phash: fp?.phash ?? null,
