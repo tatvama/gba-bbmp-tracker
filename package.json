@@ -4,7 +4,7 @@
   "private": true,
   "description": "GBA / BBMP Ward & Engineer Contact Platform — tracks Bengaluru's ward restructuring (198 → 225 → 369) and the engineers responsible for each area.",
   "scripts": {
-    "dev": "next dev",
+    "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -83,6 +83,7 @@
     "@types/react-dom": "19.0.3",
     "@vitejs/plugin-react": "4.3.4",
     "autoprefixer": "10.4.20",
+    "cross-env": "^10.1.0",
     "eslint": "8.57.1",
     "eslint-config-next": "15.1.6",
     "pg": "8.13.1",
