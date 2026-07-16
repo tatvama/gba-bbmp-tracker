@@ -1,5 +1,6 @@
 import "server-only";
-import { generateText, isAiConfigured } from "@/lib/ai/provider";
+import { isAiConfigured } from "@/lib/ai/provider";
+import { extractJson } from "@/lib/ai/json-extract";
 import { ROAD_WORK_KNOWLEDGE_TEXT } from "@/lib/ai/road-work-knowledge";
 
 /**
@@ -82,15 +83,15 @@ Return JSON of EXACTLY this shape (use [] / "" when nothing found):
   "needsManualReview": true
 }`;
 
-  const r = await generateText({ system: SYSTEM, prompt, temperature: 0, maxTokens: 3500 });
-  if (!r.ok || !r.text) {
-    return { ok: false, error: r.error ?? "AI request failed", forensics: placeholder("AI request failed — review manually.") };
+  // 8000 (was 3500): the system prompt already carries the full road-work legal
+  // knowledge base, and a real multi-document cross-check can produce many
+  // crossChecks/findings entries — 3500 routinely truncated the JSON mid-object
+  // before it could close, which is what "Could not parse AI output" actually
+  // was (a truncated response, not a malformed one). extractJson also retries by
+  // slicing the outer {...} before giving up, unlike the previous bare parse.
+  const r = await extractJson<Partial<BillForensics>>({ system: SYSTEM, prompt, fallback: {}, maxTokens: 8000 });
+  if (!r.ok) {
+    return { ok: false, error: r.error ?? "AI request failed", forensics: placeholder("AI request or parsing failed — review manually.") };
   }
-  const cleaned = r.text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  try {
-    const parsed = JSON.parse(cleaned) as BillForensics;
-    return { ok: true, forensics: { ...placeholder(""), ...parsed } };
-  } catch {
-    return { ok: false, error: "Could not parse AI output", forensics: placeholder(r.text.slice(0, 600)) };
-  }
+  return { ok: true, forensics: { ...placeholder(""), ...r.data } };
 }
