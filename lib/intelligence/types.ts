@@ -1,0 +1,225 @@
+/**
+ * Case Intelligence Engine — shared, framework-free types (no `server-only`; the
+ * artifact shape is imported by client components too).
+ *
+ * The engine investigates a complaint's complete document set and emits ONE
+ * versioned, evidence-linked `CaseIntelligence` artifact. Every Observation must
+ * carry ≥1 evidence id (the "evidence rule"); the verify stage enforces it. The
+ * `graph` is a DERIVED projection over the artifact (nodes/edges), built in one
+ * place (lib/intelligence/graph.ts) so stages stay focused on their data.
+ */
+
+/** Bump to force a full rebuild of every cached artifact.
+ *  cie-2: legal framework now also carries English statutory basis per category.
+ *  cie-3: review fixes (correlate identity fields, gstin/pan validation, graph
+ *  integrity, AI-degradation cache invalidation, deterministic doc ordering).
+ *  cie-4: ingest no longer triggers document analysis itself (removed the
+ *  @napi-rs/canvas-reaching import that broke instrumentation.ts's bundle).
+ *  cie-5: unconditional document-fact extraction (AA/TS/KW-4/tender/MDP/royalty/
+ *  insurance) — surfaced whether or not anything is flagged, not just on findings. */
+export const ENGINE_VERSION = "cie-5";
+
+export type Confidence = "High" | "Medium" | "Low";
+
+/** A grounding record: the verbatim source behind an observation/entity. */
+export interface Evidence {
+  id: string; // ev_<n>
+  sourceTable:
+    | "complaint_documents"
+    | "job_documents"
+    | "job_audits"
+    | "complaint_replies"
+    | "complaint_action_taken"
+    | "complaint_timeline"
+    | "letter_drafts"
+    | "job_cases"
+    | "complaint"
+    | "derived";
+  sourceDocId: string | null;
+  docType: string | null;
+  page: number | null;
+  extract: string; // bounded verbatim snippet
+  confidence: Confidence;
+}
+
+// ── Knowledge graph (derived projection) ─────────────────────────────────────
+export type NodeType =
+  | "Document" | "Evidence" | "Officer" | "Department" | "Contractor"
+  | "GovernmentOrder" | "TenderPackage" | "Bidder" | "WorkOrder" | "Agreement"
+  | "RunningBill" | "MeasurementBook" | "Royalty" | "MDP" | "TimelineEvent"
+  | "Rule" | "Finding" | "Observation" | "ComplianceItem" | "Project";
+
+export type EdgeType =
+  | "supported_by" | "signed_by" | "approved_by" | "responsible_for"
+  | "issued_under" | "awarded_to" | "measured_in" | "billed_in"
+  | "governed_by" | "cites_rule" | "contradicts" | "precedes"
+  | "derived_from" | "relates_to";
+
+export interface GraphNode {
+  id: string; // <type>_<n>
+  type: NodeType;
+  label: string;
+  data?: Record<string, unknown>;
+}
+export interface GraphEdge {
+  from: string;
+  to: string;
+  type: EdgeType;
+  label?: string;
+}
+export interface CaseGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+/** A single evidence-linked investigative statement (normalized BillFinding or new). */
+export interface Observation {
+  id: string; // obs_<n>
+  code?: string; // carried verbatim (SKILL-G-1, PT-X01, RY-01, …)
+  statement: string;
+  category: string; // CheckCategory | "GO" | "TENDER" | "MDP" | "OFFICER" | "CORRELATION"
+  severity: "High" | "Medium" | "Low";
+  findingClass?: string;
+  evidenceGrade?: string;
+  confidence: Confidence;
+  evidenceIds: string[];
+  ruleRefs: string[];
+  officerRefs: string[];
+  relatedTimelineIds: string[];
+  relatedDocumentIds: string[];
+  recordToDemand?: string;
+  workedExample?: string;
+  lossExposure?: number;
+}
+
+export interface TimelineEvent {
+  id: string; // tl_<n>
+  date: string | null;
+  event: string;
+  source?: string;
+  evidenceIds: string[];
+}
+
+export interface Reference {
+  label: string; // "Government Order" | "Tender" | "Work Order" | "File" | "Bill" | "Agreement" | "Job Number"
+  value: string;
+  date?: string | null;
+  evidenceIds: string[];
+}
+
+export interface OfficerRef {
+  id: string; // off_<n>
+  name: string;
+  designation?: string | null;
+  office?: string | null;
+  contactId?: string | null; // resolved to contacts.id when possible
+  roles: string[]; // "responsible" | "signed" | "approved" | "named"
+  evidenceIds: string[];
+}
+
+export interface ComplianceItem {
+  area: string; // AA | TS | Tender/KTPP | KW-4 | MB | Royalty | MDP | Labour | Environment | Insurance | Eligibility | Other
+  requirement: string;
+  status: "met" | "not_shown" | "discrepancy" | "unknown";
+  detail?: string;
+  recordToDemand?: string;
+  ruleRef?: string;
+  evidenceIds: string[];
+}
+
+export interface LegalRef {
+  instrument: string; // e.g. "KTPP Act 1999 & Rules 2000"
+  provision?: string;
+  relevance: string;
+  ruleRefKeys: string[]; // finding-code prefixes this maps from
+}
+
+export interface FinancialSummary {
+  sanctionedAmount?: number | null;
+  grossAmount?: number | null;
+  netAmount?: number | null;
+  deduction?: number | null;
+  treasuryLossTotal?: string | null;
+  lossLines: { type: string; label: string; exposure: number; formula?: string; caveat: string }[];
+  runningBills: { billNo?: string | null; billDate?: string | null; thisBill?: number | null; totalUptoDate?: number | null }[];
+}
+
+export interface Synthesis {
+  situation: string;
+  prioritizedSuspicions: { title: string; detail: string; observationIds: string[] }[];
+  outstandingIssues: { issue: string; status?: string }[];
+  contradictions: { summary: string; observationIds: string[] }[];
+  documentsToDemand: string[];
+  specificRequests: string[];
+  reliefs: string[];
+  futureCourse: string[];
+  confidenceScore: number; // 0-100
+}
+
+export interface VerificationReport {
+  passed: boolean;
+  groundedCount: number;
+  ungroundedClaims: string[];
+  numericMismatches: string[];
+  notes: string[];
+}
+
+export interface CaseIntelligenceMeta {
+  complaintId: string;
+  jobNumber: string | null;
+  source: "forensic_import" | "manual" | "mixed";
+  engineVersion: string;
+  promptVersions: Record<string, string>;
+  builtAt: string;
+  contextHash: string;
+  aiConfigured: boolean;
+  coverage: { documentsTotal: number; documentsAnalyzed: number; capped: boolean };
+}
+
+export interface CaseIntelligence {
+  meta: CaseIntelligenceMeta;
+  graph: CaseGraph;
+  evidence: Evidence[];
+  parties: {
+    contractor: {
+      name: string | null;
+      class?: string | null;
+      gstin?: string | null;
+      pan?: string | null;
+      agreementNo?: string | null;
+      evidenceIds: string[];
+    };
+    officers: OfficerRef[];
+    recipients: { designation: string; name?: string | null; office?: string | null }[];
+  };
+  references: Reference[];
+  project: {
+    workDescription: string | null;
+    ward?: string | null;
+    division?: string | null;
+    subDivision?: string | null;
+    zone?: string | null;
+  };
+  timeline: TimelineEvent[];
+  financials: FinancialSummary;
+  findings: Observation[];
+  correlations: Observation[];
+  compliance: ComplianceItem[];
+  legalFramework: LegalRef[];
+  synthesis: Synthesis;
+  verification: VerificationReport;
+  riskAssessment: {
+    band: string | null;
+    score: number | null;
+    byCategory?: Record<string, number>;
+    evidenceGradeSummary?: Record<string, number>;
+  };
+}
+
+/** Result wrapper from the engine entry point. */
+export interface BuildCaseIntelligenceResult {
+  ok: boolean;
+  intel: CaseIntelligence | null;
+  fromCache: boolean;
+  error?: string;
+}

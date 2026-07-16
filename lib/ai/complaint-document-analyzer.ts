@@ -1,6 +1,7 @@
 import "server-only";
 import { generateText, isAiConfigured, type PromptSegment } from "@/lib/ai/provider";
 import type { ComplaintExtraction } from "@/lib/types";
+import { DRAFT_STRUCTURE_BLOCK, INVESTIGATOR_PERSONA } from "@/lib/intelligence/prompts";
 import {
   COMPLAINT_DRAFT_KINDS,
   COMPLAINT_STATUSES,
@@ -221,6 +222,17 @@ export function buildComplaintDraftPrompt(input: {
       CAUTION,
   };
   const extra = extraByKind[input.kind] ?? "";
+  // The full 21-section formal structure applies to substantive demand/complaint
+  // letters. Kinds with their own shape or a deliberately short form (a WhatsApp
+  // message, an RTI application, a short clarification/reminder-email, a single-
+  // purpose request) opt out so their per-kind instruction is not overridden.
+  const NON_STRUCTURED_KINDS = new Set<ComplaintDraftKind>([
+    "whatsapp", "rti_from_complaint", "clarification_request",
+    "reminder_email", "action_taken_request", "site_inspection_request",
+  ]);
+  const system = NON_STRUCTURED_KINDS.has(input.kind)
+    ? DRAFT_SYSTEM
+    : `${DRAFT_SYSTEM}\n\n${INVESTIGATOR_PERSONA}\n\n${DRAFT_STRUCTURE_BLOCK}`;
   // Complaint context (case chronology/replies/actions/escalations/forensic
   // findings) is identical across every kind drafted for the same complaint —
   // the escalation ladder's terminal "Multiple" stage drafts reminder_letter,
@@ -230,7 +242,7 @@ export function buildComplaintDraftPrompt(input: {
   // reordered — lets that loop's 2nd/3rd call reuse the cached context instead
   // of resending it. Nothing about the wording, instructions or output changed.
   return {
-    system: DRAFT_SYSTEM,
+    system,
     prompt: [
       { text: `Complaint context:\n${input.complaintContext}`, cache: true },
       { text: `\n\nDraft: ${what}.\n\n${extra}\n${toneLine(input.tone)}\n${languageLine(input.language)}` },

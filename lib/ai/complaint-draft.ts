@@ -3,6 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildComplaintDraftPrompt } from "@/lib/ai/complaint-document-analyzer";
 import { generateTextStream } from "@/lib/ai/provider";
 import { sanitizeDraft } from "@/lib/letters/safe-language";
+import { buildCaseIntelligence } from "@/lib/intelligence/engine";
+import { serializeForDraft } from "@/lib/intelligence/serialize";
+import { reviewDraft, type QualityReport } from "@/lib/intelligence/quality-review";
+import type { CaseIntelligence } from "@/lib/intelligence/types";
 import { LETTER_SIGNATORIES, type ComplaintDraftKind, type DraftLanguage, type LegalTone } from "@/lib/constants";
 
 /**
@@ -22,7 +26,7 @@ export interface ComplaintDraftInput {
 
 /** Real pipeline stages a caller can surface as a live status (e.g. a
  *  background job persisting each update for the client to poll). */
-export type DraftStage = "loading_case" | "building_history" | "drafting" | "safety_check";
+export type DraftStage = "loading_case" | "building_history" | "building_intelligence" | "drafting" | "safety_check";
 
 export interface DraftProgress {
   stage: DraftStage;
@@ -118,7 +122,7 @@ export async function runComplaintDraft(
   admin: SupabaseClient,
   input: ComplaintDraftInput,
   onProgress?: (p: DraftProgress) => void,
-): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean }> {
+): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean; qualityReport?: QualityReport }> {
   onProgress?.({ stage: "loading_case", label: "Loading case file…" });
   const { data: c } = await admin
     .from("complaints")
@@ -134,10 +138,31 @@ export async function runComplaintDraft(
   const sigs = LETTER_SIGNATORIES as Record<string, { name: string; address: string; mobile: string | null }>;
   const signatory = sigs[(ld?.signatory_key as string) || "raghav_gowda"] ?? sigs.raghav_gowda ?? null;
 
-  // Ground EVERY letter/reply in the real chronology + forensic findings.
-  onProgress?.({ stage: "building_history", label: "Reviewing correspondence history…" });
-  const history = await buildCaseHistory(admin, input.complaintId, (c as { job_number?: string | null }).job_number ?? null);
-  const context = `${complaintContext(c as Record<string, any>, { signatory, today: todayISO() })}\n\n=== CASE HISTORY (draw the body from this) ===\n${history}`;
+  // Investigate the COMPLETE document set first: build the evidence-linked Case
+  // Intelligence artifact and draw the letter from it. Falls back to the thin
+  // chronology builder if the engine can't run (AI off / build error) so drafting
+  // never blocks.
+  const jobNo = (c as { job_number?: string | null }).job_number ?? null;
+  onProgress?.({ stage: "building_intelligence", label: "Investigating case documents…" });
+  let intel: CaseIntelligence | null = null;
+  let evidenceBlock: string;
+  try {
+    const res = await buildCaseIntelligence(admin, input.complaintId);
+    if (res.ok && res.intel) {
+      // Serialize BEFORE committing `intel`, so a serialize failure falls back to
+      // case history AND leaves intel null (no misleading quality report against
+      // an artifact the letter was not built from).
+      const block = serializeForDraft(res.intel);
+      intel = res.intel;
+      evidenceBlock = block;
+    } else {
+      evidenceBlock = `=== CASE HISTORY (draw the body from this) ===\n${await buildCaseHistory(admin, input.complaintId, jobNo)}`;
+    }
+  } catch (e) {
+    console.warn("[complaint-draft] case intelligence failed, using case history", input.complaintId, e);
+    evidenceBlock = `=== CASE HISTORY (draw the body from this) ===\n${await buildCaseHistory(admin, input.complaintId, jobNo)}`;
+  }
+  const context = `${complaintContext(c as Record<string, any>, { signatory, today: todayISO() })}\n\n${evidenceBlock}`;
 
   const { system, prompt } = buildComplaintDraftPrompt({
     kind: input.kind,
@@ -152,8 +177,12 @@ export async function runComplaintDraft(
   // follow-up 10k cap (mirroring thread-decision-agent.ts) still cut off the
   // longest case-history-heavy Kannada letters; 20k gives real headroom while
   // staying well under this model class's output ceiling.
+  // A full-structure, every-detail letter can be long (Kannada is token-dense);
+  // give substantive kinds real headroom on the streamed path. Short kinds
+  // (WhatsApp) stay small.
+  const maxTokens = input.kind === "whatsapp" ? 2_000 : 48_000;
   onProgress?.({ stage: "drafting", label: "Drafting with Claude…" });
-  const r = await generateTextStream({ system, prompt, maxTokens: 20_000, cache: { system: true } }, (partialText) => {
+  const r = await generateTextStream({ system, prompt, maxTokens, cache: { system: true } }, (partialText) => {
     onProgress?.({ stage: "drafting", label: "Drafting with Claude…", partialText });
   });
   if (!r.ok || !r.text) return { ok: r.ok, text: r.text, error: r.error };
@@ -164,10 +193,21 @@ export async function runComplaintDraft(
   // still prohibited (warn, don't block).
   onProgress?.({ stage: "safety_check", label: "Reviewing safe-language guardrails…" });
   const { text, lint } = sanitizeDraft(r.text);
+  // Quality review: how well did the letter cover the investigated intelligence?
+  // Guarded so a malformed artifact never discards an already-generated letter.
+  let qualityReport: QualityReport | undefined;
+  if (intel) {
+    try {
+      qualityReport = reviewDraft(text, intel);
+    } catch (e) {
+      console.warn("[complaint-draft] quality review failed", input.complaintId, e);
+    }
+  }
   return {
     ok: true,
     text,
     lintWarning: lint.ok ? undefined : lint.errors.map((e) => e.reason).join("; "),
     truncated: r.truncated,
+    qualityReport,
   };
 }

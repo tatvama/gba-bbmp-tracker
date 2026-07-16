@@ -24,6 +24,7 @@ export interface AiDraftJobInput {
 const STAGE_PROGRESS: Record<DraftProgress["stage"], number> = {
   loading_case: 8,
   building_history: 20,
+  building_intelligence: 22,
   drafting: 35,
   safety_check: 95,
 };
@@ -55,7 +56,7 @@ const handler: JobHandler = async (ctx) => {
   // next-step reasoning reflects what we just sent.
   await runAdvisorAnalysis(ctx.admin, input.complaintId).catch(() => {});
 
-  return { result: { text: r.text, lintWarning: r.lintWarning ?? null, truncated: r.truncated ?? false } };
+  return { result: { text: r.text, lintWarning: r.lintWarning ?? null, truncated: r.truncated ?? false, qualityReport: r.qualityReport ?? null } };
 };
 
 registerJobHandler("ai_draft", handler);

@@ -938,7 +938,7 @@ export async function generateComplaintDraft(input: {
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
-}): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean }> {
+}): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean; qualityReport?: import("@/lib/intelligence/quality-review").QualityReport }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
   // Shared generation core (also used by the background-job runner in jobs.ts).
