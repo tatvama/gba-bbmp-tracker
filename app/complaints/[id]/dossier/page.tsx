@@ -14,6 +14,9 @@ import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { formatDate, orDash } from "@/lib/format";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { triggerCaseIntelligenceRebuild } from "@/lib/actions/case-intelligence";
+import { STALE_BUILD_MS } from "@/lib/intelligence/engine";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { translate } from "@/lib/i18n/translate";
 import { translateEnum } from "@/lib/i18n/translate-enum";
@@ -60,12 +63,33 @@ export default async function DossierPage({
   const [docs, officers, intelRow] = await Promise.all([
     listComplaintDocuments(id),
     complaint.division_id ? getDivisionResponsibleOfficers(complaint.division_id) : Promise.resolve([]),
-    createAdminClient().from("case_intelligence").select("artifact, build_status").eq("complaint_id", id).maybeSingle(),
+    createAdminClient().from("case_intelligence").select("artifact, build_status, updated_at").eq("complaint_id", id).maybeSingle(),
   ]);
 
   const flagged = docs.filter((d) => d.is_duplicate || (d.vision_verdict && d.vision_verdict !== "ok") || d.geo_flag === "far");
   const intel = (intelRow.data?.artifact as CaseIntelligence | null) ?? null;
-  const intelBuilding = !intel && (intelRow.data?.build_status === "queued" || intelRow.data?.build_status === "running");
+  const buildStatus = intelRow.data?.build_status ?? null;
+  const buildUpdatedAt = intelRow.data?.updated_at ?? null;
+
+  // Is a build genuinely in flight (claimed recently)? A 'queued'/'running' row
+  // older than STALE_BUILD_MS means the build that owned it died (a redeploy in
+  // the after() window, or a non-throwing failure) — treat it as dead so it gets
+  // re-kicked rather than leaving the dossier stuck on "analysing…" forever.
+  const freshInFlight =
+    (buildStatus === "queued" || buildStatus === "running") &&
+    !!buildUpdatedAt &&
+    Date.now() - Date.parse(buildUpdatedAt as string) < STALE_BUILD_MS;
+
+  // Self-heal: the analysis is generated automatically when case files are
+  // uploaded, but a complaint imported before that wiring existed (or one whose
+  // build died) can still have no artifact. Kick a build the moment its dossier
+  // is opened, unless one is genuinely in flight. Loop-safe: once the artifact
+  // exists this never runs again, the trigger itself skips a fresh in-flight
+  // build, and the engine's context-hash gate no-ops an unchanged rebuild.
+  // after()-based, so it needs a request scope — which a Server Component is.
+  if (!intel && !freshInFlight) {
+    await triggerCaseIntelligenceRebuild(id);
+  }
 
   const references = intel ? REFERENCE_LABELS.map((label) => ({ label, refs: intel.references.filter((r) => r.label === label) })).filter((r) => r.refs.length) : [];
   const keyFindings = intel ? [...intel.findings, ...intel.correlations].sort((a, b) => ({ High: 0, Medium: 1, Low: 2 }[a.severity] - { High: 0, Medium: 1, Low: 2 }[b.severity])) : [];
@@ -144,11 +168,16 @@ export default async function DossierPage({
       <section className="mb-6 rounded-xl border bg-card p-4">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("detailPage.dossierPage.legalRefsHeading")}</h2>
         {!intel ? (
-          <EmptyState
-            compact
-            title={intelBuilding ? t("detailPage.dossierPage.analysisInProgressTitle") : t("detailPage.dossierPage.analysisNotGeneratedTitle")}
-            description={intelBuilding ? t("detailPage.dossierPage.analysisInProgressDesc") : t("detailPage.dossierPage.analysisNotGeneratedDesc")}
-          />
+          <>
+            <EmptyState
+              compact
+              title={t("detailPage.dossierPage.analysisInProgressTitle")}
+              description={t("detailPage.dossierPage.analysisInProgressDesc")}
+            />
+            {/* Auto-refreshes the page until the background build lands, then
+                unmounts itself (this branch stops rendering once intel exists). */}
+            <AutoRefresh />
+          </>
         ) : references.length === 0 ? (
           <EmptyState compact title={t("detailPage.dossierPage.noReferencesTitle")} description={t("detailPage.dossierPage.noReferencesDesc")} />
         ) : (

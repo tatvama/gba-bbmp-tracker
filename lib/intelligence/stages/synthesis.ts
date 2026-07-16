@@ -89,7 +89,14 @@ export async function synthesizeCase(input: SynthesisInput): Promise<{ synthesis
   if (!isAiConfigured()) return { synthesis: fallback, usedAi: false, promptVersion: PROMPT_VERSIONS.synthesis };
 
   const prompt = `From the case-intelligence brief below, output STRICT JSON of EXACTLY this shape:\n${SHAPE}\n\nEvery prioritizedSuspicion and contradiction MUST cite real obs ids from the brief. Do not invent findings, figures, names or references.\n\n=== CASE INTELLIGENCE BRIEF ===\n${serializeBrief(input)}`;
-  const r = await extractJson<Partial<Synthesis>>({ system: SYNTHESIS_SYSTEM, prompt, fallback: {}, maxTokens: 4000, cache: { system: true } });
+  // 8000 (not 4000): the full synthesis JSON — situation + up to 12 suspicions
+  // (title+detail+ids) + outstanding + contradictions + up to 30 documentsToDemand
+  // + requests + reliefs + futureCourse — routinely exceeded 4000 tokens and
+  // truncated mid-JSON, so extractJson failed to parse and the whole stage
+  // silently fell back to deterministic (usedAi=false). That in turn made every
+  // artifact permanently "degraded" (ai_synthesis_used=false), forcing a full
+  // rebuild on every draft/trigger. See the same fix in lib/ai/bill-forensics.ts.
+  const r = await extractJson<Partial<Synthesis>>({ system: SYNTHESIS_SYSTEM, prompt, fallback: {}, maxTokens: 8000, cache: { system: true } });
   if (!r.ok || !r.data || !r.data.situation) return { synthesis: fallback, usedAi: false, promptVersion: PROMPT_VERSIONS.synthesis };
 
   // The model may return a non-array for any list field; never let that throw and

@@ -16,6 +16,15 @@ import { synthesizeCase } from "./stages/synthesis";
 import { verifyGroundedness } from "./stages/verify";
 
 /**
+ * A build is considered dead (reclaimable) once its row hasn't advanced for this
+ * long. A real build takes ~90s; anything past this window means the process
+ * that owned it died mid-build (e.g. a redeploy inside the after() window) or a
+ * non-throwing internal failure left the status frozen. Concurrent callers
+ * within this window coalesce onto the in-flight build instead of duplicating it.
+ */
+export const STALE_BUILD_MS = 5 * 60 * 1000;
+
+/**
  * Case Intelligence Engine entry point. Investigates a complaint's complete
  * document set and returns ONE versioned, evidence-linked CaseIntelligence
  * artifact (knowledge graph + findings + financials + chronology + compliance +
@@ -62,13 +71,40 @@ export async function buildCaseIntelligence(
     if (!opts?.force) {
       const { data: cached } = await admin
         .from("case_intelligence")
-        .select("artifact, context_hash, engine_version, build_status, ai_synthesis_used")
+        .select("artifact, context_hash, engine_version, build_status, ai_synthesis_used, updated_at")
         .eq("complaint_id", complaintId)
         .maybeSingle();
       const degraded = cached?.ai_synthesis_used === false && aiConfigured;
       if (cached?.build_status === "done" && cached.context_hash === contextHash && cached.engine_version === ENGINE_VERSION && cached.artifact && !degraded) {
         return { ok: true, intel: cached.artifact as CaseIntelligence, fromCache: true };
       }
+      // Single-flight: if another builder has CLAIMED this case ('running') and
+      // is still fresh, coalesce onto it instead of running a duplicate ~90s
+      // build. Return the previous artifact if we have one; otherwise signal
+      // "not ready yet" (callers show an in-progress state / fall back). Only
+      // 'running' coalesces — 'queued' just means "requested", so a builder must
+      // still claim it below, or two queued callers would both skip and nobody
+      // would build. A 'running' older than STALE_BUILD_MS is treated as dead
+      // and reclaimed (the claim below overwrites it).
+      const fresh = !!cached?.updated_at && Date.now() - Date.parse(cached.updated_at as string) < STALE_BUILD_MS;
+      if (cached?.build_status === "running" && fresh) {
+        return cached.artifact
+          ? { ok: true, intel: cached.artifact as CaseIntelligence, fromCache: true }
+          : { ok: false, intel: null, fromCache: false, error: "Case intelligence build already in progress." };
+      }
+    }
+
+    // Claim the build so late-arriving concurrent callers coalesce (above), and
+    // so the dossier / advisor can show an accurate "analysing…" state. The
+    // engine only wrote 'done' before, leaving no interim signal. Best-effort:
+    // a failed claim is non-fatal (the build still runs; coalescing just degrades
+    // to possibly-duplicated work in a rare race).
+    try {
+      await admin
+        .from("case_intelligence")
+        .upsert({ complaint_id: complaintId, build_status: "running" }, { onConflict: "complaint_id" });
+    } catch (e) {
+      console.warn("[case-intelligence] could not claim build", complaintId, e);
     }
 
     // ── Run the pipeline ─────────────────────────────────────────────────────
@@ -166,6 +202,17 @@ export async function buildCaseIntelligence(
     return { ok: true, intel, fromCache: false };
   } catch (e) {
     console.error("[case-intelligence] build failed", complaintId, e);
+    // Advance the status off the 'running' claim so the row isn't stuck in-flight
+    // forever (which would keep the dossier polling and never retry). 'failed' is
+    // reclaimable — the dossier / triggers re-kick a build on the next view/mutation.
+    try {
+      await admin
+        .from("case_intelligence")
+        .upsert(
+          { complaint_id: complaintId, build_status: "failed", build_error: e instanceof Error ? e.message : "Case intelligence build failed" },
+          { onConflict: "complaint_id" },
+        );
+    } catch { /* ignore — best-effort */ }
     return { ok: false, intel: null, fromCache: false, error: e instanceof Error ? e.message : "Case intelligence build failed" };
   }
 }

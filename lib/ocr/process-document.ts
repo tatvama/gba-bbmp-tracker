@@ -202,15 +202,17 @@ export async function analyzeDocumentById(
   // This is the single funnel every document-analysis path lands in (direct
   // upload, OCR-then-analyze, "Re-run AI") — and the point where BOTH the OCR
   // text and ai_extracted_json are persisted, i.e. everything the Case
-  // Intelligence extract / document-facts stages read. Refresh the artifact now
-  // so the Evidence Dossier / Case File reflect this document immediately and
-  // letter drafting later reuses the warm cache instead of running the full
-  // analysis at draft time. Called directly (not triggerCaseIntelligenceRebuild,
-  // whose next/server after() needs a request scope — this also runs inside the
-  // background OCR job). Best-effort: never fail the summary over it. The
-  // engine's context-hash gate keeps a no-change re-entry cheap.
+  // Intelligence extract / document-facts stages read. Refresh the artifact so
+  // the Evidence Dossier / Case File reflect this document and letter drafting
+  // later reuses the warm cache instead of running the full analysis at draft
+  // time. Fire-and-forget (NOT awaited): the ~90s build must not hold this
+  // function — and, when reached from the OCR job handler, its concurrency slot
+  // — open. The engine's own single-flight (STALE_BUILD_MS) coalesces this with
+  // any build a caller triggered separately, so it can't run a duplicate.
+  // Called directly (not triggerCaseIntelligenceRebuild, whose next/server
+  // after() needs a request scope — this also runs inside the background job).
   if (doc.complaint_id) {
-    await buildCaseIntelligence(admin, doc.complaint_id as string).catch((e) =>
+    void buildCaseIntelligence(admin, doc.complaint_id as string).catch((e) =>
       console.warn("[ai] case intelligence rebuild after document analysis failed", e),
     );
   }
