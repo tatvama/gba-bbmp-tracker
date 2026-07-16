@@ -13,7 +13,7 @@ import type { JobType } from "./types";
  *  list. ai_draft/ocr are a single streaming/OCR call with no clean midpoint
  *  to stop, so they're deliberately absent — vision_scan checks between every
  *  photo pair. */
-export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan", "source_fetch"];
+export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan", "source_fetch", "ai_draft", "ocr", "export"];
 
 export const MODULE_LABEL: Record<JobType, string> = {
   ai_draft: "AI Drafting",

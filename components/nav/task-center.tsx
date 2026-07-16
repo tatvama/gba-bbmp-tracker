@@ -315,8 +315,14 @@ function TaskRow({
           </Button>
         )}
         {task.cancellable && (
-          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" disabled={busy} onClick={() => onCancel(task)}>
-            <Ban className="h-3 w-3" /> Cancel
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-[10px] text-rose-600 dark:text-rose-400 border-rose-200/30 hover:border-rose-200 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 gap-1 cursor-pointer"
+            disabled={busy}
+            onClick={() => onCancel(task)}
+          >
+            <Ban className="h-3 w-3 shrink-0" /> Stop
           </Button>
         )}
         {link && (

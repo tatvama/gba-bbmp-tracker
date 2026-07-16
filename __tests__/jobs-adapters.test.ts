@@ -110,7 +110,7 @@ describe("adaptBackgroundJob", () => {
     expect(t.resultLink).toBeNull();
   });
 
-  it("is never cancellable for ai_draft (no registered cancel point yet)", () => {
+  it("is now cancellable for ai_draft (to support user-requested stop action)", () => {
     const t = adaptBackgroundJob({
       id: "j1", type: "ai_draft", status: "running", title: "Counter-reply", entity_type: "complaint", entity_id: "c1",
       input: { complaintId: "c1", kind: "counter_reply" },
@@ -118,6 +118,6 @@ describe("adaptBackgroundJob", () => {
       created_at: "2026-01-01T00:00:00Z", updated_at: null, finished_at: null,
       cancel_requested: false, retry_count: 0, max_retries: 3, next_retry_at: null,
     });
-    expect(t.cancellable).toBe(false);
+    expect(t.cancellable).toBe(true);
   });
 });
