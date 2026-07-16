@@ -153,24 +153,31 @@ function crossValidate(ex: any, ocrText: string): any {
     }
   }
 
-  // Infer Complaint Type from Job Number context or subject keywords
+  // Infer the responsible BBMP department from subject keywords when the AI left
+  // it unclassified. Keep in sync with COMPLAINT_TYPES (lib/constants.ts).
   if (ex.complaintType === "Other" || !ex.complaintType) {
     const contextText = `${ex.subject} ${ex.summary} ${ex.requestedAction}`.toLowerCase();
-    
-    if (contextText.match(/pothole|road|asphalt|asphalting|tarring|ಡಾಂಬರು|ರಸ್ತೆ/)) {
-      ex.complaintType = "Road";
-    } else if (contextText.match(/drain|sewage|sewer|storm water|raja kaluve|ಕಾಲುವೆ|ಚರಂಡಿ/)) {
-      ex.complaintType = "Drain";
-    } else if (contextText.match(/garbage|trash|waste|dumping|ಕಸ|ತ್ಯಾಜ್ಯ/)) {
-      ex.complaintType = "Garbage";
-    } else if (contextText.match(/streetlight|light|bulb|ಕಂಬ|ದೀಪ/)) {
-      ex.complaintType = "Streetlight";
-    } else if (contextText.match(/footpath|sidewalk|ನಡಿಗೆ|ಪಾದಚಾರಿ/)) {
-      ex.complaintType = "Footpath";
-    } else if (contextText.match(/water logging|flooding|ನೆರೆ/)) {
-      ex.complaintType = "Water Logging";
-    } else if (contextText.match(/encroachment|encroached|ಅತಿಕ್ರಮಣ/)) {
-      ex.complaintType = "Encroachment";
+
+    if (contextText.match(/lake|tank|kere|rejuvenat|bund|ಕೆರೆ/)) {
+      ex.complaintType = "Lakes";
+    } else if (contextText.match(/drain|sewage|sewer|storm water|raja ?kaluve|rajakaluve|nala|desilt|water logging|flooding|ಕಾಲುವೆ|ಚರಂಡಿ|ನೆರೆ/)) {
+      ex.complaintType = "Storm Water Drain";
+    } else if (contextText.match(/streetlight|street light|lamp|bulb|high mast|pole light|electrical|ಬೀದಿ ?ದೀಪ|ದೀಪ/)) {
+      ex.complaintType = "Electrical";
+    } else if (contextText.match(/park|garden|tree|avenue|sapling|playground|horticultur|ಉದ್ಯಾನ|ಮರ/)) {
+      ex.complaintType = "Horticulture";
+    } else if (contextText.match(/garbage|trash|waste|dumping|sanitation|swm|mosquito|fogging|health|hospital|ಕಸ|ತ್ಯಾಜ್ಯ|ಆರೋಗ್ಯ/)) {
+      ex.complaintType = "Health";
+    } else if (contextText.match(/building|plan sanction|bye-?law|unauthoris|unauthoriz|encroach|layout|khata|town planning|ಕಟ್ಟಡ|ಅತಿಕ್ರಮಣ/)) {
+      ex.complaintType = "Town Planning";
+    } else if (contextText.match(/property tax|khata|advertis|hoarding|trade licen|estate|revenue|ಕಂದಾಯ|ಆಸ್ತಿ ?ತೆರಿಗೆ/)) {
+      ex.complaintType = "Revenue";
+    } else if (contextText.match(/legal notice|court|litigation|advocate|writ|ಕಾನೂನು|ನ್ಯಾಯಾಲಯ/)) {
+      ex.complaintType = "Legal";
+    } else if (contextText.match(/software|portal|website|e-?governance|server|application|ತಂತ್ರಾಂಶ/)) {
+      ex.complaintType = "IT";
+    } else if (contextText.match(/pothole|road|asphalt|asphalting|tarring|whitetopping|white topping|footpath|sidewalk|concreting|ಡಾಂಬರು|ರಸ್ತೆ|ಪಾದಚಾರಿ/)) {
+      ex.complaintType = "Road Infrastructure";
     }
   }
 

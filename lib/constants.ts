@@ -86,25 +86,23 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   FIELD_OFFICER: "Field Officer",
 };
 
+// BBMP responsible-department taxonomy. A complaint's `type` is the department
+// that owns the issue — the same set the AI classifier picks from during import
+// and the DB CHECK constraint enforces (see supabase/migrations/0039). Keep this
+// list, COMPLAINT_TYPE_VALUES (lib/ai/complaint-intake-analyzer.ts), and mig 0039
+// in sync.
 export const COMPLAINT_TYPES = [
-  "Road",
-  "Drain",
-  "Garbage",
-  "Streetlight",
-  "Footpath",
-  "Park",
-  "Water Logging",
-  "Encroachment",
-  "Building Violation",
-  "Public Works",
-  "Bill Payment",
-  "Tender Irregularity",
-  "Contractor Issue",
-  "Health Issue",
-  "Revenue Issue",
-  "Engineer Non Response",
-  "Ward Office Issue",
-  "Other",
+  "Road Infrastructure", // roads, asphalting, whitetopping, footpaths, potholes
+  "Storm Water Drain",   // rajakaluves / drains / desilting / flooding (custodian; sewer lines are BWSSB)
+  "Lakes",               // lakes, tanks, kere, rejuvenation, bunds
+  "Electrical",          // street lighting, poles, electrical works
+  "Horticulture",        // parks, avenue trees, gardens, playgrounds
+  "Town Planning",       // building plan/bye-law, unauthorised construction, encroachment
+  "Revenue",             // property tax, khata, estate, advertisement, trade licence
+  "Health",              // solid waste, sanitation, public health
+  "Legal",               // legal notices, litigation
+  "IT",                  // portal, software, e-governance
+  "Other",               // does not clearly fit one department
 ] as const;
 export type ComplaintType = (typeof COMPLAINT_TYPES)[number];
 

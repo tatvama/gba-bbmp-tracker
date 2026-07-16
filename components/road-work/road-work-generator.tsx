@@ -130,7 +130,7 @@ export function RoadWorkGenerator({
     // Complaint
     const fd = new FormData();
     fd.set("title", `Road work — ${subjectBase}${ref}`);
-    fd.set("type", "Road");
+    fd.set("type", "Road Infrastructure");
     fd.set("status", "Draft");
     fd.set("priority", "Medium");
     fd.set("description", finalText);

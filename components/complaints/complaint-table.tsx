@@ -10,6 +10,7 @@ import {
 import {
   ArrowUpDown, Download, ChevronLeft, ChevronRight, X, Search, RefreshCw, ArrowRight,
   Folder, Construction, Droplet, Trash2, Lightbulb, Briefcase, Minus, ArrowUp, ArrowDown,
+  Waves, Trees, Building2, Landmark, HeartPulse, Scale, Cpu,
   AlertTriangle, CheckCircle2, LucideIcon, MoreVertical, ChevronDown, ChevronUp,
   Sparkles, Clock, Printer, ShieldAlert, BarChart3, Database, FileText, Check, Plus,
   LayoutDashboard, Smartphone, Upload, Eye, CheckSquare, Square, Trash, Settings,
@@ -82,26 +83,35 @@ function TypeChip({ type }: { type: string | null }) {
 
   let Icon = Folder;
   switch (type) {
-    case "Road":
-    case "Footpath":
-    case "Public Works":
+    case "Road Infrastructure":
       Icon = Construction;
       break;
-    case "Drain":
-    case "Water Logging":
+    case "Storm Water Drain":
       Icon = Droplet;
       break;
-    case "Garbage":
-    case "Health Issue":
-      Icon = Trash2;
+    case "Lakes":
+      Icon = Waves;
       break;
-    case "Streetlight":
+    case "Electrical":
       Icon = Lightbulb;
       break;
-    case "Tender Irregularity":
-    case "Bill Payment":
-    case "Contractor Issue":
-      Icon = Briefcase;
+    case "Horticulture":
+      Icon = Trees;
+      break;
+    case "Town Planning":
+      Icon = Building2;
+      break;
+    case "Revenue":
+      Icon = Landmark;
+      break;
+    case "Health":
+      Icon = HeartPulse;
+      break;
+    case "Legal":
+      Icon = Scale;
+      break;
+    case "IT":
+      Icon = Cpu;
       break;
     default:
       Icon = Folder;
@@ -1293,11 +1303,11 @@ export function ComplaintTable({
               <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Category Breakdown</span>
             </div>
             <CardContent className="p-4 space-y-3.5">
-              <CategoryProgress label="Roads & Footpaths" count={data.filter(c => c.type === "Road" || c.type === "Footpath").length} total={totalCount} color="bg-primary" />
-              <CategoryProgress label="Drains & Sewage" count={data.filter(c => c.type === "Drain" || c.type === "Water Logging").length} total={totalCount} color="bg-blue-500" />
-              <CategoryProgress label="Garbage disposal" count={data.filter(c => c.type === "Garbage").length} total={totalCount} color="bg-rose-500" />
-              <CategoryProgress label="Streetlights" count={data.filter(c => c.type === "Streetlight").length} total={totalCount} color="bg-amber-500" />
-              <CategoryProgress label="Administrative issues" count={data.filter(c => c.type === "Tender Irregularity" || c.type === "Bill Payment" || c.type === "Contractor Issue").length} total={totalCount} color="bg-teal" />
+              <CategoryProgress label="Road Infrastructure" count={data.filter(c => c.type === "Road Infrastructure").length} total={totalCount} color="bg-primary" />
+              <CategoryProgress label="Storm Water Drains" count={data.filter(c => c.type === "Storm Water Drain").length} total={totalCount} color="bg-blue-500" />
+              <CategoryProgress label="Electrical & Lakes" count={data.filter(c => c.type === "Electrical" || c.type === "Lakes").length} total={totalCount} color="bg-amber-500" />
+              <CategoryProgress label="Horticulture & Health" count={data.filter(c => c.type === "Horticulture" || c.type === "Health").length} total={totalCount} color="bg-emerald-500" />
+              <CategoryProgress label="Planning, Revenue & Legal" count={data.filter(c => c.type === "Town Planning" || c.type === "Revenue" || c.type === "Legal" || c.type === "IT").length} total={totalCount} color="bg-teal" />
             </CardContent>
           </Card>
 

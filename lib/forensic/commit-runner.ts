@@ -377,8 +377,9 @@ export async function commitForensicJobs(
         if (tlRows.length) await admin.from("job_timeline_dates").insert(tlRows);
       }
 
-      // 4) Convert to a Complaint (idempotent, request-free core).
-      const conv = await convertJobCaseCore(admin, jobCaseId, userId);
+      // 4) Convert to a Complaint (idempotent, request-free core). Pass the
+      // AI-detected responsible department from the analyze pass as the type.
+      const conv = await convertJobCaseCore(admin, jobCaseId, userId, { complaintType: job.complaintType ?? null });
       if (!conv.ok || !conv.complaintId) throw new Error(conv.error || "Could not create the complaint.");
       const complaintId = conv.complaintId;
 

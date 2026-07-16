@@ -10,12 +10,12 @@ import { extractJobCode } from "@/lib/ifms/downloader";
  * and suggests next actions — to pre-fill a new complaint for the user to confirm.
  */
 
-/** Canonical complaint types (must match the complaints.type CHECK in mig 0004). */
+/** Canonical complaint types — the BBMP responsible-department taxonomy (must
+ *  match COMPLAINT_TYPES in lib/constants.ts and the complaints.type CHECK in
+ *  mig 0039). */
 export const COMPLAINT_TYPE_VALUES = [
-  "Road", "Drain", "Garbage", "Streetlight", "Footpath", "Park", "Water Logging",
-  "Encroachment", "Building Violation", "Public Works", "Bill Payment",
-  "Tender Irregularity", "Contractor Issue", "Health Issue", "Revenue Issue",
-  "Engineer Non Response", "Ward Office Issue", "Other",
+  "Road Infrastructure", "Storm Water Drain", "Lakes", "Electrical", "Horticulture",
+  "Town Planning", "Revenue", "Health", "Legal", "IT", "Other",
 ] as const;
 
 export interface ComplaintIntakeExtraction {

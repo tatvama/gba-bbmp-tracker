@@ -777,7 +777,7 @@ server.registerTool(
     inputSchema: {
       title: z.string().min(3).describe("Complaint title — brief description of the issue"),
       type: z.enum(COMPLAINT_TYPES).describe(
-        "Complaint type. E.g. 'Road', 'Drain', 'Garbage', 'Streetlight', 'Building Violation'",
+        "Responsible BBMP department. E.g. 'Road Infrastructure', 'Storm Water Drain', 'Electrical', 'Horticulture', 'Town Planning'",
       ),
       description: z.string().optional().describe("Detailed description of the complaint"),
       priority: z.enum(PRIORITIES).optional().describe("Low | Medium | High | Urgent"),

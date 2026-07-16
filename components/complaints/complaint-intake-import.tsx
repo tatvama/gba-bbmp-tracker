@@ -36,11 +36,11 @@ import type { ComplaintIntakeExtraction } from "@/lib/ai/complaint-intake-analyz
 import { useTranslation } from "@/lib/i18n/client";
 import { translateEnum } from "@/lib/i18n/translate-enum";
 
+// BBMP responsible-department taxonomy — keep in sync with COMPLAINT_TYPES in
+// lib/constants.ts and the complaints.type CHECK (mig 0039).
 const COMPLAINT_TYPES = [
-  "Road", "Drain", "Garbage", "Streetlight", "Footpath", "Park", "Water Logging",
-  "Encroachment", "Building Violation", "Public Works", "Bill Payment",
-  "Tender Irregularity", "Contractor Issue", "Health Issue", "Revenue Issue",
-  "Engineer Non Response", "Ward Office Issue", "Other",
+  "Road Infrastructure", "Storm Water Drain", "Lakes", "Electrical", "Horticulture",
+  "Town Planning", "Revenue", "Health", "Legal", "IT", "Other",
 ];
 
 type Phase = "idle" | "analyzing" | "review" | "committing" | "done";

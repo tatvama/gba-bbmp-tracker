@@ -17,6 +17,8 @@
  * NOTE: no `import "server-only"` — imported by client components too (types only).
  */
 
+import type { ComplaintType } from "@/lib/constants";
+
 export type ForensicSource = "json" | "ai-from-letter" | "none";
 
 export type ForensicFileRole =
@@ -131,6 +133,9 @@ export interface ForensicJobResult {
   letterFileRel: string | null;
   letterPdfRel: string | null;
   riskColour: ForensicRiskColour | null;
+  /** AI-detected responsible BBMP department (the complaint's type). Null until
+   *  analyzed; defaults to "Other" when AI is off or unsure. */
+  complaintType?: ComplaintType | null;
   skip: boolean;
   alreadyImported?: boolean;
 }

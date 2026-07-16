@@ -5,6 +5,7 @@ import { walkTempDir } from "@/lib/forensic/zip";
 import { groupEntriesByJobCode, classifyRelPath, parseJob, fileExt, type RawEntry } from "@/lib/forensic/parse-skill-output";
 import { extractDocxText } from "@/lib/forensic/docx-text";
 import { deriveDatasetFromLetter } from "@/lib/ai/forensic-letter-extract";
+import { classifyComplaintType } from "@/lib/ai/classify-complaint-type";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { isFullCode } from "@/lib/ifms/downloader";
@@ -142,6 +143,20 @@ export async function processForensicBatch(
             );
           }
         }
+
+        // Detect the responsible BBMP department (the complaint type). Work +
+        // summary lead the signal; letter/OCR text backs it up. Best-effort:
+        // classifyComplaintType returns "Other" on any failure and never throws.
+        if (!result.skip) {
+          const clsText = [
+            result.dataset?.work,
+            result.dataset?.summary,
+            result.letterText,
+            result.extractedText,
+          ].filter(Boolean).join("\n\n");
+          result.complaintType = clsText.trim() ? await classifyComplaintType(clsText) : "Other";
+        }
+
         jobs.push(result);
       } catch (e) {
         console.error(`[processForensicBatch] job FAILED code=${code}`, e);

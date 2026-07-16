@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_COMPLAINT_SETTINGS } from "@/lib/constants";
+import { DEFAULT_COMPLAINT_SETTINGS, type ComplaintType } from "@/lib/constants";
+import { classifyComplaintType } from "@/lib/ai/classify-complaint-type";
 
 /** app_settings key — same value as lib/settings COMPLAINT_SETTINGS_KEY, inlined
  *  here because lib/settings pulls the cookie-scoped supabase client
@@ -40,6 +41,7 @@ export async function convertJobCaseCore(
   admin: SupabaseClient,
   jobCaseId: string,
   userId: string,
+  opts?: { complaintType?: ComplaintType | null },
 ): Promise<ConvertJobCaseResult> {
   const { data: jc } = await admin.from("job_cases").select("*").eq("id", jobCaseId).single();
   if (!jc) return { ok: false, error: "Job case not found." };
@@ -69,11 +71,25 @@ export async function convertJobCaseCore(
 
   const jobNumber = jc.job_number as string;
   const title = (jc.description as string)?.trim() || `BBMP works job ${jobNumber}`;
+
+  // Responsible BBMP department (the complaint's type). The forensic ZIP importer
+  // pre-classifies from work + summary + letter text and passes it in; other
+  // callers (e.g. the IFMS portal path) get a best-effort classification from the
+  // job description here. Falls back to "Other".
+  let complaintType: ComplaintType = opts?.complaintType ?? "Other";
+  if (!opts?.complaintType) {
+    try {
+      complaintType = await classifyComplaintType(`${title}\n${(jc.description as string) ?? ""}`);
+    } catch {
+      complaintType = "Other";
+    }
+  }
+
   const { data: comp, error } = await admin
     .from("complaints")
     .insert({
       title: title.slice(0, 300),
-      type: "Tender Irregularity",
+      type: complaintType,
       status: "Draft",
       priority: "Medium",
       job_number: jobNumber,

@@ -79,7 +79,7 @@ export function DocumentAuditor({
   async function onApprove(finalText: string) {
     const fd = new FormData();
     fd.set("title", `Road work irregularities${wardName ? ` — ${wardName}` : ""} (${docType} audit)`);
-    fd.set("type", "Road");
+    fd.set("type", "Road Infrastructure");
     fd.set("status", "Draft");
     fd.set("priority", "High");
     fd.set("description", finalText);

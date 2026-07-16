@@ -241,7 +241,7 @@ export function AuditWizard({
       } else {
         const fd = new FormData();
         fd.set("title", `Road work audit — ${subjectBase}${ref}`);
-        fd.set("type", "Road");
+        fd.set("type", "Road Infrastructure");
         fd.set("status", "Draft");
         fd.set("priority", "Medium");
         fd.set("description", draft);

@@ -33,15 +33,15 @@ interface Sample {
 }
 
 const SAMPLES: Sample[] = [
-  { ref: "DM-CMP-2026-900001", title: "SAMPLE: Broken stormwater drain cover near park gate", type: "Drain", status: "Filed", priority: "High", ward_no: 1, given: d(-12), next: d(-1) },
-  { ref: "DM-CMP-2026-900002", title: "SAMPLE: Streetlight not working for 3 weeks", type: "Streetlight", status: "Reply Received", priority: "Medium", ward_no: 2, given: d(-25), next: d(2),
+  { ref: "DM-CMP-2026-900001", title: "SAMPLE: Broken stormwater drain cover near park gate", type: "Storm Water Drain", status: "Filed", priority: "High", ward_no: 1, given: d(-12), next: d(-1) },
+  { ref: "DM-CMP-2026-900002", title: "SAMPLE: Streetlight not working for 3 weeks", type: "Electrical", status: "Reply Received", priority: "Medium", ward_no: 2, given: d(-25), next: d(2),
     reply: { date: d(-5), by: "AEE (Sample)", summary: "Work order issued; repair scheduled.", satisfactory: false } },
-  { ref: "DM-CMP-2026-900003", title: "SAMPLE: Garbage not collected — black spot", type: "Garbage", status: "Action Taken Report Received", priority: "High", ward_no: 3, given: d(-30), next: d(-1),
+  { ref: "DM-CMP-2026-900003", title: "SAMPLE: Garbage not collected — black spot", type: "Health", status: "Action Taken Report Received", priority: "High", ward_no: 3, given: d(-30), next: d(-1),
     reply: { date: d(-15), by: "Health Officer (Sample)", summary: "Contractor instructed to resume daily collection." },
     action: { date: d(-3), by: "Health Officer (Sample)", summary: "Black spot cleared; bin placed. Verify on site." } },
-  { ref: "DM-CMP-2026-900004", title: "SAMPLE: Footpath encroachment by vendors", type: "Encroachment", status: "Escalated", priority: "Urgent", ward_no: 4, given: d(-40), next: d(1),
+  { ref: "DM-CMP-2026-900004", title: "SAMPLE: Footpath encroachment by vendors", type: "Town Planning", status: "Escalated", priority: "Urgent", ward_no: 4, given: d(-40), next: d(1),
     escalation: { level: "AEE", reason: "No action after two follow-ups." } },
-  { ref: "DM-CMP-2026-900005", title: "SAMPLE: Pothole repair — poor quality work", type: "Road", status: "Resolved", priority: "Medium", ward_no: 5, given: d(-50), next: d(-30), closure: d(-2) },
+  { ref: "DM-CMP-2026-900005", title: "SAMPLE: Pothole repair — poor quality work", type: "Road Infrastructure", status: "Resolved", priority: "Medium", ward_no: 5, given: d(-50), next: d(-30), closure: d(-2) },
 ];
 
 const TEMPLATES: { title: string; kind: string; category: string; tone: string; language: string; body: string }[] = [

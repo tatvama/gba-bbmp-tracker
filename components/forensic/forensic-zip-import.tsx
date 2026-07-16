@@ -333,6 +333,14 @@ export function ForensicZipImport({ presetFile }: { presetFile?: File } = {}) {
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sourceBadge.cls}`}>
                       {sourceBadge.text}
                     </span>
+                    {j.complaintType && (
+                      <span
+                        className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
+                        title="AI-detected responsible BBMP department (the complaint type)"
+                      >
+                        {j.complaintType}
+                      </span>
+                    )}
                   </div>
 
                   {/* present / missing checklist */}
