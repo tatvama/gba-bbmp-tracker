@@ -32,6 +32,7 @@ import { addDays } from "@/lib/rti-deadlines";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
+import { triggerCaseIntelligenceRebuild } from "@/lib/actions/case-intelligence";
 import { generateDraftPdfService } from "@/lib/pdf/document-service";
 import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -265,6 +266,7 @@ export async function createComplaint(_prev: ActionState, formData: FormData): P
   });
   revalidatePath("/complaints");
   void triggerAdvisorAnalysis(id);
+  void triggerCaseIntelligenceRebuild(id);
   return { success: true, id };
 }
 
@@ -288,6 +290,7 @@ export async function updateComplaint(id: string, _prev: ActionState, formData: 
   revalidatePath(`/complaints/${id}`);
   revalidatePath("/complaints");
   void triggerAdvisorAnalysis(id);
+  void triggerCaseIntelligenceRebuild(id);
   return { success: true, id };
 }
 
@@ -340,6 +343,7 @@ export async function setComplaintStatus(
   revalidatePath(`/complaints/${id}`);
   revalidatePath("/complaints");
   void triggerAdvisorAnalysis(id);
+  void triggerCaseIntelligenceRebuild(id);
   return { success: true, id };
 }
 
@@ -403,6 +407,7 @@ export async function updateAcknowledgmentDateAction(id: string, newDate: string
   });
   revalidatePath(`/complaints/${id}`);
   void triggerAdvisorAnalysis(id);
+  void triggerCaseIntelligenceRebuild(id);
   return { success: true, id };
 }
 
@@ -476,6 +481,7 @@ export async function fileComplaint(input: {
   revalidatePath(`/complaints/${input.complaintId}`);
   revalidatePath("/complaints");
   void triggerAdvisorAnalysis(input.complaintId);
+  void triggerCaseIntelligenceRebuild(input.complaintId);
   return { success: true, id: input.complaintId };
 }
 
@@ -531,6 +537,7 @@ export async function addComplaintReply(complaintId: string, _prev: ActionState,
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "reply", oldValue: null, newValue: d.replySummary ?? "reply added" }] });
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -585,6 +592,7 @@ export async function addComplaintActionTaken(complaintId: string, _prev: Action
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "action_taken", oldValue: null, newValue: d.actionSummary ?? "action added" }] });
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -622,6 +630,7 @@ export async function addComplaintCommunication(complaintId: string, _prev: Acti
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "communication", oldValue: null, newValue: d.communicationType }] });
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -637,6 +646,7 @@ export async function completeComplaintReminder(reminderId: string, complaintId:
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "reminder", oldValue: null, newValue: "Completed" }] });
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -665,6 +675,7 @@ export async function addComplaintEscalation(complaintId: string, _prev: ActionS
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "escalation", oldValue: null, newValue: toLevel || "escalated" }] });
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -722,6 +733,7 @@ export async function applyDocumentExtraction(_prev: ActionState, formData: Form
   await writeAudit(admin, { entityType: "complaint", entityId: complaintId, changedBy: user.id, changes: [{ field: "document_applied", oldValue: null, newValue: d.documentId }] });
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { success: true, id: complaintId };
 }
 
@@ -928,6 +940,7 @@ export async function uploadComplaintScanAction(
 
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { ok: true, documentId, jobId: jobResult.jobId, ocrStatus: "Processing" };
 }
 
@@ -1041,6 +1054,7 @@ export async function saveComplaintAiDraft(input: {
   // A saved counter-reply/letter is fresh correspondence — re-run the advisor
   // so its next-step reasoning accounts for what we just argued.
   void triggerAdvisorAnalysis(input.complaintId);
+  void triggerCaseIntelligenceRebuild(input.complaintId);
   return { ok: true, id: data.id };
 }
 
@@ -1201,6 +1215,7 @@ export async function fileCounterReplyAction(
 
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { ok: true, documentId };
 }
 
@@ -1321,6 +1336,7 @@ export async function fileCommunicationDraftAction(
 
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { ok: true, documentId };
 }
 
@@ -1418,6 +1434,7 @@ export async function fileEscalationAction(
 
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
+  void triggerCaseIntelligenceRebuild(complaintId);
   return { ok: true, documentId };
 }
 

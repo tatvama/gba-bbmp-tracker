@@ -16,8 +16,11 @@
  *  cie-4: ingest no longer triggers document analysis itself (removed the
  *  @napi-rs/canvas-reaching import that broke instrumentation.ts's bundle).
  *  cie-5: unconditional document-fact extraction (AA/TS/KW-4/tender/MDP/royalty/
- *  insurance) — surfaced whether or not anything is flagged, not just on findings. */
-export const ENGINE_VERSION = "cie-5";
+ *  insurance) — surfaced whether or not anything is flagged, not just on findings.
+ *  cie-6: document-fact schema widened to full per-category detail (authority,
+ *  validity, contractor, completion period, quarry source, etc.) + per-document
+ *  caching (mig 0041) so only new/changed documents are re-extracted. */
+export const ENGINE_VERSION = "cie-6";
 
 export type Confidence = "High" | "Medium" | "Low";
 

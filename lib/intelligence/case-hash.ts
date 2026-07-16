@@ -12,7 +12,7 @@
  * own register() function. lib/ai/advisor/context-hash.ts uses `crypto` and
  * works fine ONLY because nothing reachable from instrumentation.ts imports it.
  */
-function fnv1a64Hex(input: string): string {
+export function fnv1a64Hex(input: string): string {
   // FNV-1a, 64-bit via BigInt — pure JS, no dependency, good distribution for a
   // cache key over a small JSON signal object.
   let hash = 0xcbf29ce484222325n;

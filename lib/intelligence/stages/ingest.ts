@@ -26,6 +26,10 @@ export interface RawDoc {
   aiSummary: string | null;
   aiExtractedJson: unknown;
   documentDate: string | null;
+  /** Cached unconditional reference-fact extraction (document-facts.ts), keyed
+   *  by documentFactsHash so the stage only re-runs AI on new/changed docs. */
+  documentFacts: unknown;
+  documentFactsHash: string | null;
 }
 
 export interface RawCaseMaterial {
@@ -62,7 +66,7 @@ export async function ingestCaseMaterial(
 
   const [cDocsRes, timelineRes, repliesRes, actionsRes, escalationsRes, aiDraftsRes] = await Promise.all([
     admin.from("complaint_documents")
-      .select("id, document_type, title, original_file_name, ocr_clean_text, ocr_raw_text, ai_summary, ai_extracted_json, ai_summary_status, document_date")
+      .select("id, document_type, title, original_file_name, ocr_clean_text, ocr_raw_text, ai_summary, ai_extracted_json, ai_summary_status, document_date, document_facts, document_facts_hash")
       .eq("complaint_id", complaintId)
       .order("created_at", { ascending: true }),
     admin.from("complaint_timeline").select("id, event_date, event_type, title, summary").eq("complaint_id", complaintId).order("event_date", { ascending: true }).limit(200),
@@ -83,6 +87,8 @@ export async function ingestCaseMaterial(
     aiSummary: (d.ai_summary as string) ?? null,
     aiExtractedJson: d.ai_extracted_json ?? null,
     documentDate: (d.document_date as string) ?? null,
+    documentFacts: d.document_facts ?? null,
+    documentFactsHash: (d.document_facts_hash as string) ?? null,
   }));
 
   // Job side (only when the complaint is linked to a job).
@@ -98,7 +104,7 @@ export async function ingestCaseMaterial(
   if (jobNumber) {
     const [jDocsRes, jAuditRes, jCaseRes, rbRes, jtdRes, baRes] = await Promise.all([
       admin.from("job_documents")
-        .select("id, document_type, original_file_name, title, ocr_clean_text, ocr_raw_text, ai_summary, ai_extracted_json")
+        .select("id, document_type, original_file_name, title, ocr_clean_text, ocr_raw_text, ai_summary, ai_extracted_json, document_facts, document_facts_hash")
         .eq("job_number", jobNumber)
         .order("created_at", { ascending: true }),
       admin.from("job_audits").select("id, report, risk_score, risk_band, total_exposure").eq("job_number", jobNumber).order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -116,6 +122,8 @@ export async function ingestCaseMaterial(
       aiSummary: (d.ai_summary as string) ?? null,
       aiExtractedJson: d.ai_extracted_json ?? null,
       documentDate: null,
+      documentFacts: d.document_facts ?? null,
+      documentFactsHash: (d.document_facts_hash as string) ?? null,
     }));
     jobAudit = (jAuditRes.data as any) ?? null;
     jobCase = (jCaseRes.data as any) ?? null;

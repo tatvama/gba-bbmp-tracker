@@ -1,19 +1,26 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractDocumentFactsFromText, type DocumentFactsExtraction, type DocRefItem } from "@/lib/ai/extractors/document-facts";
 import { mapWithConcurrency } from "@/lib/utils/concurrency";
+import { fnv1a64Hex } from "../case-hash";
 import type { RawCaseMaterial, RawDoc } from "./ingest";
 import type { Store } from "../builder";
 import type { Reference, ComplianceItem } from "../types";
 
 /**
- * Stage — Document Fact Extraction (unconditional). Reads EVERY document's text
- * and pulls AA/TS/agreement(KW-4)/work-order/tender/MDP/royalty/insurance
- * reference numbers, regardless of whether anything is wrong with them — unlike
- * the forensic finding stages, which only surface a fact when it's part of a
- * flagged issue. This is what lets a letter cite "Administrative Approval No. X
- * dated Y" or note a Technical Sanction on record even when there's no dispute
- * about it. Best-effort: a single document's extraction failure never sinks the
- * stage; AI-off returns nothing (never throws).
+ * Stage — Document Fact Extraction (unconditional, per-document cached). Reads
+ * EVERY document's text and pulls AA/TS/agreement(KW-4)/work-order/tender/MDP/
+ * royalty/insurance reference numbers AND their surrounding detail, regardless
+ * of whether anything is wrong with them — unlike the forensic finding stages,
+ * which only surface a fact when it's part of a flagged issue.
+ *
+ * Cached PER DOCUMENT (document_facts / document_facts_hash columns, mig 0041),
+ * keyed by a hash of that document's own OCR text: a case with 40 already-
+ * processed documents plus 1 brand-new upload only re-runs AI extraction on the
+ * new document, not all 41. If a document's text later changes (OCR completes
+ * after initially being empty, gets corrected), the hash mismatch re-triggers
+ * extraction for that document only. Best-effort throughout: a single
+ * document's extraction or cache-write failure never sinks the stage.
  */
 
 const DOC_CAP = 40;
@@ -36,10 +43,54 @@ const FACT_META: FactMeta[] = [
   { key: "insurancePolicy", label: "Insurance Policy", ruleRef: "KW-4 agreement — insurance & performance-security clauses" },
 ];
 
-const fmt = (item: DocRefItem): string => [item.number, item.date, item.amount, item.extra].filter(Boolean).join(" | ");
+/** Every populated field of one reference, labelled, in a fixed readable order. */
+function fmt(item: DocRefItem): string {
+  const parts: string[] = [];
+  if (item.number) parts.push(`No. ${item.number}`);
+  if (item.date) parts.push(`dated ${item.date}`);
+  if (item.validFrom || item.validTo) parts.push(`Validity: ${item.validFrom ?? "?"} to ${item.validTo ?? "?"}`);
+  if (item.amount) parts.push(`Amount: ${item.amount}`);
+  if (item.rate) parts.push(`Rate: ${item.rate}`);
+  if (item.quantity) parts.push(`Qty: ${item.quantity}`);
+  if (item.material) parts.push(`Material: ${item.material}`);
+  if (item.contractorName) parts.push(`Contractor: ${item.contractorName}`);
+  if (item.completionPeriod) parts.push(`Completion period: ${item.completionPeriod}`);
+  if (item.performanceSecurity) parts.push(`Performance security: ${item.performanceSecurity}`);
+  if (item.defectLiabilityPeriod) parts.push(`DLP: ${item.defectLiabilityPeriod}`);
+  if (item.quarrySource) parts.push(`Source: ${item.quarrySource}`);
+  if (item.authority) parts.push(`Authority: ${item.authority}`);
+  if (item.insurer) parts.push(`Insurer: ${item.insurer}`);
+  if (item.policyType) parts.push(`Type: ${item.policyType}`);
+  if (item.tenderType) parts.push(`Tender type: ${item.tenderType}`);
+  if (item.publicationPeriod) parts.push(`Published: ${item.publicationPeriod}`);
+  if (item.bidders) parts.push(`Bidders: ${item.bidders}`);
+  if (item.extra) parts.push(item.extra);
+  return parts.join(" | ");
+}
+
 const asText = (d: RawDoc): string => (d.ocrText || d.aiSummary || "").trim();
 
+async function getFacts(admin: SupabaseClient, d: RawDoc): Promise<DocumentFactsExtraction> {
+  const text = asText(d);
+  const hash = fnv1a64Hex(text);
+  if (d.documentFactsHash === hash && d.documentFacts) {
+    return d.documentFacts as DocumentFactsExtraction;
+  }
+  const facts = await extractDocumentFactsFromText(text, true);
+  try {
+    await admin.from(d.source).update({
+      document_facts: facts,
+      document_facts_hash: hash,
+      document_facts_extracted_at: new Date().toISOString(),
+    }).eq("id", d.id);
+  } catch (e) {
+    console.warn("[document-facts] cache write failed", d.source, d.id, e);
+  }
+  return facts;
+}
+
 export async function buildDocumentFacts(
+  admin: SupabaseClient,
   material: RawCaseMaterial,
   store: Store,
 ): Promise<{ references: Reference[]; compliance: ComplianceItem[] }> {
@@ -48,8 +99,7 @@ export async function buildDocumentFacts(
 
   const perDoc = await mapWithConcurrency(docs, CONCURRENCY, async (d) => {
     try {
-      const facts = await extractDocumentFactsFromText(asText(d), true);
-      return { doc: d, facts };
+      return { doc: d, facts: await getFacts(admin, d) };
     } catch {
       return null;
     }
@@ -57,8 +107,8 @@ export async function buildDocumentFacts(
 
   // The same reference (e.g. one AA / TS number) commonly appears across several
   // documents; dedupe per (label + reference number) so the letter cites each
-  // reference once, keeping the richest occurrence (most number/date/amount
-  // detail) and merging every source document's evidence onto it.
+  // reference once, keeping the richest occurrence (most detail) and merging
+  // every source document's evidence onto it.
   const references: Reference[] = [];
   const norm = (s: string) => s.toLowerCase().replace(/[\s.,/\-]+/g, "");
   const byKey = new Map<string, Reference>();
@@ -76,7 +126,6 @@ export async function buildDocumentFacts(
           extract: value,
           confidence: "Medium",
         });
-        // Dedupe key: the reference number if present, else the whole value.
         const key = `${meta.label}::${norm(item.number || value)}`;
         const existing = byKey.get(key);
         if (existing) {

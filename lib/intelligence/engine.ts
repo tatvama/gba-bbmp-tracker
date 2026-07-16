@@ -78,7 +78,8 @@ export async function buildCaseIntelligence(
     const correlations = correlateDocuments(material, store);
     // Unconditional AA/TS/agreement(KW-4)/tender/MDP/royalty/insurance facts —
     // surfaced whether or not anything is wrong with them (unlike findings).
-    const docFacts = await buildDocumentFacts(material, store);
+    // Cached per document (mig 0041): a new document is the only one reprocessed.
+    const docFacts = await buildDocumentFacts(admin, material, store);
     const references = [...extracted.references, ...docFacts.references];
     const compliance = [...analyzed.compliance, ...docFacts.compliance];
     const legalFramework = buildLegalFramework(analyzed.findings, compliance);
