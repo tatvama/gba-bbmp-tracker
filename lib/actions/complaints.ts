@@ -33,7 +33,9 @@ import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
 import { triggerCaseIntelligenceRebuild } from "@/lib/actions/case-intelligence";
-import { generateDraftPdfService } from "@/lib/pdf/document-service";
+import { fileLetterWithCopies } from "@/lib/distribution/distribution-service";
+import { complaintDistributionDeps } from "@/lib/distribution/complaint-deps";
+import type { RecipientRoleKey } from "@/lib/complaints/recipient-roles";
 import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
@@ -1103,7 +1105,7 @@ export async function getLatestComplaintAiDraft(
 export async function fileCounterReplyAction(
   complaintId: string,
   content: string,
-  opts?: { language?: string },
+  opts?: { language?: string; recipients?: RecipientRoleKey[] },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
@@ -1116,46 +1118,24 @@ export async function fileCounterReplyAction(
     .eq("id", complaintId)
     .single();
 
-  let pdf: Buffer;
-  let fileName: string;
+  // Render the recipient copy (with the selected Copy-To) + the mandatory office
+  // copy (full distribution), store both linked, via the Distribution service.
+  let filed: Awaited<ReturnType<typeof fileLetterWithCopies>>;
   try {
-    const r = await generateDraftPdfService("Counter-reply", content, undefined, {
-      reference: counterReplyCase?.internal_case_number ?? null,
-    });
-    pdf = r.buffer;
-    fileName = `counter-reply-${Date.now()}.pdf`;
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? `Could not render the PDF: ${e.message}` : "Could not render the PDF." };
-  }
-
-  const key = `complaints/${complaintId}/${fileName}`;
-  try {
-    await uploadToR2({ key, body: pdf, contentType: "application/pdf", contentLength: pdf.byteLength });
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
-  }
-
-  const { data: doc, error } = await admin
-    .from("complaint_documents")
-    .insert({
-      complaint_id: complaintId,
-      document_type: "Counter-reply",
+    filed = await fileLetterWithCopies(complaintDistributionDeps(admin), {
+      complaintId,
+      documentType: "Counter-reply",
       title: "Counter-reply",
-      original_file_name: fileName,
-      storage_bucket: R2_STORAGE_SENTINEL,
-      storage_path: key,
-      mime_type: "application/pdf",
-      file_size: pdf.byteLength,
-      document_date: todayISO(),
-      ocr_status: "Skipped",
-      ocr_clean_text: content, // we already have the text — viewable/searchable
-      ai_summary_status: isAiConfigured() ? "generating" : "none",
-      uploaded_by: user.id,
-    })
-    .select("id")
-    .single();
-  if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the counter-reply document." };
-  const documentId = doc.id as string;
+      content,
+      reference: counterReplyCase?.internal_case_number ?? null,
+      recipients: opts?.recipients,
+      uploadedBy: user.id,
+      aiSummaryStatus: isAiConfigured() ? "generating" : "none",
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not file the counter-reply." };
+  }
+  const documentId = filed.recipientDocId;
 
   // Structured AI summary from the letter text (background; the text is already
   // stored, so no OCR needed). Replaces the old first-300-chars placeholder.
@@ -1179,7 +1159,7 @@ export async function fileCounterReplyAction(
     complaintId,
     eventType: "Note",
     title: "Counter-reply filed",
-    summary: "Counter-reply rendered to PDF and filed alongside the department's reply.",
+    summary: `Counter-reply rendered to PDF and filed alongside the department's reply.${filed.officeCopyDocId ? " Office copy generated and stored." : ""}`,
     relatedDocumentId: documentId,
     createdBy: user.id,
   });
@@ -1223,9 +1203,10 @@ export async function fileCommunicationDraftAction(
   complaintId: string,
   content: string,
   kind: ComplaintDraftKind,
+  opts?: { recipients?: RecipientRoleKey[] },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   if (kind === "counter_reply") {
-    return fileCounterReplyAction(complaintId, content);
+    return fileCounterReplyAction(complaintId, content, { recipients: opts?.recipients });
   }
 
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
@@ -1240,46 +1221,22 @@ export async function fileCommunicationDraftAction(
     .single();
 
   const label = COMPLAINT_DRAFT_KINDS[kind];
-  let pdf: Buffer;
-  let fileName: string;
+  let filed: Awaited<ReturnType<typeof fileLetterWithCopies>>;
   try {
-    const r = await generateDraftPdfService(label, content, undefined, {
-      reference: compCase?.internal_case_number ?? null,
-    });
-    pdf = r.buffer;
-    fileName = `${kind}-${Date.now()}.pdf`;
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? `Could not render the PDF: ${e.message}` : "Could not render the PDF." };
-  }
-
-  const key = `complaints/${complaintId}/${fileName}`;
-  try {
-    await uploadToR2({ key, body: pdf, contentType: "application/pdf" });
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
-  }
-
-  const { data: doc, error } = await admin
-    .from("complaint_documents")
-    .insert({
-      complaint_id: complaintId,
-      document_type: kind === "reminder_letter" ? "Reminder letter" : "Legal notice",
+    filed = await fileLetterWithCopies(complaintDistributionDeps(admin), {
+      complaintId,
+      documentType: kind === "reminder_letter" ? "Reminder letter" : "Legal notice",
       title: label,
-      original_file_name: fileName,
-      storage_bucket: R2_STORAGE_SENTINEL,
-      storage_path: key,
-      mime_type: "application/pdf",
-      file_size: pdf.byteLength,
-      document_date: todayISO(),
-      ocr_status: "Skipped",
-      ocr_clean_text: content,
-      ai_summary_status: isAiConfigured() ? "generating" : "none",
-      uploaded_by: user.id,
-    })
-    .select("id")
-    .single();
-  if (error || !doc) return { ok: false, error: error?.message ?? `Could not save the document.` };
-  const documentId = doc.id as string;
+      content,
+      reference: compCase?.internal_case_number ?? null,
+      recipients: opts?.recipients,
+      uploadedBy: user.id,
+      aiSummaryStatus: isAiConfigured() ? "generating" : "none",
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : `Could not file the ${label}.` };
+  }
+  const documentId = filed.recipientDocId;
 
   if (isAiConfigured()) {
     void analyzeDocumentById(documentId, { force: true, ensureOcr: false }).catch((e) =>
@@ -1352,7 +1309,7 @@ export async function fileCommunicationDraftAction(
 export async function fileEscalationAction(
   complaintId: string,
   content: string,
-  opts?: { kind?: ComplaintDraftKind; title?: string; language?: string },
+  opts?: { kind?: ComplaintDraftKind; title?: string; language?: string; recipients?: RecipientRoleKey[] },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
@@ -1366,46 +1323,22 @@ export async function fileEscalationAction(
     .eq("id", complaintId)
     .single();
 
-  let pdf: Buffer;
-  let fileName: string;
+  let filed: Awaited<ReturnType<typeof fileLetterWithCopies>>;
   try {
-    const r = await generateDraftPdfService(label, content, undefined, {
-      reference: escalationCase?.internal_case_number ?? null,
-    });
-    pdf = r.buffer;
-    fileName = `escalation-${Date.now()}.pdf`;
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? `Could not render the PDF: ${e.message}` : "Could not render the PDF." };
-  }
-
-  const key = `complaints/${complaintId}/${fileName}`;
-  try {
-    await uploadToR2({ key, body: pdf, contentType: "application/pdf", contentLength: pdf.byteLength });
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Storage upload failed." };
-  }
-
-  const { data: doc, error } = await admin
-    .from("complaint_documents")
-    .insert({
-      complaint_id: complaintId,
-      document_type: "Escalation letter",
+    filed = await fileLetterWithCopies(complaintDistributionDeps(admin), {
+      complaintId,
+      documentType: "Escalation letter",
       title: label,
-      original_file_name: fileName,
-      storage_bucket: R2_STORAGE_SENTINEL,
-      storage_path: key,
-      mime_type: "application/pdf",
-      file_size: pdf.byteLength,
-      document_date: todayISO(),
-      ocr_status: "Skipped",
-      ocr_clean_text: content,
-      ai_summary_status: isAiConfigured() ? "generating" : "none",
-      uploaded_by: user.id,
-    })
-    .select("id")
-    .single();
-  if (error || !doc) return { ok: false, error: error?.message ?? "Could not save the escalation document." };
-  const documentId = doc.id as string;
+      content,
+      reference: escalationCase?.internal_case_number ?? null,
+      recipients: opts?.recipients,
+      uploadedBy: user.id,
+      aiSummaryStatus: isAiConfigured() ? "generating" : "none",
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not file the escalation letter." };
+  }
+  const documentId = filed.recipientDocId;
 
   // Structured AI summary from the letter text (background; text already stored).
   if (isAiConfigured()) {

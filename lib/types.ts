@@ -275,6 +275,11 @@ export interface ComplaintDocument {
   vision_checked_at: string | null;
   geo_flag: string | null;
   geo_distance_m: number | null;
+  // Document Distribution (0043): recipient/office-copy variant + Copy-To snapshot.
+  doc_variant: string | null; // 'recipient' | 'office' (see DOCUMENT_VARIANTS)
+  parent_document_id: string | null; // office copy → its recipient copy
+  recipients: unknown; // { roles, enrichment } snapshot on the recipient copy
+  copy_to: unknown; // LetterRecipient[] actually rendered
 }
 
 /** Structured AI extraction stored in complaint_documents.ai_extracted_json. */

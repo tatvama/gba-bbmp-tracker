@@ -119,10 +119,18 @@ export function DocumentList({
     return <EmptyState icon={FileText} title="No documents yet" description="Upload complaint papers, replies, ATRs, or site photos above." />;
   }
 
+  // Office copies are a variant of their parent letter — nest them under it
+  // rather than listing them as standalone documents.
+  const officeByParent = new Map<string, ComplaintDocument>();
+  for (const d of documents) {
+    if (d.doc_variant === "office" && d.parent_document_id) officeByParent.set(d.parent_document_id, d);
+  }
+  const topLevel = documents.filter((d) => d.doc_variant !== "office");
+
   return (
     <>
       <ul className="space-y-3">
-        {documents.map((d, idx) => {
+        {topLevel.map((d, idx) => {
           const busy = busyId === d.id;
           const staggerClass = `stagger-${(idx % 4) + 1}`;
           return (
@@ -222,6 +230,16 @@ export function DocumentList({
                   </>
                 )}
               </div>
+
+              {officeByParent.get(d.id) && (
+                <div className="mt-2 flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-2 text-xs">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">Office copy (full internal distribution)</span>
+                  <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => view(officeByParent.get(d.id)!)}>
+                    <Eye className="h-3.5 w-3.5" /> View
+                  </Button>
+                </div>
+              )}
             </li>
           );
         })}

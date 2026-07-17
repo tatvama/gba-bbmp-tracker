@@ -19,6 +19,8 @@ import { DocumentViewer, type ViewerTarget } from "@/components/complaints/docum
 import { LetterPreview } from "@/components/complaints/letter-preview";
 import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
+import { RecipientSelector } from "@/components/complaints/recipient-selector";
+import { useRecipientSelection } from "@/lib/complaints/client/use-recipient-selection";
 import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import { EscalationDeadlineBadge } from "@/components/complaints/escalation-deadline-badge";
 import { openDraftPdf } from "@/lib/print-letter";
@@ -802,6 +804,7 @@ function CounterReplyPanel({
   const [replyFiles, setReplyFiles] = React.useState<ReplyFile[]>([]);
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [selectedKind, setSelectedKind] = React.useState<ComplaintDraftKind>("counter_reply");
+  const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients } = useRecipientSelection(complaintId, selectedKind);
 
   // Load existing draft if any on mount or when selectedKind changes
   React.useEffect(() => {
@@ -915,11 +918,12 @@ function CounterReplyPanel({
     setError(null);
     setSavedMsg(null);
     const r = selectedKind === "counter_reply"
-      ? await fileCounterReplyAction(complaintId, draft)
-      : await fileCommunicationDraftAction(complaintId, draft, selectedKind);
+      ? await fileCounterReplyAction(complaintId, draft, { recipients })
+      : await fileCommunicationDraftAction(complaintId, draft, selectedKind, { recipients });
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file."); return; }
-    setSavedMsg(`${COMPLAINT_DRAFT_KINDS[selectedKind]} filed as a PDF and logged to timeline.`);
+    clearRecipients();
+    setSavedMsg(`${COMPLAINT_DRAFT_KINDS[selectedKind]} filed as a PDF (with office copy) and logged to timeline.`);
     await loadFiles();
     router.refresh();
   }
@@ -1162,6 +1166,7 @@ function CounterReplyPanel({
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
+          <RecipientSelector selected={recipients} onToggle={toggleRecipient} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit {COMPLAINT_DRAFT_KINDS[selectedKind]}
@@ -1263,6 +1268,7 @@ function EscalatePanel({
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
+  const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients } = useRecipientSelection(complaintId, "escalate");
 
   // Load existing escalation draft if any on mount
   React.useEffect(() => {
@@ -1282,10 +1288,11 @@ function EscalatePanel({
     setFiling(true);
     setError(null);
     setSavedMsg(null);
-    const r = await fileEscalationAction(complaintId, draft, { kind, title: COMPLAINT_DRAFT_KINDS[kind] });
+    const r = await fileEscalationAction(complaintId, draft, { kind, title: COMPLAINT_DRAFT_KINDS[kind], recipients });
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file the escalation."); return; }
-    setSavedMsg("Escalation filed as a PDF — view it from the Correspondence tab.");
+    clearRecipients();
+    setSavedMsg("Escalation filed as a PDF (with office copy) — view it from the Correspondence tab.");
     onEscalated();
   }
 
@@ -1377,6 +1384,7 @@ function EscalatePanel({
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
+          <RecipientSelector selected={recipients} onToggle={toggleRecipient} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit Escalation Letter

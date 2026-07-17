@@ -27,6 +27,8 @@ type ThreadEntry = {
   title: string;
   subtitle?: string | null;
   viewer?: ViewerTarget;
+  /** The office copy filed alongside this outbound letter, if any. */
+  officeViewer?: ViewerTarget;
   createdByProfile?: { name: string; role: string } | null;
 };
 
@@ -60,7 +62,16 @@ export function CaseThread({
 
   const entries: ThreadEntry[] = [];
 
+  // Office copies are a variant of their parent letter, not standalone
+  // correspondence — index them by parent so they attach as a secondary action,
+  // and skip them as top-level entries below.
+  const officeByParent = new Map<string, ComplaintDocument>();
   for (const d of documents) {
+    if (d.doc_variant === "office" && d.parent_document_id) officeByParent.set(d.parent_document_id, d);
+  }
+
+  for (const d of documents) {
+    if (d.doc_variant === "office") continue;
     const t = d.document_type;
     const target: ViewerTarget = {
       documentId: d.id,
@@ -83,6 +94,20 @@ export function CaseThread({
       entries.push({ id: d.id, date: d.uploaded_at, dir: "in", kind: "Reply / report", title: d.title || d.document_type || "Department reply", subtitle: d.ai_summary, viewer: target, createdByProfile: d.uploaded_by_profile });
     } else {
       entries.push({ id: d.id, date: d.uploaded_at, dir: "note", kind: "Document", title: d.title || d.original_file_name || "Document", subtitle: d.document_type, viewer: target, createdByProfile: d.uploaded_by_profile });
+    }
+  }
+
+  // Attach each letter's office copy (if any) as a secondary action on its entry.
+  for (const entry of entries) {
+    const office = officeByParent.get(entry.id);
+    if (office) {
+      entry.officeViewer = {
+        documentId: office.id,
+        title: office.title || "Office copy",
+        mimeType: office.mime_type,
+        fileName: office.original_file_name,
+        fallbackText: office.ocr_clean_text,
+      };
     }
   }
 
@@ -164,6 +189,11 @@ export function CaseThread({
                   <Button size="sm" variant="outline" onClick={() => setViewTarget(e.viewer!)}>
                     <Eye className="h-4 w-4 mr-1" /> {e.kind === "Draft" ? "Read" : "View"}
                   </Button>
+                  {e.officeViewer && (
+                    <Button size="sm" variant="ghost" onClick={() => setViewTarget(e.officeViewer!)}>
+                      <FileText className="h-4 w-4 mr-1" /> Office copy
+                    </Button>
+                  )}
                   {(() => {
                     const docId = e.viewer?.documentId;
                     const doc = docId ? documents.find((d) => d.id === docId) : null;
