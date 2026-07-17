@@ -95,22 +95,32 @@ async function findInFlightJob(admin: SupabaseClient, type: JobType, entityType:
  * retryJobAction (lib/actions/jobs.ts), and from sweepBackgroundJobs for due
  * retries — always with the same dispatch metadata shape so none of those
  * callers need their own copy of the claim/execute/finalize logic.
+ *
+ * DELIBERATELY does not fall back to `await import("@/lib/jobs/handlers")`
+ * when a handler isn't registered yet (tried in commit aea88b9, reverted
+ * here): sweepBackgroundJobs below is reachable from instrumentation.ts (via
+ * lib/startup/jobs.ts's periodic sweep), and instrumentation.ts's own bundle
+ * traces THROUGH dynamic imports too (see its top-of-file comment) — so that
+ * one `import()` statement, though only ever taken on a cold-boot race, was
+ * enough for Next's bundler to pull the OCR handler's native deps
+ * (@napi-rs/canvas, sharp) into the instrumentation entry and break both
+ * `next build` and dev compilation. Registration instead happens the same way
+ * it always has: every request-scoped action/route that calls startJob() for
+ * a type already imports that type's handler for its own side effect
+ * (lib/actions/jobs.ts → ai-draft, the OCR routes → ocr, etc.). If a handler
+ * genuinely isn't registered yet (only possible in the first seconds after a
+ * fresh boot, before any request has landed), skip this dispatch rather than
+ * mark the job permanently failed — the same due job is re-eligible on the
+ * next sweep tick or the next real request's own dispatch, by which point the
+ * handler is virtually always registered.
  */
 export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise<void> {
   const admin = createAdminClient();
-  let handler = getJobHandler(meta.type);
-  if (!handler) {
-    try {
-      await import("@/lib/jobs/handlers");
-      handler = getJobHandler(meta.type);
-    } catch (e) {
-      console.error(`[runner] failed to dynamically load job handlers for type "${meta.type}":`, e);
-    }
-  }
+  const handler = getJobHandler(meta.type);
   const config = getJobConfig(meta.type);
   if (!config) return; // unknown type — nothing this runner can do
   if (!handler) {
-    await admin.from("background_jobs").update({ status: "failed", error: `No handler registered for job type "${meta.type}".`, finished_at: nowISO() }).eq("id", jobId);
+    console.warn(`[runner] no handler registered yet for job type "${meta.type}" — skipping this dispatch, will retry on the next sweep/request.`);
     return;
   }
 
