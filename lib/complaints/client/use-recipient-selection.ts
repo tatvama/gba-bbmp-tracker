@@ -54,5 +54,13 @@ export function useRecipientSelection(complaintId: string, kind: string) {
     }
   }, [storageKey]);
 
-  return { selected, toggle, clear };
+  const setSelectedAll = React.useCallback(
+    (next: RecipientRoleKey[]) => {
+      setSelected(next);
+      write(next);
+    },
+    [write]
+  );
+
+  return { selected, toggle, clear, setSelectedAll };
 }

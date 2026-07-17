@@ -804,7 +804,7 @@ function CounterReplyPanel({
   const [replyFiles, setReplyFiles] = React.useState<ReplyFile[]>([]);
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [selectedKind, setSelectedKind] = React.useState<ComplaintDraftKind>("counter_reply");
-  const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients } = useRecipientSelection(complaintId, selectedKind);
+  const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, selectedKind);
 
   // Load existing draft if any on mount or when selectedKind changes
   React.useEffect(() => {
@@ -1166,7 +1166,7 @@ function CounterReplyPanel({
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <RecipientSelector selected={recipients} onToggle={toggleRecipient} />
+          <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit {COMPLAINT_DRAFT_KINDS[selectedKind]}
@@ -1268,7 +1268,7 @@ function EscalatePanel({
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
-  const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients } = useRecipientSelection(complaintId, "escalate");
+  const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, "escalate");
 
   // Load existing escalation draft if any on mount
   React.useEffect(() => {
@@ -1384,7 +1384,7 @@ function EscalatePanel({
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <RecipientSelector selected={recipients} onToggle={toggleRecipient} />
+          <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit Escalation Letter
