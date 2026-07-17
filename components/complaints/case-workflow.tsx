@@ -1407,17 +1407,6 @@ function EscalatePanel({
               >
                 {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Print / PDF
               </Button>
-              <div className="space-y-1">
-                <Label className="text-xs">Record escalation to</Label>
-                <div className="flex gap-2">
-                  <select className={selectCls} value={toLevel} onChange={(e) => setToLevel(e.target.value)}>
-                    {["AEE", "EE", "SE", "CE", "Commissioner", "Lokayukta", "Chief Secretary", "ACB", "Legal"].map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                  <Button size="sm" onClick={recordEscalation}><Gavel className="h-4 w-4" /> Record</Button>
-                </div>
-              </div>
             </div>
           </div>
           {savedMsg && <p className="flex items-center gap-1.5 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> {savedMsg}</p>}
