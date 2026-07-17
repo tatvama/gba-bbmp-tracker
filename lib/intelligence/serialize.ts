@@ -82,6 +82,24 @@ export function serializeForDraft(intel: CaseIntelligence): string {
     if (ic.note) L.push(`Note (include in prose beneath the table): ${ic.note}`);
   }
 
+  // Schedule-B quantity tables (excavation, dismantling/milling) — one GFM table
+  // per group with a TOTAL row, reproduced VERBATIM. Figures are transcribed from
+  // the documents (require verification); the drafter must not add, drop or alter
+  // any row or figure.
+  const sb = intel.scheduleBTables;
+  if (sb && sb.groups.length) {
+    L.push("\n[SCHEDULE-B QUANTITIES] (transcribed from the case documents; require verification against the certified Schedule-B and Measurement Book)");
+    L.push("Reproduce EACH of the following EXACTLY as a Markdown table in the Engineering / Financial Analysis section, under its heading, keeping every row, the TOTAL row and every figure (translate only the headings and descriptions if the letter is not in English):");
+    for (const g of sb.groups) {
+      L.push(`\n${g.title}:`);
+      L.push("| Item | Description | Qty | Unit | Rate (Rs.) | Amount at Schedule Rate (Rs.) |");
+      L.push("| --- | --- | --- | --- | --- | --- |");
+      for (const r of g.rows) L.push(`| ${r.item} | ${r.description} | ${r.qty} | ${r.unit} | ${r.rate} | ${r.amount} |`);
+      L.push(`| | ${g.totalLabel} | ${g.totalQty ?? ""} | ${g.totalUnit ?? ""} | | ${g.totalAmount} |`);
+    }
+    if (sb.note) L.push(`Note (include in prose beneath the tables): ${sb.note}`);
+  }
+
   // Legal framework
   if (legalFramework.length) {
     L.push("\n[APPLICABLE LEGAL FRAMEWORK]");

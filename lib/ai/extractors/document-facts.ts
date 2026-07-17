@@ -36,6 +36,20 @@ export interface DocRefItem {
   /** Anything else visibly tied to this reference that doesn't fit another field. */
   extra?: string | null;
 }
+
+/** One Schedule-B / BOQ / estimate / measurement-book line item, transcribed
+ *  verbatim. Only earthwork-excavation, dismantling and milling items are pulled
+ *  (the accountability-relevant, un-reverifiable earthwork/disposal items the
+ *  reference complaint tabulates) — not every item in the schedule. */
+export interface ScheduleBLineItem {
+  item?: string | null; // item number / Sl. No. as printed
+  description?: string | null;
+  qty?: string | null; // sanctioned/Schedule-B quantity as printed
+  unit?: string | null; // Cum / Sqm / Mtr etc.
+  rate?: string | null; // rate per unit as printed
+  amount?: string | null; // amount at schedule rate, if printed
+}
+
 export interface DocumentFactsExtraction {
   administrativeApproval: DocRefItem[];
   technicalSanction: DocRefItem[];
@@ -45,11 +59,13 @@ export interface DocumentFactsExtraction {
   mineralDispatchPermit: DocRefItem[];
   royaltyChallan: DocRefItem[];
   insurancePolicy: DocRefItem[];
+  scheduleBItems: ScheduleBLineItem[];
 }
 
 const EMPTY: DocumentFactsExtraction = {
   administrativeApproval: [], technicalSanction: [], agreementKw4: [], workOrder: [],
   tenderNotification: [], mineralDispatchPermit: [], royaltyChallan: [], insurancePolicy: [],
+  scheduleBItems: [],
 };
 
 const SHAPE = `{
@@ -60,7 +76,8 @@ const SHAPE = `{
   "tenderNotification": [{"number": "tender / NIT / e-procurement reference", "date": "", "amount": "estimated tender amount if stated", "tenderType": "RFQ, limited, or open tender, if stated", "publicationPeriod": "publication/bid period if stated", "bidders": "number of bidders or names, if stated"}],
   "mineralDispatchPermit": [{"number": "MDP / mineral dispatch permit number", "date": "", "validFrom": "", "validTo": "", "quarrySource": "quarry / source name if stated", "material": "material type e.g. sand, jelly, M-sand", "quantity": "permitted quantity if stated", "authority": "issuing DMG/mines office if stated"}],
   "royaltyChallan": [{"number": "royalty challan / DMG receipt number", "date": "", "amount": "royalty amount paid", "material": "material type", "quantity": "quantity if stated", "rate": "royalty rate per unit if stated", "authority": "DMG office if stated"}],
-  "insurancePolicy": [{"number": "policy number", "insurer": "insurance company name", "policyType": "policy type e.g. CAR / WC / third-party", "validFrom": "", "validTo": "", "amount": "sum insured if stated"}]
+  "insurancePolicy": [{"number": "policy number", "insurer": "insurance company name", "policyType": "policy type e.g. CAR / WC / third-party", "validFrom": "", "validTo": "", "amount": "sum insured if stated"}],
+  "scheduleBItems": [{"item": "item number / Sl.No. as printed e.g. 'Item 2' or '2'", "description": "the item description exactly as printed", "qty": "sanctioned/Schedule-B quantity as printed e.g. 9,763.25", "unit": "unit e.g. Cum / Sqm / Mtr", "rate": "rate per unit as printed", "amount": "amount at schedule rate as printed, if shown"}]
 }`;
 
 /** Transcribe every AA/TS/agreement/tender/MDP/royalty/insurance reference and
@@ -72,30 +89,31 @@ export async function extractDocumentFactsFromText(ocrText: string, cache?: bool
   if (!text) return EMPTY;
 
   const system = extractorSystem(
-    "Read one BBMP/PWD civil-works document (work order, technical sanction, administrative approval, KW-4 agreement, tender notification, mineral dispatch permit / royalty challan, insurance policy, or any other record) and transcribe ONLY the administrative/legal reference numbers and their surrounding detail (dates, amounts, validity, authority, contractor, quarry source, etc.) that are clearly visible for the categories below.",
+    "Read one BBMP/PWD civil-works document (work order, technical sanction, administrative approval, KW-4 agreement, tender notification, mineral dispatch permit / royalty challan, insurance policy, Schedule-B / bill of quantities / estimate / measurement book, or any other record) and transcribe ONLY the administrative/legal reference numbers and their surrounding detail (dates, amounts, validity, authority, contractor, quarry source, etc.) that are clearly visible for the categories below. For scheduleBItems, transcribe line items ONLY from a Schedule-B / BOQ / estimate / measurement-book quantity table that has quantity and rate columns, and ONLY the earthwork-excavation, dismantling and milling items (descriptions containing 'earth work'/'excavation', 'dismantling', or 'milling'); skip all other items (asphalting, WMM, GSB, kerb laying, drains, etc.) and omit the whole array if the document has no such table. Never infer or calculate a value that is not printed.",
   );
-  const prompt = `Output STRICT JSON of EXACTLY this shape (use an empty array for any category with nothing visible; omit any field within an item that isn't clearly stated):\n${SHAPE}\n\nDOCUMENT:\n${text.slice(0, 12_000)}`;
+  const prompt = `Output STRICT JSON of EXACTLY this shape (use an empty array for any category with nothing visible; omit any field within an item that isn't clearly stated):\n${SHAPE}\n\nDOCUMENT:\n${text.slice(0, 16_000)}`;
 
   const r = await extractJson<Partial<DocumentFactsExtraction>>({
     system,
     prompt,
     fallback: {},
-    maxTokens: 1500,
+    maxTokens: 3500,
     cache: cache ? { system: true } : undefined,
   });
   if (!r.ok) return EMPTY;
 
-  const arr = (v: unknown): DocRefItem[] =>
-    Array.isArray(v) ? v.filter((x): x is DocRefItem => Boolean(x) && typeof x === "object") : [];
+  const arr = <T,>(v: unknown): T[] =>
+    Array.isArray(v) ? v.filter((x): x is T => Boolean(x) && typeof x === "object") : [];
   const d = r.data;
   return {
-    administrativeApproval: arr(d.administrativeApproval),
-    technicalSanction: arr(d.technicalSanction),
-    agreementKw4: arr(d.agreementKw4),
-    workOrder: arr(d.workOrder),
-    tenderNotification: arr(d.tenderNotification),
-    mineralDispatchPermit: arr(d.mineralDispatchPermit),
-    royaltyChallan: arr(d.royaltyChallan),
-    insurancePolicy: arr(d.insurancePolicy),
+    administrativeApproval: arr<DocRefItem>(d.administrativeApproval),
+    technicalSanction: arr<DocRefItem>(d.technicalSanction),
+    agreementKw4: arr<DocRefItem>(d.agreementKw4),
+    workOrder: arr<DocRefItem>(d.workOrder),
+    tenderNotification: arr<DocRefItem>(d.tenderNotification),
+    mineralDispatchPermit: arr<DocRefItem>(d.mineralDispatchPermit),
+    royaltyChallan: arr<DocRefItem>(d.royaltyChallan),
+    insurancePolicy: arr<DocRefItem>(d.insurancePolicy),
+    scheduleBItems: arr<ScheduleBLineItem>(d.scheduleBItems),
   };
 }

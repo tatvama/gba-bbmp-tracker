@@ -173,6 +173,7 @@ export async function buildCaseIntelligence(
       correlations,
       compliance,
       insuranceCoverage: docFacts.insuranceCoverage,
+      scheduleBTables: docFacts.scheduleBTables,
       legalFramework,
       synthesis: verified.synthesis,
       verification: verified.report,

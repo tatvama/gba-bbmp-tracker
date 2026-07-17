@@ -22,8 +22,11 @@
  *  caching (mig 0041) so only new/changed documents are re-extracted.
  *  cie-7: deterministic KW-4 Clause 13 insurance-coverage table (Type of Cover /
  *  Minimum Cover Required Under KW-4 / Status) added to the artifact so letters
- *  reproduce it verbatim as a table (never AI-invented). */
-export const ENGINE_VERSION = "cie-7";
+ *  reproduce it verbatim as a table (never AI-invented).
+ *  cie-8: Schedule-B quantity tables (excavation / dismantling-milling line items
+ *  transcribed from documents; Item/Description/Qty/Unit/Rate/Amount + group
+ *  totals) added to the artifact for the same verbatim-table reproduction. */
+export const ENGINE_VERSION = "cie-8";
 
 export type Confidence = "High" | "Medium" | "Low";
 
@@ -163,6 +166,40 @@ export interface InsuranceCoverage {
   note?: string; // narrative to accompany the table (Clause 13.2/13.3 obligations, policies found)
 }
 
+/** One Schedule-B / BOQ line item, as transcribed from the case documents. Every
+ *  figure is the value as printed (verbatim), so a letter cites the real
+ *  Schedule-B numbers; the amount is computed (qty × rate) only when not printed. */
+export interface ScheduleBRow {
+  item: string; // "Item 2" / "2" (as printed), or "-" if not shown
+  description: string;
+  qty: string; // sanctioned/Schedule-B quantity as printed
+  unit: string; // "Cum" / "Sqm" / "Mtr", or "-" if not shown
+  rate: string; // rate per unit as printed
+  amount: string; // amount at schedule rate (printed, else computed qty × rate)
+}
+
+/** A category grouping of Schedule-B rows (excavation, or dismantling/milling)
+ *  with its per-group total, mirroring the reference Lokayukta complaint's two
+ *  Schedule-B tables. `totalQty` is filled only when every row shares one unit. */
+export interface ScheduleBGroup {
+  category: "excavation" | "dismantling_milling";
+  title: string; // display heading, e.g. "Excavation (earthwork)"
+  totalLabel: string; // e.g. "TOTAL EXCAVATION SANCTIONED"
+  rows: ScheduleBRow[];
+  totalQty?: string | null; // summed quantity when the group has a single unit, else null
+  totalUnit?: string | null; // the shared unit, when totalQty is present
+  totalAmount: string; // summed amount at schedule rate, grouped (no "Rs." prefix)
+}
+
+/** Deterministic Schedule-B quantity tables (earthwork-excavation and
+ *  dismantling/milling line items) built by lib/intelligence/schedule-b-tables.ts
+ *  from figures transcribed out of the case documents. Null when no such line
+ *  items were found. The drafter reproduces these verbatim as tables. */
+export interface ScheduleBTables {
+  groups: ScheduleBGroup[];
+  note?: string; // "transcribed; verify against the certified Schedule-B / MB"
+}
+
 export interface FinancialSummary {
   sanctionedAmount?: number | null;
   grossAmount?: number | null;
@@ -237,6 +274,9 @@ export interface CaseIntelligence {
   /** Deterministic KW-4 Clause 13 insurance table; null when the case is not a
    *  works contract (no job number / agreement / insurance policy on record). */
   insuranceCoverage: InsuranceCoverage | null;
+  /** Deterministic Schedule-B quantity tables (excavation, dismantling/milling)
+   *  transcribed from the case documents; null when no such line items found. */
+  scheduleBTables: ScheduleBTables | null;
   legalFramework: LegalRef[];
   synthesis: Synthesis;
   verification: VerificationReport;
