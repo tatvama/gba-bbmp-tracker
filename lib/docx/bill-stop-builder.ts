@@ -7,11 +7,10 @@
  */
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  Table, TableRow, TableCell, WidthType, ShadingType, ImageRun,
+  Table, TableRow, TableCell, WidthType, ShadingType,
 } from "docx";
 import type { LetterSkeleton } from "@/lib/letters/types";
 import type { TableModel } from "@/lib/letters/tables";
-import { buildQrDataUrl, qrPayloadForCase } from "@/lib/pdf/letter-reference";
 
 const KN_FONT = "Nirmala UI"; // Windows Kannada-capable; viewers substitute Noto Sans Kannada etc.
 const A4 = { width: 11906, height: 16838 }; // twips (210 × 297 mm)
@@ -104,16 +103,9 @@ export interface DocxOptions {
 
 const ROW_CAP = 80; // bound table size so generation stays inside the serverless window
 
-function pngBufferFromDataUrl(dataUrl: string): Buffer | null {
-  const m = dataUrl.match(/^data:image\/png;base64,(.+)$/);
-  return m?.[1] ? Buffer.from(m[1], "base64") : null;
-}
-
-/** Right-aligned "Our Ref" text + QR block, mirroring buildReferenceHeaderHtml. */
+/** Right-aligned "Our Ref" text block. */
 async function referenceHeaderParagraphs(reference: string): Promise<Paragraph[]> {
-  const qrDataUrl = await buildQrDataUrl(qrPayloadForCase(reference));
-  const qrBuffer = qrDataUrl ? pngBufferFromDataUrl(qrDataUrl) : null;
-  const paras: Paragraph[] = [
+  return [
     new Paragraph({
       alignment: AlignmentType.RIGHT,
       spacing: { after: 40 },
@@ -125,14 +117,6 @@ async function referenceHeaderParagraphs(reference: string): Promise<Paragraph[]
       children: [run("Quote this reference on any acknowledgment", { italics: true, size: 16 })],
     }),
   ];
-  if (qrBuffer) {
-    paras.push(new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { after: 200 },
-      children: [new ImageRun({ type: "png", data: qrBuffer, transformation: { width: 70, height: 70 } })],
-    }));
-  }
-  return paras;
 }
 
 /** Build the Word document for a letter skeleton. Returns the .docx bytes. */

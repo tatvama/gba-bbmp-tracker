@@ -63,8 +63,8 @@ export function buildReferenceHeaderHtml(reference: string, qrDataUrl: string | 
   </div>`;
 }
 
-/** Convenience: build the full header HTML for a case number in one call. */
+/** Convenience: build the full header HTML for a case number in one call.
+ *  QR image removed from the rendered header (kept as text-only "Our Ref"). */
 export async function referenceHeaderForCase(caseNumber: string): Promise<string> {
-  const qr = await buildQrDataUrl(qrPayloadForCase(caseNumber));
-  return buildReferenceHeaderHtml(caseNumber, qr);
+  return buildReferenceHeaderHtml(caseNumber, null);
 }
