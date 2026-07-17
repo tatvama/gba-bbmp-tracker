@@ -25,8 +25,11 @@
  *  reproduce it verbatim as a table (never AI-invented).
  *  cie-8: Schedule-B quantity tables (excavation / dismantling-milling line items
  *  transcribed from documents; Item/Description/Qty/Unit/Rate/Amount + group
- *  totals) added to the artifact for the same verbatim-table reproduction. */
-export const ENGINE_VERSION = "cie-8";
+ *  totals) added to the artifact for the same verbatim-table reproduction.
+ *  cie-9: TVCC (Technical Vigilance Cell) reports transcribed + a deterministic
+ *  TVCC cross-check (tvcc field) added to the artifact, feeding the Engineering
+ *  Compliance Matrix (lib/compliance/*, a projection over this artifact). */
+export const ENGINE_VERSION = "cie-9";
 
 export type Confidence = "High" | "Medium" | "Low";
 
@@ -200,6 +203,37 @@ export interface ScheduleBTables {
   note?: string; // "transcribed; verify against the certified Schedule-B / MB"
 }
 
+/** One TVCC (Technical Vigilance Cell) report transcribed from a document. TVCC
+ *  is an ENGINEERING-COMPLIANCE verification (BBMP administrative instructions /
+ *  GOs / tender conditions), NOT a statute. */
+export interface TvccReportItem {
+  reportType: string; // inspection | quality | site | rectification | compliance | recommendation | other
+  reference?: string | null;
+  date?: string | null;
+  authority?: string | null;
+  observation?: string | null;
+}
+
+/** One cross-verification of a TVCC report against another record on the artifact. */
+export interface TvccCrossCheck {
+  against: string; // "Schedule-B / BOQ" | "Running bills" | "Quality findings" | …
+  status: "consistent" | "discrepancy" | "not_verifiable";
+  detail: string;
+}
+
+/** Deterministic TVCC compliance snapshot (built in the document-facts stage,
+ *  consumed by the Engineering Compliance Matrix as one dimension). Never
+ *  AI-invented — reports are transcribed and cross-checks run over existing
+ *  artifact data (Schedule-B, running bills, findings). */
+export interface TvccCompliance {
+  reportsFound: TvccReportItem[];
+  /** Which of the expected TVCC report types are present vs absent. */
+  coverage: { type: string; present: boolean }[];
+  crossChecks: TvccCrossCheck[];
+  status: "met" | "not_shown" | "discrepancy" | "unknown";
+  note?: string;
+}
+
 export interface FinancialSummary {
   sanctionedAmount?: number | null;
   grossAmount?: number | null;
@@ -277,6 +311,9 @@ export interface CaseIntelligence {
   /** Deterministic Schedule-B quantity tables (excavation, dismantling/milling)
    *  transcribed from the case documents; null when no such line items found. */
   scheduleBTables: ScheduleBTables | null;
+  /** Deterministic TVCC (Technical Vigilance Cell) compliance snapshot; null when
+   *  the case is not a works contract. Consumed by the Engineering Compliance Matrix. */
+  tvcc: TvccCompliance | null;
   legalFramework: LegalRef[];
   synthesis: Synthesis;
   verification: VerificationReport;

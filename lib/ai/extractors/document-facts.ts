@@ -50,6 +50,16 @@ export interface ScheduleBLineItem {
   amount?: string | null; // amount at schedule rate, if printed
 }
 
+/** One TVCC (Technical Vigilance Cell) report reference transcribed verbatim.
+ *  TVCC is a quality/vigilance verification, NOT a statute. */
+export interface TvccReportRef {
+  reportType?: string | null; // inspection / quality / site / rectification / compliance / recommendation
+  reference?: string | null; // report number / reference as printed
+  date?: string | null;
+  authority?: string | null; // issuing TVCC / vigilance office
+  observation?: string | null; // headline observation or finding, if stated
+}
+
 export interface DocumentFactsExtraction {
   administrativeApproval: DocRefItem[];
   technicalSanction: DocRefItem[];
@@ -60,12 +70,13 @@ export interface DocumentFactsExtraction {
   royaltyChallan: DocRefItem[];
   insurancePolicy: DocRefItem[];
   scheduleBItems: ScheduleBLineItem[];
+  tvccReports: TvccReportRef[];
 }
 
 const EMPTY: DocumentFactsExtraction = {
   administrativeApproval: [], technicalSanction: [], agreementKw4: [], workOrder: [],
   tenderNotification: [], mineralDispatchPermit: [], royaltyChallan: [], insurancePolicy: [],
-  scheduleBItems: [],
+  scheduleBItems: [], tvccReports: [],
 };
 
 const SHAPE = `{
@@ -77,7 +88,8 @@ const SHAPE = `{
   "mineralDispatchPermit": [{"number": "MDP / mineral dispatch permit number", "date": "", "validFrom": "", "validTo": "", "quarrySource": "quarry / source name if stated", "material": "material type e.g. sand, jelly, M-sand", "quantity": "permitted quantity if stated", "authority": "issuing DMG/mines office if stated"}],
   "royaltyChallan": [{"number": "royalty challan / DMG receipt number", "date": "", "amount": "royalty amount paid", "material": "material type", "quantity": "quantity if stated", "rate": "royalty rate per unit if stated", "authority": "DMG office if stated"}],
   "insurancePolicy": [{"number": "policy number", "insurer": "insurance company name", "policyType": "policy type e.g. CAR / WC / third-party", "validFrom": "", "validTo": "", "amount": "sum insured if stated"}],
-  "scheduleBItems": [{"item": "item number / Sl.No. as printed e.g. 'Item 2' or '2'", "description": "the item description exactly as printed", "qty": "sanctioned/Schedule-B quantity as printed e.g. 9,763.25", "unit": "unit e.g. Cum / Sqm / Mtr", "rate": "rate per unit as printed", "amount": "amount at schedule rate as printed, if shown"}]
+  "scheduleBItems": [{"item": "item number / Sl.No. as printed e.g. 'Item 2' or '2'", "description": "the item description exactly as printed", "qty": "sanctioned/Schedule-B quantity as printed e.g. 9,763.25", "unit": "unit e.g. Cum / Sqm / Mtr", "rate": "rate per unit as printed", "amount": "amount at schedule rate as printed, if shown"}],
+  "tvccReports": [{"reportType": "inspection / quality / site / rectification / compliance / recommendation", "reference": "TVCC report number/reference as printed", "date": "", "authority": "issuing TVCC / technical vigilance / quality-control office", "observation": "the headline observation or finding, if stated"}]
 }`;
 
 /** Transcribe every AA/TS/agreement/tender/MDP/royalty/insurance reference and
@@ -89,7 +101,7 @@ export async function extractDocumentFactsFromText(ocrText: string, cache?: bool
   if (!text) return EMPTY;
 
   const system = extractorSystem(
-    "Read one BBMP/PWD civil-works document (work order, technical sanction, administrative approval, KW-4 agreement, tender notification, mineral dispatch permit / royalty challan, insurance policy, Schedule-B / bill of quantities / estimate / measurement book, or any other record) and transcribe ONLY the administrative/legal reference numbers and their surrounding detail (dates, amounts, validity, authority, contractor, quarry source, etc.) that are clearly visible for the categories below. For scheduleBItems, transcribe line items ONLY from a Schedule-B / BOQ / estimate / measurement-book quantity table that has quantity and rate columns, and ONLY the earthwork-excavation, dismantling and milling items (descriptions containing 'earth work'/'excavation', 'dismantling', or 'milling'); skip all other items (asphalting, WMM, GSB, kerb laying, drains, etc.) and omit the whole array if the document has no such table. Never infer or calculate a value that is not printed.",
+    "Read one BBMP/PWD civil-works document (work order, technical sanction, administrative approval, KW-4 agreement, tender notification, mineral dispatch permit / royalty challan, insurance policy, Schedule-B / bill of quantities / estimate / measurement book, or any other record) and transcribe ONLY the administrative/legal reference numbers and their surrounding detail (dates, amounts, validity, authority, contractor, quarry source, etc.) that are clearly visible for the categories below. For scheduleBItems, transcribe line items ONLY from a Schedule-B / BOQ / estimate / measurement-book quantity table that has quantity and rate columns, and ONLY the earthwork-excavation, dismantling and milling items (descriptions containing 'earth work'/'excavation', 'dismantling', or 'milling'); skip all other items (asphalting, WMM, GSB, kerb laying, drains, etc.) and omit the whole array if the document has no such table. For tvccReports, transcribe ONLY from a Technical Vigilance Cell (TVCC) / third-party quality-inspection / vigilance report (reference, date, issuing office, headline observation); omit the array if the document is not such a report. Never infer or calculate a value that is not printed.",
   );
   const prompt = `Output STRICT JSON of EXACTLY this shape (use an empty array for any category with nothing visible; omit any field within an item that isn't clearly stated):\n${SHAPE}\n\nDOCUMENT:\n${text.slice(0, 16_000)}`;
 
@@ -115,5 +127,6 @@ export async function extractDocumentFactsFromText(ocrText: string, cache?: bool
     royaltyChallan: arr<DocRefItem>(d.royaltyChallan),
     insurancePolicy: arr<DocRefItem>(d.insurancePolicy),
     scheduleBItems: arr<ScheduleBLineItem>(d.scheduleBItems),
+    tvccReports: arr<TvccReportRef>(d.tvccReports),
   };
 }

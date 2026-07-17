@@ -1,4 +1,5 @@
 import type { CaseIntelligence } from "./types";
+import { runComplianceMatrixRanked, complianceSummary } from "@/lib/compliance/engine";
 
 /**
  * Deterministically serialize a CaseIntelligence artifact into a section-labelled
@@ -62,8 +63,11 @@ export function serializeForDraft(intel: CaseIntelligence): string {
     }
   }
 
-  // Compliance checklist
-  if (compliance.length) {
+  // Compliance checklist — the raw per-item list. For a works file the
+  // Engineering Compliance Matrix below SUPERSEDES this (it is the canonical
+  // rollup), so emit these bullets only for non-works complaints to avoid
+  // reporting compliance twice with a possibly-contradictory status.
+  if (compliance.length && !intel.meta?.jobNumber) {
     L.push("\n[RULE-WISE / KTPP COMPLIANCE]");
     for (const c2 of compliance) L.push(`  - ${c2.area}: ${c2.requirement} [${c2.status}]${c2.recordToDemand ? ` -> demand: ${c2.recordToDemand}` : ""}`);
   }
@@ -98,6 +102,35 @@ export function serializeForDraft(intel: CaseIntelligence): string {
       L.push(`| | ${g.totalLabel} | ${g.totalQty ?? ""} | ${g.totalUnit ?? ""} | | ${g.totalAmount} |`);
     }
     if (sb.note) L.push(`Note (include in prose beneath the tables): ${sb.note}`);
+  }
+
+  // Engineering Compliance Matrix — the whole-file per-dimension status
+  // (deterministic projection over this artifact via lib/compliance). Emitted as
+  // a GFM table the drafter reproduces; only for works files, and only the
+  // dimensions that actually apply (not "not_applicable").
+  if (intel.meta?.jobNumber) {
+    const cellSafe = (s: string) => (s || "").replace(/[–—―]/g, "-").replace(/\|/g, "/").replace(/\s+/g, " ").trim();
+    const matrix = runComplianceMatrixRanked(intel).filter((f) => f.status !== "not_applicable");
+    if (matrix.length) {
+      const sum = complianceSummary(matrix);
+      L.push(`\n[ENGINEERING COMPLIANCE MATRIX] (${sum.discrepancy} discrepancy, ${sum.notShown} not-on-record, ${sum.met} met of ${sum.total} dimensions)`);
+      L.push("Reproduce as a Markdown table in the Rule-wise / Compliance Analysis section (keep every row; translate only the wording if the letter is not in English):");
+      L.push("| # | Compliance Dimension | Status | Severity | Basis / reason | Records to be produced |");
+      L.push("| --- | --- | --- | --- | --- | --- |");
+      matrix.forEach((f, i) => {
+        L.push(`| ${i + 1} | ${cellSafe(f.label)} | ${f.status} | ${f.severity} | ${cellSafe(f.reason)} | ${cellSafe(f.documentsRequired.join("; ")) || "-"} |`);
+      });
+    }
+  }
+
+  // TVCC (Technical Vigilance) cross-check detail beyond the matrix row.
+  // Works files only (the matrix row summarises status; this adds the detail).
+  const tv = intel.tvcc;
+  if (intel.meta?.jobNumber && tv && (tv.reportsFound.length || tv.crossChecks.length)) {
+    L.push("\n[TVCC (TECHNICAL VIGILANCE) VERIFICATION] (engineering-compliance check per BBMP administrative instructions / tender conditions, NOT a statute)");
+    if (tv.reportsFound.length) L.push(`Reports on record: ${tv.reportsFound.map((r) => [r.reportType, r.reference, r.date].filter(Boolean).join(" ")).join("; ")}`);
+    for (const c of tv.crossChecks) L.push(`  - vs ${c.against} [${c.status}]: ${c.detail}`);
+    if (tv.note) L.push(`Note: ${tv.note}`);
   }
 
   // Legal framework

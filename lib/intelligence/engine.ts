@@ -11,6 +11,7 @@ import { extractEntities } from "./stages/extract";
 import { analyzeCase } from "./stages/analyze";
 import { correlateDocuments } from "./stages/correlate";
 import { buildDocumentFacts } from "./stages/document-facts";
+import { buildTvccCompliance } from "@/lib/compliance/tvcc";
 import { buildLegalFramework } from "./stages/legal-map";
 import { synthesizeCase } from "./stages/synthesis";
 import { verifyGroundedness } from "./stages/verify";
@@ -118,6 +119,16 @@ export async function buildCaseIntelligence(
     const docFacts = await buildDocumentFacts(admin, material, store);
     const references = [...extracted.references, ...docFacts.references];
     const compliance = [...analyzed.compliance, ...docFacts.compliance];
+    // Deterministic TVCC cross-check — built here (not in the doc-facts stage)
+    // because it reconciles the transcribed TVCC reports against records only
+    // assembled by other stages (Schedule-B, running bills, findings).
+    const tvcc = buildTvccCompliance({
+      reports: docFacts.tvccReports,
+      scheduleBTables: docFacts.scheduleBTables,
+      runningBills: analyzed.financials.runningBills,
+      findings: analyzed.findings,
+      isWorksCase: Boolean(material.jobNumber),
+    });
     const legalFramework = buildLegalFramework(analyzed.findings, compliance);
     const synth = await synthesizeCase({
       project: extracted.project,
@@ -174,6 +185,7 @@ export async function buildCaseIntelligence(
       compliance,
       insuranceCoverage: docFacts.insuranceCoverage,
       scheduleBTables: docFacts.scheduleBTables,
+      tvcc,
       legalFramework,
       synthesis: verified.synthesis,
       verification: verified.report,

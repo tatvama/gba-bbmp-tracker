@@ -7,8 +7,8 @@
  */
 export const PROMPT_VERSIONS = {
   synthesis: "syn-1",
-  draftStructure: "draft-struct-3",
-  documentFacts: "docfacts-2",
+  draftStructure: "draft-struct-4",
+  documentFacts: "docfacts-3",
 } as const;
 
 /** Investigation-officer persona shared by the synthesis pass and drafting. */
@@ -35,7 +35,7 @@ export const DRAFT_STRUCTURE_BLOCK = `Structure the letter with ALL of these sec
 8. Applicable Legal Framework: the statutes and rules (KTPP Act & Rules, KPWD/PWD Code, KW-4, Minor Mineral Concession Rules, RTI Act 2005, etc.) relevant to the findings.
 9. Engineering Analysis. If the CASE INTELLIGENCE contains SCHEDULE-B QUANTITIES tables, reproduce EACH group here EXACTLY as a GitHub-flavoured Markdown table with the columns "Item | Description | Qty | Unit | Rate (Rs.) | Amount at Schedule Rate (Rs.)" including its TOTAL row, keeping every row and figure unchanged, then state the accompanying note in prose.
 10. Financial Analysis: figures and possible-exposure lines, each framed as "possible exposure requiring verification".
-11. Rule-wise / KTPP Compliance Analysis: the compliance checklist items and their status. If the CASE INTELLIGENCE contains an INSURANCE COVERAGE table (KW-4 Clause 13), reproduce it here EXACTLY as a GitHub-flavoured Markdown table with the columns "Type of Cover | Minimum Cover Required Under KW-4 | Status", keeping every row and every figure unchanged, then state the accompanying note in prose beneath it.
+11. Rule-wise / KTPP Compliance Analysis: the compliance checklist items and their status. If the CASE INTELLIGENCE contains an ENGINEERING COMPLIANCE MATRIX, reproduce it here EXACTLY as a GitHub-flavoured Markdown table with the columns "# | Compliance Dimension | Status | Severity | Basis / reason | Records to be produced", keeping every row unchanged. If it contains an INSURANCE COVERAGE table (KW-4 Clause 13), reproduce that too as a Markdown table ("Type of Cover | Minimum Cover Required Under KW-4 | Status"), keeping every row and figure. Where a TVCC (Technical Vigilance) verification is present, state its cross-check results in prose (it is an engineering-compliance check, not a statute). Then state the accompanying notes in prose beneath the tables.
 12. Technical Analysis.
 13. Documented Suspicions / Red Flags: EVERY finding with its finding code and the specific record to be produced, in cautious language.
 14. Specific Requests.
