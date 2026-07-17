@@ -7,7 +7,7 @@
  */
 export const PROMPT_VERSIONS = {
   synthesis: "syn-1",
-  draftStructure: "draft-struct-1",
+  draftStructure: "draft-struct-2",
   documentFacts: "docfacts-1",
 } as const;
 
@@ -35,7 +35,7 @@ export const DRAFT_STRUCTURE_BLOCK = `Structure the letter with ALL of these sec
 8. Applicable Legal Framework: the statutes and rules (KTPP Act & Rules, KPWD/PWD Code, KW-4, Minor Mineral Concession Rules, RTI Act 2005, etc.) relevant to the findings.
 9. Engineering Analysis.
 10. Financial Analysis: figures and possible-exposure lines, each framed as "possible exposure requiring verification".
-11. Rule-wise / KTPP Compliance Analysis: the compliance checklist items and their status.
+11. Rule-wise / KTPP Compliance Analysis: the compliance checklist items and their status. If the CASE INTELLIGENCE contains an INSURANCE COVERAGE table (KW-4 Clause 13), reproduce it here EXACTLY as a GitHub-flavoured Markdown table with the columns "Type of Cover | Minimum Cover Required Under KW-4 | Status", keeping every row and every figure unchanged, then state the accompanying note in prose beneath it.
 12. Technical Analysis.
 13. Documented Suspicions / Red Flags: EVERY finding with its finding code and the specific record to be produced, in cautious language.
 14. Specific Requests.
@@ -46,7 +46,8 @@ export const DRAFT_STRUCTURE_BLOCK = `Structure the letter with ALL of these sec
 19. Sender block (FROM) verbatim in the signature block at the bottom.
 20. Enclosures.
 21. Copy To.
-Include EVERY material fact, figure, date, finding code, contractor GSTIN/PAN, and Government-Order / work-order / tender / file number present in the case intelligence. Length is not a constraint: do not summarize detail away.`;
+Include EVERY material fact, figure, date, finding code, contractor GSTIN/PAN, and Government-Order / work-order / tender / file number present in the case intelligence. Length is not a constraint: do not summarize detail away.
+Wherever the case intelligence gives itemised, tabular data (the insurance coverage table, loss/exposure lines, running bills, quantity/schedule breakdowns), present it as a GitHub-flavoured Markdown table (a header row, a "| --- |" separator row using plain hyphens, then one row per item) rather than collapsing it into a sentence. Copy every figure exactly as given; never add, drop or alter a row or a number.`;
 
 export const SYNTHESIS_SYSTEM = `${INVESTIGATOR_PERSONA}
 You are given a STRUCTURED case-intelligence brief (entities, evidence-linked findings, financials, chronology, compliance checklist, legal framework). Reason over ALL of it and produce a strict-JSON investigation synthesis.

@@ -19,8 +19,11 @@
  *  insurance) — surfaced whether or not anything is flagged, not just on findings.
  *  cie-6: document-fact schema widened to full per-category detail (authority,
  *  validity, contractor, completion period, quarry source, etc.) + per-document
- *  caching (mig 0041) so only new/changed documents are re-extracted. */
-export const ENGINE_VERSION = "cie-6";
+ *  caching (mig 0041) so only new/changed documents are re-extracted.
+ *  cie-7: deterministic KW-4 Clause 13 insurance-coverage table (Type of Cover /
+ *  Minimum Cover Required Under KW-4 / Status) added to the artifact so letters
+ *  reproduce it verbatim as a table (never AI-invented). */
+export const ENGINE_VERSION = "cie-7";
 
 export type Confidence = "High" | "Medium" | "Low";
 
@@ -137,6 +140,29 @@ export interface LegalRef {
   ruleRefKeys: string[]; // finding-code prefixes this maps from
 }
 
+/** One row of the KW-4 Clause 13 insurance-coverage compliance table. The cover
+ *  types and the minimum-cover requirements are FIXED by the KW-4 standard
+ *  contract; only the "Works, Plant and Materials" minimum (agreement value +
+ *  20%) and the per-row Status are case-specific. */
+export interface InsuranceCoverRow {
+  coverType: string; // e.g. "Works, Plant and Materials"
+  minimumRequired: string; // e.g. "Agreement value plus 20% (approximately Rs. …)"
+  status: string; // "Not on record" | "On record (Policy No. …)"
+}
+
+/** The full deterministic insurance-compliance table (mandatory KW-4 Clause 13
+ *  covers, their minimum requirement, and whether each is evidenced) that a
+ *  Lokayukta complaint / legal notice / counter-reply reproduces verbatim. Built
+ *  in the engine (lib/intelligence/insurance-coverage.ts), NOT by the drafter —
+ *  the figures and cover types must never be AI-invented. */
+export interface InsuranceCoverage {
+  rows: InsuranceCoverRow[];
+  agreementValue?: string | null; // the agreement/contract value the +20% is computed on, if known
+  policiesFound: number;
+  ruleRef: string; // e.g. "KW-4 Section 4 (GCC) Clause 13 (Insurance)"
+  note?: string; // narrative to accompany the table (Clause 13.2/13.3 obligations, policies found)
+}
+
 export interface FinancialSummary {
   sanctionedAmount?: number | null;
   grossAmount?: number | null;
@@ -208,6 +234,9 @@ export interface CaseIntelligence {
   findings: Observation[];
   correlations: Observation[];
   compliance: ComplianceItem[];
+  /** Deterministic KW-4 Clause 13 insurance table; null when the case is not a
+   *  works contract (no job number / agreement / insurance policy on record). */
+  insuranceCoverage: InsuranceCoverage | null;
   legalFramework: LegalRef[];
   synthesis: Synthesis;
   verification: VerificationReport;

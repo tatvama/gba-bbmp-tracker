@@ -68,6 +68,20 @@ export function serializeForDraft(intel: CaseIntelligence): string {
     for (const c2 of compliance) L.push(`  - ${c2.area}: ${c2.requirement} [${c2.status}]${c2.recordToDemand ? ` -> demand: ${c2.recordToDemand}` : ""}`);
   }
 
+  // Insurance coverage (KW-4 Clause 13) — emitted as a real Markdown table so the
+  // drafter reproduces it VERBATIM in the letter (the PDF/preview renderer parses
+  // GFM tables). The rows, the +20% minimum and the sums are DETERMINISTIC; the
+  // drafter must not add, drop, merge or alter any row or figure.
+  const ic = intel.insuranceCoverage;
+  if (ic && ic.rows.length) {
+    L.push(`\n[INSURANCE COVERAGE] (${ic.ruleRef})`);
+    L.push("Reproduce the following EXACTLY as a Markdown table in the letter's compliance section (keep every row and every figure; translate only the column headings and cell wording if the letter is not in English):");
+    L.push("| Type of Cover | Minimum Cover Required Under KW-4 | Status |");
+    L.push("| --- | --- | --- |");
+    for (const r of ic.rows) L.push(`| ${r.coverType} | ${r.minimumRequired} | ${r.status} |`);
+    if (ic.note) L.push(`Note (include in prose beneath the table): ${ic.note}`);
+  }
+
   // Legal framework
   if (legalFramework.length) {
     L.push("\n[APPLICABLE LEGAL FRAMEWORK]");

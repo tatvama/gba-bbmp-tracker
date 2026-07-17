@@ -172,6 +172,7 @@ export async function buildCaseIntelligence(
       findings: analyzed.findings,
       correlations,
       compliance,
+      insuranceCoverage: docFacts.insuranceCoverage,
       legalFramework,
       synthesis: verified.synthesis,
       verification: verified.report,

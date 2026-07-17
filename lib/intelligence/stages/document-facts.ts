@@ -3,9 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractDocumentFactsFromText, type DocumentFactsExtraction, type DocRefItem } from "@/lib/ai/extractors/document-facts";
 import { mapWithConcurrency } from "@/lib/utils/concurrency";
 import { fnv1a64Hex } from "../case-hash";
+import { buildInsuranceCoverageTable, parseRupees } from "../insurance-coverage";
 import type { RawCaseMaterial, RawDoc } from "./ingest";
 import type { Store } from "../builder";
-import type { Reference, ComplianceItem } from "../types";
+import type { Reference, ComplianceItem, InsuranceCoverage } from "../types";
 
 /**
  * Stage — Document Fact Extraction (unconditional, per-document cached). Reads
@@ -93,9 +94,9 @@ export async function buildDocumentFacts(
   admin: SupabaseClient,
   material: RawCaseMaterial,
   store: Store,
-): Promise<{ references: Reference[]; compliance: ComplianceItem[] }> {
+): Promise<{ references: Reference[]; compliance: ComplianceItem[]; insuranceCoverage: InsuranceCoverage | null }> {
   const docs = [...material.complaintDocs, ...material.jobDocs].filter((d) => asText(d).length > 12).slice(0, DOC_CAP);
-  if (!docs.length) return { references: [], compliance: [] };
+  if (!docs.length) return { references: [], compliance: [], insuranceCoverage: null };
 
   const perDoc = await mapWithConcurrency(docs, CONCURRENCY, async (d) => {
     try {
@@ -140,13 +141,63 @@ export async function buildDocumentFacts(
     }
   }
 
+  const isWorksCase = Boolean(material.jobNumber);
+
+  // Deterministic KW-4 Clause 13 insurance-coverage table (built BEFORE the
+  // compliance loop so the loop can defer insurance to it). Aggregate the raw
+  // per-document insurance policies and agreement values (the +20% base) across
+  // every document, then hand them to the pure builder. The contract value is
+  // the LARGEST parseable agreement amount seen (guards against a smaller
+  // sub-figure); its verbatim string is kept for faithful display.
+  let bestAgreement: { raw: string; val: number } | null = null;
+  const allPolicies: DocRefItem[] = [];
+  for (const entry of perDoc) {
+    if (!entry) continue;
+    for (const p of entry.facts.insurancePolicy ?? []) allPolicies.push(p);
+    for (const a of entry.facts.agreementKw4 ?? []) {
+      const val = parseRupees(a.amount);
+      if (val != null && (!bestAgreement || val > bestAgreement.val)) {
+        bestAgreement = { raw: (a.amount ?? "").trim(), val };
+      }
+    }
+  }
+  const insuranceCoverage = buildInsuranceCoverageTable({
+    policies: allPolicies,
+    agreementValue: bestAgreement?.val ?? null,
+    agreementValueRaw: bestAgreement?.raw ?? null,
+    isWorksCase,
+  });
+
   // Compliance status per area. "not_shown" is only meaningful for a works case
   // (job_number present) — for a non-works citizen complaint, absence of a
   // Technical Sanction etc. isn't a real gap, so we simply say nothing about it.
-  const isWorksCase = Boolean(material.jobNumber);
   const compliance: ComplianceItem[] = [];
   for (const meta of FACT_META) {
     const refsForArea = references.filter((r) => r.label === meta.label);
+
+    // Insurance is represented by the per-cover KW-4 table when it exists — emit
+    // ONE aggregate compliance item derived from that table (not the generic
+    // met/not_shown), so the letter's compliance section never says insurance is
+    // "met" while its own table shows 4 of 5 mandatory covers missing.
+    if (meta.key === "insurancePolicy" && insuranceCoverage) {
+      const total = insuranceCoverage.rows.length;
+      const onRecord = insuranceCoverage.rows.filter((r) => r.status !== "Not on record").length;
+      const status: ComplianceItem["status"] = onRecord === 0 ? "not_shown" : onRecord < total ? "discrepancy" : "met";
+      compliance.push({
+        area: meta.label,
+        requirement: `All ${total} KW-4 Clause 13 insurance covers on record`,
+        status,
+        detail: `${onRecord} of ${total} mandatory KW-4 Clause 13 covers evidenced; see the insurance coverage table for the per-cover status.`,
+        recordToDemand:
+          onRecord < total
+            ? "Certified copies of the missing KW-4 Clause 13 insurance policies, premium receipts and certificates of insurance"
+            : undefined,
+        ruleRef: meta.ruleRef,
+        evidenceIds: refsForArea.flatMap((r) => r.evidenceIds),
+      });
+      continue;
+    }
+
     if (refsForArea.length) {
       compliance.push({
         area: meta.label,
@@ -169,5 +220,5 @@ export async function buildDocumentFacts(
     }
   }
 
-  return { references, compliance };
+  return { references, compliance, insuranceCoverage };
 }
