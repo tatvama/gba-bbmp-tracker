@@ -8,8 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { DESIGNATIONS, VERIFICATION_STATUSES, CONFIDENCE_SCORES } from "@/lib/constants";
-import type { ContactWithRelations } from "@/lib/types";
+import { ChevronDown, Plus, X } from "lucide-react";
+import {
+  DESIGNATIONS, VERIFICATION_STATUSES, CONFIDENCE_SCORES,
+  OFFICIAL_TITLES, OFFICER_STATUSES, DESIGNATION_CATEGORIES, OFFICE_TYPES,
+} from "@/lib/constants";
+import type { ContactWithRelations, ContactJurisdiction } from "@/lib/types";
 import type { ActionState } from "@/lib/actions/contacts";
 import {
   getCorporationsAction,
@@ -400,6 +404,82 @@ export function ContactForm({
             </Field>
           </div>
         </div>
+
+        {/* Card 5: Official Identity & Workflow (collapsible, all optional) */}
+        <details className="group border border-border/50 bg-card rounded-xl shadow-xs">
+          <summary className="flex cursor-pointer list-none items-center justify-between p-5 pb-3">
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground/75">5. Official Identity &amp; Workflow</h3>
+              <p className="text-[11px] text-muted-foreground/50 mt-0.5 font-medium">Optional. Used by AI letter drafting and complaint / RTI / notice routing.</p>
+            </div>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-border/45 p-5 space-y-4.5">
+            <div className="grid gap-4.5 sm:grid-cols-3">
+              <Field label="Official title" error={fe.officialTitle}>
+                <select name="officialTitle" defaultValue={initial?.official_title ?? ""} className={selectCls}>
+                  <option value="">—</option>
+                  {OFFICIAL_TITLES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Officer status" error={fe.officerStatus}>
+                <select name="officerStatus" defaultValue={initial?.officer_status ?? "Active"} className={selectCls}>
+                  {OFFICER_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+              <Field label="Employee / official code" error={fe.employeeCode}>
+                <Input name="employeeCode" defaultValue={initial?.employee_code ?? ""} className="h-9.5" />
+              </Field>
+              <Field label="Department category" error={fe.designationCategory}>
+                <select name="designationCategory" defaultValue={initial?.designation_category ?? ""} className={selectCls}>
+                  <option value="">—</option>
+                  {DESIGNATION_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+              <Field label="Office type" error={fe.officeType}>
+                <select name="officeType" defaultValue={initial?.office_type ?? ""} className={selectCls}>
+                  <option value="">—</option>
+                  {OFFICE_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+              <Field label="Zone (BBMP administrative)" error={fe.zone}>
+                <Input name="zone" defaultValue={initial?.zone ?? ""} placeholder="e.g. Mahadevapura" className="h-9.5" />
+              </Field>
+            </div>
+            <div className="grid gap-4.5 sm:grid-cols-2">
+              <Field label="Office name" error={fe.officeName}>
+                <Input name="officeName" defaultValue={initial?.office_name ?? ""} placeholder="e.g. BBMP ARO Office, K.R. Puram" className="h-9.5" />
+              </Field>
+              <Field label="Letter salutation" error={fe.letterSalutation}>
+                <Input name="letterSalutation" defaultValue={initial?.letter_salutation ?? ""} placeholder="Respected Sir / Madam" className="h-9.5" />
+              </Field>
+            </div>
+            <div className="space-y-2 pt-1">
+              <Label>Can receive</Label>
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                <WorkflowFlag name="canReceiveComplaint" label="Complaint" defaultChecked={initial?.can_receive_complaint ?? true} />
+                <WorkflowFlag name="canReceiveRti" label="RTI" defaultChecked={initial?.can_receive_rti ?? true} />
+                <WorkflowFlag name="canReceiveAppeal" label="Appeal" defaultChecked={initial?.can_receive_appeal ?? true} />
+                <WorkflowFlag name="canReceiveLegalNotice" label="Legal notice" defaultChecked={initial?.can_receive_legal_notice ?? true} />
+                <WorkflowFlag name="canReceiveTvccNotice" label="TVCC notice" defaultChecked={initial?.can_receive_tvcc_notice ?? false} />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        {/* Card 6: Ward Jurisdiction (collapsible one-to-many) */}
+        <details className="group border border-border/50 bg-card rounded-xl shadow-xs" open={Boolean(initial?.jurisdictions?.length)}>
+          <summary className="flex cursor-pointer list-none items-center justify-between p-5 pb-3">
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground/75">6. Ward Jurisdiction</h3>
+              <p className="text-[11px] text-muted-foreground/50 mt-0.5 font-medium">The ward(s) this official is responsible for. One official can cover many wards.</p>
+            </div>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-border/45 p-5">
+            <WardJurisdictionEditor initial={initial?.jurisdictions ?? []} />
+          </div>
+        </details>
       </div>
 
       {/* Sticky Actions Bar at the bottom of the screen */}
@@ -441,6 +521,67 @@ function Field({
       </Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+/** A workflow can-receive toggle. The hidden "false" companion (submitted BEFORE
+ *  the checkbox) makes an unchecked box submit false rather than being absent —
+ *  the form's FormData parser keeps the last value for a repeated key. */
+function WorkflowFlag({ name, label, defaultChecked }: { name: string; label: string; defaultChecked: boolean }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2">
+      <input type="hidden" name={name} value="false" />
+      <input type="checkbox" name={name} value="on" defaultChecked={defaultChecked} className="h-4 w-4 accent-primary" />
+      <span className="text-slate-700 dark:text-slate-300">{label}</span>
+    </label>
+  );
+}
+
+/** Multi-ward jurisdiction editor. Manages ward rows client-side and serializes
+ *  them into ONE hidden `wardJurisdictions` JSON input (the FormData parser
+ *  collapses duplicate keys, so multi-value cannot ride as repeated inputs). */
+function WardJurisdictionEditor({ initial }: { initial: ContactJurisdiction[] }) {
+  const [rows, setRows] = React.useState<{ wardId: string | null; wardNo: string; wardName: string }[]>(() =>
+    (initial ?? [])
+      .slice()
+      .sort((a, b) => (a.ward_no ?? 0) - (b.ward_no ?? 0))
+      .map((j) => ({ wardId: j.ward_id ?? null, wardNo: j.ward_no != null ? String(j.ward_no) : "", wardName: j.ward_name ?? "" })),
+  );
+
+  const update = (i: number, patch: Partial<(typeof rows)[number]>) =>
+    setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const add = () => setRows((prev) => [...prev, { wardId: null, wardNo: "", wardName: "" }]);
+  const remove = (i: number) => setRows((prev) => prev.filter((_, j) => j !== i));
+
+  const payload = JSON.stringify(
+    rows
+      .filter((r) => r.wardNo.trim() || r.wardName.trim())
+      .map((r) => ({
+        wardId: r.wardId || null,
+        wardNo: r.wardNo.trim() ? Number(r.wardNo.trim()) : null,
+        wardName: r.wardName.trim() || null,
+      })),
+  );
+
+  return (
+    <div className="space-y-2">
+      <input type="hidden" name="wardJurisdictions" value={payload} />
+      {rows.length === 0 && (
+        <p className="text-xs text-muted-foreground">No wards yet. Add the ward(s) this official handles.</p>
+      )}
+      {rows.map((r, i) => (
+        <div key={i} className="grid grid-cols-[90px_1fr_auto] items-center gap-2">
+          <Input value={r.wardNo} onChange={(e) => update(i, { wardNo: e.target.value.replace(/[^\d]/g, "") })} placeholder="No." inputMode="numeric" className="h-9" />
+          <Input value={r.wardName} onChange={(e) => update(i, { wardName: e.target.value })} placeholder="Ward name" className="h-9" />
+          <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} aria-label="Remove ward">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={add} className="mt-1">
+        <Plus className="h-4 w-4" /> Add ward
+      </Button>
     </div>
   );
 }

@@ -52,7 +52,7 @@ const WARD_SELECT =
   "*, division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name,sl_no), derived_corporation:corporations!derived_corporation_id(id,code,name)";
 
 const CONTACT_SELECT =
-  "*, corporation:corporations!corporation_id(id,code,name), division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name)";
+  "*, corporation:corporations!corporation_id(id,code,name), division:divisions!division_id(id,name), eng_subdivision:eng_subdivisions!eng_subdivision_id(id,name), jurisdictions:contact_jurisdictions(id,contact_id,ward_id,ward_no,ward_name,zone,aro_office_division,jurisdiction_type,is_primary,created_at)";
 
 // --------------------------------------------------------------------------
 // Dashboard
@@ -502,7 +502,7 @@ export async function getContact(id: string): Promise<ContactWithRelations | nul
   const supabase = await sb();
   const { data, error } = await supabase
     .from("contacts")
-    .select(CONTACT_SELECT)
+    .select(CONTACT_SELECT) // includes contact_jurisdictions — seeds the ward editor on edit
     .eq("id", id)
     .maybeSingle();
   logErr("getContact", error);

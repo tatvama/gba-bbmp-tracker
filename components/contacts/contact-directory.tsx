@@ -84,12 +84,17 @@ export function ContactDirectory({
       if (!needle) return true;
       const hay = [
         c.full_name,
+        c.official_title,
         c.designation,
         c.phone,
         c.email,
+        c.office_name,
+        c.zone,
         c.division?.name,
         c.eng_subdivision?.name,
         c.corporation?.name,
+        // ward numbers + names so an officer is findable by any ward they cover
+        ...(c.jurisdictions ?? []).flatMap((j) => [j.ward_no != null ? String(j.ward_no) : null, j.ward_name, j.zone]),
       ]
         .filter(Boolean)
         .join(" ")

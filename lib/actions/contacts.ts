@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { writeAudit, diffFields } from "@/lib/audit";
-import { contactSchema } from "@/lib/validators";
+import { contactSchema, contactJurisdictionInputSchema, type ContactJurisdictionInput } from "@/lib/validators";
 import { WRITE_ROLES, VERIFY_ROLES, VERIFICATION_STATUSES } from "@/lib/constants";
 
 export interface ActionState {
@@ -37,7 +37,62 @@ function toRow(input: Record<string, any>) {
     confidence_score: input.confidenceScore,
     public_notes: input.publicNotes ?? null,
     internal_notes: input.internalNotes ?? null,
+    // Master-directory upgrade (0044). not-null columns get their default when
+    // the field is absent; checkbox booleans rely on a hidden "false" companion
+    // input in the form so an unchecked box submits false, not undefined.
+    official_title: input.officialTitle ?? null,
+    office_name: input.officeName ?? null,
+    letter_salutation: input.letterSalutation ?? null,
+    designation_category: input.designationCategory ?? null,
+    office_type: input.officeType ?? null,
+    zone: input.zone ?? null,
+    employee_code: input.employeeCode ?? null,
+    officer_status: input.officerStatus ?? "Active",
+    can_receive_complaint: input.canReceiveComplaint ?? true,
+    can_receive_rti: input.canReceiveRti ?? true,
+    can_receive_appeal: input.canReceiveAppeal ?? true,
+    can_receive_legal_notice: input.canReceiveLegalNotice ?? true,
+    can_receive_tvcc_notice: input.canReceiveTvccNotice ?? false,
   };
+}
+
+/** Replace a contact's ward jurisdictions from the form's hidden JSON input.
+ *  Absent field → leave existing untouched; present (even "[]") → replace-all,
+ *  so the form round-trips the full set (getContact seeds the editor on edit). */
+async function syncContactJurisdictions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  contactId: string,
+  raw: FormDataEntryValue | null,
+): Promise<void> {
+  if (raw == null || typeof raw !== "string") return; // field not submitted → don't touch
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || "[]");
+  } catch {
+    return; // malformed → leave existing jurisdictions intact
+  }
+  if (!Array.isArray(parsed)) return;
+
+  const rows = parsed
+    .map((r) => contactJurisdictionInputSchema.safeParse(r))
+    .filter((r): r is { success: true; data: ContactJurisdictionInput } => r.success)
+    .map((r) => r.data)
+    .filter((r) => r.wardNo != null || r.wardId); // must identify a ward
+
+  await supabase.from("contact_jurisdictions").delete().eq("contact_id", contactId);
+  if (!rows.length) return;
+  await supabase.from("contact_jurisdictions").insert(
+    rows.map((r, i) => ({
+      contact_id: contactId,
+      ward_id: r.wardId ?? null,
+      ward_no: r.wardNo ?? null,
+      ward_name: r.wardName ?? null,
+      zone: r.zone ?? null,
+      aro_office_division: r.aroOfficeDivision ?? null,
+      jurisdiction_type: "ward",
+      is_primary: r.isPrimary ?? i === 0,
+    })),
+  );
 }
 
 function parseForm(formData: FormData) {
@@ -66,6 +121,7 @@ export async function createContact(
   const { data, error } = await supabase.from("contacts").insert(row).select("id").single();
   if (error) return { error: error.message };
 
+  await syncContactJurisdictions(supabase, data.id, formData.get("wardJurisdictions"));
   await writeAudit(supabase, {
     entityType: "contact",
     entityId: data.id,
@@ -98,6 +154,7 @@ export async function updateContact(
   const { error } = await supabase.from("contacts").update(row).eq("id", id);
   if (error) return { error: error.message };
 
+  await syncContactJurisdictions(supabase, id, formData.get("wardJurisdictions"));
   await writeAudit(supabase, {
     entityType: "contact",
     entityId: id,

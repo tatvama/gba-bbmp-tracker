@@ -12,6 +12,10 @@ import {
   PUBLIC_IMPACT_LEVELS,
   CONFIDENCE_SCORES,
   DESIGNATIONS,
+  OFFICIAL_TITLES,
+  OFFICER_STATUSES,
+  DESIGNATION_CATEGORIES,
+  OFFICE_TYPES,
   FIRST_APPEAL_GROUNDS,
   PRIORITIES,
   RTI_CATEGORIES,
@@ -32,6 +36,12 @@ const optUuid = z.preprocess(emptyToUndef, z.string().uuid().optional());
 const optNum = z.preprocess(emptyToUndef, z.coerce.number().optional());
 const optEnum = <T extends readonly [string, ...string[]]>(values: T) =>
   z.preprocess(emptyToUndef, z.enum(values).optional());
+// Checkbox → boolean. Unchecked boxes are absent from FormData; a checked box
+// submits its value ("on" or "true"); anything falsy/absent → undefined.
+const optBool = z.preprocess(
+  (v) => (v === undefined || v === "" ? undefined : v === "on" || v === "true" || v === true),
+  z.boolean().optional(),
+);
 // BBMP/GBA job code (ddd-yy-nnnnnn). Enforced only when non-empty so drafts/imports pass.
 const optJobCode = z.preprocess(
   emptyToUndef,
@@ -83,8 +93,37 @@ export const contactSchema = z.object({
   confidenceScore: z.enum(CONFIDENCE_SCORES),
   publicNotes: z.preprocess(emptyToUndef, z.string().trim().optional()),
   internalNotes: z.preprocess(emptyToUndef, z.string().trim().optional()),
+  // Master-directory upgrade (0044) — all optional; enums validated only when set.
+  officialTitle: optEnum(OFFICIAL_TITLES),
+  officeName: optText,
+  letterSalutation: optText,
+  designationCategory: optEnum(DESIGNATION_CATEGORIES),
+  officeType: optEnum(OFFICE_TYPES),
+  zone: optText,
+  employeeCode: optText,
+  officerStatus: optEnum(OFFICER_STATUSES),
+  canReceiveComplaint: optBool,
+  canReceiveRti: optBool,
+  canReceiveAppeal: optBool,
+  canReceiveLegalNotice: optBool,
+  canReceiveTvccNotice: optBool,
+  // One hidden input carries the ward jurisdictions as a JSON array
+  // ([{ wardId?, wardNo?, wardName?, isPrimary? }]) — the FormData parser
+  // collapses duplicate keys, so multi-value must ride in a single field.
+  wardJurisdictions: optText,
 });
 export type ContactInput = z.infer<typeof contactSchema>;
+
+/** One ward-jurisdiction row as submitted by the contact form / import. */
+export const contactJurisdictionInputSchema = z.object({
+  wardId: z.string().uuid().optional().nullable(),
+  wardNo: z.coerce.number().int().positive().optional().nullable(),
+  wardName: z.string().trim().optional().nullable(),
+  zone: z.string().trim().optional().nullable(),
+  aroOfficeDivision: z.string().trim().optional().nullable(),
+  isPrimary: z.coerce.boolean().optional(),
+});
+export type ContactJurisdictionInput = z.infer<typeof contactJurisdictionInputSchema>;
 
 /** Ward edit — identity fields are not user-editable; these are the curatable ones. */
 export const wardEditSchema = z.object({

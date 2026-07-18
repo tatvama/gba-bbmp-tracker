@@ -1,0 +1,1439 @@
+{
+ "source": "BBMP Official ARO Directory (AroDetails.pdf)",
+ "officerCount": 64,
+ "wardCount": 198,
+ "officers": [
+  {
+   "zone": "Yelahanka",
+   "aroOfficeDivision": "YELAHANKA",
+   "officer": "Ashok",
+   "mobile": "8310015349",
+   "email": "aromsnbbmp@gmail.com",
+   "address": "BBMP Yelhanka, Bellary Road, Yelhanka Old Town, Bangalore - 64",
+   "wards": [
+    {
+     "wardNo": 1,
+     "wardName": "Kempegowda Ward"
+    },
+    {
+     "wardNo": 2,
+     "wardName": "Chowdeshwari Ward"
+    }
+   ]
+  },
+  {
+   "zone": "Yelahanka",
+   "aroOfficeDivision": "YELAHANKA SATELLITE TOWN",
+   "officer": "Kruthika M.V",
+   "mobile": "9535671411",
+   "email": "aroynknt@gmail.com",
+   "address": "B Sector , Behind RTO Complex, Yelahanka Satelite Town, Banglore - 64",
+   "wards": [
+    {
+     "wardNo": 3,
+     "wardName": "Attur"
+    },
+    {
+     "wardNo": 4,
+     "wardName": "Yelahanka Satellite town"
+    }
+   ]
+  },
+  {
+   "zone": "Yelahanka",
+   "aroOfficeDivision": "BYATARAYANPURA",
+   "officer": "Vittaliah",
+   "mobile": "9880512226",
+   "email": "arothanisandra@gmail.com",
+   "address": "Thanisandra Main Road, Thanisandra, Bangalore - 64",
+   "wards": [
+    {
+     "wardNo": 5,
+     "wardName": "Jakkur"
+    },
+    {
+     "wardNo": 6,
+     "wardName": "Thanisandra"
+    }
+   ]
+  },
+  {
+   "zone": "Yelahanka",
+   "aroOfficeDivision": "KODIGEHALLI",
+   "officer": "Basawaraju Magi",
+   "mobile": "9480683002",
+   "email": "arobbmpkod@gmail.com",
+   "address": "Kaveri School Road, Near Public Park, Sahakar Nagar, Bangalore - 92",
+   "wards": [
+    {
+     "wardNo": 7,
+     "wardName": "Byatarayanapura"
+    },
+    {
+     "wardNo": 8,
+     "wardName": "Kodigehalli"
+    }
+   ]
+  },
+  {
+   "zone": "Yelahanka",
+   "aroOfficeDivision": "VIDYARANYAPURA",
+   "officer": "Basavaraju N.G",
+   "mobile": "9480685884",
+   "email": "arovpura@gmail.com",
+   "address": "No. 26, 1st Block, Vidyaranyapura Main Raod, Bangalore",
+   "wards": [
+    {
+     "wardNo": 9,
+     "wardName": "Vidyaranyapura"
+    },
+    {
+     "wardNo": 10,
+     "wardName": "Doddabommasandra"
+    },
+    {
+     "wardNo": 11,
+     "wardName": "Kuvempunagar"
+    }
+   ]
+  },
+  {
+   "zone": "Mahadevapura",
+   "aroOfficeDivision": "HORAMAVU",
+   "officer": "K. Doddashamachari",
+   "mobile": "9480685868",
+   "email": "aerohoramavu@gmail.com",
+   "address": "Near Gandhi Statue, Jayanthi Nagar Circle, Hormavu",
+   "wards": [
+    {
+     "wardNo": 51,
+     "wardName": "Vijinapura"
+    },
+    {
+     "wardNo": 25,
+     "wardName": "Horamavu"
+    },
+    {
+     "wardNo": 26,
+     "wardName": "Ramamurthynagar"
+    }
+   ]
+  },
+  {
+   "zone": "Mahadevapura",
+   "aroOfficeDivision": "HOODI",
+   "officer": "SMT.JYOTHILAKSHMI.S",
+   "mobile": "9108201798",
+   "email": "arohoodi100@gmail.com",
+   "address": "Whitefield Road, Near Mahadevapura Corporation Bank, RHB Colony, Bangalore 48",
+   "wards": [
+    {
+     "wardNo": 54,
+     "wardName": "Hoodi"
+    },
+    {
+     "wardNo": 85,
+     "wardName": "Doddanekkundi"
+    },
+    {
+     "wardNo": 82,
+     "wardName": "Garudacharpalya"
+    }
+   ]
+  },
+  {
+   "zone": "Mahadevapura",
+   "aroOfficeDivision": "K.R.PURAM",
+   "officer": "Satish K R",
+   "mobile": "9844753625",
+   "email": "arokrpura.bbmp@gmail.com",
+   "address": "K.R. Puram Old CMC Office, Old Madras Raod, K.R. Puram, Bangalore",
+   "wards": [
+    {
+     "wardNo": 55,
+     "wardName": "Devasandra"
+    },
+    {
+     "wardNo": 52,
+     "wardName": "K.R.Puram"
+    },
+    {
+     "wardNo": 53,
+     "wardName": "Basavanapura"
+    }
+   ]
+  },
+  {
+   "zone": "Mahadevapura",
+   "aroOfficeDivision": "HAL AIRPORT",
+   "officer": "Krishanmurthy N",
+   "mobile": "8660417896",
+   "email": "arohalsubzone@gmail.com",
+   "address": "No.8 &9, Akash Nagar, MVG Layout, B.Narayanapura , Bangalore 16",
+   "wards": [
+    {
+     "wardNo": 81,
+     "wardName": "Vignananagar"
+    },
+    {
+     "wardNo": 87,
+     "wardName": "HAL Airport"
+    },
+    {
+     "wardNo": 56,
+     "wardName": "A. Narayanapura"
+    }
+   ]
+  },
+  {
+   "zone": "Mahadevapura",
+   "aroOfficeDivision": "WHITE FIELD",
+   "officer": "G.S.Siddalingappa",
+   "mobile": "9901035179",
+   "email": "aro.whitefield@gmail.com",
+   "address": "Ramagondanahalli near govt primary school, Ramgondana halli, Bangalore-560066",
+   "wards": [
+    {
+     "wardNo": 83,
+     "wardName": "Kadugodi"
+    },
+    {
+     "wardNo": 84,
+     "wardName": "Hagadooru"
+    },
+    {
+     "wardNo": 149,
+     "wardName": "Varthur"
+    }
+   ]
+  },
+  {
+   "zone": "Mahadevapura",
+   "aroOfficeDivision": "MARATH HALLI",
+   "officer": "Krishnappa N",
+   "mobile": "9480685204",
+   "email": "aromarathahalli@gmail.com",
+   "address": "Krishna Mansion, Near Vaibhav Hotel Building, Ring Road, Marathahalli",
+   "wards": [
+    {
+     "wardNo": 150,
+     "wardName": "Bellandur"
+    },
+    {
+     "wardNo": 86,
+     "wardName": "Marathalli"
+    }
+   ]
+  },
+  {
+   "zone": "Dasarahalli",
+   "aroOfficeDivision": "SHETTY HALLI",
+   "officer": "Vasanth",
+   "mobile": "9480685312",
+   "email": "aroshettihalli.rev@gmail.com",
+   "address": "Shettihalli cross, near govt primary school, ravindra Nagar, blore-57",
+   "wards": [
+    {
+     "wardNo": 12,
+     "wardName": "SHETTY HALLI"
+    },
+    {
+     "wardNo": 13,
+     "wardName": "Mallasandra"
+    }
+   ]
+  },
+  {
+   "zone": "Dasarahalli",
+   "aroOfficeDivision": "T-DASARAHALLI",
+   "officer": "Dhananjaya",
+   "mobile": "9480684121",
+   "email": "aero.dasarahalli@gmail.com",
+   "address": "1st main, 4 th cross, near jain temple ,T dasarahalli , blore -57",
+   "wards": [
+    {
+     "wardNo": 14,
+     "wardName": "Bagalagunte"
+    },
+    {
+     "wardNo": 15,
+     "wardName": "T. Dasarahalli"
+    }
+   ]
+  },
+  {
+   "zone": "Dasarahalli",
+   "aroOfficeDivision": "PEENYA INDUSTRIAL AREA",
+   "officer": "V.Shivamma",
+   "mobile": "9480683382",
+   "email": "aeropeenya@gmail.com",
+   "address": "peenya industrial area, near water tank,Blore 73",
+   "wards": [
+    {
+     "wardNo": 39,
+     "wardName": "Chokkasandra"
+    },
+    {
+     "wardNo": 41,
+     "wardName": "Peenya Industrial Area"
+    }
+   ]
+  },
+  {
+   "zone": "Dasarahalli",
+   "aroOfficeDivision": "HEGGANHALLI",
+   "officer": "Nagaveni Erappa",
+   "mobile": "9480685438",
+   "email": "hegganahalli91@gmail.com",
+   "address": "near hegganahalli bus stand, hegganahalli, Blore -91",
+   "wards": [
+    {
+     "wardNo": 70,
+     "wardName": "Rajagopalanagar"
+    },
+    {
+     "wardNo": 71,
+     "wardName": "Hegganahalli"
+    }
+   ]
+  },
+  {
+   "zone": "RajarajeshwariNagar",
+   "aroOfficeDivision": "YESHWANTHPURA",
+   "officer": "S.M. Shashikala",
+   "mobile": "9480683621",
+   "email": "aro.ypr@gmail.com",
+   "address": "Yeshwanthpura Commercial Complex, 2nd Floor, N.C. Road Banglore",
+   "wards": [
+    {
+     "wardNo": 37,
+     "wardName": "Yeshwanthpur"
+    },
+    {
+     "wardNo": 16,
+     "wardName": "Jalahalli"
+    },
+    {
+     "wardNo": 17,
+     "wardName": "J.P.Park"
+    }
+   ]
+  },
+  {
+   "zone": "RajarajeshwariNagar",
+   "aroOfficeDivision": "LAKSHMIDEVINAGAR",
+   "officer": "N. Ramesh",
+   "mobile": "9480735211",
+   "email": "aroldnagar@gmail.com",
+   "address": "No. 9/1, 8th Cross, Sathyanarayana Temple Road, Gorguntepalya, Banglore -22",
+   "wards": [
+    {
+     "wardNo": 38,
+     "wardName": "H.M.T"
+    },
+    {
+     "wardNo": 42,
+     "wardName": "Lakshmidevinagar"
+    }
+   ]
+  },
+  {
+   "zone": "RajarajeshwariNagar",
+   "aroOfficeDivision": "LAGGERE",
+   "officer": "Venkatappa. D",
+   "mobile": "9986880111",
+   "email": "arolaggere@gmail.com",
+   "address": "Gram Panchayath Office, NH - 4 Tumkur Road Bangalore",
+   "wards": [
+    {
+     "wardNo": 69,
+     "wardName": "Laggere"
+    },
+    {
+     "wardNo": 73,
+     "wardName": "Kottigepalya"
+    }
+   ]
+  },
+  {
+   "zone": "RajarajeshwariNagar",
+   "aroOfficeDivision": "HEROHALLI",
+   "officer": "K SRINIVASAIAH",
+   "mobile": "9945167964",
+   "email": "aropadmanabhanagar@gmail.com",
+   "address": "Anjananagar,bharath nagar 1st stage, naer Bsnl office Magadi Road Bangalore",
+   "wards": [
+    {
+     "wardNo": 72,
+     "wardName": "Herohalli"
+    },
+    {
+     "wardNo": 40,
+     "wardName": "Doddabidarakallu"
+    }
+   ]
+  },
+  {
+   "zone": "RajarajeshwariNagar",
+   "aroOfficeDivision": "RAJARAJESHWARINAGAR",
+   "officer": "Mahesh.S",
+   "mobile": "9538634774",
+   "email": "ashokmramanna@gmail.com",
+   "address": "18th Cross Ideal Homes Layout, RR Nagar, Bangalore",
+   "wards": [
+    {
+     "wardNo": 160,
+     "wardName": "Rajarajeshwarinagar"
+    },
+    {
+     "wardNo": 129,
+     "wardName": "Jnanabharathi ward"
+    }
+   ]
+  },
+  {
+   "zone": "RajarajeshwariNagar",
+   "aroOfficeDivision": "KENGERI",
+   "officer": "Devaraj",
+   "mobile": "9448905713",
+   "email": "aro.kengeri@gmail.com",
+   "address": "Kengeri satellite town road, near surana college, Kengeri upnagar, Bangalore",
+   "wards": [
+    {
+     "wardNo": 198,
+     "wardName": "Hemmigepura"
+    },
+    {
+     "wardNo": 159,
+     "wardName": "Kengeri"
+    },
+    {
+     "wardNo": 130,
+     "wardName": "Ullalu"
+    }
+   ]
+  },
+  {
+   "zone": "Bommanahalli",
+   "aroOfficeDivision": "HSR LAYOUT",
+   "officer": "Ramachandraiah L.N",
+   "mobile": "9480685984",
+   "email": "aro.hsrlayout@gmail.com",
+   "address": "Behind BDA Complex HSR 6TH Sector, 9th Main, 14TH A Cross, HSR Layout",
+   "wards": [
+    {
+     "wardNo": 174,
+     "wardName": "HSR Layout"
+    },
+    {
+     "wardNo": 190,
+     "wardName": "Mangammanapalya"
+    }
+   ]
+  },
+  {
+   "zone": "Bommanahalli",
+   "aroOfficeDivision": "BOMMANA HALLI",
+   "officer": "Nataraj",
+   "mobile": "9480685528",
+   "email": "arobhalli@gmail.com",
+   "address": "Begur Road, Bommanahalli, Bangalore",
+   "wards": [
+    {
+     "wardNo": 175,
+     "wardName": "Bommanahalli"
+    },
+    {
+     "wardNo": 188,
+     "wardName": "Bilekahalli"
+    },
+    {
+     "wardNo": 189,
+     "wardName": "Hongasandra"
+    }
+   ]
+  },
+  {
+   "zone": "Bommanahalli",
+   "aroOfficeDivision": "BEGUR",
+   "officer": "H.B.Santhosh Kumar",
+   "mobile": "7259653938",
+   "email": "arobegur@gmail.com",
+   "address": "Old Gram Panchayath Office, Begur, Banglore.",
+   "wards": [
+    {
+     "wardNo": 191,
+     "wardName": "Singasandra"
+    },
+    {
+     "wardNo": 192,
+     "wardName": "Begur"
+    }
+   ]
+  },
+  {
+   "zone": "Bommanahalli",
+   "aroOfficeDivision": "ARAKERE",
+   "officer": "S V Manjunath",
+   "mobile": "9731103437",
+   "email": "aroarakere@gmail.com",
+   "address": "Bannerghatta Road, MICO Layout, Bangalore.",
+   "wards": [
+    {
+     "wardNo": 193,
+     "wardName": "Arakere"
+    },
+    {
+     "wardNo": 186,
+     "wardName": "Jaraganahalli"
+    },
+    {
+     "wardNo": 187,
+     "wardName": "Puttenahalli"
+    }
+   ]
+  },
+  {
+   "zone": "Bommanahalli",
+   "aroOfficeDivision": "ANJANAPURA",
+   "officer": "Indrajeet Lamani",
+   "mobile": "9731321490",
+   "email": "aroanjan1946@gmail.com",
+   "address": "Old Gram Panchayath Office, Begur, Banglore.",
+   "wards": [
+    {
+     "wardNo": 194,
+     "wardName": "Gottigere"
+    },
+    {
+     "wardNo": 196,
+     "wardName": "Anjanapura"
+    }
+   ]
+  },
+  {
+   "zone": "Bommanahalli",
+   "aroOfficeDivision": "YELACHENAHALLI",
+   "officer": "Rangaswamy",
+   "mobile": "9480684564",
+   "email": "yelachenahalliaro@gmail.com",
+   "address": "Konanakunte Cross, Kanakapura Road, Bangalore",
+   "wards": [
+    {
+     "wardNo": 195,
+     "wardName": "Konanakunte"
+    },
+    {
+     "wardNo": 185,
+     "wardName": "Yelachenahalli"
+    }
+   ]
+  },
+  {
+   "zone": "Bommanahalli",
+   "aroOfficeDivision": "UTTARAHALLI",
+   "officer": "Ramesh",
+   "mobile": "9731383407",
+   "email": "uttarahalliaro@gmail.com",
+   "address": "Near Subramanyapura Police Station, Bangalore",
+   "wards": [
+    {
+     "wardNo": 197,
+     "wardName": "Vasanthapura"
+    },
+    {
+     "wardNo": 184,
+     "wardName": "Uttarahalli"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "VIJAYANAGAR",
+   "officer": "NIRMALA S M",
+   "mobile": "9916703838",
+   "email": "vijayanagarmanager@gmail.com",
+   "address": "Near Swimming Pool, Hampinagar, Bangalore.",
+   "wards": [
+    {
+     "wardNo": 122,
+     "wardName": "Kempapura Agrahara"
+    },
+    {
+     "wardNo": 123,
+     "wardName": "Vijaynagar"
+    },
+    {
+     "wardNo": 124,
+     "wardName": "Hosahalli"
+    },
+    {
+     "wardNo": 134,
+     "wardName": "Bapujinagar"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "GALI ANJANEYASWAMY TEMPLE",
+   "officer": "Madhuri kotagi",
+   "mobile": "9845356483",
+   "email": "arogalianjaneya@gmail.com",
+   "address": "GALI ANJANEYASWAMY TEMPLE",
+   "wards": [
+    {
+     "wardNo": 132,
+     "wardName": "Attiguppe"
+    },
+    {
+     "wardNo": 133,
+     "wardName": "Hampinagar"
+    },
+    {
+     "wardNo": 157,
+     "wardName": "Gali Anjaneya swamy Temple Ward"
+    },
+    {
+     "wardNo": 158,
+     "wardName": "Deepanjali Nagar"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "KEMPEGOWDA NAGAR",
+   "officer": "Chandrakantha",
+   "mobile": "9480684432",
+   "email": "arokgn@gmail.com",
+   "address": "Corporation Building 1st Floor, J.C. Road, Bangalore",
+   "wards": [
+    {
+     "wardNo": 142,
+     "wardName": "Sunkenahalli"
+    },
+    {
+     "wardNo": 143,
+     "wardName": "Vishveshwarapuram"
+    },
+    {
+     "wardNo": 118,
+     "wardName": "Sudham Nagara"
+    },
+    {
+     "wardNo": 119,
+     "wardName": "Dharmaraya Swamy Temple Ward"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "KORAMANGALA",
+   "officer": "Roopa",
+   "mobile": "7349795222",
+   "email": "arokml@gmail.com",
+   "address": "Near Sukhsagar Hotel 17th A main 2nd Cross 5th Block, Koramangala, Bangalore",
+   "wards": [
+    {
+     "wardNo": 147,
+     "wardName": "Adugodi"
+    },
+    {
+     "wardNo": 148,
+     "wardName": "Ejipura"
+    },
+    {
+     "wardNo": 151,
+     "wardName": "Koramangala"
+    },
+    {
+     "wardNo": 173,
+     "wardName": "Jakkasandra"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "B.T.M.LAYOUT",
+   "officer": "Purushotham",
+   "mobile": "9480685616",
+   "email": "arobtm172@gmail.com",
+   "address": "Near Ayyappa Swamy Temple, Hosur Road, Bangalore",
+   "wards": [
+    {
+     "wardNo": 152,
+     "wardName": "Sudduguntepalya"
+    },
+    {
+     "wardNo": 146,
+     "wardName": "Lakkasandra"
+    },
+    {
+     "wardNo": 172,
+     "wardName": "Madiwala"
+    },
+    {
+     "wardNo": 176,
+     "wardName": "BTM Layout"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "HOMBEGOWDA NAGAR",
+   "officer": "G. Chandrashekar",
+   "mobile": "9480685452",
+   "email": "aerohgnagar@gmail.com",
+   "address": "2nd Cross, 2nd Main, LIC Colony, Byrasandra, Banglore.",
+   "wards": [
+    {
+     "wardNo": 153,
+     "wardName": "Jayangar"
+    },
+    {
+     "wardNo": 144,
+     "wardName": "Siddapura"
+    },
+    {
+     "wardNo": 145,
+     "wardName": "Hombegowdanagar"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "BASAVANAGUDI",
+   "officer": "M H Swamy",
+   "mobile": "9480685876",
+   "email": "arobasavanagudi@gmail.com",
+   "address": "GALI ANJANEYASWAMY TEMPLE",
+   "wards": [
+    {
+     "wardNo": 154,
+     "wardName": "Basavanagudi"
+    },
+    {
+     "wardNo": 155,
+     "wardName": "Hanumanthanagar"
+    },
+    {
+     "wardNo": 164,
+     "wardName": "Vidyapeetha Ward"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "PADMANABHA NAGAR",
+   "officer": "Rajkumar",
+   "mobile": "9480685388",
+   "email": "aropadmanabhanagar@gmail.com",
+   "address": "Chennammanakere Achhukattu, Banashankari, Bangalore.",
+   "wards": [
+    {
+     "wardNo": 161,
+     "wardName": "Hosakerehalli"
+    },
+    {
+     "wardNo": 181,
+     "wardName": "Kumaraswamylayout"
+    },
+    {
+     "wardNo": 182,
+     "wardName": "Padmanabhanagar"
+    },
+    {
+     "wardNo": 183,
+     "wardName": "Chikkallasandra"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "GIRINAGAR",
+   "officer": "Santhosh Kumar Ijeri",
+   "mobile": "9886920689",
+   "email": "girinagararo@gmail.com",
+   "address": "Chennammanakere Achhukattu, Banashankari, Bangalore.",
+   "wards": [
+    {
+     "wardNo": 162,
+     "wardName": "Girinagar"
+    },
+    {
+     "wardNo": 163,
+     "wardName": "Katriguppe"
+    },
+    {
+     "wardNo": 156,
+     "wardName": "Srinagar"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "JAYANAGAR",
+   "officer": "E. Kanchana",
+   "mobile": "9480683092",
+   "email": "aro173jayanagar@gmail.com",
+   "address": "Jayanagar Shopping Complex, 1st Floor, 4th Block, Jayanagar. Bangalore-11",
+   "wards": [
+    {
+     "wardNo": 168,
+     "wardName": "Pattabhiramnagar"
+    },
+    {
+     "wardNo": 169,
+     "wardName": "Byrasandra"
+    },
+    {
+     "wardNo": 170,
+     "wardName": "Jayanagar East"
+    },
+    {
+     "wardNo": 171,
+     "wardName": "Gurappanapalya"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "J.P. NAGAR",
+   "officer": "Sharanamma",
+   "mobile": "9480685479",
+   "email": "bbmparojpn@gmail.com",
+   "address": "Near Oxford College 29th & 30th Main Road, 1st Phase, JP Nagar, Bangalore",
+   "wards": [
+    {
+     "wardNo": 177,
+     "wardName": "J.P.Nagar"
+    },
+    {
+     "wardNo": 178,
+     "wardName": "Sarakki"
+    },
+    {
+     "wardNo": 179,
+     "wardName": "Shakambarinagar"
+    }
+   ]
+  },
+  {
+   "zone": "South",
+   "aroOfficeDivision": "BANASHNKARI",
+   "officer": "Suguna",
+   "mobile": "9480685720",
+   "email": "arobanashankari01@gmail.com",
+   "address": "S. Kariyappa Road, Yediyur BBMP Complex, Jayanagar 7th Block, Bangalore.",
+   "wards": [
+    {
+     "wardNo": 180,
+     "wardName": "Banashankari Temple Ward"
+    },
+    {
+     "wardNo": 165,
+     "wardName": "Ganeshmandira Ward"
+    },
+    {
+     "wardNo": 166,
+     "wardName": "Karisandra"
+    },
+    {
+     "wardNo": 167,
+     "wardName": "Yadiyuru"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "MATHIKERE",
+   "officer": "N. Krishna I/C",
+   "mobile": "9060806360",
+   "email": "aromathikere@gmail.com",
+   "address": "Netaji Circle, Mattikere, Bangalore",
+   "wards": [
+    {
+     "wardNo": 35,
+     "wardName": "Aramane Nagar"
+    },
+    {
+     "wardNo": 36,
+     "wardName": "Mathikere"
+    },
+    {
+     "wardNo": 45,
+     "wardName": "Malleshwaram"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "MALLESHWARAM",
+   "officer": "Shilpa Baradwaj",
+   "mobile": "9480683381",
+   "email": "aromalleshwaram76@gmail.com",
+   "address": "IPP Center, 16th Cross, Opp Choudaiah Memorial Hall, Kodandaramapura, Vaiyalikaval, Bangalore - 03",
+   "wards": [
+    {
+     "wardNo": 64,
+     "wardName": "Rajmahal"
+    },
+    {
+     "wardNo": 65,
+     "wardName": "Kadumalleshwara"
+    },
+    {
+     "wardNo": 66,
+     "wardName": "Subramanyanagar"
+    },
+    {
+     "wardNo": 76,
+     "wardName": "Gayathrinagar"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "MAHALAKSHMI LAYOUT",
+   "officer": "Narasimhamurthy.D.K",
+   "mobile": "9480685549",
+   "email": "aromlp66@gmail.com",
+   "address": "RTO Complex, Rajajinagar Bangalore - 9",
+   "wards": [
+    {
+     "wardNo": 74,
+     "wardName": "Shakthiganapathi nagar"
+    },
+    {
+     "wardNo": 68,
+     "wardName": "Mahalakshmipuram"
+    },
+    {
+     "wardNo": 43,
+     "wardName": "Nandini Layout"
+    },
+    {
+     "wardNo": 44,
+     "wardName": "Marappana Palya"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "NAGAPURA",
+   "officer": "B.S. SUNANDA",
+   "mobile": "9480685102",
+   "email": "aronagapura@gmail.com",
+   "address": "RTO Complex, Rajajinagar Bangalore - 9",
+   "wards": [
+    {
+     "wardNo": 75,
+     "wardName": "Shankaramata"
+    },
+    {
+     "wardNo": 67,
+     "wardName": "Nagapura"
+    },
+    {
+     "wardNo": 102,
+     "wardName": "Vrushabhavathinagar"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "GANDHINAGAR",
+   "officer": "Krishna. M",
+   "mobile": "9731577669",
+   "email": "arogandhinagar00@gmail.com",
+   "address": "Dr. TCM Rayan Road, Near City Railway Station, Bangalore - 53",
+   "wards": [
+    {
+     "wardNo": 94,
+     "wardName": "Gandhinagar"
+    },
+    {
+     "wardNo": 95,
+     "wardName": "Subhashnagar"
+    },
+    {
+     "wardNo": 96,
+     "wardName": "Okalipuram"
+    },
+    {
+     "wardNo": 77,
+     "wardName": "Dattathreya Temple"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "RAJAJINAGAR",
+   "officer": "Rekha",
+   "mobile": "9480685474",
+   "email": "arorajajinagara@gmail.com",
+   "address": "RTO Complex, Rajajinagar Bangalore - 10",
+   "wards": [
+    {
+     "wardNo": 99,
+     "wardName": "Rajajinagar"
+    },
+    {
+     "wardNo": 100,
+     "wardName": "Basaveshwaranagar"
+    },
+    {
+     "wardNo": 101,
+     "wardName": "Kamakshipalya"
+    },
+    {
+     "wardNo": 107,
+     "wardName": "Shivanagar"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "SRIRAMMANDIRA",
+   "officer": "Bharathi. H",
+   "mobile": "9480685471",
+   "email": "arosrm01@gmail.com",
+   "address": "RTO Complex, Rajajinagar Bangalore - 10",
+   "wards": [
+    {
+     "wardNo": 108,
+     "wardName": "Srirammandira ward"
+    },
+    {
+     "wardNo": 97,
+     "wardName": "Dayanandanagar"
+    },
+    {
+     "wardNo": 98,
+     "wardName": "Prakashnagar"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "CHICKPET",
+   "officer": "Rajappa",
+   "mobile": "9880664894",
+   "email": "arochickpet@gmail.com",
+   "address": "Tulsi Thota, Balepet, Bangalore - 53",
+   "wards": [
+    {
+     "wardNo": 109,
+     "wardName": "Chikpet"
+    },
+    {
+     "wardNo": 120,
+     "wardName": "Cottonpet"
+    },
+    {
+     "wardNo": 121,
+     "wardName": "Binnypet"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "GOVINDARAJNAGAR",
+   "officer": "Renuka Prasad.C",
+   "mobile": "9480685066",
+   "email": "arogovindarajanagar@gmail.com",
+   "address": "16th Main road , M.C Layout Vijayanagar, (Near Udaya School) Bengaluru-560040. Telephone number : 080-22975738",
+   "wards": [
+    {
+     "wardNo": 125,
+     "wardName": "Marenahalli"
+    },
+    {
+     "wardNo": 103,
+     "wardName": "Kaveripura"
+    },
+    {
+     "wardNo": 104,
+     "wardName": "Govindrajnagara"
+    },
+    {
+     "wardNo": 105,
+     "wardName": "Agrahara Dasarahalli"
+    },
+    {
+     "wardNo": 106,
+     "wardName": "Dr. Rajkumar Ward"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "CHANDRALAYOUT",
+   "officer": "Yashavantharaj",
+   "mobile": "9480685657",
+   "email": "arochandralayout@gmail.com",
+   "address": "Dr.B.R. Ambedkar Stadium, Basaveshwar Nagar, Bangalore-79",
+   "wards": [
+    {
+     "wardNo": 126,
+     "wardName": "Maruthi Mandira Ward"
+    },
+    {
+     "wardNo": 127,
+     "wardName": "Moodalapalya"
+    },
+    {
+     "wardNo": 128,
+     "wardName": "Nagarabhavi"
+    },
+    {
+     "wardNo": 131,
+     "wardName": "Nayandanahalli"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "JAGAJEEVANRAM NAGAR",
+   "officer": "Leelavathi",
+   "mobile": "9480685045",
+   "email": "arojjr@gmail.com",
+   "address": "Dr. TCM Rayan Road, Near City Railway Station, Bangalore - 53",
+   "wards": [
+    {
+     "wardNo": 135,
+     "wardName": "Padarayanapura"
+    },
+    {
+     "wardNo": 136,
+     "wardName": "Jagareevanram Nagar"
+    },
+    {
+     "wardNo": 137,
+     "wardName": "Rayapuram"
+    },
+    {
+     "wardNo": 138,
+     "wardName": "Chalavadipalya"
+    }
+   ]
+  },
+  {
+   "zone": "West",
+   "aroOfficeDivision": "CHAMARAJPET",
+   "officer": "G.NARASIMHANAYAK",
+   "mobile": "9611911472",
+   "email": "chamarajpetaro@gmail.com",
+   "address": "Dr. TCM Rayan Road, Near City Railway Station, Bangalore - 53",
+   "wards": [
+    {
+     "wardNo": 139,
+     "wardName": "K.R. Market"
+    },
+    {
+     "wardNo": 140,
+     "wardName": "Chamrajpet"
+    },
+    {
+     "wardNo": 141,
+     "wardName": "Azadnagar"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "HEBBAL",
+   "officer": "Niranjan Murthy P",
+   "mobile": "9844413684",
+   "email": "arohebbal@gmail.com",
+   "address": "Munireddypalya Main Road, Opposite to Snow city, J C Nagar Bangalore",
+   "wards": [
+    {
+     "wardNo": 18,
+     "wardName": "Radhakrishna Temple Ward"
+    },
+    {
+     "wardNo": 19,
+     "wardName": "Sanjaynagar"
+    },
+    {
+     "wardNo": 20,
+     "wardName": "Ganganagar"
+    },
+    {
+     "wardNo": 21,
+     "wardName": "Hebbal"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "H.B.R.LAYOUT",
+   "officer": "JAYA",
+   "mobile": "9480685172",
+   "email": "aerohbrlayout@gmail.com",
+   "address": "Shop No. 16, BDA Complex, Opp KEB Office, HBR Layout, Bangalore",
+   "wards": [
+    {
+     "wardNo": 23,
+     "wardName": "Nagavara"
+    },
+    {
+     "wardNo": 24,
+     "wardName": "HBR Layout"
+    },
+    {
+     "wardNo": 29,
+     "wardName": "Kacharakanahalli"
+    },
+    {
+     "wardNo": 30,
+     "wardName": "Kadugondanahalli"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "MARUTHISEVANAGAR",
+   "officer": "Guru Prasanna",
+   "mobile": "9480683077",
+   "email": "aromsnbbmp@gmail.com",
+   "address": "BBMP Offices, Opp, to Frazer town, Police Station, MM Road, Cox Town, Bangalore",
+   "wards": [
+    {
+     "wardNo": 27,
+     "wardName": "Banasawadi"
+    },
+    {
+     "wardNo": 28,
+     "wardName": "Kammanahalli"
+    },
+    {
+     "wardNo": 49,
+     "wardName": "Lingarajapura"
+    },
+    {
+     "wardNo": 59,
+     "wardName": "Maruthiseva Nagar"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "K.G. HALLI",
+   "officer": "Venkatesh. N",
+   "mobile": "9480685544",
+   "email": "arokgn@gmail.com",
+   "address": "BBMP offices, Next to KSFC Building, Thimmaiah Road, Vasanth Nagara, Bangalore",
+   "wards": [
+    {
+     "wardNo": 31,
+     "wardName": "Kushalnagar"
+    },
+    {
+     "wardNo": 32,
+     "wardName": "Kavalbyrasandra"
+    },
+    {
+     "wardNo": 48,
+     "wardName": "Muneshwaranagar"
+    },
+    {
+     "wardNo": 60,
+     "wardName": "Sagayapuram"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "J.C. NAGAR",
+   "officer": "A.E Rajanna",
+   "mobile": "9886329447",
+   "email": "arojcnagar@gmail.com",
+   "address": "Munireddypalya Main Road, Opposite to Snow city, J C Nagar Bangalore",
+   "wards": [
+    {
+     "wardNo": 46,
+     "wardName": "Jayachamarajendra Nagar"
+    },
+    {
+     "wardNo": 22,
+     "wardName": "Vishwanatha Nagenahalli"
+    },
+    {
+     "wardNo": 33,
+     "wardName": "Manorayanapalya"
+    },
+    {
+     "wardNo": 34,
+     "wardName": "Gangenahalli"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "C.V. RAMANNAGAR",
+   "officer": "Adinath Chougala",
+   "mobile": "9886329158",
+   "email": "arocvr@gmail.com",
+   "address": "BBMP Offices, Opp. To Frazer Town Plice Station, MM Road, Cox Town, Bangalore",
+   "wards": [
+    {
+     "wardNo": 50,
+     "wardName": "Benniganahalli"
+    },
+    {
+     "wardNo": 57,
+     "wardName": "C.V. Ramannagar"
+    },
+    {
+     "wardNo": 58,
+     "wardName": "Hosathippasandra"
+    },
+    {
+     "wardNo": 79,
+     "wardName": "Sarvagnanagar"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "PULIKESHINAGAR",
+   "officer": "Lokamatha",
+   "mobile": "9480685217",
+   "email": "aropknbbmp@gmail.com",
+   "address": "BBMP offices, Next to KSFC Building, Thimmaiah Road, Vasanth Nagara, Blore",
+   "wards": [
+    {
+     "wardNo": 61,
+     "wardName": "S.K. Garden"
+    },
+    {
+     "wardNo": 47,
+     "wardName": "Devarajeevanahalli"
+    },
+    {
+     "wardNo": 78,
+     "wardName": "Pulikeshinagar"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "JEEVANBHIMA NAGAR",
+   "officer": "Murthy",
+   "mobile": "9480685836",
+   "email": "arojbn@gmail.com",
+   "address": "Next to Little Flower School, HAL 2nd Stage, Bangalore",
+   "wards": [
+    {
+     "wardNo": 80,
+     "wardName": "Hoysalanagar"
+    },
+    {
+     "wardNo": 88,
+     "wardName": "Jeevanbhimanagar"
+    },
+    {
+     "wardNo": 113,
+     "wardName": "Konena Agrahara"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "SHIVAJINAGAR",
+   "officer": "Jyothi lakshmi H",
+   "mobile": "9480685406",
+   "email": "aro.shivajinagar@gmail.com",
+   "address": "BBMP PU Girl Collage, Dispensary Road, Shivajinagar, Bangalore.",
+   "wards": [
+    {
+     "wardNo": 90,
+     "wardName": "Ulsoor"
+    },
+    {
+     "wardNo": 91,
+     "wardName": "Bharathinagar"
+    },
+    {
+     "wardNo": 92,
+     "wardName": "Shivajinagar"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "VASANTHANAGAR",
+   "officer": "B.V Veena",
+   "mobile": "9448023844",
+   "email": "arovasanthanagar@gmail.com",
+   "address": "BBMP offices, Next To KSFC Building, Thimmaiah Road, Vasanth Nagara, BANGALORE",
+   "wards": [
+    {
+     "wardNo": 93,
+     "wardName": "Vasanthnagar"
+    },
+    {
+     "wardNo": 110,
+     "wardName": "Sampangiramnagar"
+    },
+    {
+     "wardNo": 62,
+     "wardName": "Ramaswamy palya"
+    },
+    {
+     "wardNo": 63,
+     "wardName": "Jayamahal"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "SHANTHINAGAR",
+   "officer": "Basavaraj",
+   "mobile": "9480685599",
+   "email": "viveknanda.basavaraj@gmail.com",
+   "address": "12th Floor, Public Utility Building, MG Road, Bangalore",
+   "wards": [
+    {
+     "wardNo": 111,
+     "wardName": "Shanthala Nagar"
+    },
+    {
+     "wardNo": 116,
+     "wardName": "Neelasandra"
+    },
+    {
+     "wardNo": 117,
+     "wardName": "Shanthinagar"
+    }
+   ]
+  },
+  {
+   "zone": "East",
+   "aroOfficeDivision": "DOMLUR",
+   "officer": "Chandrappa Berajjana",
+   "mobile": "9632289839",
+   "email": "chandrappakb2020@gmail.com",
+   "address": "12th Floor, Public Utility Building, MG Road, Bangalore",
+   "wards": [
+    {
+     "wardNo": 114,
+     "wardName": "Agaram"
+    },
+    {
+     "wardNo": 115,
+     "wardName": "Vannarpet"
+    },
+    {
+     "wardNo": 89,
+     "wardName": "Jogupalya"
+    },
+    {
+     "wardNo": 112,
+     "wardName": "Domlur"
+    }
+   ]
+  }
+ ]
+}

@@ -59,11 +59,32 @@ export const DESIGNATIONS = [
   "Junior Engineer",
   "Health Officer",
   "Revenue Officer",
+  "Assistant Revenue Officer",
   "Ward Engineer",
   "Contractor",
   "Office Staff",
 ] as const;
 export type Designation = (typeof DESIGNATIONS)[number];
+
+// ── Master-directory vocabularies (0044). Used by the contact form dropdowns +
+//    the ARO importer. All optional on a contact; kept small and extensible. ──
+export const OFFICIAL_TITLES = ["Sri", "Smt", "Kum", "Mr", "Mrs", "Ms", "Dr", "Er"] as const;
+export type OfficialTitle = (typeof OFFICIAL_TITLES)[number];
+
+export const OFFICER_STATUSES = ["Active", "Transferred", "Retired", "Inactive"] as const;
+export type OfficerStatus = (typeof OFFICER_STATUSES)[number];
+
+export const DESIGNATION_CATEGORIES = [
+  "Revenue", "Engineering", "Health", "Town Planning", "TVCC", "Legal",
+  "Solid Waste", "Finance", "Water Supply", "Electrical", "Administration", "Other",
+] as const;
+export type DesignationCategory = (typeof DESIGNATION_CATEGORIES)[number];
+
+export const OFFICE_TYPES = [
+  "ARO Office", "Ward Office", "Zone Office", "Head Office",
+  "AE Office", "EE Office", "Division Office", "Other",
+] as const;
+export type OfficeType = (typeof OFFICE_TYPES)[number];
 
 export const USER_ROLES = [
   "ADMIN",

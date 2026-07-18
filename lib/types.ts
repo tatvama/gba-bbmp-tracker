@@ -122,6 +122,37 @@ export interface Contact {
   current_posting_end: string | null;
   transfer_status: string | null;
   public_visible: boolean;
+  // Master-directory upgrade (added in 0044_contact_directory.sql)
+  official_title: string | null; // Sri / Smt / Mr / Dr / Er
+  office_name: string | null;
+  letter_salutation: string | null;
+  designation_category: string | null;
+  office_type: string | null;
+  zone: string | null; // BBMP administrative zone (free text; NOT the GBA corporation)
+  employee_code: string | null;
+  officer_status: string; // Active | Transferred | Retired | Inactive (default Active)
+  can_receive_complaint: boolean;
+  can_receive_rti: boolean;
+  can_receive_appeal: boolean;
+  can_receive_legal_notice: boolean;
+  can_receive_tvcc_notice: boolean;
+  imported_from: string | null;
+  imported_at: string | null;
+}
+
+/** One ward (or division/zone/city) an official is responsible for. A contact
+ *  has many of these — the one-to-many that replaces "one contact per ward". */
+export interface ContactJurisdiction {
+  id: string;
+  contact_id: string;
+  ward_id: string | null; // resolved BBMP-225 ward when ward_no matches wards.new_no
+  ward_no: number | null;
+  ward_name: string | null;
+  zone: string | null;
+  aro_office_division: string | null;
+  jurisdiction_type: "ward" | "division" | "zone" | "city";
+  is_primary: boolean;
+  created_at: string;
 }
 
 export interface Complaint {
@@ -418,6 +449,7 @@ export interface ContactWithRelations extends Contact {
   corporation?: Pick<Corporation, "id" | "code" | "name"> | null;
   division?: Pick<Division, "id" | "name"> | null;
   eng_subdivision?: Pick<EngSubDivision, "id" | "name"> | null;
+  jurisdictions?: ContactJurisdiction[] | null;
 }
 
 // =============================================================================
