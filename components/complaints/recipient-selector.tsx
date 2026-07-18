@@ -1,13 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { COMPLAINT_RECIPIENT_ROLES, type RecipientRoleKey } from "@/lib/complaints/recipient-roles";
+import {
+  COMPLAINT_RECIPIENT_ROLES,
+  RECIPIENT_ROLE_GROUP_ORDER,
+  type RecipientRoleKey,
+  type RecipientRoleGroup,
+} from "@/lib/complaints/recipient-roles";
 
 /**
- * Recipient Selection — the reusable 5-role Copy-To checklist shown before a
- * complaint letter is filed. Registry-driven (adding a role needs no change
- * here), with a live Copy-To preview. The mandatory Office Copy is always
- * generated automatically, so it is stated, not toggled.
+ * Recipient Selection — the reusable Copy-To checklist shown before a complaint
+ * letter is filed. Registry-driven (adding a role needs no change here) and
+ * grouped by tier (BBMP officers / GBA & State / statutory bodies), with a live
+ * Copy-To preview. The mandatory Office Copy is always generated automatically,
+ * so it is stated, not toggled.
  */
 export function RecipientSelector({
   selected,
@@ -28,6 +34,12 @@ export function RecipientSelector({
   const preview = COMPLAINT_RECIPIENT_ROLES.filter((r) => selected.includes(r.key));
   const allKeys = COMPLAINT_RECIPIENT_ROLES.map((r) => r.key);
   const isAllSelected = allKeys.every((k) => selected.includes(k));
+
+  // Roles grouped by tier, keeping registry order within each group and only
+  // rendering groups that actually have roles.
+  const grouped = RECIPIENT_ROLE_GROUP_ORDER
+    .map((g) => ({ group: g, roles: COMPLAINT_RECIPIENT_ROLES.filter((r) => r.group === g) }))
+    .filter((x) => x.roles.length > 0) as { group: RecipientRoleGroup; roles: typeof COMPLAINT_RECIPIENT_ROLES }[];
 
   return (
     <div className={`rounded-lg border bg-card p-3 text-sm ${className ?? ""}`}>
@@ -52,22 +64,31 @@ export function RecipientSelector({
         )}
       </div>
 
-      <div className="grid gap-1.5 sm:grid-cols-2 mt-2">
-        {COMPLAINT_RECIPIENT_ROLES.map((r) => (
-          <label key={r.key} className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-primary"
-              checked={selected.includes(r.key)}
-              onChange={() => onToggle(r.key)}
-            />
-            <span className="text-slate-700 dark:text-slate-300">
-              {r.title}{" "}
-              <span className="text-muted-foreground text-xs">
-                ({officeOverrides?.[r.key] ?? r.level})
-              </span>
-            </span>
-          </label>
+      <div className="mt-2 space-y-3">
+        {grouped.map(({ group, roles }) => (
+          <div key={group}>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              {group}
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {roles.map((r) => (
+                <label key={r.key} className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={selected.includes(r.key)}
+                    onChange={() => onToggle(r.key)}
+                  />
+                  <span className="text-slate-700 dark:text-slate-300">
+                    {r.title}{" "}
+                    <span className="text-muted-foreground text-xs">
+                      ({officeOverrides?.[r.key] ?? r.level})
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 

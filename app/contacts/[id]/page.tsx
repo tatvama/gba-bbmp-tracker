@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DetailRow } from "@/components/detail-row";
 import { ContactCard } from "@/components/contacts/contact-card";
@@ -56,6 +57,28 @@ export default async function ContactDetailPage({
           <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
           <CardContent>
             <DetailRow label="Department">{orDash(contact.department)}</DetailRow>
+            {contact.jurisdictions && contact.jurisdictions.length > 0 && (
+              <DetailRow label={`Wards (${contact.jurisdictions.length})`}>
+                <div className="mt-0.5 flex flex-wrap gap-1.5">
+                  {contact.jurisdictions
+                    .slice()
+                    .sort((a, b) => (a.ward_no ?? 9999) - (b.ward_no ?? 9999))
+                    .map((j) => (
+                      <Badge
+                        key={j.id}
+                        variant={j.is_primary ? "primary-subtle" : "outline"}
+                        className="font-medium"
+                        title={[j.ward_name, j.zone ? `${j.zone} Zone` : null, j.is_primary ? "Primary ward" : null]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      >
+                        {j.ward_no != null ? `Ward ${j.ward_no}` : "Ward —"}
+                        {j.ward_name ? ` · ${j.ward_name}` : ""}
+                      </Badge>
+                    ))}
+                </div>
+              </DetailRow>
+            )}
             <DetailRow label="Jurisdiction notes">{orDash(contact.jurisdiction_notes)}</DetailRow>
             <DetailRow label="Email">{orDash(contact.email)}</DetailRow>
             <DetailRow label="WhatsApp">{orDash(contact.whatsapp)}</DetailRow>

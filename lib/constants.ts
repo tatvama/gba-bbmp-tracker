@@ -51,6 +51,15 @@ export const CONFIDENCE_SCORES = ["HIGH", "MEDIUM", "LOW"] as const;
 export type ConfidenceScore = (typeof CONFIDENCE_SCORES)[number];
 
 export const DESIGNATIONS = [
+  // Senior statutory / political / administrative authorities (escalation &
+  // legal-notice recipients — not tied to a ward/sub-division).
+  "Chief Minister",
+  "Minister in-charge",
+  "Chief Commissioner",
+  "Principal Secretary",
+  "Lokayukta",
+  "Director / ADGP",
+  // BBMP engineering / field cadre.
   "Chief Engineer",
   "Superintending Engineer",
   "Executive Engineer",
@@ -68,7 +77,7 @@ export type Designation = (typeof DESIGNATIONS)[number];
 
 // ── Master-directory vocabularies (0044). Used by the contact form dropdowns +
 //    the ARO importer. All optional on a contact; kept small and extensible. ──
-export const OFFICIAL_TITLES = ["Sri", "Smt", "Kum", "Mr", "Mrs", "Ms", "Dr", "Er"] as const;
+export const OFFICIAL_TITLES = ["Sri", "Smt", "Kum", "Mr", "Mrs", "Ms", "Dr", "Er", "Justice"] as const;
 export type OfficialTitle = (typeof OFFICIAL_TITLES)[number];
 
 export const OFFICER_STATUSES = ["Active", "Transferred", "Retired", "Inactive"] as const;

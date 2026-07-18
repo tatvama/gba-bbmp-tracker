@@ -30,12 +30,25 @@ describe("recipient-roles registry", () => {
       "assistant_executive_engineer",
     ]);
   });
-  it("the 2 escalation-authority roles are selectable but NOT in the office-copy distribution", () => {
-    expect(roleByKey("principal_secretary_udd")).toBeDefined();
-    expect(roleByKey("chief_secretary")).toBeDefined();
+  it("the escalation / GBA / statutory authority roles are selectable but NOT in the office-copy distribution", () => {
+    const authorityKeys = [
+      "chief_commissioner_gba",
+      "principal_secretary_udd",
+      "chief_secretary",
+      "minister_incharge_gba",
+      "chief_minister",
+      "lokayukta",
+      "acb_director",
+    ] as const;
     const officeCopy = officeCopyRoleKeys();
-    expect(officeCopy).not.toContain("principal_secretary_udd");
-    expect(officeCopy).not.toContain("chief_secretary");
+    for (const k of authorityKeys) {
+      expect(roleByKey(k)).toBeDefined();
+      expect(officeCopy).not.toContain(k);
+    }
+  });
+  it("every role declares a group that is one of the known groups", () => {
+    const groups = new Set(["BBMP Zone & Division Officers", "GBA & State Government", "Statutory / Oversight Bodies"]);
+    for (const r of COMPLAINT_RECIPIENT_ROLES) expect(groups.has(r.group)).toBe(true);
   });
   it("roleByKey / isRecipientRoleKey work", () => {
     expect(roleByKey("executive_engineer")?.title).toBe("Executive Engineer");
@@ -124,6 +137,23 @@ describe("dynamic Commissioner office in Copy To", () => {
     const out = buildCopyToBlock(["chief_secretary", "principal_secretary_udd"]);
     expect(out).toContain("The Principal Secretary - Urban Development Department, Government of Karnataka");
     expect(out).toContain("The Chief Secretary - Government of Karnataka");
+  });
+  it("the GBA / statutory authority roles render title-only, in canonical order", () => {
+    const out = buildCopyToBlock(["acb_director", "lokayukta", "chief_commissioner_gba", "chief_minister"]);
+    expect(out).toBe(
+      [
+        "## Copy To",
+        "",
+        "1. The Chief Commissioner - Greater Bengaluru Authority (GBA)",
+        "2. The Chief Minister - Government of Karnataka (Chairman, GBA)",
+        "3. The Lokayukta - Karnataka Lokayukta",
+        "4. The Director / ADGP - Anti-Corruption Bureau (ACB), Karnataka",
+      ].join("\n"),
+    );
+  });
+  it("enriches a statutory authority with the incumbent's name when resolved", () => {
+    const out = buildCopyToBlock(["lokayukta"], { lokayukta: { name: "Justice B.S. Patil", designation: "Lokayukta", office: null, address: "Bengaluru" } });
+    expect(out).toBe("## Copy To\n\n1. The Lokayukta - Karnataka Lokayukta, Justice B.S. Patil");
   });
 });
 

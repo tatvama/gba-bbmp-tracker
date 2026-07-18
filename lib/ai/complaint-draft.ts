@@ -6,6 +6,8 @@ import { sanitizeDraft } from "@/lib/letters/safe-language";
 import { buildCaseIntelligence } from "@/lib/intelligence/engine";
 import { serializeForDraft } from "@/lib/intelligence/serialize";
 import { reviewDraft, type QualityReport } from "@/lib/intelligence/quality-review";
+import { resolveOfficerForWard } from "@/lib/contacts/resolve-officer";
+import type { OfficerRecipient } from "@/lib/contacts/officer-recipient";
 import type { CaseIntelligence } from "@/lib/intelligence/types";
 import { LETTER_SIGNATORIES, type ComplaintDraftKind, type DraftLanguage, type LegalTone } from "@/lib/constants";
 
@@ -37,19 +39,35 @@ export interface DraftProgress {
 
 function complaintContext(
   c: Record<string, any>,
-  opts: { signatory?: { name: string; address: string; mobile?: string | null } | null; today: string },
+  opts: {
+    signatory?: { name: string; address: string; mobile?: string | null } | null;
+    today: string;
+    wardOfficer?: OfficerRecipient | null;
+  },
 ): string {
   // Real, ready-to-use FROM / TO / Date blocks so the AI never brackets them.
   const fromBlock = opts.signatory
     ? ["FROM (sender / signatory — use verbatim):", opts.signatory.name, opts.signatory.address, opts.signatory.mobile ? `Mobile: ${opts.signatory.mobile}` : ""].filter(Boolean).join("\n")
     : "";
-  const toLines = [
-    `The ${c.assigned_engineer?.designation || "Executive Engineer"}`,
-    c.assigned_engineer?.full_name || "",
-    c.eng_subdivision?.name ? `${c.eng_subdivision.name} Sub-division` : "",
-    "Bruhat Bengaluru Mahanagara Palike (BBMP)",
-    c.assigned_engineer?.office_address || "",
-  ].filter(Boolean);
+  // Recipient: the explicitly assigned engineer wins; otherwise the officer on
+  // record in the BBMP directory for this complaint's ward (matched by ward);
+  // otherwise a generic sub-division fallback.
+  const wo = opts.wardOfficer ?? null;
+  const toLines = c.assigned_engineer
+    ? [
+        `The ${c.assigned_engineer.designation || "Executive Engineer"}`,
+        c.assigned_engineer.full_name || "",
+        c.eng_subdivision?.name ? `${c.eng_subdivision.name} Sub-division` : "",
+        "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+        c.assigned_engineer.office_address || "",
+      ].filter(Boolean)
+    : wo
+      ? wo.postalBlock
+      : [
+          "The Executive Engineer",
+          c.eng_subdivision?.name ? `${c.eng_subdivision.name} Sub-division` : "",
+          "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+        ].filter(Boolean);
   const toBlock = `TO (recipient — use verbatim, omit any line not given):\n${toLines.join("\n")}`;
 
   return [
@@ -70,6 +88,9 @@ function complaintContext(
     c.latest_reply_summary ? `Latest reply (${c.latest_reply_date ?? "?"}): ${c.latest_reply_summary}` : "No reply received yet.",
     c.latest_action_taken_summary ? `Latest action taken (${c.latest_action_taken_date ?? "?"}): ${c.latest_action_taken_summary}` : "No action taken recorded yet.",
     c.ward?.new_name ? `Ward: ${c.ward.new_no} ${c.ward.new_name}` : "",
+    wo
+      ? `Ward-responsible official on record (BBMP directory, matched by ward): ${wo.name}${wo.designation ? `, ${wo.designation}` : ""}${wo.officeName ? ` — ${wo.officeName}` : ""}${wo.phone ? ` — ${wo.phone}` : ""}${wo.email ? ` — ${wo.email}` : ""}`
+      : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -131,6 +152,20 @@ export async function runComplaintDraft(
     .single();
   if (!c) return { ok: false, error: "Complaint not found." };
 
+  // Ward → responsible official from the BBMP contact directory (matched by the
+  // complaint's ward). Surfaced in the draft context, and used as the recipient
+  // when no engineer is explicitly assigned. Best-effort: null when no mapping.
+  const cRow = c as { ward_id?: string | null; ward?: { new_no?: number | null } | null };
+  let wardOfficer: OfficerRecipient | null = null;
+  if (cRow.ward_id) {
+    const r = await resolveOfficerForWard(admin, { wardId: cRow.ward_id });
+    wardOfficer = r?.recipient ?? null;
+  }
+  if (!wardOfficer && cRow.ward?.new_no != null) {
+    const r = await resolveOfficerForWard(admin, { wardNo: cRow.ward.new_no });
+    wardOfficer = r?.recipient ?? null;
+  }
+
   // Sender identity for the FROM block — the complaint's own letter signatory if
   // set (forensic imports set signatory_key), else the default. Keeps From real.
   const { data: ld } = await admin
@@ -162,7 +197,7 @@ export async function runComplaintDraft(
     console.warn("[complaint-draft] case intelligence failed, using case history", input.complaintId, e);
     evidenceBlock = `=== CASE HISTORY (draw the body from this) ===\n${await buildCaseHistory(admin, input.complaintId, jobNo)}`;
   }
-  const context = `${complaintContext(c as Record<string, any>, { signatory, today: todayISO() })}\n\n${evidenceBlock}`;
+  const context = `${complaintContext(c as Record<string, any>, { signatory, today: todayISO(), wardOfficer })}\n\n${evidenceBlock}`;
 
   const { system, prompt } = buildComplaintDraftPrompt({
     kind: input.kind,

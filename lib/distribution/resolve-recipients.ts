@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { COMPLAINT_RECIPIENT_ROLES, corporationOfficeName } from "@/lib/complaints/recipient-roles";
+import { matchOfficerByDesignation, type OfficerMatchRow } from "./officer-match";
 import type { RecipientEnrichment } from "./copy-to";
 
 /**
@@ -46,8 +47,8 @@ export async function resolveComplaintRecipients(
     };
 
     for (const role of COMPLAINT_RECIPIENT_ROLES) {
-      // "state" roles (Principal Secretary, Chief Secretary) are fixed
-      // Government-of-Karnataka offices — no per-complaint contact to resolve.
+      // "state" roles (Chief Commissioner GBA, Lokayukta, Chief Minister, …) are
+      // fixed offices — resolved globally by designation below, not per-complaint.
       if (role.jurisdiction === "state") continue;
       const pool = buckets[role.jurisdiction];
       const levels = new Set(role.matchRoleLevels.map((l) => l.toLowerCase()));
@@ -85,6 +86,25 @@ export async function resolveComplaintRecipients(
           office: existing?.office ?? corporationOfficeName(corpName),
           address: existing?.address ?? null,
         };
+      }
+    }
+
+    // "state" roles (GBA / State Government / statutory bodies) — resolved
+    // globally by designation from the contact directory (e.g. the imported GBA
+    // senior authorities). One query for every state-role designation, then a
+    // pure match per role. Degrades to title-only when no contact is on record.
+    const stateRoles = COMPLAINT_RECIPIENT_ROLES.filter((r) => r.jurisdiction === "state");
+    const stateDesignations = [...new Set(stateRoles.flatMap((r) => r.matchDesignations))];
+    if (stateDesignations.length) {
+      const { data } = await admin
+        .from("contacts")
+        .select("full_name, designation, office_name, office_address, officer_status")
+        .in("designation", stateDesignations)
+        .limit(200);
+      const rows = (data as OfficerMatchRow[] | null) ?? [];
+      for (const role of stateRoles) {
+        const m = matchOfficerByDesignation(rows, role.matchDesignations);
+        if (m) enrich[role.key] = { name: m.name, designation: role.title, office: m.office, address: m.address };
       }
     }
   } catch (e) {

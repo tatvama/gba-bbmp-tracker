@@ -2,7 +2,12 @@
 
 import * as React from "react";
 import { LayoutGrid, Table as TableIcon, Download, AlertTriangle, X } from "lucide-react";
-import type { ContactWithRelations } from "@/lib/types";
+import type {
+  ContactWithRelations,
+  Division,
+  EngSubDivision,
+  WardWithRelations,
+} from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,13 +36,23 @@ import { VERIFICATION_STATUSES, DESIGNATIONS } from "@/lib/constants";
 import { findDuplicates } from "@/lib/dedupe";
 import { formatPhone } from "@/lib/phone";
 import { exportRows } from "@/lib/export";
+import { buildWardIndex, contactMatchesHierarchy } from "@/lib/contacts/filter-hierarchy";
 
 export function ContactDirectory({
   contacts,
   initialStatus,
+  allDivisions = [],
+  allSubDivisions = [],
+  allWards = [],
 }: {
   contacts: ContactWithRelations[];
   initialStatus?: string;
+  /** Master BBMP-225 hierarchy (NOT derived from `contacts`) — division/
+   *  sub-division/ward filter options must reflect every real unit, including
+   *  ones with zero contacts on file. Mirrors the complaints filter. */
+  allDivisions?: Division[];
+  allSubDivisions?: (EngSubDivision & { division?: Pick<Division, "id" | "name"> | null })[];
+  allWards?: WardWithRelations[];
 }) {
   const [view, setView] = React.useState<"cards" | "table">("cards");
   const [q, setQ] = React.useState("");
@@ -45,6 +60,52 @@ export function ContactDirectory({
   const [designation, setDesignation] = React.useState("all");
   const [corp, setCorp] = React.useState("all");
   const [missingOnly, setMissingOnly] = React.useState(false);
+  const [division, setDivision] = React.useState("all");
+  const [subDivision, setSubDivision] = React.useState("all");
+  const [ward, setWard] = React.useState("all");
+
+  // Division/sub-division/ward options are sourced from the MASTER hierarchy
+  // (never from `contacts`), and drill down strictly: sub-division needs a
+  // division picked, ward needs both. Same rule as the complaints filter.
+  const divisionOpts = React.useMemo(
+    () => [...new Set(allDivisions.map((d) => d.name))].sort((a, b) => a.localeCompare(b)),
+    [allDivisions],
+  );
+  const hasAnySubDivision = allSubDivisions.length > 0;
+  const hasAnyWard = allWards.length > 0;
+
+  const subDivisionOpts = React.useMemo(() => {
+    if (division === "all") return [];
+    return [...new Set(allSubDivisions.filter((s) => s.division?.name === division).map((s) => s.name))].sort((a, b) => a.localeCompare(b));
+  }, [allSubDivisions, division]);
+
+  const wardOpts = React.useMemo(() => {
+    if (division === "all" || subDivision === "all") return [];
+    const scoped = allWards.filter((w) => w.division?.name === division && w.eng_subdivision?.name === subDivision);
+    const byNo = new Map<string, string>();
+    for (const w of scoped) {
+      const value = String(w.new_no);
+      if (!byNo.has(value)) byNo.set(value, `${w.new_no} · ${w.new_name}`);
+    }
+    return [...byNo.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => Number(a.value) - Number(b.value));
+  }, [allWards, division, subDivision]);
+
+  // ward_no (BBMP-225 new_no) -> its division / sub-division. Lets a contact's
+  // ward jurisdictions (imported ARO officers, who carry no division/
+  // sub-division FK) be matched up the engineering hierarchy, and lets an
+  // engineer attached at a sub-division match every ward under it.
+  const wardIndex = React.useMemo(() => buildWardIndex(allWards), [allWards]);
+
+  // Keep the cascade coherent: dropping a parent selection clears an
+  // now-invalid child so it can't silently filter everything out.
+  React.useEffect(() => {
+    if (subDivision !== "all" && !subDivisionOpts.includes(subDivision)) setSubDivision("all");
+  }, [subDivisionOpts, subDivision]);
+  React.useEffect(() => {
+    if (ward !== "all" && !wardOpts.some((w) => w.value === ward)) setWard("all");
+  }, [wardOpts, ward]);
 
   const corps = React.useMemo(
     () =>
@@ -81,6 +142,12 @@ export function ContactDirectory({
       if (designation !== "all" && c.designation !== designation) return false;
       if (corp !== "all" && c.corporation?.code !== corp) return false;
       if (missingOnly && c.phone && c.email && c.office_address) return false;
+
+      // Division / sub-division / ward — matched against BOTH location signals a
+      // contact can carry (engineer FK + ARO ward jurisdictions). See
+      // lib/contacts/filter-hierarchy.
+      if (!contactMatchesHierarchy(c, { division, subDivision, ward }, wardIndex)) return false;
+
       if (!needle) return true;
       const hay = [
         c.full_name,
@@ -101,14 +168,17 @@ export function ContactDirectory({
         .toLowerCase();
       return hay.includes(needle);
     });
-  }, [contacts, q, status, designation, corp, missingOnly]);
+  }, [contacts, q, status, designation, corp, missingOnly, division, subDivision, ward, wardIndex]);
 
   const hasFilters =
     q !== "" ||
     status !== "all" ||
     designation !== "all" ||
     corp !== "all" ||
-    missingOnly;
+    missingOnly ||
+    division !== "all" ||
+    subDivision !== "all" ||
+    ward !== "all";
 
   function resetFilters() {
     setQ("");
@@ -116,6 +186,9 @@ export function ContactDirectory({
     setDesignation("all");
     setCorp("all");
     setMissingOnly(false);
+    setDivision("all");
+    setSubDivision("all");
+    setWard("all");
   }
 
   const filterPills = React.useMemo(() => {
@@ -133,8 +206,18 @@ export function ContactDirectory({
     if (missingOnly) {
       pills.push({ label: "Missing Details", onRemove: () => setMissingOnly(false) });
     }
+    if (division !== "all") {
+      pills.push({ label: `Division: ${division}`, onRemove: () => setDivision("all") });
+    }
+    if (subDivision !== "all") {
+      pills.push({ label: `Sub-division: ${subDivision}`, onRemove: () => setSubDivision("all") });
+    }
+    if (ward !== "all") {
+      const wl = wardOpts.find((w) => w.value === ward)?.label ?? ward;
+      pills.push({ label: `Ward: ${wl}`, onRemove: () => setWard("all") });
+    }
     return pills;
-  }, [status, designation, corp, missingOnly, corps]);
+  }, [status, designation, corp, missingOnly, corps, division, subDivision, ward, wardOpts]);
 
   function doExport(format: "csv" | "xlsx") {
     exportRows(
@@ -253,6 +336,59 @@ export function ContactDirectory({
                     {corps.map(([code, name]) => (
                       <SelectItem key={code} value={code}>
                         {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Division → Sub-division → Ward cascade (master BBMP hierarchy) */}
+              {divisionOpts.length > 0 && (
+                <Select value={division} onValueChange={setDivision}>
+                  <SelectTrigger className="h-8 w-full sm:w-44 text-xs font-semibold">
+                    <SelectValue placeholder="All Divisions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Divisions</SelectItem>
+                    {divisionOpts.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {hasAnySubDivision && (
+                <Select value={subDivision} onValueChange={setSubDivision} disabled={division === "all"}>
+                  <SelectTrigger className="h-8 w-full sm:w-48 text-xs font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      {division === "all" ? "Select division first" : "All Sub-divisions"}
+                    </SelectItem>
+                    {subDivisionOpts.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {hasAnyWard && (
+                <Select value={ward} onValueChange={setWard} disabled={subDivision === "all"}>
+                  <SelectTrigger className="h-8 w-full sm:w-44 text-xs font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      {subDivision === "all" ? "Select sub-division first" : "All Wards"}
+                    </SelectItem>
+                    {wardOpts.map((w) => (
+                      <SelectItem key={w.value} value={w.value}>
+                        Ward {w.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
