@@ -15,11 +15,14 @@ export type RecipientRoleKey =
   | "zonal_chief_engineer"
   | "accounts_officer"
   | "executive_engineer"
-  | "assistant_executive_engineer";
+  | "assistant_executive_engineer"
+  | "principal_secretary_udd"
+  | "chief_secretary";
 
 /** Which jurisdiction FK on the complaint scopes the officer lookup. There is no
- *  zone entity in the schema — corporation is the de-facto zone tier. */
-export type RecipientJurisdiction = "zone" | "division" | "subdivision";
+ *  zone entity in the schema — corporation is the de-facto zone tier. "state" is
+ *  a fixed Government-of-Karnataka office with no per-complaint resolution. */
+export type RecipientJurisdiction = "zone" | "division" | "subdivision" | "state";
 
 export interface RecipientRoleDescriptor {
   key: RecipientRoleKey;
@@ -41,6 +44,12 @@ export const COMPLAINT_RECIPIENT_ROLES: RecipientRoleDescriptor[] = [
   { key: "accounts_officer", title: "Accounts Officer", level: "Division Level", jurisdiction: "division", matchDesignations: ["Accounts Officer", "Chief Accounts Officer"], matchRoleLevels: ["AO"], officeCopy: true, order: 3 },
   { key: "executive_engineer", title: "Executive Engineer", level: "Division Level", jurisdiction: "division", matchDesignations: ["Executive Engineer"], matchRoleLevels: ["EE"], officeCopy: true, order: 4 },
   { key: "assistant_executive_engineer", title: "Assistant Executive Engineer", level: "Sub-Division Level", jurisdiction: "subdivision", matchDesignations: ["Assistant Executive Engineer"], matchRoleLevels: ["AEE"], officeCopy: true, order: 5 },
+  // Escalation-ladder authorities (State Government) — fixed offices, no per-
+  // complaint contact lookup, and NOT part of the mandatory internal Office
+  // Copy distribution (that stays the 5 engineering roles above); selectable
+  // as optional Copy-To recipients like everything else.
+  { key: "principal_secretary_udd", title: "The Principal Secretary", level: "Urban Development Department, Government of Karnataka", jurisdiction: "state", matchDesignations: ["Principal Secretary"], matchRoleLevels: [], officeCopy: false, order: 6 },
+  { key: "chief_secretary", title: "The Chief Secretary", level: "Government of Karnataka", jurisdiction: "state", matchDesignations: ["Chief Secretary"], matchRoleLevels: [], officeCopy: false, order: 7 },
 ];
 
 const BY_KEY = new Map(COMPLAINT_RECIPIENT_ROLES.map((r) => [r.key, r]));
@@ -56,4 +65,15 @@ export function isRecipientRoleKey(key: string): key is RecipientRoleKey {
 /** The keys of every role in the mandatory internal Office Copy distribution. */
 export function officeCopyRoleKeys(): RecipientRoleKey[] {
   return COMPLAINT_RECIPIENT_ROLES.filter((r) => r.officeCopy).map((r) => r.key);
+}
+
+/** "Bengaluru South" (corporations.name) -> "Bengaluru South City Corporation"
+ *  (the form used in outgoing correspondence). Idempotent if already suffixed.
+ *  Framework-free (no "server-only") so both the server-side resolver
+ *  (lib/distribution/resolve-recipients.ts) and the client-side live preview
+ *  (RecipientSelector, via case-workflow.tsx) can render the Commissioner's
+ *  zone/corporation office identically. */
+export function corporationOfficeName(corpName: string): string {
+  const name = corpName.trim();
+  return /city corporation$/i.test(name) ? name : `${name} City Corporation`;
 }

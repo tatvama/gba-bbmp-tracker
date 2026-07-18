@@ -21,6 +21,7 @@ import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
 import { RecipientSelector } from "@/components/complaints/recipient-selector";
 import { useRecipientSelection } from "@/lib/complaints/client/use-recipient-selection";
+import { corporationOfficeName } from "@/lib/complaints/recipient-roles";
 import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import { EscalationDeadlineBadge } from "@/components/complaints/escalation-deadline-badge";
 import { openDraftPdf } from "@/lib/print-letter";
@@ -135,6 +136,7 @@ export function CaseWorkflow({
   acknowledgmentDate,
   submittedDate,
   submissionChannel,
+  corporationName,
 }: {
   complaintId: string;
   status: string;
@@ -148,6 +150,10 @@ export function CaseWorkflow({
   acknowledgmentDate?: string | null;
   submittedDate?: string | null;
   submissionChannel?: string | null;
+  /** The complaint's own zone/corporation (e.g. "Bengaluru South") — shown
+   *  dynamically as the Commissioner's office in the Recipient Selection
+   *  preview, mirroring what the server resolver renders into the filed letter. */
+  corporationName?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -476,13 +482,14 @@ export function CaseWorkflow({
                 escalationStage={escalationStage}
                 escalationStageDeadline={escalationStageDeadline}
                 acknowledgmentDate={acknowledgmentDate}
+                corporationName={corporationName}
               />
             </div>
           </StepPanel>
         )}
 
         {active === "escalate" && (
-          <EscalatePanel complaintId={complaintId} caseNumber={caseNumber} aiConfigured={aiConfigured} onEscalated={() => router.refresh()} />
+          <EscalatePanel complaintId={complaintId} caseNumber={caseNumber} aiConfigured={aiConfigured} corporationName={corporationName} onEscalated={() => router.refresh()} />
         )}
 
         {active === "close" && (
@@ -777,6 +784,7 @@ function CounterReplyPanel({
   escalationStage,
   escalationStageDeadline,
   acknowledgmentDate,
+  corporationName,
 }: {
   complaintId: string;
   aiConfigured: boolean;
@@ -786,6 +794,7 @@ function CounterReplyPanel({
   escalationStage?: string;
   escalationStageDeadline?: string | null;
   acknowledgmentDate?: string | null;
+  corporationName?: string | null;
 }) {
   const router = useRouter();
   const [gap, setGap] = React.useState<ReplyGap | null>(null);
@@ -805,6 +814,10 @@ function CounterReplyPanel({
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [selectedKind, setSelectedKind] = React.useState<ComplaintDraftKind>("counter_reply");
   const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, selectedKind);
+  const recipientOfficeOverrides = React.useMemo(
+    () => (corporationName ? { zonal_commissioner: corporationOfficeName(corporationName) } : undefined),
+    [corporationName],
+  );
 
   // Load existing draft if any on mount or when selectedKind changes
   React.useEffect(() => {
@@ -1166,7 +1179,7 @@ function CounterReplyPanel({
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} />
+          <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} officeOverrides={recipientOfficeOverrides} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit {COMPLAINT_DRAFT_KINDS[selectedKind]}
@@ -1248,11 +1261,13 @@ function EscalatePanel({
   complaintId,
   caseNumber,
   aiConfigured,
+  corporationName,
   onEscalated,
 }: {
   complaintId: string;
   caseNumber: string | null;
   aiConfigured: boolean;
+  corporationName?: string | null;
   onEscalated: () => void;
 }) {
   const [generating, setGenerating] = React.useState<ComplaintDraftKind | null>(null);
@@ -1269,6 +1284,10 @@ function EscalatePanel({
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
   const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, "escalate");
+  const recipientOfficeOverrides = React.useMemo(
+    () => (corporationName ? { zonal_commissioner: corporationOfficeName(corporationName) } : undefined),
+    [corporationName],
+  );
 
   // Load existing escalation draft if any on mount
   React.useEffect(() => {
@@ -1384,7 +1403,7 @@ function EscalatePanel({
               <AlertTriangle className="h-3.5 w-3.5" /> Review flagged wording before sending: {lintWarning}
             </p>
           )}
-          <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} />
+          <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} officeOverrides={recipientOfficeOverrides} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit Escalation Letter

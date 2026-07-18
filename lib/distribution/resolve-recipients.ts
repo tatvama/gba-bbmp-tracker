@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { COMPLAINT_RECIPIENT_ROLES } from "@/lib/complaints/recipient-roles";
+import { COMPLAINT_RECIPIENT_ROLES, corporationOfficeName } from "@/lib/complaints/recipient-roles";
 import type { RecipientEnrichment } from "./copy-to";
 
 /**
@@ -37,14 +37,18 @@ export async function resolveComplaintRecipients(
       .eq("id", complaintId)
       .maybeSingle();
     if (!c) return enrich;
+    const corporationId = (c as Record<string, string | null>).corporation_id;
 
     const buckets: Record<"zone" | "division" | "subdivision", ContactRow[]> = {
-      zone: await contactsFor(admin, "corporation_id", (c as Record<string, string | null>).corporation_id),
+      zone: await contactsFor(admin, "corporation_id", corporationId),
       division: await contactsFor(admin, "division_id", (c as Record<string, string | null>).division_id),
       subdivision: await contactsFor(admin, "eng_subdivision_id", (c as Record<string, string | null>).eng_subdivision_id),
     };
 
     for (const role of COMPLAINT_RECIPIENT_ROLES) {
+      // "state" roles (Principal Secretary, Chief Secretary) are fixed
+      // Government-of-Karnataka offices — no per-complaint contact to resolve.
+      if (role.jurisdiction === "state") continue;
       const pool = buckets[role.jurisdiction];
       const levels = new Set(role.matchRoleLevels.map((l) => l.toLowerCase()));
       const desigs = new Set(role.matchDesignations.map((d) => d.toLowerCase()));
@@ -64,10 +68,34 @@ export async function resolveComplaintRecipients(
         };
       }
     }
+
+    // The Commissioner's OFFICE is the complaint's own zone/corporation — e.g.
+    // "Bengaluru South City Corporation" — set this dynamically regardless of
+    // whether a named Commissioner contact was found above (officer coverage
+    // at this level is sparse; the office itself is always determinable from
+    // the complaint's corporation_id). A resolved contact's own office (if any)
+    // takes precedence; this only fills the gap.
+    if (corporationId) {
+      const corpName = await corporationNameById(admin, corporationId);
+      if (corpName) {
+        const existing = enrich.zonal_commissioner;
+        enrich.zonal_commissioner = {
+          name: existing?.name ?? null,
+          designation: existing?.designation ?? "Commissioner",
+          office: existing?.office ?? corporationOfficeName(corpName),
+          address: existing?.address ?? null,
+        };
+      }
+    }
   } catch (e) {
     console.warn("[resolve-recipients] enrichment failed; falling back to title-only", e);
   }
   return enrich;
+}
+
+async function corporationNameById(admin: SupabaseClient, corporationId: string): Promise<string | null> {
+  const { data } = await admin.from("corporations").select("name").eq("id", corporationId).maybeSingle();
+  return (data?.name as string | undefined) ?? null;
 }
 
 async function contactsFor(admin: SupabaseClient, col: string, val: string | null | undefined): Promise<ContactRow[]> {

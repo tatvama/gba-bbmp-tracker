@@ -10,6 +10,7 @@ import {
   officeCopyRoleKeys,
   roleByKey,
   isRecipientRoleKey,
+  corporationOfficeName,
 } from "../lib/complaints/recipient-roles";
 import { DOCUMENT_VARIANTS, isKnownVariant, activeVariants } from "../lib/distribution/document-variants";
 
@@ -20,14 +21,43 @@ describe("recipient-roles registry", () => {
     const orders = COMPLAINT_RECIPIENT_ROLES.map((r) => r.order);
     expect(new Set(orders).size).toBe(orders.length);
   });
-  it("includes every role in the office-copy distribution today", () => {
-    expect(officeCopyRoleKeys()).toEqual(COMPLAINT_RECIPIENT_ROLES.map((r) => r.key));
+  it("office-copy distribution is exactly the 5 internal engineering roles", () => {
+    expect(officeCopyRoleKeys()).toEqual([
+      "zonal_commissioner",
+      "zonal_chief_engineer",
+      "accounts_officer",
+      "executive_engineer",
+      "assistant_executive_engineer",
+    ]);
+  });
+  it("the 2 escalation-authority roles are selectable but NOT in the office-copy distribution", () => {
+    expect(roleByKey("principal_secretary_udd")).toBeDefined();
+    expect(roleByKey("chief_secretary")).toBeDefined();
+    const officeCopy = officeCopyRoleKeys();
+    expect(officeCopy).not.toContain("principal_secretary_udd");
+    expect(officeCopy).not.toContain("chief_secretary");
   });
   it("roleByKey / isRecipientRoleKey work", () => {
     expect(roleByKey("executive_engineer")?.title).toBe("Executive Engineer");
+    expect(roleByKey("principal_secretary_udd")?.title).toBe("The Principal Secretary");
+    expect(roleByKey("chief_secretary")?.level).toBe("Government of Karnataka");
     expect(roleByKey("nope")).toBeUndefined();
     expect(isRecipientRoleKey("accounts_officer")).toBe(true);
+    expect(isRecipientRoleKey("chief_secretary")).toBe(true);
     expect(isRecipientRoleKey("mayor")).toBe(false);
+  });
+});
+
+describe("corporationOfficeName", () => {
+  it("appends 'City Corporation' to a bare corporation name", () => {
+    expect(corporationOfficeName("Bengaluru South")).toBe("Bengaluru South City Corporation");
+    expect(corporationOfficeName("Bengaluru North")).toBe("Bengaluru North City Corporation");
+  });
+  it("is idempotent when already suffixed", () => {
+    expect(corporationOfficeName("Bengaluru South City Corporation")).toBe("Bengaluru South City Corporation");
+  });
+  it("trims whitespace", () => {
+    expect(corporationOfficeName("  Bengaluru East  ")).toBe("Bengaluru East City Corporation");
   });
 });
 
@@ -68,10 +98,32 @@ describe("buildCopyToBlock", () => {
 });
 
 describe("buildOfficeDistributionBlock", () => {
-  it("lists all five roles regardless of selection", () => {
+  it("lists the 5 internal roles regardless of selection, and excludes the 2 escalation authorities", () => {
     const out = buildOfficeDistributionBlock();
-    for (const r of COMPLAINT_RECIPIENT_ROLES) expect(out).toContain(r.title);
+    for (const r of COMPLAINT_RECIPIENT_ROLES.filter((x) => x.officeCopy)) expect(out).toContain(r.title);
+    expect(out).not.toContain("The Principal Secretary");
+    expect(out).not.toContain("The Chief Secretary");
     expect(out.startsWith("## Copy To")).toBe(true);
+  });
+  it("shows the Commissioner's dynamic zone/corporation office when enriched", () => {
+    const out = buildOfficeDistributionBlock({ zonal_commissioner: { office: corporationOfficeName("Bengaluru South") } });
+    expect(out).toContain("Zonal Commissioner - Zone Level (Bengaluru South City Corporation)");
+  });
+});
+
+describe("dynamic Commissioner office in Copy To", () => {
+  it("renders the complaint's zone/corporation alongside the level when supplied (same enrichment pattern as every other role)", () => {
+    const out = buildCopyToBlock(["zonal_commissioner"], { zonal_commissioner: { office: corporationOfficeName("Bengaluru North") } });
+    expect(out).toBe("## Copy To\n\n1. Zonal Commissioner - Zone Level (Bengaluru North City Corporation)");
+  });
+  it("falls back to the generic level when no zone is known", () => {
+    const out = buildCopyToBlock(["zonal_commissioner"]);
+    expect(out).toBe("## Copy To\n\n1. Zonal Commissioner - Zone Level");
+  });
+  it("the 2 new escalation-authority roles render with no enrichment expected", () => {
+    const out = buildCopyToBlock(["chief_secretary", "principal_secretary_udd"]);
+    expect(out).toContain("The Principal Secretary - Urban Development Department, Government of Karnataka");
+    expect(out).toContain("The Chief Secretary - Government of Karnataka");
   });
 });
 
@@ -98,7 +150,9 @@ describe("officeCopyBody", () => {
   it("prepends the marker and carries the full distribution", () => {
     const out = officeCopyBody("## Subject\n\nBody.\n\n## Copy To\n\n1. Only EE\n");
     expect(out).toMatch(/^\*\*OFFICE COPY - NOT FOR DISPATCH\*\*/);
-    for (const r of COMPLAINT_RECIPIENT_ROLES) expect(out).toContain(r.title);
+    for (const r of COMPLAINT_RECIPIENT_ROLES.filter((x) => x.officeCopy)) expect(out).toContain(r.title);
+    expect(out).not.toContain("The Principal Secretary");
+    expect(out).not.toContain("The Chief Secretary");
     expect(out).not.toContain("Only EE");
   });
   it("emits no en/em dashes in the rendered lines", () => {

@@ -179,6 +179,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           acknowledgmentDate={complaint.acknowledgment_date}
           submittedDate={complaint.date_submitted ?? null}
           submissionChannel={complaint.complaint_mode ?? null}
+          corporationName={complaint.corporation?.name ?? null}
         />
       )}
 

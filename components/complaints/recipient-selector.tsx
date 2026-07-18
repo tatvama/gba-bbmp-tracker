@@ -13,11 +13,16 @@ export function RecipientSelector({
   selected,
   onToggle,
   onSelectAll,
+  officeOverrides,
   className,
 }: {
   selected: RecipientRoleKey[];
   onToggle: (key: RecipientRoleKey) => void;
   onSelectAll?: (keys: RecipientRoleKey[]) => void;
+  /** Per-role office text to show alongside the level, e.g. the complaint's own
+   *  zone/corporation for the Commissioner ("Bengaluru South City Corporation")
+   *  — mirrors what the server resolver will actually render into the Copy To. */
+  officeOverrides?: Partial<Record<RecipientRoleKey, string>>;
   className?: string;
 }) {
   const preview = COMPLAINT_RECIPIENT_ROLES.filter((r) => selected.includes(r.key));
@@ -57,7 +62,10 @@ export function RecipientSelector({
               onChange={() => onToggle(r.key)}
             />
             <span className="text-slate-700 dark:text-slate-300">
-              {r.title} <span className="text-muted-foreground text-xs">({r.level})</span>
+              {r.title}{" "}
+              <span className="text-muted-foreground text-xs">
+                ({officeOverrides?.[r.key] ?? r.level})
+              </span>
             </span>
           </label>
         ))}
@@ -69,7 +77,7 @@ export function RecipientSelector({
           <ol className="list-decimal pl-4 text-slate-600 dark:text-slate-400">
             {preview.map((r) => (
               <li key={r.key}>
-                {r.title} - {r.level}
+                {r.title} - {officeOverrides?.[r.key] ?? r.level}
               </li>
             ))}
           </ol>
