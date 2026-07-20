@@ -9,7 +9,36 @@ import { reviewDraft, type QualityReport } from "@/lib/intelligence/quality-revi
 import { resolveOfficerForWard } from "@/lib/contacts/resolve-officer";
 import type { OfficerRecipient } from "@/lib/contacts/officer-recipient";
 import type { CaseIntelligence } from "@/lib/intelligence/types";
-import { LETTER_SIGNATORIES, type ComplaintDraftKind, type DraftLanguage, type LegalTone } from "@/lib/constants";
+import {
+  LETTER_SIGNATORIES,
+  DEFAULT_LEGAL_NOTICE_SENDER,
+  HIGH_COURT_CHIEF_JUSTICE_TO,
+  type ComplaintDraftKind,
+  type DraftLanguage,
+  type LegalTone,
+  type LegalNoticeSender,
+} from "@/lib/constants";
+
+// Redeclared locally (not imported from lib/settings.ts) — that module imports
+// next/headers via createClient, which must never load in this request-free
+// core (it runs from the background-job runner and the escalation scheduler
+// with no request in flight). We read app_settings directly via the admin
+// client passed in, same caution as lib/complaints/escalation-scheduler.ts.
+const LEGAL_NOTICE_SENDER_KEY = "legal_notice_sender";
+
+/** Request-free read of the saved default PIL sender, merged over defaults. */
+async function loadLegalNoticeSender(admin: SupabaseClient): Promise<LegalNoticeSender> {
+  try {
+    const { data } = await admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", LEGAL_NOTICE_SENDER_KEY)
+      .maybeSingle();
+    return { ...DEFAULT_LEGAL_NOTICE_SENDER, ...((data?.value as Partial<LegalNoticeSender>) ?? {}) };
+  } catch {
+    return DEFAULT_LEGAL_NOTICE_SENDER;
+  }
+}
 
 /**
  * Core complaint-letter generation, framework-free (takes an admin client) so it
@@ -24,6 +53,13 @@ export interface ComplaintDraftInput {
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
+  /**
+   * Petitioner identity for the FROM / signature block of a `legal_notice`
+   * (drafted as a PIL letter to the Hon'ble Chief Justice). When omitted for a
+   * legal notice, the saved app_settings default is used — this is how the
+   * request-free escalation scheduler supplies it. Ignored for other kinds.
+   */
+  sender?: LegalNoticeSender;
 }
 
 /** Real pipeline stages a caller can surface as a live status (e.g. a
@@ -37,23 +73,49 @@ export interface DraftProgress {
   partialText?: string;
 }
 
+/** Rich FROM / signature block for the PIL legal notice (petitioner identity). */
+function pilFromBlock(s: LegalNoticeSender): string {
+  return [
+    "FROM (petitioner / signatory — use verbatim at the very top and again in the signature block; omit any line not given):",
+    s.name,
+    s.ageYears ? `Aged about ${s.ageYears} years` : "",
+    s.parentage || "",
+    s.organisation || "",
+    s.address || "",
+    s.mobile ? `Mobile: ${s.mobile}` : "",
+    s.email ? `Email: ${s.email}` : "",
+    s.role ? `Petitioner capacity (place under the name in the signature block): ${s.role}` : "",
+  ].filter(Boolean).join("\n");
+}
+
 function complaintContext(
   c: Record<string, any>,
   opts: {
+    kind: ComplaintDraftKind;
     signatory?: { name: string; address: string; mobile?: string | null } | null;
+    legalSender?: LegalNoticeSender | null;
     today: string;
     wardOfficer?: OfficerRecipient | null;
   },
 ): string {
+  const isPil = opts.kind === "legal_notice";
   // Real, ready-to-use FROM / TO / Date blocks so the AI never brackets them.
-  const fromBlock = opts.signatory
-    ? ["FROM (sender / signatory — use verbatim):", opts.signatory.name, opts.signatory.address, opts.signatory.mobile ? `Mobile: ${opts.signatory.mobile}` : ""].filter(Boolean).join("\n")
-    : "";
-  // Recipient: the explicitly assigned engineer wins; otherwise the officer on
-  // record in the BBMP directory for this complaint's ward (matched by ward);
-  // otherwise a generic sub-division fallback.
+  // A legal notice is drafted as a Public Interest Litigation letter petition,
+  // so it uses the RICH petitioner block (age / parentage / organisation /
+  // email) and is addressed to the Hon'ble Chief Justice; every other kind
+  // keeps the plain signatory block and its department/ward recipient.
+  const fromBlock = isPil && opts.legalSender
+    ? pilFromBlock(opts.legalSender)
+    : opts.signatory
+      ? ["FROM (sender / signatory — use verbatim):", opts.signatory.name, opts.signatory.address, opts.signatory.mobile ? `Mobile: ${opts.signatory.mobile}` : ""].filter(Boolean).join("\n")
+      : "";
+  // Recipient: for a PIL legal notice, always the Hon'ble Chief Justice.
+  // Otherwise the explicitly assigned engineer wins; else the officer on record
+  // in the BBMP directory for this complaint's ward; else a generic fallback.
   const wo = opts.wardOfficer ?? null;
-  const toLines = c.assigned_engineer
+  const toLines = isPil
+    ? HIGH_COURT_CHIEF_JUSTICE_TO
+    : c.assigned_engineer
     ? [
         `The ${c.assigned_engineer.designation || "Executive Engineer"}`,
         c.assigned_engineer.full_name || "",
@@ -173,6 +235,16 @@ export async function runComplaintDraft(
   const sigs = LETTER_SIGNATORIES as Record<string, { name: string; address: string; mobile: string | null }>;
   const signatory = sigs[(ld?.signatory_key as string) || "raghav_gowda"] ?? sigs.raghav_gowda ?? null;
 
+  // A legal notice is drafted as a PIL letter petition to the Hon'ble Chief
+  // Justice — its FROM / signature block uses the richer petitioner identity
+  // (age, parentage, organisation, capacity, email). Prefer the caller-supplied
+  // sender (the editable From-details form); otherwise fall back to the saved
+  // app_settings default (this is the path the request-free escalation
+  // scheduler takes, since it never supplies a sender).
+  const legalSender = input.kind === "legal_notice"
+    ? input.sender ?? (await loadLegalNoticeSender(admin))
+    : null;
+
   // Investigate the COMPLETE document set first: build the evidence-linked Case
   // Intelligence artifact and draw the letter from it. Falls back to the thin
   // chronology builder if the engine can't run (AI off / build error) so drafting
@@ -197,7 +269,7 @@ export async function runComplaintDraft(
     console.warn("[complaint-draft] case intelligence failed, using case history", input.complaintId, e);
     evidenceBlock = `=== CASE HISTORY (draw the body from this) ===\n${await buildCaseHistory(admin, input.complaintId, jobNo)}`;
   }
-  const context = `${complaintContext(c as Record<string, any>, { signatory, today: todayISO(), wardOfficer })}\n\n${evidenceBlock}`;
+  const context = `${complaintContext(c as Record<string, any>, { kind: input.kind, signatory, legalSender, today: todayISO(), wardOfficer })}\n\n${evidenceBlock}`;
 
   const { system, prompt } = buildComplaintDraftPrompt({
     kind: input.kind,

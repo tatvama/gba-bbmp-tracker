@@ -19,6 +19,7 @@ import { DocumentViewer, type ViewerTarget } from "@/components/complaints/docum
 import { LetterPreview } from "@/components/complaints/letter-preview";
 import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
+import { LegalNoticeSenderDialog } from "@/components/complaints/legal-notice-sender-dialog";
 import { RecipientSelector } from "@/components/complaints/recipient-selector";
 import { useRecipientSelection } from "@/lib/complaints/client/use-recipient-selection";
 import { corporationOfficeName } from "@/lib/complaints/recipient-roles";
@@ -42,13 +43,15 @@ import {
   listComplaintReplyFilesAction,
   generateDocumentSummaryAction,
   getDocumentViewUrl,
+  getLegalNoticeSenderAction,
+  saveLegalNoticeSenderAction,
   type ReplyFile,
 } from "@/lib/actions/complaints";
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import type { ComplaintDocument } from "@/lib/types";
-import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage } from "@/lib/constants";
+import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage, type LegalNoticeSender } from "@/lib/constants";
 
 export interface WorkflowLetter {
   letterId: string | null;
@@ -897,7 +900,7 @@ function CounterReplyPanel({
   // draft surface uses) instead of a direct blocking generateComplaintDraft
   // call — the generation now survives navigation, and the useTask effect
   // above picks up the result whenever it finishes.
-  async function generate(kind: ComplaintDraftKind, language: DraftLanguage) {
+  async function generate(kind: ComplaintDraftKind, language: DraftLanguage, sender?: LegalNoticeSender) {
     setSelectedKind(kind);
     setError(null);
     setSavedMsg(null);
@@ -905,13 +908,42 @@ function CounterReplyPanel({
     setTruncated(false);
     setSavedAt(null);
     setStarting(true);
-    const start = await startAiDraftJob({ complaintId, kind, language });
+    const start = await startAiDraftJob({ complaintId, kind, language, sender });
     setStarting(false);
     if (!start.ok || !start.jobId) {
       setError(start.error ?? "Could not generate the letter (is the AI key configured?).");
       return;
     }
     startTask(start.jobId);
+  }
+
+  // Legal notice = a PIL letter petition to the Hon'ble Chief Justice, whose
+  // FROM / signature block is captured from the user each time (pre-filled from
+  // the saved default) — see LegalNoticeSenderDialog. Opening the dialog fetches
+  // the saved default once; confirming persists it and starts the draft.
+  const [legalSenderOpen, setLegalSenderOpen] = React.useState(false);
+  const [legalSender, setLegalSender] = React.useState<LegalNoticeSender | null>(null);
+  const [senderLoading, setSenderLoading] = React.useState(false);
+
+  async function openLegalNoticeDialog() {
+    setError(null);
+    if (!legalSender) {
+      setSenderLoading(true);
+      try {
+        const r = await getLegalNoticeSenderAction();
+        setLegalSender(r.sender);
+      } finally {
+        setSenderLoading(false);
+      }
+    }
+    setLegalSenderOpen(true);
+  }
+
+  async function confirmLegalNotice(sender: LegalNoticeSender, language: DraftLanguage) {
+    setLegalSenderOpen(false);
+    setLegalSender(sender); // remember for the rest of the session (and re-open pre-fill)
+    void saveLegalNoticeSenderAction(sender); // persist as the org-wide default
+    await generate("legal_notice", language, sender);
   }
 
   async function save() {
@@ -1059,7 +1091,7 @@ function CounterReplyPanel({
     legalTooltip = `Legal Notice will become available after the reminder waiting period expires if no department reply is received. It will take ${diffDays > 0 ? diffDays : 0} days to activate.`;
     legalLabel = `Legal Notice (in ${diffDays > 0 ? diffDays : 0}d)`;
   } else if (legalState === "active") {
-    legalTooltip = "Generate a formal legal notice before escalating the complaint. Available now (0 days remaining).";
+    legalTooltip = "Draft the legal notice as a Public Interest Litigation letter-petition to the Hon'ble Chief Justice, High Court of Karnataka. You confirm the petitioner (FROM) details before it generates.";
     legalLabel = "Legal Notice (Active for test) 🔵";
   } else if (legalState === "completed") {
     legalTooltip = "Legal Notice has already been generated and filed.";
@@ -1127,20 +1159,25 @@ function CounterReplyPanel({
             </TooltipContent>
           </Tooltip>
 
-          {/* Button 3: Legal Notice */}
+          {/* Button 3: Legal Notice — opens the petitioner From-details form
+              (PIL letter to the Hon'ble Chief Justice) instead of firing
+              immediately; language is chosen inside that dialog. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
-                <LanguageChoiceButton
+                <Button
                   size="sm"
                   variant={legalState === "active" ? "default" : "outline"}
-                  busy={generating && selectedKind === "legal_notice"}
-                  disabled={legalState !== "active" || !aiConfigured}
-                  icon={Gavel}
-                  onChoose={(lang) => generate("legal_notice", lang)}
+                  disabled={legalState !== "active" || !aiConfigured || senderLoading || (generating && selectedKind === "legal_notice")}
+                  onClick={openLegalNoticeDialog}
                 >
+                  {senderLoading || (generating && selectedKind === "legal_notice") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Gavel className="h-4 w-4" />
+                  )}
                   {legalLabel}
-                </LanguageChoiceButton>
+                </Button>
               </span>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
@@ -1149,6 +1186,14 @@ function CounterReplyPanel({
           </Tooltip>
         </TooltipProvider>
       </div>
+
+      <LegalNoticeSenderDialog
+        open={legalSenderOpen}
+        onOpenChange={setLegalSenderOpen}
+        initial={legalSender}
+        busy={generating && selectedKind === "legal_notice"}
+        onConfirm={confirmLegalNotice}
+      />
 
       {error && <p className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}
 

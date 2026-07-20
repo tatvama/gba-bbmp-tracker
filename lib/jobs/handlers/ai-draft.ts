@@ -10,13 +10,16 @@ import { registerJobHandler } from "@/lib/jobs/registry";
 import type { JobHandler } from "@/lib/jobs/types";
 import { runComplaintDraft, type DraftProgress } from "@/lib/ai/complaint-draft";
 import { runAdvisorAnalysis } from "@/lib/ai/advisor/recommendation-engine";
-import type { ComplaintDraftKind, DraftLanguage, LegalTone } from "@/lib/constants";
+import type { ComplaintDraftKind, DraftLanguage, LegalTone, LegalNoticeSender } from "@/lib/constants";
 
 export interface AiDraftJobInput {
   complaintId: string;
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
+  /** Petitioner identity for a `legal_notice` PIL (see startAiDraftJob). Passed
+   *  straight through to runComplaintDraft, which uses it as the FROM block. */
+  sender?: LegalNoticeSender;
 }
 
 /** Rough progress % per real pipeline stage — "drafting" then ramps toward 90

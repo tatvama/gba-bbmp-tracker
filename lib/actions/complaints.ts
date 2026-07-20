@@ -25,9 +25,11 @@ import {
   STORAGE_BUCKETS,
   R2_STORAGE_SENTINEL,
   COMPLAINT_DRAFT_KINDS,
+  DEFAULT_LEGAL_NOTICE_SENDER,
   type UserRole,
+  type LegalNoticeSender,
 } from "@/lib/constants";
-import { getComplaintSettings } from "@/lib/settings";
+import { getComplaintSettings, getLegalNoticeSender, LEGAL_NOTICE_SENDER_KEY } from "@/lib/settings";
 import { addDays } from "@/lib/rti-deadlines";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
@@ -953,11 +955,56 @@ export async function generateComplaintDraft(input: {
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
+  /** Petitioner identity for a `legal_notice` PIL (see runComplaintDraft). */
+  sender?: LegalNoticeSender;
 }): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean; qualityReport?: import("@/lib/intelligence/quality-review").QualityReport }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
   // Shared generation core (also used by the background-job runner in jobs.ts).
   return runComplaintDraft(a.admin, input);
+}
+
+/**
+ * Read the saved default legal-notice sender (petitioner identity for the PIL
+ * letter to the Hon'ble Chief Justice) so the From-details form can be
+ * pre-filled. Falls back to the seed default when unset or unreadable.
+ */
+export async function getLegalNoticeSenderAction(): Promise<{ sender: LegalNoticeSender }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { sender: DEFAULT_LEGAL_NOTICE_SENDER };
+  // Reuse the shared reader (lib/settings.ts) rather than re-inlining the
+  // app_settings read; the auth gate above is the only thing this adds.
+  return { sender: await getLegalNoticeSender() };
+}
+
+/**
+ * Persist the legal-notice sender as the org-wide default, so the next From-
+ * details form is pre-filled with it and the request-free escalation scheduler
+ * reuses the same petitioner identity. Stored in the generic app_settings
+ * key/value table — no dedicated schema.
+ */
+export async function saveLegalNoticeSenderAction(
+  sender: LegalNoticeSender,
+): Promise<{ ok: boolean; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const trim = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const value: LegalNoticeSender = {
+    name: trim(sender.name) || DEFAULT_LEGAL_NOTICE_SENDER.name,
+    ageYears: trim(sender.ageYears),
+    parentage: trim(sender.parentage),
+    organisation: trim(sender.organisation),
+    role: trim(sender.role),
+    address: trim(sender.address) || DEFAULT_LEGAL_NOTICE_SENDER.address,
+    mobile: trim(sender.mobile),
+    email: trim(sender.email),
+  };
+  const { error } = await a.admin.from("app_settings").upsert(
+    { key: LEGAL_NOTICE_SENDER_KEY, value, updated_by: a.user.id, updated_at: new Date().toISOString() },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 /** Short-lived signed URL for viewing a private document (original or processed). */

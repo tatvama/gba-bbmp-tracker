@@ -7,7 +7,7 @@ import { COMPLAINT_FIELD_ROLES, COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind }
 import { startJob, dispatchJob } from "@/lib/jobs/runner";
 import { listAllTaskItems } from "@/lib/jobs/adapters";
 import type { JobType, TaskItem } from "@/lib/jobs/types";
-import type { DraftLanguage, LegalTone } from "@/lib/constants";
+import type { DraftLanguage, LegalTone, LegalNoticeSender } from "@/lib/constants";
 // Side-effect import: registers every job type's handler (ai_draft today,
 // more as later stages land) — see lib/jobs/handlers/index.ts.
 import "@/lib/jobs/handlers";
@@ -54,6 +54,9 @@ export async function startAiDraftJob(input: {
   kind: ComplaintDraftKind;
   tone?: LegalTone;
   language?: DraftLanguage;
+  /** Petitioner identity for a `legal_notice` PIL — persisted into the job input
+   *  so the (possibly deferred) handler drafts with the sender the user chose. */
+  sender?: LegalNoticeSender;
 }): Promise<{ ok: boolean; jobId?: string; error?: string }> {
   let user;
   try {

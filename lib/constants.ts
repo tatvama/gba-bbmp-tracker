@@ -631,6 +631,60 @@ export const LETTER_SIGNATORIES = {
 } as const;
 export type SignatoryKey = keyof typeof LETTER_SIGNATORIES;
 
+// ── Legal notice (PIL letter-petition to the Hon'ble Chief Justice) ──────────
+/**
+ * Sender identity for the legal notice, which is drafted as a Public Interest
+ * Litigation letter petition to the Hon'ble Chief Justice, High Court of
+ * Karnataka. Richer than LETTER_SIGNATORIES — the PIL FROM block and signature
+ * block need the petitioner's age, parentage, organisation, capacity and email.
+ * Captured from the user at generation time (an editable form pre-filled from
+ * the saved default) and persisted as the app_settings 'legal_notice_sender'
+ * default so the request-free escalation scheduler can reuse it too.
+ */
+export interface LegalNoticeSender {
+  /** Full name of the petitioner. */
+  name: string;
+  /** Age in years — rendered as "Aged about N years". */
+  ageYears?: string;
+  /** Parentage line, e.g. "S/o D.K. Nagaraju" (include the S/o, D/o or W/o prefix). */
+  parentage?: string;
+  /** Organisation / trust lines, e.g. "Sree Shirdi Sai Darshanam Trust, Sai Baba Mandir". */
+  organisation?: string;
+  /** Capacity within the organisation, e.g. "member / trustee" (placed under the name in the signature block). */
+  role?: string;
+  /** Full postal address (may span multiple lines). */
+  address: string;
+  /** Mobile number. */
+  mobile?: string;
+  /** Email address. */
+  email?: string;
+}
+
+/**
+ * Default PIL sender — seeded from the primary letter signatory so the form is
+ * pre-filled with a known-good name and address; the user completes the richer
+ * fields once and it is saved as the org-wide default.
+ */
+export const DEFAULT_LEGAL_NOTICE_SENDER: LegalNoticeSender = {
+  name: LETTER_SIGNATORIES.raghav_gowda.name,
+  ageYears: "",
+  parentage: "",
+  organisation: "",
+  role: "",
+  address: LETTER_SIGNATORIES.raghav_gowda.address,
+  mobile: LETTER_SIGNATORIES.raghav_gowda.mobile ?? "",
+  email: "",
+};
+
+/** Recipient (TO) block for the PIL legal notice — the Hon'ble Chief Justice. */
+export const HIGH_COURT_CHIEF_JUSTICE_TO: string[] = [
+  "The Hon'ble Chief Justice",
+  "High Court of Karnataka",
+  "High Court Buildings",
+  "Dr. B.R. Ambedkar Veedhi",
+  "Bengaluru 560001",
+];
+
 export const LETTER_VARIANTS = ["bill_stop", "lokayukta", "rti", "bilingual_summary"] as const;
 export type LetterVariant = (typeof LETTER_VARIANTS)[number];
 export const LETTER_DRAFT_KINDS: Record<LetterVariant, string> = {
