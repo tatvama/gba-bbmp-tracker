@@ -39,6 +39,7 @@ import { fileLetterWithCopies } from "@/lib/distribution/distribution-service";
 import { complaintDistributionDeps } from "@/lib/distribution/complaint-deps";
 import type { RecipientRoleKey } from "@/lib/complaints/recipient-roles";
 import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
+import { buildComplaintDocumentFileName } from "@/lib/complaints/document-naming";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 
@@ -822,10 +823,6 @@ export async function deleteComplaintDocument(documentId: string, complaintId: s
 
 // ── Capture-first scan upload (live photos / PDF → one optimised PDF) ─────────
 
-function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "document";
-}
-
 /** Map an uploaded document type to a timeline event type (CHECK-constrained). */
 function docTypeToEvent(docType: string): string {
   const t = docType.toLowerCase();
@@ -872,7 +869,7 @@ export async function uploadComplaintScanAction(
     return { ok: false, error: e instanceof Error ? e.message : "Could not merge the pages into a PDF." };
   }
 
-  const fileName = `${slugify(docType)}.pdf`;
+  const fileName = await buildComplaintDocumentFileName(admin, complaintId, docType, "pdf");
   const path = buildPath(complaintId, fileName, Date.now(), Math.random().toString(36).slice(2, 8));
   try {
     await uploadToR2({ key: path, body: merged.pdf, contentType: "application/pdf" });

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/supabase-upload";
+import { buildComplaintDocumentFileName, extFromUpload } from "@/lib/complaints/document-naming";
 import { analyzeDocumentById } from "@/lib/ocr/process-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";
 import { findPhotoMatches, deriveStage } from "@/lib/dedupe-photos";
@@ -46,7 +47,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const documentType = (form.get("documentType") as string) || null;
   const asEvidence = String(form.get("asEvidence")) === "true";
   const isSitePhoto = !!documentType && documentType.startsWith("Site photo");
-  const path = buildPath(id, file.name || "upload", Date.now(), Math.random().toString(36).slice(2, 8));
+
+  // Admin client created early — the file name itself now depends on a DB read
+  // (the complaint's job/case number + a same-type document count), so it must
+  // resolve before the storage path is built, not after.
+  const admin = createAdminClient();
+  const fileName = await buildComplaintDocumentFileName(admin, id, documentType || "", extFromUpload(mime, file.name || ""));
+  const path = buildPath(id, fileName, Date.now(), Math.random().toString(36).slice(2, 8));
 
   // 1) Upload original to PRIVATE storage (R2).
   try {
@@ -61,8 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Fingerprint for duplicate-photo detection (best-effort; never blocks upload).
   const fp = await fingerprintImage(buffer, mime).catch(() => null);
 
-  // 2) Persist document row (admin client; app-level role already checked).
-  const admin = createAdminClient();
+  // 2) Persist document row (app-level role already checked above).
 
   // Geofence: is the photo's EXIF GPS near the complaint's reported location?
   const { data: comp } = await admin
@@ -90,7 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       document_type: documentType,
       title: (form.get("title") as string) || file.name || null,
       description: (form.get("description") as string) || null,
-      original_file_name: file.name || null,
+      original_file_name: fileName,
       storage_bucket: R2_STORAGE_SENTINEL,
       storage_path: path,
       mime_type: mime,
