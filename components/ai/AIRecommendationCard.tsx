@@ -16,23 +16,23 @@ import { markReminderGenerated } from "@/lib/actions/ai-advisor";
 import { openDraftPdf } from "@/lib/print-letter";
 import { formatDateTime } from "@/lib/format";
 import type { DraftLanguage } from "@/lib/constants";
-import type { RecommendationRow, RecommendationAction } from "@/lib/ai/advisor/types";
+import type { AdvisorLanguage, RecommendationRow, RecommendationAction } from "@/lib/ai/advisor/types";
 import { AIHealthScore } from "./AIHealthScore";
 import { AITimelineInsight } from "./AITimelineInsight";
 
-// Button labels are Kannada — the advisor panel is always shown in Kannada.
+// Action-button labels per language (chosen by the panel's language toggle).
 const ACTION_META: Record<
   RecommendationAction,
-  { icon: React.ComponentType<{ className?: string }>; buttonLabel: string | null }
+  { icon: React.ComponentType<{ className?: string }>; buttonLabel: Record<AdvisorLanguage, string> | null }
 > = {
-  generate_reminder: { icon: Bell, buttonLabel: "ಜ್ಞಾಪನಾ ಪತ್ರ ರಚಿಸಿ" },
-  escalate: { icon: Gavel, buttonLabel: "ಉನ್ನತೀಕರಣ ಪತ್ರ ಕರಡು ಮಾಡಿ" },
-  counter_reply: { icon: MessageSquareReply, buttonLabel: "ಪ್ರತ್ಯುತ್ತರ ಕರಡು ಮಾಡಿ" },
-  request_clarification: { icon: HelpCircle, buttonLabel: "ಸ್ಪಷ್ಟೀಕರಣ ವಿನಂತಿ ಕರಡು ಮಾಡಿ" },
-  convert_to_rti: { icon: FileText, buttonLabel: "ಆರ್‌ಟಿಐ ವಿನಂತಿ ಕರಡು ಮಾಡಿ" },
-  upload_evidence: { icon: Camera, buttonLabel: "ದಾಖಲೆಗಳಿಗೆ ಹೋಗಿ" },
-  review: { icon: Search, buttonLabel: "ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ" },
-  close: { icon: CircleCheck, buttonLabel: "ಪ್ರಕರಣ ಸಾರಾಂಶಕ್ಕೆ ಹೋಗಿ" },
+  generate_reminder: { icon: Bell, buttonLabel: { kn: "ಜ್ಞಾಪನಾ ಪತ್ರ ರಚಿಸಿ", en: "Draft reminder letter" } },
+  escalate: { icon: Gavel, buttonLabel: { kn: "ಉನ್ನತೀಕರಣ ಪತ್ರ ಕರಡು ಮಾಡಿ", en: "Draft escalation letter" } },
+  counter_reply: { icon: MessageSquareReply, buttonLabel: { kn: "ಪ್ರತ್ಯುತ್ತರ ಕರಡು ಮಾಡಿ", en: "Draft counter-reply" } },
+  request_clarification: { icon: HelpCircle, buttonLabel: { kn: "ಸ್ಪಷ್ಟೀಕರಣ ವಿನಂತಿ ಕರಡು ಮಾಡಿ", en: "Draft clarification request" } },
+  convert_to_rti: { icon: FileText, buttonLabel: { kn: "ಆರ್‌ಟಿಐ ವಿನಂತಿ ಕರಡು ಮಾಡಿ", en: "Draft RTI request" } },
+  upload_evidence: { icon: Camera, buttonLabel: { kn: "ದಾಖಲೆಗಳಿಗೆ ಹೋಗಿ", en: "Go to documents" } },
+  review: { icon: Search, buttonLabel: { kn: "ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ", en: "Review documents" } },
+  close: { icon: CircleCheck, buttonLabel: { kn: "ಪ್ರಕರಣ ಸಾರಾಂಶಕ್ಕೆ ಹೋಗಿ", en: "Go to case summary" } },
   wait: { icon: Clock, buttonLabel: null },
   none: { icon: CircleCheck, buttonLabel: null },
 };
@@ -43,22 +43,32 @@ const GENERATE_ACTIONS = new Set<RecommendationAction>([
   "generate_reminder", "counter_reply", "request_clarification", "convert_to_rti",
 ]);
 
-/** Kannada labels for the confidence band + issue-status chips. */
-const CONFIDENCE_KN: Record<string, string> = { High: "ಹೆಚ್ಚು", Medium: "ಮಧ್ಯಮ", Low: "ಕಡಿಮೆ" };
-const ISSUE_STATUS_KN: Record<string, string> = { answered: "ಉತ್ತರಿಸಲಾಗಿದೆ", partial: "ಭಾಗಶಃ", open: "ಬಾಕಿ" };
+/** Confidence-band + issue-status chip labels per language (values stay English enums). */
+const CONFIDENCE_LABEL: Record<AdvisorLanguage, Record<string, string>> = {
+  kn: { High: "ಹೆಚ್ಚು", Medium: "ಮಧ್ಯಮ", Low: "ಕಡಿಮೆ" },
+  en: { High: "High", Medium: "Medium", Low: "Low" },
+};
+const ISSUE_STATUS_LABEL: Record<AdvisorLanguage, Record<string, string>> = {
+  kn: { answered: "ಉತ್ತರಿಸಲಾಗಿದೆ", partial: "ಭಾಗಶಃ", open: "ಬಾಕಿ" },
+  en: { answered: "Answered", partial: "Partial", open: "Open" },
+};
 
 export function AIRecommendationCard({
   complaintId,
   recommendation,
   aiConfigured,
   priority,
+  lang = "kn",
 }: {
   complaintId: string;
   recommendation: RecommendationRow | null;
   aiConfigured: boolean;
   priority?: string | null;
+  lang?: AdvisorLanguage;
 }) {
   const router = useRouter();
+  const confidenceLabel = CONFIDENCE_LABEL[lang];
+  const issueStatusLabel = ISSUE_STATUS_LABEL[lang];
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
@@ -181,7 +191,7 @@ export function AIRecommendationCard({
         <div className="flex flex-wrap items-center gap-2 pt-1 text-xs select-none">
           {recommendation.confidence && (
             <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-bold border-primary/20 bg-primary/5 text-primary">
-              {CONFIDENCE_KN[recommendation.confidence] ?? recommendation.confidence} ವಿಶ್ವಾಸ (Confidence)
+              {confidenceLabel[recommendation.confidence] ?? recommendation.confidence} ವಿಶ್ವಾಸ (Confidence)
             </Badge>
           )}
           {priority && (
@@ -200,18 +210,22 @@ export function AIRecommendationCard({
       {/* 3. Banner Warnings / Status Indicators (Common) */}
       {!aiConfigured && (
         <p className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-400 font-semibold leading-relaxed">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> AI ವಿವರಣೆ ಲಭ್ಯವಿಲ್ಲ — ಶಿಫಾರಸುಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ANTHROPIC_API_KEY ಹೊಂದಿಸಿ. ಆರೋಗ್ಯ ಸ್ಕೋರ್ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಿಸುತ್ತದೆ.
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {lang === "en"
+            ? "AI explanation unavailable — set ANTHROPIC_API_KEY to enable recommendations. The health score still updates automatically."
+            : "AI ವಿವರಣೆ ಲಭ್ಯವಿಲ್ಲ — ಶಿಫಾರಸುಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ANTHROPIC_API_KEY ಹೊಂದಿಸಿ. ಆರೋಗ್ಯ ಸ್ಕೋರ್ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಿಸುತ್ತದೆ."}
         </p>
       )}
 
       {isAnalyzing && (
         <p className="flex items-center gap-2 text-xs text-slate-400 font-bold">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" /> ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ…
+          <Loader2 className="h-4 w-4 animate-spin text-primary" /> {lang === "en" ? "Analysing…" : "ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ…"}
         </p>
       )}
 
       {!recommendation && !isAnalyzing && (
-        <p className="text-xs text-slate-455 dark:text-slate-500 font-semibold leading-relaxed">ಇನ್ನೂ ವಿಶ್ಲೇಷಿಸಿಲ್ಲ. ಈ ದೂರನ್ನು ಮುಂದಿನ ನವೀಕರಣದಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತದೆ.</p>
+        <p className="text-xs text-slate-455 dark:text-slate-500 font-semibold leading-relaxed">{lang === "en"
+          ? "Not analysed yet. This complaint will be analysed automatically on the next update."
+          : "ಇನ್ನೂ ವಿಶ್ಲೇಷಿಸಿಲ್ಲ. ಈ ದೂರನ್ನು ಮುಂದಿನ ನವೀಕರಣದಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತದೆ."}</p>
       )}
 
       {/* 4. Collapsed preview layout (All screen sizes) */}
@@ -302,7 +316,7 @@ export function AIRecommendationCard({
                     <p className="text-[11px] font-black uppercase tracking-wider text-primary">ಶಿಫಾರಸು (Recommendation)</p>
                     {recommendation.confidence && (
                       <span className="text-[10px] font-extrabold text-primary/80">
-                        {CONFIDENCE_KN[recommendation.confidence] ?? recommendation.confidence}
+                        {confidenceLabel[recommendation.confidence] ?? recommendation.confidence}
                         {typeof recommendation.confidence_score === "number" ? ` · ${recommendation.confidence_score}%` : ""} ವಿಶ್ವಾಸ
                       </span>
                     )}
@@ -334,7 +348,7 @@ export function AIRecommendationCard({
                           o.status === "partial" ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" :
                           "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
                         }`}>
-                          {ISSUE_STATUS_KN[o.status] ?? o.status}
+                          {issueStatusLabel[o.status] ?? o.status}
                         </span>
                         <span className="text-slate-800 dark:text-slate-205">{o.issue}</span>
                       </li>
@@ -345,7 +359,7 @@ export function AIRecommendationCard({
 
               {/* Timeline summary / contradictions / commitments / risks */}
               <div className="pt-4 border-t dark:border-slate-850">
-                <AITimelineInsight recommendation={recommendation} />
+                <AITimelineInsight recommendation={recommendation} lang={lang} />
               </div>
 
               {/* Action trigger button inside modal */}
@@ -362,7 +376,7 @@ export function AIRecommendationCard({
                         setIsOpen(false);
                       }}
                     >
-                      {meta.buttonLabel}
+                      {meta.buttonLabel[lang]}
                     </LanguageChoiceButton>
                   ) : (
                     <Button size="sm" className="w-full h-10 font-bold bg-primary text-primary-foreground hover:bg-primary/95 shadow-xs" disabled={busy} onClick={() => {
@@ -370,7 +384,7 @@ export function AIRecommendationCard({
                       setIsOpen(false);
                     }}>
                       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <meta.icon className="h-4 w-4" />}
-                      {meta.buttonLabel}
+                      {meta.buttonLabel[lang]}
                       {!busy && <ArrowRight className="ml-auto h-3.5 w-3.5" />}
                     </Button>
                   )}

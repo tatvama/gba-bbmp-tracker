@@ -7,6 +7,7 @@ import type { ReminderSuggestion } from "./reminder-workflow";
 import { ACTION_LABELS, ACTION_LABELS_KN } from "./narrative-agent";
 import type {
   AdvisorContext,
+  AdvisorLanguage,
   Commitment,
   Contradiction,
   OutstandingIssue,
@@ -50,18 +51,22 @@ function fallback(
   healthScore: HealthScoreResult,
   ctx: AdvisorContext,
   analyzedCount: number,
+  lang: AdvisorLanguage,
 ): ThreadDecision {
   const prev = ctx.previousRecommendation;
+  const labels = lang === "en" ? ACTION_LABELS : ACTION_LABELS_KN;
   return {
     currentSituation: healthScore.riskFactors.length
       ? healthScore.riskFactors.join("; ")
-      : "AI ವಿವರಣೆ ಲಭ್ಯವಿಲ್ಲ (AI ಕಾನ್ಫಿಗರ್ ಆಗಿಲ್ಲ ಅಥವಾ ವಿನಂತಿ ವಿಫಲವಾಗಿದೆ).",
+      : lang === "en"
+        ? "AI explanation unavailable (AI not configured or the request failed)."
+        : "AI ವಿವರಣೆ ಲಭ್ಯವಿಲ್ಲ (AI ಕಾನ್ಫಿಗರ್ ಆಗಿಲ್ಲ ಅಥವಾ ವಿನಂತಿ ವಿಫಲವಾಗಿದೆ).",
     reasoning: "",
     outstandingIssues: prev?.outstanding_issues ?? [],
     contradictions: prev?.contradictions ?? [],
     commitments: prev?.commitments ?? [],
     recommendedAction: action,
-    recommendationLabel: ACTION_LABELS_KN[action],
+    recommendationLabel: labels[action],
     confidenceBand: "Low",
     confidenceScore: 0,
     expectedOutcome: "",
@@ -163,12 +168,26 @@ function buildCorrespondence(ctx: AdvisorContext, demands: string): { text: stri
   return { text: lines.join("\n"), count };
 }
 
-const SYSTEM =
+const PERSONA_AND_FRAMING =
   "You are the case-strategy advisor for a citizen holding BBMP/GBA (Bengaluru civic body) accountable on a public-works complaint. You are given the COMPLETE correspondence so far. Reason over ALL of it — never judge only the latest reply. Decide the single most useful next step and track what remains open. " +
-  "CAUTIOUS FRAMING (non-negotiable): treat every adverse point as a documented suspicion requiring records/explanation — never assert that a named officer or contractor committed fraud, theft, forgery or corruption. Do not invent dates, amounts, or facts not present in the correspondence. " +
-  "LANGUAGE (non-negotiable): write every human-readable text value in formal Kannada (ಕನ್ನಡ) — currentSituation, reasoning, recommendationLabel, expectedOutcome, timelineSummary, and every string inside outstandingIssues[].issue, contradictions[].summary, contradictions[].conflictsWith, commitments[].commitment, detectedRisks[] and missingInformation[]. Do NOT translate the machine values: recommendedAction, confidenceBand (must stay exactly High/Medium/Low), the status tokens (open/answered/partial and pending/fulfilled/overdue/unmet) and all dates (YYYY-MM-DD) MUST remain the exact English/enum tokens listed. " +
-  "NUMERALS (non-negotiable): inside the Kannada text, write every number — rupee amounts, percentages, day/month counts, quantities, job/case numbers — using standard Arabic numerals (0,1,2,3,4,5,6,7,8,9), exactly like official Kannada government letters do. NEVER use Kannada-script digits (೦೧೨೩೪೫೬೭೮೯). Example: write 'ರೂ. 3,00,000 ರಿಂದ ರೂ. 6,00,000' — NOT 'ರೂ. ೩,೦೦,೦೦೦ ರಿಂದ ರೂ. ೬,೦೦,೦೦೦'. " +
-  "Output STRICT JSON only, no prose, no markdown.";
+  "CAUTIOUS FRAMING (non-negotiable): treat every adverse point as a documented suspicion requiring records/explanation — never assert that a named officer or contractor committed fraud, theft, forgery or corruption. Do not invent dates, amounts, or facts not present in the correspondence. ";
+
+// Applies to BOTH languages: the machine/enum values are never translated.
+const MACHINE_VALUES_NOTE =
+  "Do NOT translate the machine values: recommendedAction, confidenceBand (must stay exactly High/Medium/Low), the status tokens (open/answered/partial and pending/fulfilled/overdue/unmet) and all dates (YYYY-MM-DD) MUST remain the exact English/enum tokens listed. ";
+
+const LANG_KN =
+  "LANGUAGE (non-negotiable): write every human-readable text value in formal Kannada (ಕನ್ನಡ) — currentSituation, reasoning, recommendationLabel, expectedOutcome, timelineSummary, and every string inside outstandingIssues[].issue, contradictions[].summary, contradictions[].conflictsWith, commitments[].commitment, detectedRisks[] and missingInformation[]. " +
+  MACHINE_VALUES_NOTE +
+  "NUMERALS (non-negotiable): inside the Kannada text, write every number — rupee amounts, percentages, day/month counts, quantities, job/case numbers — using standard Arabic numerals (0,1,2,3,4,5,6,7,8,9), exactly like official Kannada government letters do. NEVER use Kannada-script digits (೦೧೨೩೪೫೬೭೮೯). Example: write 'ರೂ. 3,00,000 ರಿಂದ ರೂ. 6,00,000' — NOT 'ರೂ. ೩,೦೦,೦೦೦ ರಿಂದ ರೂ. ೬,೦೦,೦೦೦'. ";
+
+const LANG_EN =
+  "LANGUAGE (non-negotiable): write every human-readable text value in clear, formal English — currentSituation, reasoning, recommendationLabel, expectedOutcome, timelineSummary, and every string inside outstandingIssues[].issue, contradictions[].summary, contradictions[].conflictsWith, commitments[].commitment, detectedRisks[] and missingInformation[]. " +
+  MACHINE_VALUES_NOTE;
+
+function buildSystem(lang: AdvisorLanguage): string {
+  return `${PERSONA_AND_FRAMING}${lang === "en" ? LANG_EN : LANG_KN}Output STRICT JSON only, no prose, no markdown.`;
+}
 
 export async function analyzeThread(input: {
   context: AdvisorContext;
@@ -179,10 +198,13 @@ export async function analyzeThread(input: {
   evidenceGaps?: string[];
   /** What the deterministic rules would pick — a strong hint + the AI-off fallback. */
   deterministicFallbackAction: RecommendationAction;
+  /** Output language for every human-readable field. Defaults to Kannada. */
+  language?: AdvisorLanguage;
 }): Promise<{ ok: boolean; data: ThreadDecision; error?: string }> {
   const { context: ctx, healthScore, deterministicFallbackAction: fb } = input;
+  const lang: AdvisorLanguage = input.language ?? "kn";
   const { text: correspondence, count: analyzedCount } = buildCorrespondence(ctx, input.demands);
-  const base = fallback(fb, healthScore, ctx, analyzedCount);
+  const base = fallback(fb, healthScore, ctx, analyzedCount, lang);
 
   const LADDER_STAGE_LABEL: Record<string, string> = {
     awaiting_ack: "waiting for the department's acknowledgment",
@@ -248,7 +270,9 @@ Output STRICT JSON of EXACTLY this shape:
   "missingInformation": ["short phrase describing info still missing, if any"]
 }
 Use empty arrays / null where there is nothing. confidenceScore is an integer 0-100 that should agree with confidenceBand (High≈75-100, Medium≈45-74, Low≈0-44).
-REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ); recommendedAction, confidenceBand, the status tokens and dates stay in English exactly as specified. ALL NUMBERS inside the Kannada text (amounts, percentages, day counts) must use Arabic numerals 0-9 — never Kannada-script digits (೦-೯).`;
+${lang === "en"
+  ? "REMINDER: all free-text values above must be in clear, formal English; recommendedAction, confidenceBand, the status tokens and dates stay exactly as specified."
+  : "REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ); recommendedAction, confidenceBand, the status tokens and dates stay in English exactly as specified. ALL NUMBERS inside the Kannada text (amounts, percentages, day counts) must use Arabic numerals 0-9 — never Kannada-script digits (೦-೯)."}`;
 
   // Kannada is far more token-dense than English (a Kannada character can be
   // several tokens): a full Kannada response for this schema measured ~7,900
@@ -262,7 +286,7 @@ REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ)
   // SYSTEM) is marked cacheable. 1h TTL, not the 5m default — re-analysis of
   // the same complaint is more likely tens of minutes apart than seconds apart.
   const r = await extractJson<Partial<ThreadDecision>>({
-    system: SYSTEM,
+    system: buildSystem(lang),
     prompt: [
       { text: correspondenceBlock, cache: true },
       { text: decisionRequest },
@@ -292,7 +316,7 @@ REMINDER: all free-text values above must be in formal Kannada (ಕನ್ನಡ)
       contradictions: Array.isArray(d.contradictions) ? d.contradictions : [],
       commitments: Array.isArray(d.commitments) ? d.commitments : [],
       recommendedAction: action,
-      recommendationLabel: d.recommendationLabel || ACTION_LABELS_KN[action],
+      recommendationLabel: d.recommendationLabel || (lang === "en" ? ACTION_LABELS : ACTION_LABELS_KN)[action],
       confidenceBand: band,
       confidenceScore: score,
       expectedOutcome: d.expectedOutcome ?? "",

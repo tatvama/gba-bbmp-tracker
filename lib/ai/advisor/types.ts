@@ -31,6 +31,32 @@ export interface Commitment {
   status: "pending" | "fulfilled" | "overdue" | "unmet";
 }
 
+/** The two languages the advisor narrative can be rendered in. */
+export type AdvisorLanguage = "kn" | "en";
+
+/**
+ * A full snapshot of the human-readable narrative fields for ONE language,
+ * cached in `complaint_ai_recommendations.narratives[lang]` so switching to a
+ * language already generated at the current case-state is instant (no AI call).
+ * Field names mirror the flat columns they project into on the row.
+ */
+export interface NarrativeSnapshot {
+  current_situation: string | null;
+  reasoning: string | null;
+  expected_outcome: string | null;
+  confidence: "High" | "Medium" | "Low" | null;
+  confidence_score: number | null;
+  recommendation: string | null;
+  recommendation_action: RecommendationAction | null;
+  missing_information: string[];
+  detected_risks: string[];
+  outstanding_issues: OutstandingIssue[];
+  contradictions: Contradiction[];
+  commitments: Commitment[];
+  analyzed_correspondence_count: number | null;
+  timeline_summary: string | null;
+}
+
 /** Row shape of `complaint_ai_recommendations` (one per complaint, upserted). */
 export interface RecommendationRow {
   id: string;
@@ -53,6 +79,10 @@ export interface RecommendationRow {
   analyzed_correspondence_count: number | null;
   timeline_summary: string | null;
   context_hash: string | null;
+  /** Language currently projected into the flat fields above ('kn' | 'en'). */
+  narrative_language: AdvisorLanguage;
+  /** Per-language narrative cache, valid for the current `context_hash`. */
+  narratives: Partial<Record<AdvisorLanguage, NarrativeSnapshot>>;
   last_analyzed_at: string | null;
   analysis_status: "idle" | "queued" | "running" | "done" | "failed";
   analysis_error: string | null;

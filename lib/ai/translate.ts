@@ -5,28 +5,62 @@ import { isAiConfigured } from "@/lib/ai/provider";
 import { fnv1a64Hex } from "@/lib/intelligence/case-hash";
 
 /**
- * On-demand English rendering of Kannada (or mixed) free text — for the Case
- * File and Evidence Dossier pages, which must show the actual extracted content
- * (forensic findings, AA/TS/KW-4/tender references, complaint narrative,
- * timeline) in English, not just switch UI labels. Distinct from lib/i18n,
- * which is static-chrome-only by design.
+ * On-demand translation of civic-works free text, in either direction:
+ *  - Kannada → English (translateToEnglish): the Case File / Evidence Dossier
+ *    pages render extracted content in English, not just switch UI labels.
+ *  - English → Kannada (translateToKannada): the AI Advisor generates its
+ *    narrative once in English and derives the Kannada view by TRANSLATION,
+ *    so it never pays for a second full AI reasoning run per language.
+ *
+ * Distinct from lib/i18n, which is static-chrome-only by design.
  *
  * Cached in translation_cache (mig 0042) by content hash so a repeated string
- * and a repeat page view never re-hit the model. Strings with no Kannada script
- * are passed through unchanged (already English/numeric). Best-effort: on any
+ * and a repeat page view never re-hit the model. Strings that don't need the
+ * target language (English→Kannada: text with no Latin letters; Kannada→English:
+ * text with no Kannada script) pass through unchanged. Best-effort: on any
  * failure (AI off, parse error) a string maps to itself — never throws, never
  * renders blank.
  */
 
 const KANNADA = /[ಀ-೿]/; // Kannada Unicode block
+const LATIN = /[A-Za-z]/;
 const CHUNK = 40;
 
-function needsTranslation(s: string): boolean {
-  return KANNADA.test(s);
+const SYSTEM_EN =
+  "Translate BBMP / PWD (Karnataka government civil-works) text from Kannada, or mixed Kannada-English, into clear English. Preserve ALL numbers, dates, amounts, GSTIN/PAN and reference codes EXACTLY as written. Keep official term names recognizable (e.g. Technical Sanction, Work Order, KW-4 agreement). Do not add commentary or omit anything.";
+
+const SYSTEM_KN =
+  "Translate BBMP / PWD (Karnataka government civil-works) text into formal Kannada (ಕನ್ನಡ). Preserve ALL numbers, dates, amounts, percentages, GSTIN/PAN and reference codes EXACTLY as written, using standard Arabic numerals (0,1,2,3,4,5,6,7,8,9) — NEVER Kannada-script digits (೦೧೨೩೪೫೬೭೮೯). Keep official English term names recognizable (e.g. Technical Sanction, Work Order, KW-4 agreement, RTI). Do not add commentary or omit anything.";
+
+/** One translation direction: which strings need translating, the model prompt,
+ *  and the cache key (namespaced by target so the two directions never collide). */
+interface Direction {
+  target: "en" | "kn";
+  targetName: string;
+  system: string;
+  needs: (s: string) => boolean;
+  key: (s: string) => string;
 }
 
-const TRANSLATE_SYSTEM =
-  "Translate BBMP / PWD (Karnataka government civil-works) text from Kannada, or mixed Kannada-English, into clear English. Preserve ALL numbers, dates, amounts, GSTIN/PAN and reference codes EXACTLY as written. Keep official term names recognizable (e.g. Technical Sanction, Work Order, KW-4 agreement). Do not add commentary or omit anything.";
+const DIR_EN: Direction = {
+  target: "en",
+  targetName: "English",
+  system: SYSTEM_EN,
+  needs: (s) => KANNADA.test(s),
+  // Unchanged from the original one-directional implementation, so every
+  // English translation already cached keeps hitting.
+  key: (s) => fnv1a64Hex(s),
+};
+
+const DIR_KN: Direction = {
+  target: "kn",
+  targetName: "Kannada",
+  system: SYSTEM_KN,
+  needs: (s) => LATIN.test(s),
+  // Namespaced so an English source's Kannada translation can never collide
+  // with a Kannada source's English translation in the shared cache table.
+  key: (s) => fnv1a64Hex(`kn:${s}`),
+};
 
 /**
  * Translate one group of strings, writing successes into `result`. If some
@@ -36,56 +70,56 @@ const TRANSLATE_SYSTEM =
  * single string, which then simply falls back to identity upstream. Recursion
  * strictly shrinks the group, so it always terminates.
  */
-async function translateChunk(strings: string[], result: Map<string, string>): Promise<void> {
+async function translateChunk(dir: Direction, strings: string[], result: Map<string, string>): Promise<void> {
   if (!strings.length) return;
-  const items = strings.map((kn, id) => ({ id, kn }));
-  const r = await extractJson<{ items?: { id: number; en: string }[] }>({
-    system: extractorSystem(TRANSLATE_SYSTEM),
-    prompt: `Translate each item's "kn" text to English. Output STRICT JSON of EXACTLY this shape, one entry per input id:\n{"items":[{"id":0,"en":"english text"}]}\n\nINPUT:\n${JSON.stringify(items)}`,
+  const items = strings.map((src, id) => ({ id, src }));
+  const r = await extractJson<{ items?: { id: number; out: string }[] }>({
+    system: extractorSystem(dir.system),
+    prompt: `Translate each item's "src" text to ${dir.targetName}. Output STRICT JSON of EXACTLY this shape, one entry per input id:\n{"items":[{"id":0,"out":"translated text"}]}\n\nINPUT:\n${JSON.stringify(items)}`,
     fallback: {},
     maxTokens: 8000,
   });
   const got = new Set<number>();
   for (const it of r.data?.items ?? []) {
     const orig = strings[it.id];
-    if (orig != null && typeof it.en === "string" && it.en.trim()) { result.set(orig, it.en.trim()); got.add(it.id); }
+    if (orig != null && typeof it.out === "string" && it.out.trim()) { result.set(orig, it.out.trim()); got.add(it.id); }
   }
   const missing = strings.filter((_, i) => !got.has(i));
   if (missing.length && strings.length > 1) {
     const mid = Math.ceil(missing.length / 2);
-    await translateChunk(missing.slice(0, mid), result);
-    if (missing.length > 1) await translateChunk(missing.slice(mid), result);
+    await translateChunk(dir, missing.slice(0, mid), result);
+    if (missing.length > 1) await translateChunk(dir, missing.slice(mid), result);
   }
   // strings.length === 1 and still missing → give up (identity fallback upstream).
 }
 
-async function aiTranslateBatch(strings: string[]): Promise<Map<string, string>> {
+async function aiTranslateBatch(dir: Direction, strings: string[]): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   for (let i = 0; i < strings.length; i += CHUNK) {
-    await translateChunk(strings.slice(i, i + CHUNK), result);
+    await translateChunk(dir, strings.slice(i, i + CHUNK), result);
   }
   return result;
 }
 
 /**
- * Returns a Map from each input string to its English rendering. Every non-empty
- * input is present in the map (mapping to itself if it needs no translation, is
- * uncached and AI is off/failed).
+ * Core: returns a Map from each input string to its rendering in `dir.target`.
+ * Every non-empty input is present in the map (mapping to itself if it needs no
+ * translation, is uncached and AI is off/failed).
  */
-export async function translateToEnglish(admin: SupabaseClient, texts: string[]): Promise<Map<string, string>> {
+async function translateBatch(admin: SupabaseClient, texts: string[], dir: Direction): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const unique = [...new Set(texts.map((t) => (t ?? "").trim()).filter(Boolean))];
   if (!unique.length) return out;
 
-  // Passthrough anything already English/numeric.
-  const kannada: string[] = [];
+  // Passthrough anything already in / not needing the target language.
+  const toTranslate: string[] = [];
   for (const t of unique) {
-    if (needsTranslation(t)) kannada.push(t);
+    if (dir.needs(t)) toTranslate.push(t);
     else out.set(t, t);
   }
-  if (!kannada.length) return out;
+  if (!toTranslate.length) return out;
 
-  const hashByText = new Map(kannada.map((t) => [t, fnv1a64Hex(t)] as const));
+  const hashByText = new Map(toTranslate.map((t) => [t, dir.key(t)] as const));
 
   // Cache lookup.
   try {
@@ -102,15 +136,15 @@ export async function translateToEnglish(admin: SupabaseClient, texts: string[])
     /* cache table absent / query failed — fall through to translate */
   }
 
-  const missing = kannada.filter((t) => !out.has(t));
+  const missing = toTranslate.filter((t) => !out.has(t));
   if (missing.length && isAiConfigured()) {
-    const translated = await aiTranslateBatch(missing);
+    const translated = await aiTranslateBatch(dir, missing);
     const rows: { source_hash: string; target_lang: string; translated_text: string }[] = [];
     for (const t of missing) {
-      const en = translated.get(t);
-      if (en) {
-        out.set(t, en);
-        rows.push({ source_hash: hashByText.get(t)!, target_lang: "en", translated_text: en });
+      const tr = translated.get(t);
+      if (tr) {
+        out.set(t, tr);
+        rows.push({ source_hash: hashByText.get(t)!, target_lang: dir.target, translated_text: tr });
       }
     }
     if (rows.length) {
@@ -123,11 +157,21 @@ export async function translateToEnglish(admin: SupabaseClient, texts: string[])
   }
 
   // Anything still unresolved (AI off / failed) → identity, so nothing renders blank.
-  for (const t of kannada) if (!out.has(t)) out.set(t, t);
+  for (const t of toTranslate) if (!out.has(t)) out.set(t, t);
   return out;
 }
 
-/** Convenience: translate one string (or return it unchanged). */
+/** Kannada (or mixed) → English. Map keys are the trimmed source strings. */
+export function translateToEnglish(admin: SupabaseClient, texts: string[]): Promise<Map<string, string>> {
+  return translateBatch(admin, texts, DIR_EN);
+}
+
+/** English (or mixed) → formal Kannada. Map keys are the trimmed source strings. */
+export function translateToKannada(admin: SupabaseClient, texts: string[]): Promise<Map<string, string>> {
+  return translateBatch(admin, texts, DIR_KN);
+}
+
+/** Convenience: translate one string to English (or return it unchanged). */
 export async function translateOne(admin: SupabaseClient, text: string | null | undefined): Promise<string> {
   const t = (text ?? "").trim();
   if (!t) return "";

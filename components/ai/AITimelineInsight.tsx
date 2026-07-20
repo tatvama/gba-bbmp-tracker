@@ -1,5 +1,5 @@
 import { AlertTriangle, FileWarning, GitCompareArrows, Handshake } from "lucide-react";
-import type { RecommendationRow } from "@/lib/ai/advisor/types";
+import type { AdvisorLanguage, RecommendationRow } from "@/lib/ai/advisor/types";
 
 const styleFor = (i: number) =>
   ["text-rose-600 dark:text-rose-400", "text-amber-600 dark:text-amber-400"][i % 2];
@@ -11,16 +11,15 @@ const COMMITMENT_CHIP: Record<string, string> = {
   unmet: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
 };
 
-/** Kannada labels for the commitment-status chips (the values stay English enums). */
-const COMMITMENT_STATUS_KN: Record<string, string> = {
-  fulfilled: "ಈಡೇರಿಸಲಾಗಿದೆ",
-  pending: "ಬಾಕಿ",
-  overdue: "ಅವಧಿ ಮೀರಿದೆ",
-  unmet: "ಈಡೇರಿಸಿಲ್ಲ",
+/** Commitment-status chip labels per language (the stored values stay English enums). */
+const COMMITMENT_STATUS_LABEL: Record<AdvisorLanguage, Record<string, string>> = {
+  kn: { fulfilled: "ಈಡೇರಿಸಲಾಗಿದೆ", pending: "ಬಾಕಿ", overdue: "ಅವಧಿ ಮೀರಿದೆ", unmet: "ಈಡೇರಿಸಿಲ್ಲ" },
+  en: { fulfilled: "Fulfilled", pending: "Pending", overdue: "Overdue", unmet: "Unmet" },
 };
 
-export function AITimelineInsight({ recommendation, className = "" }: { recommendation: RecommendationRow | null; className?: string }) {
+export function AITimelineInsight({ recommendation, className = "", lang = "kn" }: { recommendation: RecommendationRow | null; className?: string; lang?: AdvisorLanguage }) {
   if (!recommendation) return null;
+  const commitmentStatus = COMMITMENT_STATUS_LABEL[lang];
   const { timeline_summary, detected_risks, missing_information, contradictions, commitments } = recommendation;
 
   if (
@@ -49,7 +48,7 @@ export function AITimelineInsight({ recommendation, className = "" }: { recommen
             {contradictions.map((c, i) => (
               <li key={i} className="text-rose-600 dark:text-rose-400 font-semibold leading-relaxed">
                 • {c.summary}
-                {c.conflictsWith && <span className="text-muted-foreground font-normal"> — ವಿರುದ್ಧವಾಗಿದೆ: {c.conflictsWith}</span>}
+                {c.conflictsWith && <span className="text-muted-foreground font-normal"> — {lang === "en" ? "conflicts with" : "ವಿರುದ್ಧವಾಗಿದೆ"}: {c.conflictsWith}</span>}
               </li>
             ))}
           </ul>
@@ -64,11 +63,11 @@ export function AITimelineInsight({ recommendation, className = "" }: { recommen
             {commitments.map((m, i) => (
               <li key={i} className="flex items-start gap-2 font-semibold leading-relaxed">
                 <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${COMMITMENT_CHIP[m.status] ?? COMMITMENT_CHIP.pending}`}>
-                  {COMMITMENT_STATUS_KN[m.status] ?? m.status}
+                  {commitmentStatus[m.status] ?? m.status}
                 </span>
                 <span className="text-slate-800 dark:text-slate-205">
                   {m.commitment}
-                  {m.dueBy && <span className="text-muted-foreground font-normal"> (ಗಡುವು {m.dueBy})</span>}
+                  {m.dueBy && <span className="text-muted-foreground font-normal"> ({lang === "en" ? "due" : "ಗಡುವು"} {m.dueBy})</span>}
                 </span>
               </li>
             ))}

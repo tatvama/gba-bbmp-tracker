@@ -1,10 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { getComplaintAiRecommendationAction, triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
-import type { RecommendationRow } from "@/lib/ai/advisor/types";
+import { cn } from "@/lib/utils";
+import {
+  getComplaintAiRecommendationAction,
+  triggerAdvisorAnalysis,
+  setAdvisorLanguageAction,
+} from "@/lib/actions/ai-advisor";
+import type { AdvisorLanguage, RecommendationRow } from "@/lib/ai/advisor/types";
 import { AIRecommendationCard } from "./AIRecommendationCard";
-import { AITimelineInsight } from "./AITimelineInsight";
 
 /** A 'running'/'queued' row older than this is treated as a dead lock to recover. */
 const STALE_MS = 120_000;
@@ -27,10 +31,13 @@ function allText(r: RecommendationRow): string {
  *  - polls every 4s the WHOLE time it's open, so an analysis triggered by ANY
  *    later action — uploading a reply, filing a counter-reply, an edit — is
  *    reflected within a few seconds (React ignores prop changes after mount, so
- *    a one-shot / in-flight-only poll would miss these); and
+ *    a one-shot / in-flight-only poll would miss these);
  *  - on open, kicks a fresh analysis if the row is missing (never analysed) or
- *    stuck in a stale in-flight lock (a prior run died mid-flight), so the panel
- *    never spins on "Analysing…" forever.
+ *    stuck in a stale in-flight lock (a prior run died mid-flight); and
+ *  - offers an English/Kannada toggle. The advisor's narrative is cached per
+ *    language, so switching to a language already generated for the current
+ *    case-state is instant (no AI call); otherwise it regenerates in the
+ *    background and the poll picks it up. Default is Kannada.
  */
 export function AIInsightsPanel({
   complaintId,
@@ -44,6 +51,10 @@ export function AIInsightsPanel({
   priority?: string | null;
 }) {
   const [recommendation, setRecommendation] = React.useState(initialRecommendation);
+  const [viewLang, setViewLang] = React.useState<AdvisorLanguage>(
+    initialRecommendation?.narrative_language === "en" ? "en" : "kn",
+  );
+  const [switching, setSwitching] = React.useState(false);
   const activeRef = React.useRef(true);
   React.useEffect(() => () => { activeRef.current = false; }, []);
 
@@ -61,12 +72,29 @@ export function AIInsightsPanel({
     return () => clearInterval(id);
   }, [refresh]);
 
-  // On mount: recover a missing or stale-stuck analysis, OR convert a case whose
-  // narrative predates a Kannada-quality fix. The backend single-flight +
-  // context-hash gate make a redundant kick cheap, and it only reclaims a lock
-  // that's actually dead (see STALE_LOCK_MS in the engine). These checks fire at
-  // most once per mount (kickedRef) and self-limit once the text passes, so they
-  // can't loop.
+  // Switch the advisor's display language. Optimistically flip the toggle, then
+  // ask the server to promote the cached narrative (instant) or kick a
+  // background regeneration (the poll reflects it). Kannada default is never
+  // fought by the mount effect below because that only self-heals toward the
+  // language the panel is currently showing.
+  const switchLang = React.useCallback(async (lang: AdvisorLanguage) => {
+    setViewLang(lang);
+    if (!aiConfigured) return;
+    setSwitching(true);
+    try {
+      const row = await setAdvisorLanguageAction(complaintId, lang);
+      if (activeRef.current && row) setRecommendation(row);
+    } finally {
+      if (activeRef.current) setSwitching(false);
+    }
+  }, [aiConfigured, complaintId]);
+
+  // On mount: recover a missing or stale-stuck analysis, OR self-heal a stored
+  // narrative that doesn't match the language currently shown (e.g. a legacy
+  // pre-switch row that predates Kannada, or one using Kannada-script digits).
+  // The self-heal only ever targets the CURRENTLY-SHOWN language (viewLang at
+  // mount = the row's stored language, default Kannada), so it never overrides a
+  // user's explicit later toggle. Fires at most once per mount (kickedRef).
   const kickedRef = React.useRef(false);
   React.useEffect(() => {
     if (kickedRef.current) return;
@@ -74,23 +102,49 @@ export function AIInsightsPanel({
     const inFlight = r?.analysis_status === "queued" || r?.analysis_status === "running";
     const stale = !r?.updated_at || Date.now() - Date.parse(r.updated_at) > STALE_MS;
     const text = r ? allText(r) : "";
-    // A stored narrative with NO Kannada characters (U+0C80–U+0CFF) predates the
-    // Kannada switch — re-run so this case shows in Kannada like the rest.
-    const looksEnglish = !!text && !/[ಀ-೿]/.test(text);
-    // A stored narrative using Kannada-SCRIPT digits (೦-೯) predates the numeral
-    // fix — official Kannada correspondence uses Arabic numerals (0-9) even in
-    // Kannada text, so this also needs a re-run.
+    const hasKannada = /[ಀ-೿]/.test(text);
     const hasKannadaDigits = /[೦-೯]/.test(text);
-    if (!r || (inFlight && stale) || looksEnglish || hasKannadaDigits) {
+    // Text doesn't match the shown language, or (Kannada only) uses script digits.
+    const mismatched = !!text && (viewLang === "kn" ? !hasKannada || hasKannadaDigits : hasKannada);
+    if (!r || (inFlight && stale) || mismatched) {
       kickedRef.current = true;
-      void triggerAdvisorAnalysis(complaintId).then(refresh);
+      void triggerAdvisorAnalysis(complaintId, viewLang).then(refresh);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+  const langMismatch = recommendation?.narrative_language && recommendation.narrative_language !== viewLang;
+
   return (
     <div className="space-y-3">
-      <AIRecommendationCard complaintId={complaintId} recommendation={recommendation} aiConfigured={aiConfigured} priority={priority} />
+      <div className="flex items-center justify-end">
+        <div className="inline-flex items-center rounded-md border border-slate-200 p-0.5 text-[11px] font-bold dark:border-slate-800" role="group" aria-label="Advisor language">
+          {(["kn", "en"] as AdvisorLanguage[]).map((l) => (
+            <button
+              key={l}
+              type="button"
+              disabled={!aiConfigured || switching}
+              aria-pressed={viewLang === l}
+              onClick={() => void switchLang(l)}
+              className={cn(
+                "rounded px-2.5 py-1 transition-colors disabled:opacity-50",
+                viewLang === l
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {l === "kn" ? "ಕನ್ನಡ" : "English"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <AIRecommendationCard
+        complaintId={complaintId}
+        recommendation={langMismatch ? { ...recommendation!, analysis_status: "running" } : recommendation}
+        aiConfigured={aiConfigured}
+        priority={priority}
+        lang={viewLang}
+      />
     </div>
   );
 }
