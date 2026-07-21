@@ -477,7 +477,7 @@ function buildDetailedTree(
   // Map to group complaints by ward number
   const complaintsByWard = new Map<number, ComplaintWithRelations[]>();
   for (const c of filtered) {
-    const wNo = c.ward?.new_no;
+    const wNo = isGba ? c.gba_ward?.ward_no : c.ward?.new_no;
     if (wNo === undefined || wNo === null) continue;
     if (!complaintsByWard.has(wNo)) {
       complaintsByWard.set(wNo, []);
