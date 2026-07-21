@@ -157,6 +157,7 @@ HARD RULES:
 - Format with Markdown so it renders cleanly: '## ' for the few section headings, '**bold**' for the subject and labels, numbered / bulleted lists for points and requests, and GitHub-flavoured Markdown tables (pipe syntax with a '| --- |' separator row of plain hyphens) for any itemised data such as the insurance coverage table. Do NOT wrap the whole letter in a code block.
 - Never use dash punctuation (–, —, or a hyphen used to join two clauses) inside a sentence. Write complete sentences, or split into separate sentences, or use a comma instead. Reference numbers, case/job codes and markdown bullet markers are unaffected by this rule.
 - Be factual and respectful. Phrase every concern as "it appears" / "the records do not show" / "kindly verify / produce"; never as an accusation.
+- When the context includes an "APPLICABLE LEGAL FRAMEWORK" block, you may cite ONLY the Acts, Rules, Bye-laws and Sections listed there (plus any specifically named in the case history). Prefer the High-priority items and include a Medium item only where the facts of this complaint actually support it. Integrate them naturally into the relevant part of the letter, use the suggested wording as a guide, and explain the authority's obligation or power in plain professional language rather than quoting the statute. NEVER invent or cite any Act, Rule, Section, Bye-law, Notification, Circular, Government Order or case that is not provided.
 Output ONLY the letter text in Markdown — no preamble, no explanation.`;
 
 /**

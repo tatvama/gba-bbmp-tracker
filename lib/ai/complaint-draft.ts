@@ -10,6 +10,13 @@ import { resolveOfficerForWard } from "@/lib/contacts/resolve-officer";
 import type { OfficerRecipient } from "@/lib/contacts/officer-recipient";
 import type { CaseIntelligence } from "@/lib/intelligence/types";
 import {
+  buildLegalResolutionContext,
+  resolveLegalFramework,
+  renderLegalFramework,
+  validateDraftCitations,
+  type ResolvedLegalFramework,
+} from "@/lib/legal";
+import {
   LETTER_SIGNATORIES,
   DEFAULT_LEGAL_NOTICE_SENDER,
   HIGH_COURT_CHIEF_JUSTICE_TO,
@@ -205,7 +212,7 @@ export async function runComplaintDraft(
   admin: SupabaseClient,
   input: ComplaintDraftInput,
   onProgress?: (p: DraftProgress) => void,
-): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean; qualityReport?: QualityReport }> {
+): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean; qualityReport?: QualityReport; legalCitationWarning?: string }> {
   onProgress?.({ stage: "loading_case", label: "Loading case file…" });
   const { data: c } = await admin
     .from("complaints")
@@ -269,7 +276,29 @@ export async function runComplaintDraft(
     console.warn("[complaint-draft] case intelligence failed, using case history", input.complaintId, e);
     evidenceBlock = `=== CASE HISTORY (draw the body from this) ===\n${await buildCaseHistory(admin, input.complaintId, jobNo)}`;
   }
-  const context = `${complaintContext(c as Record<string, any>, { kind: input.kind, signatory, legalSender, today: todayISO(), wardOfficer })}\n\n${evidenceBlock}`;
+  const baseContext = `${complaintContext(c as Record<string, any>, { kind: input.kind, signatory, legalSender, today: todayISO(), wardOfficer })}\n\n${evidenceBlock}`;
+
+  // Additive legal-framework enrichment: resolve the applicable Acts / Rules /
+  // Sections for this complaint from the curated, verified knowledge base and append
+  // them to the context so the letter can cite the law behind each duty. Skipped for
+  // legal_notice (the PIL petition keeps its own hard-coded statute whitelist). Fully
+  // inert when nothing applies, and wrapped so a resolver error never blocks drafting.
+  let resolvedLegal: ResolvedLegalFramework | null = null;
+  let legalBlock = "";
+  if (input.kind !== "legal_notice") {
+    try {
+      const dto = buildLegalResolutionContext(c as Record<string, any>, {
+        draftKind: input.kind,
+        hasForensicFindings: Boolean(intel?.findings?.length) || Boolean(jobNo),
+        caseHistoryText: evidenceBlock,
+      });
+      resolvedLegal = resolveLegalFramework(dto);
+      legalBlock = renderLegalFramework(resolvedLegal);
+    } catch (e) {
+      console.warn("[complaint-draft] legal framework resolution failed (non-fatal)", input.complaintId, e);
+    }
+  }
+  const context = legalBlock ? `${baseContext}\n\n${legalBlock}` : baseContext;
 
   const { system, prompt } = buildComplaintDraftPrompt({
     kind: input.kind,
@@ -310,11 +339,28 @@ export async function runComplaintDraft(
       console.warn("[complaint-draft] quality review failed", input.complaintId, e);
     }
   }
+  // Post-draft citation safety net (WARN, never block — mirrors the lint gate): flag
+  // any statute-shaped citation in the letter not backed by the resolved framework or
+  // grounded in the provided context / case history. Surfaced for audit; nothing is
+  // discarded or altered.
+  let legalCitationWarning: string | undefined;
+  if (resolvedLegal) {
+    try {
+      const w = validateDraftCitations(text, resolvedLegal, { contextText: context });
+      if (w.length) {
+        legalCitationWarning = w.join("; ");
+        console.warn("[complaint-draft] unverified legal citation(s)", input.complaintId, legalCitationWarning);
+      }
+    } catch (e) {
+      console.warn("[complaint-draft] citation validation failed (non-fatal)", input.complaintId, e);
+    }
+  }
   return {
     ok: true,
     text,
     lintWarning: lint.ok ? undefined : lint.errors.map((e) => e.reason).join("; "),
     truncated: r.truncated,
     qualityReport,
+    legalCitationWarning,
   };
 }
