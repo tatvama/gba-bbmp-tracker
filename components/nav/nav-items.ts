@@ -36,7 +36,17 @@ export interface NavItem {
   labelKey: string;
   icon: LucideIcon;
   group: NavGroup;
+  /** Overrides the sidebar's default active-path check (exact match, or
+   *  pathname starting with href + "/"). Needed when a page's own sub-routes
+   *  shouldn't inherit its highlight — e.g. /rti/[id] case pages live one
+   *  level under /rti but belong to "All RTIs", not "RTI Dashboard". */
+  isActive?: (pathname: string) => boolean;
 }
+
+/** Literal top-level segments under /rti/ that are their own pages, not a
+ *  case id — kept in sync with app/rti/*\/page.tsx. Anything else under
+ *  /rti/ is a case detail route (/rti/[id], /rti/[id]/edit, ...). */
+const RTI_OWN_SUBPAGES = new Set(["all", "new", "calendar", "reports", "settings", "road-work", "audit"]);
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard, group: "main" },
@@ -47,8 +57,26 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/officers", label: "Officers", labelKey: "nav.officers", icon: Network, group: "main" },
   { href: "/bbmp-works/search", label: "Work Search", labelKey: "nav.workSearch", icon: HardHat, group: "main" },
 
-  { href: "/rti", label: "RTI Dashboard", labelKey: "nav.rtiDashboard", icon: FileText, group: "rti" },
-  { href: "/rti/all", label: "All RTIs", labelKey: "nav.allRtis", icon: Files, group: "rti" },
+  {
+    href: "/rti",
+    label: "RTI Dashboard",
+    labelKey: "nav.rtiDashboard",
+    icon: FileText,
+    group: "rti",
+    isActive: (pathname) => pathname === "/rti",
+  },
+  {
+    href: "/rti/all",
+    label: "All RTIs",
+    labelKey: "nav.allRtis",
+    icon: Files,
+    group: "rti",
+    isActive: (pathname) => {
+      if (pathname === "/rti/all" || pathname.startsWith("/rti/all/")) return true;
+      const firstSegment = /^\/rti\/([^/]+)/.exec(pathname)?.[1];
+      return !!firstSegment && !RTI_OWN_SUBPAGES.has(firstSegment);
+    },
+  },
   { href: "/rti/new", label: "New RTI", labelKey: "nav.newRti", icon: FilePlus2, group: "rti" },
   { href: "/rti/calendar", label: "RTI Calendar", labelKey: "nav.rtiCalendar", icon: CalendarClock, group: "rti" },
   { href: "/rti/reports", label: "RTI Reports", labelKey: "nav.rtiReports", icon: BarChart3, group: "rti" },

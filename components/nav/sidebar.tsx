@@ -57,10 +57,14 @@ export function Sidebar({
   const [collapsed, setCollapsed] = React.useState(false);
   const { t } = useTranslation("navigation");
 
-  const activeHref = NAV_ITEMS.map((i) => i.href)
-    .filter((href) =>
-      href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"),
-    )
+  const activeHref = NAV_ITEMS.filter((item) =>
+    item.isActive
+      ? item.isActive(pathname)
+      : item.href === "/"
+        ? pathname === "/"
+        : pathname === item.href || pathname.startsWith(item.href + "/"),
+  )
+    .map((item) => item.href)
     .sort((a, b) => b.length - a.length)[0];
 
   const NavLink = ({ item }: { item: (typeof NAV_ITEMS)[number] }) => {
