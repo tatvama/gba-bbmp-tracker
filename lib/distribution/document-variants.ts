@@ -22,6 +22,10 @@ export interface DocumentVariantDescriptor {
 export const DOCUMENT_VARIANTS = {
   recipient: { key: "recipient", documentType: null, includesFullDistribution: false },
   office: { key: "office", documentType: "Office copy (PDF)", marker: "OFFICE COPY - NOT FOR DISPATCH", includesFullDistribution: true },
+  // A copy of the letter re-addressed to a division's TVCC (Technical Vigilance &
+  // Control Cell) — same complaint body, TVCC addressee. Linked to the primary
+  // letter via parent_document_id, exactly like the office copy.
+  tvcc_copy: { key: "tvcc_copy", documentType: "TVCC copy (PDF)", includesFullDistribution: false },
   // Reserved (no renderer registered yet):
   signed: { key: "signed", documentType: "Signed copy (PDF)", includesFullDistribution: false, reserved: true },
   dispatch: { key: "dispatch", documentType: "Dispatch copy (PDF)", includesFullDistribution: false, reserved: true },

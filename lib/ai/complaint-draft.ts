@@ -67,6 +67,19 @@ export interface ComplaintDraftInput {
    * request-free escalation scheduler supplies it. Ignored for other kinds.
    */
   sender?: LegalNoticeSender;
+  /**
+   * Override the recipient (TO) block with these verbatim lines (designation +
+   * address, no "To," prefix) instead of the resolved ward officer. Used to
+   * address a copy to a specific office such as a division's TVCC. Ignored for
+   * `legal_notice` (always the Hon'ble Chief Justice).
+   */
+  recipientOverride?: string[];
+  /**
+   * Override the FROM / signatory block for a non-PIL letter (name + address +
+   * mobile). Used when the sender is asked at draft time (e.g. the TVCC copy)
+   * rather than taken from the saved signatory registry.
+   */
+  senderOverride?: { name: string; address: string; mobile?: string | null };
 }
 
 /** Real pipeline stages a caller can surface as a live status (e.g. a
@@ -103,6 +116,7 @@ function complaintContext(
     legalSender?: LegalNoticeSender | null;
     today: string;
     wardOfficer?: OfficerRecipient | null;
+    recipientOverride?: string[];
   },
 ): string {
   const isPil = opts.kind === "legal_notice";
@@ -122,6 +136,8 @@ function complaintContext(
   const wo = opts.wardOfficer ?? null;
   const toLines = isPil
     ? HIGH_COURT_CHIEF_JUSTICE_TO
+    : opts.recipientOverride && opts.recipientOverride.length
+    ? opts.recipientOverride
     : c.assigned_engineer
     ? [
         `The ${c.assigned_engineer.designation || "Executive Engineer"}`,
@@ -240,7 +256,9 @@ export async function runComplaintDraft(
   const { data: ld } = await admin
     .from("letter_drafts").select("signatory_key").eq("complaint_id", input.complaintId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   const sigs = LETTER_SIGNATORIES as Record<string, { name: string; address: string; mobile: string | null }>;
-  const signatory = sigs[(ld?.signatory_key as string) || "raghav_gowda"] ?? sigs.raghav_gowda ?? null;
+  const signatory = input.senderOverride
+    ? { name: input.senderOverride.name, address: input.senderOverride.address, mobile: input.senderOverride.mobile ?? null }
+    : (sigs[(ld?.signatory_key as string) || "raghav_gowda"] ?? sigs.raghav_gowda ?? null);
 
   // A legal notice is drafted as a PIL letter petition to the Hon'ble Chief
   // Justice — its FROM / signature block uses the richer petitioner identity
@@ -276,7 +294,7 @@ export async function runComplaintDraft(
     console.warn("[complaint-draft] case intelligence failed, using case history", input.complaintId, e);
     evidenceBlock = `=== CASE HISTORY (draw the body from this) ===\n${await buildCaseHistory(admin, input.complaintId, jobNo)}`;
   }
-  const baseContext = `${complaintContext(c as Record<string, any>, { kind: input.kind, signatory, legalSender, today: todayISO(), wardOfficer })}\n\n${evidenceBlock}`;
+  const baseContext = `${complaintContext(c as Record<string, any>, { kind: input.kind, signatory, legalSender, today: todayISO(), wardOfficer, recipientOverride: input.recipientOverride })}\n\n${evidenceBlock}`;
 
   // Additive legal-framework enrichment: resolve the applicable Acts / Rules /
   // Sections for this complaint from the curated, verified knowledge base and append

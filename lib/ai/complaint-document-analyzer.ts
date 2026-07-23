@@ -273,6 +273,9 @@ export function buildComplaintDraftPrompt(input: {
     clarification_request:
       "Write a short, courteous letter asking the department to CLARIFY specific points that its reply left ambiguous or incomplete — where the response was given but is unclear, internally inconsistent, or does not squarely answer what was asked. List each point needing clarification as a numbered, specific question tied to the case history; do NOT re-argue settled points or make new demands. This is a request for clarity, not an escalation. " +
       CAUTION,
+    tvcc_complaint:
+      "Address this to the Technical Vigilance & Control Cell (T.V.C.C.), headed by the Executive Engineer, of the concerned Greater Bengaluru Authority city corporation — the technical-vigilance body that examines works / engineering irregularities. Open with the case number and the work / job details, set out the documented suspicions and red flags from the case history and the forensic findings, and request a TECHNICAL VIGILANCE ENQUIRY and the production of the specific records. Use the TO (T.V.C.C.) address block given in the context verbatim at the very top, and place the FROM (sender / signatory) block verbatim at the bottom (signature block). " +
+      CAUTION,
   };
   const extra = extraByKind[input.kind] ?? "";
   // The full 21-section formal structure applies to substantive demand/complaint

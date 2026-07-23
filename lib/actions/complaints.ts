@@ -24,18 +24,21 @@ import {
   COMPLAINT_VERIFY_ROLES,
   STORAGE_BUCKETS,
   R2_STORAGE_SENTINEL,
+  CORP_NAME,
   COMPLAINT_DRAFT_KINDS,
   DEFAULT_LEGAL_NOTICE_SENDER,
   type UserRole,
   type LegalNoticeSender,
+  type CorporationCode,
 } from "@/lib/constants";
-import { getComplaintSettings, getLegalNoticeSender, LEGAL_NOTICE_SENDER_KEY } from "@/lib/settings";
+import { getComplaintSettings, getLegalNoticeSender, LEGAL_NOTICE_SENDER_KEY, getTvccOffices, TVCC_OFFICES_KEY, getTvccSender, TVCC_SENDER_KEY } from "@/lib/settings";
+import { mergeTvccOffices, tvccRecipientLines, DEFAULT_TVCC_SENDER, type TvccOffice, type TvccSender } from "@/lib/distribution/tvcc";
 import { addDays } from "@/lib/rti-deadlines";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
 import { triggerCaseIntelligenceRebuild } from "@/lib/actions/case-intelligence";
-import { fileLetterWithCopies } from "@/lib/distribution/distribution-service";
+import { fileLetterWithCopies, fileTvccCopy } from "@/lib/distribution/distribution-service";
 import { complaintDistributionDeps } from "@/lib/distribution/complaint-deps";
 import type { RecipientRoleKey } from "@/lib/complaints/recipient-roles";
 import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
@@ -1149,7 +1152,7 @@ export async function getLatestComplaintAiDraft(
 export async function fileCounterReplyAction(
   complaintId: string,
   content: string,
-  opts?: { language?: string; recipients?: RecipientRoleKey[] },
+  opts?: { language?: string; recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; tvccLanguage?: string },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
@@ -1173,6 +1176,9 @@ export async function fileCounterReplyAction(
       content,
       reference: counterReplyCase?.internal_case_number ?? null,
       recipients: opts?.recipients,
+      tvccDivision: opts?.tvccDivision ?? null,
+      tvccLanguage: opts?.tvccLanguage ?? opts?.language ?? null,
+      tvccOffice: opts?.tvccDivision ? (await getTvccOffices())[opts.tvccDivision] : null,
       uploadedBy: user.id,
       aiSummaryStatus: isAiConfigured() ? "generating" : "none",
     });
@@ -1247,10 +1253,15 @@ export async function fileCommunicationDraftAction(
   complaintId: string,
   content: string,
   kind: ComplaintDraftKind,
-  opts?: { recipients?: RecipientRoleKey[] },
+  opts?: { recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; language?: string; tvccLanguage?: string },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   if (kind === "counter_reply") {
-    return fileCounterReplyAction(complaintId, content, { recipients: opts?.recipients });
+    return fileCounterReplyAction(complaintId, content, {
+      recipients: opts?.recipients,
+      tvccDivision: opts?.tvccDivision ?? null,
+      language: opts?.language,
+      tvccLanguage: opts?.tvccLanguage,
+    });
   }
 
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
@@ -1274,6 +1285,9 @@ export async function fileCommunicationDraftAction(
       content,
       reference: compCase?.internal_case_number ?? null,
       recipients: opts?.recipients,
+      tvccDivision: opts?.tvccDivision ?? null,
+      tvccLanguage: opts?.tvccLanguage ?? null,
+      tvccOffice: opts?.tvccDivision ? (await getTvccOffices())[opts.tvccDivision] : null,
       uploadedBy: user.id,
       aiSummaryStatus: isAiConfigured() ? "generating" : "none",
     });
@@ -1353,7 +1367,7 @@ export async function fileCommunicationDraftAction(
 export async function fileEscalationAction(
   complaintId: string,
   content: string,
-  opts?: { kind?: ComplaintDraftKind; title?: string; language?: string; recipients?: RecipientRoleKey[] },
+  opts?: { kind?: ComplaintDraftKind; title?: string; language?: string; recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; tvccLanguage?: string },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
@@ -1376,6 +1390,9 @@ export async function fileEscalationAction(
       content,
       reference: escalationCase?.internal_case_number ?? null,
       recipients: opts?.recipients,
+      tvccDivision: opts?.tvccDivision ?? null,
+      tvccLanguage: opts?.tvccLanguage ?? opts?.language ?? null,
+      tvccOffice: opts?.tvccDivision ? (await getTvccOffices())[opts.tvccDivision] : null,
       uploadedBy: user.id,
       aiSummaryStatus: isAiConfigured() ? "generating" : "none",
     });
@@ -1413,6 +1430,155 @@ export async function fileEscalationAction(
   void triggerAdvisorAnalysis(complaintId);
   void triggerCaseIntelligenceRebuild(complaintId);
   return { ok: true, documentId };
+}
+
+/**
+ * Prepare a complaint copy for the chosen division's TVCC (Technical Vigilance &
+ * Control Cell). Used at the Submit stage. Rather than mechanically re-address
+ * the existing letter, this AI-DRAFTS a proper formal complaint letter (same
+ * pipeline / format as every other draft) addressed TO the TVCC and FROM the
+ * given sender (asked in the dialog, pre-filled from the saved default), then
+ * stores it as a `tvcc_copy` variant linked to the primary letter (if any).
+ */
+export async function fileComplaintTvccCopyAction(
+  complaintId: string,
+  opts: { division: CorporationCode; language?: DraftLanguage; office?: TvccOffice | null; sender?: TvccSender },
+): Promise<{ ok: boolean; documentId?: string; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const { user, admin } = a;
+
+  const { data: comp } = await admin
+    .from("complaints")
+    .select("internal_case_number")
+    .eq("id", complaintId)
+    .single();
+
+  const office = opts.office ?? (await getTvccOffices())[opts.division];
+  const sender = opts.sender ?? (await getTvccSender());
+  const language: DraftLanguage = opts.language ?? "Kannada";
+
+  // The stored primary complaint letter document — used as the parent for lineage.
+  const { data: letterDocs } = await admin
+    .from("complaint_documents")
+    .select("id, document_type, created_at")
+    .eq("complaint_id", complaintId)
+    .in("document_type", ["Generated complaint letter (PDF)", "Generated complaint letter"])
+    .order("created_at", { ascending: false });
+  const primaryDoc =
+    (letterDocs ?? []).find((d) => d.document_type === "Generated complaint letter (PDF)") ??
+    (letterDocs ?? [])[0] ??
+    null;
+
+  // AI-draft a proper complaint letter addressed to the TVCC, FROM the sender.
+  const draft = await runComplaintDraft(admin, {
+    complaintId,
+    kind: "tvcc_complaint",
+    language,
+    recipientOverride: tvccRecipientLines(office, language),
+    senderOverride: { name: sender.name, address: sender.address, mobile: sender.mobile || null },
+  });
+  if (!draft.ok || !draft.text) {
+    return { ok: false, error: draft.error ?? "Could not draft the TVCC complaint letter (is the AI key configured?)." };
+  }
+
+  let filed: Awaited<ReturnType<typeof fileTvccCopy>>;
+  try {
+    filed = await fileTvccCopy(complaintDistributionDeps(admin), {
+      complaintId,
+      contentOverride: draft.text,
+      title: "TVCC complaint",
+      reference: comp?.internal_case_number ?? null,
+      division: opts.division,
+      office,
+      language,
+      parentDocumentId: primaryDoc?.id ?? null,
+      uploadedBy: user.id,
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not store the TVCC copy." };
+  }
+
+  // Structured AI summary from the letter text (background; text already stored).
+  if (isAiConfigured()) {
+    void analyzeDocumentById(filed.tvccCopyDocId, { force: true, ensureOcr: false }).catch((e) =>
+      console.error("[tvcc-copy] summary generation failed", e),
+    );
+  }
+
+  await addTimeline(admin, {
+    complaintId,
+    eventType: "Note",
+    title: "TVCC complaint copy prepared",
+    summary: `An AI-drafted complaint letter addressed to the Executive Engineer, T.V.C.C., ${CORP_NAME[opts.division]} City Corporation was prepared and stored with the case.`,
+    relatedDocumentId: filed.tvccCopyDocId,
+    createdBy: user.id,
+  });
+
+  revalidatePath(`/complaints/${complaintId}`);
+  return { ok: true, documentId: filed.tvccCopyDocId };
+}
+
+/** The TVCC office addresses (saved edits overlaid on the seed) — pre-fills the
+ *  editable dialog. Auth-gated wrapper over the shared settings reader. */
+export async function getTvccOfficesAction(): Promise<{ offices: Record<CorporationCode, TvccOffice> }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { offices: mergeTvccOffices() };
+  return { offices: await getTvccOffices() };
+}
+
+/**
+ * Persist one division's TVCC address as the org-wide default (app_settings
+ * `tvcc_offices`), so the next copy — from any user, at Submit or a follow-up —
+ * is addressed with it. Empty lines are dropped; an all-empty save falls back to
+ * the seed at read time (mergeTvccOffices).
+ */
+export async function saveTvccOfficeAction(
+  code: CorporationCode,
+  office: { addressLinesEn: string[]; addressLinesKn: string[] },
+): Promise<{ ok: boolean; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const clean = (lines: unknown): string[] =>
+    Array.isArray(lines) ? lines.map((l) => (typeof l === "string" ? l.trim() : "")).filter(Boolean) : [];
+  const { data } = await a.admin.from("app_settings").select("value").eq("key", TVCC_OFFICES_KEY).maybeSingle();
+  const current = (data?.value ?? {}) as Record<string, unknown>;
+  const next = {
+    ...current,
+    [code]: { addressLinesEn: clean(office.addressLinesEn), addressLinesKn: clean(office.addressLinesKn) },
+  };
+  const { error } = await a.admin.from("app_settings").upsert(
+    { key: TVCC_OFFICES_KEY, value: next, updated_by: a.user.id, updated_at: new Date().toISOString() },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/** The saved default FROM / signatory for a TVCC complaint copy — pre-fills the
+ *  "from address" fields in the copy dialog. Auth-gated wrapper. */
+export async function getTvccSenderAction(): Promise<{ sender: TvccSender }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { sender: DEFAULT_TVCC_SENDER };
+  return { sender: await getTvccSender() };
+}
+
+/** Persist the TVCC complaint sender (FROM) as the org-wide default. */
+export async function saveTvccSenderAction(sender: TvccSender): Promise<{ ok: boolean; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const trim = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const value: TvccSender = {
+    name: trim(sender.name) || DEFAULT_TVCC_SENDER.name,
+    address: trim(sender.address) || DEFAULT_TVCC_SENDER.address,
+    mobile: trim(sender.mobile),
+  };
+  const { error } = await a.admin.from("app_settings").upsert(
+    { key: TVCC_SENDER_KEY, value, updated_by: a.user.id, updated_at: new Date().toISOString() },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export interface ReplyFile {

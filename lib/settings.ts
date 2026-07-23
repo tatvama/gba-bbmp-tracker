@@ -11,13 +11,17 @@ import {
   type ForensicsRules,
   DEFAULT_LEGAL_NOTICE_SENDER,
   type LegalNoticeSender,
+  type CorporationCode,
 } from "@/lib/constants";
+import { mergeTvccOffices, DEFAULT_TVCC_SENDER, type TvccOffice, type TvccSender } from "@/lib/distribution/tvcc";
 
 export const DEADLINE_RULES_KEY = "rti_deadline_rules";
 export const COMPLAINT_SETTINGS_KEY = "complaint_settings";
 export const PHOTO_DEDUPE_RULES_KEY = "photo_dedupe_rules";
 export const FORENSICS_RULES_KEY = "forensics_rules";
 export const LEGAL_NOTICE_SENDER_KEY = "legal_notice_sender";
+export const TVCC_OFFICES_KEY = "tvcc_offices";
+export const TVCC_SENDER_KEY = "tvcc_sender";
 
 /**
  * Read the configurable RTI deadline rules from app_settings, falling back to the
@@ -93,6 +97,44 @@ export async function getLegalNoticeSender(): Promise<LegalNoticeSender> {
     return { ...DEFAULT_LEGAL_NOTICE_SENDER, ...value };
   } catch {
     return DEFAULT_LEGAL_NOTICE_SENDER;
+  }
+}
+
+/**
+ * Read the TVCC office addresses — the user's saved per-division edits overlaid
+ * on the hardcoded seed (mergeTvccOffices guarantees a complete, usable map even
+ * when nothing is saved or the DB is unreachable). Used to pre-fill the editable
+ * dialog and to render the addressee on a filed TVCC copy.
+ */
+export async function getTvccOffices(): Promise<Record<CorporationCode, TvccOffice>> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", TVCC_OFFICES_KEY)
+      .maybeSingle();
+    const saved = (data?.value ?? {}) as Partial<Record<CorporationCode, Partial<TvccOffice>>>;
+    return mergeTvccOffices(saved);
+  } catch {
+    return mergeTvccOffices();
+  }
+}
+
+/** Read the saved default FROM / signatory for a TVCC complaint copy, merged
+ *  over the seed default. Pre-fills the "from address" fields in the copy dialog. */
+export async function getTvccSender(): Promise<TvccSender> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", TVCC_SENDER_KEY)
+      .maybeSingle();
+    const value = (data?.value ?? {}) as Partial<TvccSender>;
+    return { ...DEFAULT_TVCC_SENDER, ...value };
+  } catch {
+    return DEFAULT_TVCC_SENDER;
   }
 }
 

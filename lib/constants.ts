@@ -534,6 +534,7 @@ export const COMPLAINT_DRAFT_KINDS = {
   clarification_request: "Clarification request to department",
   reminder_letter: "Reminder letter (no reply received)",
   legal_notice: "Legal notice (failure to reply/act)",
+  tvcc_complaint: "TVCC complaint (Technical Vigilance Cell)",
 } as const;
 export type ComplaintDraftKind = keyof typeof COMPLAINT_DRAFT_KINDS;
 

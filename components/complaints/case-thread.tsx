@@ -29,6 +29,8 @@ type ThreadEntry = {
   viewer?: ViewerTarget;
   /** The office copy filed alongside this outbound letter, if any. */
   officeViewer?: ViewerTarget;
+  /** A copy re-addressed to the division's TVCC, filed alongside this letter. */
+  tvccViewer?: ViewerTarget;
   createdByProfile?: { name: string; role: string } | null;
 };
 
@@ -66,12 +68,14 @@ export function CaseThread({
   // correspondence — index them by parent so they attach as a secondary action,
   // and skip them as top-level entries below.
   const officeByParent = new Map<string, ComplaintDocument>();
+  const tvccByParent = new Map<string, ComplaintDocument>();
   for (const d of documents) {
     if (d.doc_variant === "office" && d.parent_document_id) officeByParent.set(d.parent_document_id, d);
+    if (d.doc_variant === "tvcc_copy" && d.parent_document_id) tvccByParent.set(d.parent_document_id, d);
   }
 
   for (const d of documents) {
-    if (d.doc_variant === "office") continue;
+    if (d.doc_variant === "office" || d.doc_variant === "tvcc_copy") continue;
     const t = d.document_type;
     const target: ViewerTarget = {
       documentId: d.id,
@@ -97,7 +101,8 @@ export function CaseThread({
     }
   }
 
-  // Attach each letter's office copy (if any) as a secondary action on its entry.
+  // Attach each letter's office copy and/or TVCC copy (if any) as secondary
+  // actions on its entry.
   for (const entry of entries) {
     const office = officeByParent.get(entry.id);
     if (office) {
@@ -107,6 +112,16 @@ export function CaseThread({
         mimeType: office.mime_type,
         fileName: office.original_file_name,
         fallbackText: office.ocr_clean_text,
+      };
+    }
+    const tvcc = tvccByParent.get(entry.id);
+    if (tvcc) {
+      entry.tvccViewer = {
+        documentId: tvcc.id,
+        title: tvcc.title || "TVCC copy",
+        mimeType: tvcc.mime_type,
+        fileName: tvcc.original_file_name,
+        fallbackText: tvcc.ocr_clean_text,
       };
     }
   }
@@ -192,6 +207,11 @@ export function CaseThread({
                   {e.officeViewer && (
                     <Button size="sm" variant="ghost" onClick={() => setViewTarget(e.officeViewer!)}>
                       <FileText className="h-4 w-4 mr-1" /> Office copy
+                    </Button>
+                  )}
+                  {e.tvccViewer && (
+                    <Button size="sm" variant="ghost" onClick={() => setViewTarget(e.tvccViewer!)}>
+                      <FileText className="h-4 w-4 mr-1" /> TVCC copy
                     </Button>
                   )}
                   {(() => {

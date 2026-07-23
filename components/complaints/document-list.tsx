@@ -119,13 +119,25 @@ export function DocumentList({
     return <EmptyState icon={FileText} title="No documents yet" description="Upload complaint papers, replies, ATRs, or site photos above." />;
   }
 
-  // Office copies are a variant of their parent letter — nest them under it
-  // rather than listing them as standalone documents.
-  const officeByParent = new Map<string, ComplaintDocument>();
+  // Office copies and TVCC copies are variants of their parent letter — nest
+  // them under it rather than listing them as standalone documents. A variant
+  // whose parent isn't in this list (orphan) still shows top-level so it's never
+  // hidden.
+  const NESTED_VARIANTS = new Set(["office", "tvcc_copy"]);
+  const docIds = new Set(documents.map((d) => d.id));
+  const childrenByParent = new Map<string, ComplaintDocument[]>();
   for (const d of documents) {
-    if (d.doc_variant === "office" && d.parent_document_id) officeByParent.set(d.parent_document_id, d);
+    if (NESTED_VARIANTS.has(d.doc_variant ?? "") && d.parent_document_id && docIds.has(d.parent_document_id)) {
+      const arr = childrenByParent.get(d.parent_document_id) ?? [];
+      arr.push(d);
+      childrenByParent.set(d.parent_document_id, arr);
+    }
   }
-  const topLevel = documents.filter((d) => d.doc_variant !== "office");
+  const topLevel = documents.filter(
+    (d) => !(NESTED_VARIANTS.has(d.doc_variant ?? "") && d.parent_document_id && docIds.has(d.parent_document_id)),
+  );
+  const nestedLabel = (d: ComplaintDocument) =>
+    d.doc_variant === "office" ? "Office copy (full internal distribution)" : d.title || "TVCC copy";
 
   return (
     <>
@@ -231,15 +243,15 @@ export function DocumentList({
                 )}
               </div>
 
-              {officeByParent.get(d.id) && (
-                <div className="mt-2 flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-2 text-xs">
+              {(childrenByParent.get(d.id) ?? []).map((child) => (
+                <div key={child.id} className="mt-2 flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-2 text-xs">
                   <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">Office copy (full internal distribution)</span>
-                  <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => view(officeByParent.get(d.id)!)}>
+                  <span className="text-muted-foreground">{nestedLabel(child)}</span>
+                  <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => view(child)}>
                     <Eye className="h-3.5 w-3.5" /> View
                   </Button>
                 </div>
-              )}
+              ))}
             </li>
           );
         })}

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Send, FileCheck2, MessageSquareReply, Gavel, Loader2, Save, ScrollText, AlertTriangle, Check, ChevronRight, Bell,
-  FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil, Sparkles, FileSearch, Download,
+  FileText, Eye, Search, Printer, CircleCheck, RotateCcw, Pencil, Sparkles, FileSearch, Download, ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,8 +21,11 @@ import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
 import { LegalNoticeSenderDialog } from "@/components/complaints/legal-notice-sender-dialog";
 import { RecipientSelector } from "@/components/complaints/recipient-selector";
+import { TvccCopyOption, type TvccCopySelection } from "@/components/complaints/tvcc-copy-option";
+import { TvccCopyDialog, type TvccCopyConfirm } from "@/components/complaints/tvcc-copy-dialog";
 import { useRecipientSelection } from "@/lib/complaints/client/use-recipient-selection";
 import { corporationOfficeName } from "@/lib/complaints/recipient-roles";
+import { corporationCodeFromName, TVCC_DIVISION_OPTIONS } from "@/lib/distribution/tvcc";
 import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import { EscalationDeadlineBadge } from "@/components/complaints/escalation-deadline-badge";
 import { openDraftPdf } from "@/lib/print-letter";
@@ -40,6 +43,9 @@ import {
   fileCounterReplyAction,
   fileEscalationAction,
   fileCommunicationDraftAction,
+  fileComplaintTvccCopyAction,
+  saveTvccOfficeAction,
+  saveTvccSenderAction,
   listComplaintReplyFilesAction,
   generateDocumentSummaryAction,
   getDocumentViewUrl,
@@ -51,7 +57,7 @@ import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import type { ComplaintDocument } from "@/lib/types";
-import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage, type LegalNoticeSender } from "@/lib/constants";
+import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage, type LegalNoticeSender, type CorporationCode } from "@/lib/constants";
 
 export interface WorkflowLetter {
   letterId: string | null;
@@ -161,6 +167,9 @@ export function CaseWorkflow({
   const router = useRouter();
   const searchParams = useSearchParams();
   const reached = stepFromStatus(status);
+  // Pre-select the TVCC division from the complaint's own corporation when known
+  // (nullable / GBA-ward cases fall through to an unset picker the user fills in).
+  const defaultTvccDivision = React.useMemo(() => corporationCodeFromName(corporationName), [corporationName]);
   // Honor a ?step= deep link (e.g. the AI advisor's "Draft escalation letter"
   // opens ?step=escalate) over the default step, as long as it's not locked.
   const stepParam = searchParams.get("step");
@@ -340,6 +349,7 @@ export function CaseWorkflow({
             busyId={busyId}
             submittedDate={submittedDate ?? null}
             submissionChannel={submissionChannel ?? null}
+            defaultTvccDivision={defaultTvccDivision}
           />
         )}
 
@@ -486,13 +496,14 @@ export function CaseWorkflow({
                 escalationStageDeadline={escalationStageDeadline}
                 acknowledgmentDate={acknowledgmentDate}
                 corporationName={corporationName}
+                defaultTvccDivision={defaultTvccDivision}
               />
             </div>
           </StepPanel>
         )}
 
         {active === "escalate" && (
-          <EscalatePanel complaintId={complaintId} caseNumber={caseNumber} aiConfigured={aiConfigured} corporationName={corporationName} onEscalated={() => router.refresh()} />
+          <EscalatePanel complaintId={complaintId} caseNumber={caseNumber} aiConfigured={aiConfigured} corporationName={corporationName} defaultTvccDivision={defaultTvccDivision} onEscalated={() => router.refresh()} />
         )}
 
         {active === "close" && (
@@ -535,6 +546,7 @@ function SubmitPanel({
   busyId,
   submittedDate,
   submissionChannel,
+  defaultTvccDivision,
 }: {
   complaintId: string;
   jobNumber: string | null;
@@ -548,6 +560,7 @@ function SubmitPanel({
   busyId: string | null;
   submittedDate: string | null;
   submissionChannel: string | null;
+  defaultTvccDivision: CorporationCode | null;
 }) {
   const [submittedDateInput, setSubmittedDateInput] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [channel, setChannel] = React.useState<string>(SUBMIT_CHANNELS[0]);
@@ -560,8 +573,31 @@ function SubmitPanel({
   const [printStatus, setPrintStatus] = React.useState(letter?.printStatus ?? "none");
   const [printedAt, setPrintedAt] = React.useState(letter?.printedAt ?? null);
   const [printedByName, setPrintedByName] = React.useState(letter?.printedByName ?? null);
+  const [tvccDialogOpen, setTvccDialogOpen] = React.useState(false);
+  const [tvccBusy, setTvccBusy] = React.useState(false);
+  const [tvccMsg, setTvccMsg] = React.useState<string | null>(null);
 
   const hasLetter = Boolean(letter && (letter.text || letter.pdfDocId || letter.docxDocId));
+  const tvccCopies = documents.filter((d) => d.doc_variant === "tvcc_copy");
+
+  async function handleTvccConfirm({ division, language, office, sender }: TvccCopyConfirm) {
+    setTvccBusy(true);
+    setError(null);
+    setTvccMsg(null);
+    // Save the (possibly edited) TO address + FROM details as the org-wide
+    // defaults, then AI-draft the complaint letter addressed to that TVCC.
+    await Promise.all([
+      saveTvccOfficeAction(division, { addressLinesEn: office.addressLinesEn, addressLinesKn: office.addressLinesKn }),
+      saveTvccSenderAction(sender),
+    ]);
+    const r = await fileComplaintTvccCopyAction(complaintId, { division, language, office, sender });
+    setTvccBusy(false);
+    if (!r.ok) { setError(r.error ?? "Could not prepare the TVCC copy."); return; }
+    setTvccDialogOpen(false);
+    const label = TVCC_DIVISION_OPTIONS.find((o) => o.code === division)?.label ?? "the selected division";
+    setTvccMsg(`TVCC complaint copy drafted for ${label} and stored with the case.`);
+    onFiled();
+  }
   const letterDoc = documents.find((d) => d.id === letter?.pdfDocId || d.id === letter?.docxDocId);
   // Only bill_stop / forensic-imported letters go through the print queue
   // (letterId present + printStatus tracked); manually drafted letters skip
@@ -677,6 +713,50 @@ function SubmitPanel({
         </div>
       )}
 
+      {/* Prepare an AI-drafted complaint copy addressed to the division's TVCC */}
+      {(
+        <div className="space-y-2.5 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+          <div>
+            <p className="flex items-center gap-1.5 text-sm font-medium">
+              <ShieldAlert className="h-4 w-4 text-muted-foreground" /> Copy to the TVCC (Technical Vigilance &amp; Control Cell)
+            </p>
+            <p className="text-xs text-muted-foreground">
+              AI-drafts a formal complaint letter (standard letter format) addressed to the Executive Engineer, T.V.C.C. of the concerned division. You pick the division, confirm/edit the office (TO) address and your own (FROM) details, and choose the language.
+            </p>
+          </div>
+          <div>
+            <Button size="sm" onClick={() => setTvccDialogOpen(true)} disabled={tvccBusy}>
+              {tvccBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Prepare TVCC copy…
+            </Button>
+          </div>
+          <TvccCopyDialog
+            open={tvccDialogOpen}
+            onOpenChange={setTvccDialogOpen}
+            defaultDivision={defaultTvccDivision}
+            busy={tvccBusy}
+            onConfirm={handleTvccConfirm}
+          />
+          {tvccMsg && (
+            <p className="flex items-start gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {tvccMsg}
+            </p>
+          )}
+          {tvccCopies.length > 0 && (
+            <ul className="space-y-1">
+              {tvccCopies.map((d) => (
+                <li key={d.id} className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-2 text-xs">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">{d.title || "TVCC copy"}</span>
+                  <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => setViewTarget({ documentId: d.id, title: d.title || "TVCC copy", mimeType: d.mime_type, fileName: d.original_file_name })}>
+                    <Eye className="h-3.5 w-3.5" /> View
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Print status — the cycle starts here for imported letters */}
       {!filed && isTracked && (
         <div className={`flex flex-wrap items-center gap-2.5 rounded-md border p-3 ${isPrinted ? "border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-950/20" : "border-amber-200 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/20"}`}>
@@ -788,6 +868,7 @@ function CounterReplyPanel({
   escalationStageDeadline,
   acknowledgmentDate,
   corporationName,
+  defaultTvccDivision,
 }: {
   complaintId: string;
   aiConfigured: boolean;
@@ -798,6 +879,7 @@ function CounterReplyPanel({
   escalationStageDeadline?: string | null;
   acknowledgmentDate?: string | null;
   corporationName?: string | null;
+  defaultTvccDivision?: CorporationCode | null;
 }) {
   const router = useRouter();
   const [gap, setGap] = React.useState<ReplyGap | null>(null);
@@ -817,6 +899,7 @@ function CounterReplyPanel({
   const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
   const [selectedKind, setSelectedKind] = React.useState<ComplaintDraftKind>("counter_reply");
   const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, selectedKind);
+  const [tvccCopy, setTvccCopy] = React.useState<TvccCopySelection>({ division: null, language: "Kannada" });
   const recipientOfficeOverrides = React.useMemo(
     () => (corporationName ? { zonal_commissioner: corporationOfficeName(corporationName) } : undefined),
     [corporationName],
@@ -963,8 +1046,8 @@ function CounterReplyPanel({
     setError(null);
     setSavedMsg(null);
     const r = selectedKind === "counter_reply"
-      ? await fileCounterReplyAction(complaintId, draft, { recipients })
-      : await fileCommunicationDraftAction(complaintId, draft, selectedKind, { recipients });
+      ? await fileCounterReplyAction(complaintId, draft, { recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language })
+      : await fileCommunicationDraftAction(complaintId, draft, selectedKind, { recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language });
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file."); return; }
     clearRecipients();
@@ -1225,6 +1308,7 @@ function CounterReplyPanel({
             </p>
           )}
           <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} officeOverrides={recipientOfficeOverrides} />
+          <TvccCopyOption defaultDivision={defaultTvccDivision ?? null} onChange={setTvccCopy} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit {COMPLAINT_DRAFT_KINDS[selectedKind]}
@@ -1307,12 +1391,14 @@ function EscalatePanel({
   caseNumber,
   aiConfigured,
   corporationName,
+  defaultTvccDivision,
   onEscalated,
 }: {
   complaintId: string;
   caseNumber: string | null;
   aiConfigured: boolean;
   corporationName?: string | null;
+  defaultTvccDivision?: CorporationCode | null;
   onEscalated: () => void;
 }) {
   const [generating, setGenerating] = React.useState<ComplaintDraftKind | null>(null);
@@ -1329,6 +1415,7 @@ function EscalatePanel({
   const [pdfBusy, setPdfBusy] = React.useState(false);
   const [filing, setFiling] = React.useState(false);
   const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, "escalate");
+  const [tvccCopy, setTvccCopy] = React.useState<TvccCopySelection>({ division: null, language: "Kannada" });
   const recipientOfficeOverrides = React.useMemo(
     () => (corporationName ? { zonal_commissioner: corporationOfficeName(corporationName) } : undefined),
     [corporationName],
@@ -1352,7 +1439,7 @@ function EscalatePanel({
     setFiling(true);
     setError(null);
     setSavedMsg(null);
-    const r = await fileEscalationAction(complaintId, draft, { kind, title: COMPLAINT_DRAFT_KINDS[kind], recipients });
+    const r = await fileEscalationAction(complaintId, draft, { kind, title: COMPLAINT_DRAFT_KINDS[kind], recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language });
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file the escalation."); return; }
     clearRecipients();
@@ -1449,6 +1536,7 @@ function EscalatePanel({
             </p>
           )}
           <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} officeOverrides={recipientOfficeOverrides} />
+          <TvccCopyOption defaultDivision={defaultTvccDivision ?? null} onChange={setTvccCopy} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
               <FileCheck2 className="h-4 w-4" /> View / Edit Escalation Letter

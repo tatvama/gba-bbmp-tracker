@@ -1,10 +1,12 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { R2_STORAGE_SENTINEL } from "@/lib/constants";
+import { R2_STORAGE_SENTINEL, type CorporationCode } from "@/lib/constants";
 import { officeCopyRoleKeys, type RecipientRoleKey } from "@/lib/complaints/recipient-roles";
 import { DOCUMENT_VARIANTS } from "./document-variants";
 import { applyCopyTo, buildCopyToBlock, officeCopyBody, toRecipientList, type RecipientEnrichment } from "./copy-to";
+import { tvccAddresseeBlock, tvccRecipientSnapshot, TVCC_OFFICES, type TvccOffice } from "./tvcc";
+import { readdressLetterToTvcc } from "./tvcc-copy";
 import type { StoragePort, VariantRenderer, RecipientResolver } from "./ports";
 
 /**
@@ -36,13 +38,83 @@ export interface FileLetterInput {
   recipients?: RecipientRoleKey[]; // selected Copy-To roles (optional → none)
   uploadedBy: string | null;
   aiSummaryStatus?: string; // "generating" | "none"
+  /** When set, ALSO render a separate copy re-addressed to this division's TVCC
+   *  and link it to the recipient copy (best-effort — never blocks the filing). */
+  tvccDivision?: CorporationCode | null;
+  tvccLanguage?: string | null; // language for the TVCC addressee block ("en" default)
+  /** The resolved (saved-or-seed) office for tvccDivision; seed used if omitted. */
+  tvccOffice?: TvccOffice | null;
 }
 
 export interface FileLetterResult {
   recipientDocId: string;
   officeCopyDocId: string | null;
+  /** The re-addressed TVCC copy id, when a tvccDivision was requested and it rendered. */
+  tvccCopyDocId: string | null;
   /** Recipient-copy markdown (Copy-To applied) — for the caller's ai_drafts row. */
   recipientContent: string;
+}
+
+/** Deps needed to render + store a variant PDF (subset of DistributionDeps). */
+type VariantDeps = Pick<DistributionDeps, "admin" | "storage" | "render">;
+
+/**
+ * Render a letter re-addressed to a division's TVCC and store it as a
+ * `tvcc_copy` variant linked to `parentDocumentId`. Throws on failure so the
+ * standalone Submit-stage action can surface it; the follow-up path wraps this
+ * best-effort so a TVCC hiccup never loses the primary letter.
+ */
+export async function fileTvccCopy(
+  deps: VariantDeps,
+  input: {
+    complaintId: string;
+    baseContent?: string; // the letter markdown to re-address (no Copy-To applied)
+    /** Final letter content already addressed to the TVCC (e.g. AI-drafted) —
+     *  when set, it is stored as-is and re-addressing is skipped. */
+    contentOverride?: string;
+    title: string;
+    reference?: string | null;
+    division: CorporationCode;
+    office?: TvccOffice | null; // resolved (saved-or-seed) address; seed used if omitted
+    language?: string | null;
+    parentDocumentId?: string | null;
+    uploadedBy: string | null;
+  },
+): Promise<{ tvccCopyDocId: string; readdressed: boolean }> {
+  const office = input.office ?? TVCC_OFFICES[input.division];
+  const { content, readdressed } =
+    input.contentOverride != null
+      ? { content: input.contentOverride, readdressed: true }
+      : readdressLetterToTvcc(input.baseContent ?? "", tvccAddresseeBlock(office, input.language ?? null));
+  const pdf = await deps.render(`${input.title} (TVCC Copy)`, content, { reference: input.reference ?? null });
+
+  const key = `complaints/${input.complaintId}/tvcc-copy-${input.division.toLowerCase()}-${Date.now()}.pdf`;
+  await deps.storage.upload({ key, body: pdf.buffer, contentType: "application/pdf", contentLength: pdf.buffer.byteLength });
+  const { data, error } = await deps.admin
+    .from("complaint_documents")
+    .insert({
+      complaint_id: input.complaintId,
+      document_type: DOCUMENT_VARIANTS.tvcc_copy.documentType,
+      title: `${input.title} — TVCC copy`,
+      original_file_name: key.split("/").pop(),
+      storage_bucket: R2_STORAGE_SENTINEL,
+      storage_path: key,
+      mime_type: "application/pdf",
+      file_size: pdf.buffer.byteLength,
+      file_sha256: sha256(pdf.buffer),
+      document_date: todayISO(),
+      ocr_status: "Skipped",
+      ocr_clean_text: content,
+      ai_summary_status: "none",
+      uploaded_by: input.uploadedBy,
+      doc_variant: "tvcc_copy",
+      parent_document_id: input.parentDocumentId ?? null,
+      copy_to: [tvccRecipientSnapshot(office, input.language ?? null)],
+    })
+    .select("id")
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Could not store the TVCC copy.");
+  return { tvccCopyDocId: data.id as string, readdressed };
 }
 
 export async function fileLetterWithCopies(deps: DistributionDeps, input: FileLetterInput): Promise<FileLetterResult> {
@@ -124,5 +196,30 @@ export async function fileLetterWithCopies(deps: DistributionDeps, input: FileLe
     console.error("[distribution] office copy failed (filed letter kept)", input.complaintId, e);
   }
 
-  return { recipientDocId, officeCopyDocId, recipientContent };
+  // 3) TVCC copy — optional, re-addressed to the chosen division. Best-effort
+  // AFTER the primary is safe (same principle as the office copy).
+  let tvccCopyDocId: string | null = null;
+  if (input.tvccDivision) {
+    try {
+      const r = await fileTvccCopy(
+        { admin: deps.admin, storage: deps.storage, render: deps.render },
+        {
+          complaintId: input.complaintId,
+          baseContent: input.content,
+          title: input.title,
+          reference: input.reference ?? null,
+          division: input.tvccDivision,
+          office: input.tvccOffice ?? null,
+          language: input.tvccLanguage ?? null,
+          parentDocumentId: recipientDocId,
+          uploadedBy: input.uploadedBy,
+        },
+      );
+      tvccCopyDocId = r.tvccCopyDocId;
+    } catch (e) {
+      console.error("[distribution] TVCC copy failed (filed letter kept)", input.complaintId, e);
+    }
+  }
+
+  return { recipientDocId, officeCopyDocId, tvccCopyDocId, recipientContent };
 }
