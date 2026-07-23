@@ -59,6 +59,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DeadlineBadge } from "@/components/rti/deadline-badge";
+import { RtiStatusBadge } from "@/components/rti/rti-status-badge";
 import { activeDeadline, daysBetween } from "@/lib/rti-deadlines";
 import { formatDate } from "@/lib/format";
 import { exportRows } from "@/lib/export";
@@ -209,7 +210,14 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
       });
   }, [secondAppeals, byId]);
 
-  // 7. Closed This Month
+  // 7. Formal Complaints Filed (Section 18) — status has no statutory deadline
+  // and no dedicated join table, so it needs its own bucket or it silently
+  // disappears from every other section on this page.
+  const complaintsFiled = React.useMemo(() => {
+    return rtis.filter((r) => r.status === "Complaint Filed").map(mapRtiRow);
+  }, [rtis, mapRtiRow]);
+
+  // 8. Closed This Month
   const closedThisMonth = React.useMemo(() => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     return rtis
@@ -238,6 +246,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
   const filteredIncomplete = React.useMemo(() => filterRows(incompleteReply), [incompleteReply, globalFilter]);
   const filteredFirstAppeals = React.useMemo(() => filterRows(firstAppealsPending), [firstAppealsPending, globalFilter]);
   const filteredSecondAppeals = React.useMemo(() => filterRows(secondAppealsPending), [secondAppealsPending, globalFilter]);
+  const filteredComplaintsFiled = React.useMemo(() => filterRows(complaintsFiled), [complaintsFiled, globalFilter]);
   const filteredClosed = React.useMemo(() => filterRows(closedThisMonth), [closedThisMonth, globalFilter]);
 
   // Total results count matching all filters
@@ -250,7 +259,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
       count += filteredNoReply.length + filteredIncomplete.length;
     }
     if (categoryFilter === "all" || categoryFilter === "appeals") {
-      count += filteredFirstAppeals.length + filteredSecondAppeals.length;
+      count += filteredFirstAppeals.length + filteredSecondAppeals.length + filteredComplaintsFiled.length;
     }
     if (categoryFilter === "all" || categoryFilter === "completed") {
       count += filteredClosed.length;
@@ -264,6 +273,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
     filteredIncomplete,
     filteredFirstAppeals,
     filteredSecondAppeals,
+    filteredComplaintsFiled,
     filteredClosed,
   ]);
 
@@ -327,54 +337,6 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
     { key: "actions", label: "Actions" },
   ];
 
-  // Refined Status Badges (Enterprise Government Style)
-  const renderReportStatusBadge = (status: string) => {
-    let bg = "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700/80";
-    let dot = "bg-slate-400";
-    switch (status) {
-      case "Draft":
-        bg = "bg-slate-50 dark:bg-slate-950/40 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800/80";
-        dot = "bg-slate-400";
-        break;
-      case "Filed":
-      case "Awaiting Reply":
-        bg = "bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/50";
-        dot = "bg-blue-500";
-        break;
-      case "Reply Received":
-      case "FAA Order Received":
-        bg = "bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50";
-        dot = "bg-emerald-500";
-        break;
-      case "Partial Reply":
-        bg = "bg-amber-50/50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 border-amber-100 dark:border-amber-900/50";
-        dot = "bg-amber-500";
-        break;
-      case "Rejected":
-      case "No Reply":
-      case "Second Appeal Filed":
-        bg = "bg-rose-50/50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-400 border-rose-100 dark:border-rose-900/50";
-        dot = "bg-rose-500";
-        break;
-      case "First Appeal Drafted":
-      case "First Appeal Filed":
-        bg = "bg-purple-50/50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-100 dark:border-purple-900/50";
-        dot = "bg-purple-500";
-        break;
-      case "Closed":
-        bg = "bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
-        dot = "bg-slate-500";
-        break;
-    }
-
-    return (
-      <span className={cn("inline-flex items-center gap-1.5 h-6 rounded-md border px-2.5 text-[11px] font-semibold tracking-wide select-none leading-none", bg)}>
-        <span className={cn("h-1.5 w-1.5 rounded-full shrink-0 animate-pulse", dot)} />
-        {status}
-      </span>
-    );
-  };
-
   const renderCell = (row: any, colKey: string) => {
     const val = row[colKey];
     if (colKey === "actions") {
@@ -435,7 +397,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
     }
 
     if (colKey === "status") {
-      return renderReportStatusBadge(val);
+      return <RtiStatusBadge status={val} />;
     }
 
     if (colKey === "due" && row.raw) {
@@ -686,7 +648,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
   const totalRtisCount = rtis.length;
   const criticalCount = overdue.length + dueIn7.length;
   const pendingCount = noReply.length + incompleteReply.length;
-  const appealsCount = firstAppealsPending.length + secondAppealsPending.length;
+  const appealsCount = firstAppealsPending.length + secondAppealsPending.length + complaintsFiled.length;
   const closedCount = rtis.filter(r => r.status === "Closed").length;
   const complianceRate = totalRtisCount ? Math.round((closedCount / totalRtisCount) * 100) : 100;
 
@@ -969,7 +931,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
                 : "text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             )}
           >
-            Appeals ({firstAppealsPending.length + secondAppealsPending.length})
+            Appeals ({firstAppealsPending.length + secondAppealsPending.length + complaintsFiled.length})
           </button>
           <button
             onClick={() => scrollToSection("group-completed")}
@@ -1239,7 +1201,7 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
                   Active Appeal Registries
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100/50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border dark:border-purple-900/50 ml-auto">
-                  {filteredFirstAppeals.length + filteredSecondAppeals.length} active
+                  {filteredFirstAppeals.length + filteredSecondAppeals.length + filteredComplaintsFiled.length} active
                 </span>
               </div>
               <div className="grid gap-6">
@@ -1273,6 +1235,22 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
                   </div>,
                   <div className="flex items-center gap-2 text-[10px] font-extrabold text-purple-500 bg-purple-50/50 dark:bg-purple-950/20 px-2 py-1 rounded border border-purple-100/80 dark:border-purple-900/50">
                     <Info className="h-3 w-3" /> Awaiting Information Commission listing. Keep diary numbers handy.
+                  </div>
+                )}
+                {renderReportCard(
+                  "report-complaints-filed",
+                  "Formal Complaints Filed (Section 18)",
+                  "RTI cases escalated to a formal non-compliance complaint before the Information Commission after the appeals track concluded. No statutory deadline applies here — track hearing notices manually.",
+                  filteredComplaintsFiled.length,
+                  RTI_COLUMNS,
+                  filteredComplaintsFiled,
+                  "rti-complaints-filed",
+                  "border-l-4 border-l-purple-500",
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500">
+                    <FileText className="h-4 w-4" />
+                  </div>,
+                  <div className="flex items-center gap-2 text-[10px] font-extrabold text-purple-500 bg-purple-50/50 dark:bg-purple-950/20 px-2 py-1 rounded border border-purple-100/80 dark:border-purple-900/50">
+                    <Info className="h-3 w-3" /> No SLA tracked. Monitor Commission hearing notices directly.
                   </div>
                 )}
               </div>
