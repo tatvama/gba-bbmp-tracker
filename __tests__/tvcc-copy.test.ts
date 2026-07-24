@@ -6,6 +6,7 @@ import {
   tvccAddresseeBlock,
   tvccRecipientSnapshot,
   corporationCodeFromName,
+  corporationOfficeAddress,
   isCorporationCode,
   resolveTvccLanguage,
   mergeTvccOffices,
@@ -107,6 +108,37 @@ describe("tvcc address directory", () => {
     expect(isCorporationCode("DAKSHINA")).toBe(true);
     expect(isCorporationCode("nope")).toBe(false);
     expect(isCorporationCode(null)).toBe(false);
+  });
+});
+
+describe("corporationOfficeAddress (zonal officer Copy-To stamp)", () => {
+  it("returns the corporation office postal address (no T.V.C.C. designation)", () => {
+    const addr = corporationOfficeAddress(TVCC_OFFICES.DAKSHINA);
+    expect(addr).toContain("Bengaluru South City Corporation");
+    expect(addr).toContain("560068");
+    // It is the plain office address — the Executive Engineer / TVCC designation
+    // is NOT part of it (that belongs to the TVCC copy, not a zonal Copy-To).
+    expect(addr).not.toContain("Executive Engineer");
+    expect(addr).not.toContain("T.V.C.C.");
+  });
+
+  it("renders Kannada when asked", () => {
+    const addr = corporationOfficeAddress(TVCC_OFFICES.UTTARA, "kn");
+    expect(addr).toContain("ಬೆಂಗಳೂರು ಉತ್ತರ ನಗರ ಪಾಲಿಕೆ");
+    expect(addr).toContain("560092");
+  });
+
+  it("bilingual carries both English and Kannada, joined by ' / '", () => {
+    const addr = corporationOfficeAddress(TVCC_OFFICES.KENDRA, "Bilingual");
+    expect(addr).toContain("Bengaluru Central City Corporation");
+    expect(addr).toContain("ಬೆಂಗಳೂರು ಕೇಂದ್ರ ನಗರ ಪಾಲಿಕೆ");
+    expect(addr).toContain(" / ");
+  });
+
+  it("is a single line (no newlines) so it fits one Copy-To entry", () => {
+    for (const code of CORPORATION_CODES) {
+      expect(corporationOfficeAddress(TVCC_OFFICES[code])).not.toContain("\n");
+    }
   });
 });
 

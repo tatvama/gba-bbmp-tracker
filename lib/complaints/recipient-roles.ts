@@ -13,7 +13,7 @@
 export type RecipientRoleKey =
   | "zonal_commissioner"
   | "zonal_chief_engineer"
-  | "accounts_officer"
+  | "deputy_controller_finance"
   | "executive_engineer"
   | "assistant_executive_engineer"
   | "chief_commissioner_gba"
@@ -22,6 +22,7 @@ export type RecipientRoleKey =
   | "minister_incharge_gba"
   | "chief_minister"
   | "lokayukta"
+  | "deputy_lokayukta"
   | "acb_director";
 
 /** Which jurisdiction FK on the complaint scopes the officer lookup. There is no
@@ -55,17 +56,23 @@ export interface RecipientRoleDescriptor {
   matchRoleLevels: string[];
   /** included in the mandatory Office Copy distribution list. */
   officeCopy: boolean;
+  /** When true, this officer sits in one of the 5 GBA city-corporation offices,
+   *  so the filing UI asks which corporation to address the copy to and stamps
+   *  that office's postal address (from the GBA address sheet) onto the Copy-To. */
+  corporationAddressed?: boolean;
   order: number; // canonical display order
 }
 
 export const COMPLAINT_RECIPIENT_ROLES: RecipientRoleDescriptor[] = [
-  // ── BBMP zone & division officers — the mandatory internal Office Copy set,
-  //    resolved per-complaint from its corporation / division / sub-division. ──
-  { key: "zonal_commissioner", title: "Zonal Commissioner", level: "Zone Level", group: "BBMP Zone & Division Officers", jurisdiction: "zone", matchDesignations: ["Zonal Commissioner", "Commissioner"], matchRoleLevels: ["Commissioner", "Special Commissioner"], officeCopy: true, order: 1 },
-  { key: "zonal_chief_engineer", title: "Zonal Chief Engineer", level: "Zone Level", group: "BBMP Zone & Division Officers", jurisdiction: "zone", matchDesignations: ["Chief Engineer"], matchRoleLevels: ["CE"], officeCopy: true, order: 2 },
-  { key: "accounts_officer", title: "Accounts Officer", level: "Division Level", group: "BBMP Zone & Division Officers", jurisdiction: "division", matchDesignations: ["Accounts Officer", "Chief Accounts Officer"], matchRoleLevels: ["AO"], officeCopy: true, order: 3 },
-  { key: "executive_engineer", title: "Executive Engineer", level: "Division Level", group: "BBMP Zone & Division Officers", jurisdiction: "division", matchDesignations: ["Executive Engineer"], matchRoleLevels: ["EE"], officeCopy: true, order: 4 },
-  { key: "assistant_executive_engineer", title: "Assistant Executive Engineer", level: "Sub-Division Level", group: "BBMP Zone & Division Officers", jurisdiction: "subdivision", matchDesignations: ["Assistant Executive Engineer"], matchRoleLevels: ["AEE"], officeCopy: true, order: 5 },
+  // ── BBMP zone & division officers — the mandatory internal Office Copy set.
+  //    Every one sits in a GBA city-corporation office (corporationAddressed),
+  //    so the filing UI asks which of the 5 corporations to address the copy to
+  //    and stamps that office's postal address onto the Copy-To. ──
+  { key: "zonal_commissioner", title: "Zonal Commissioner", level: "Zone Level", group: "BBMP Zone & Division Officers", jurisdiction: "zone", matchDesignations: ["Zonal Commissioner", "Commissioner"], matchRoleLevels: ["Commissioner", "Special Commissioner"], officeCopy: true, corporationAddressed: true, order: 1 },
+  { key: "zonal_chief_engineer", title: "Zonal Chief Engineer", level: "Zone Level", group: "BBMP Zone & Division Officers", jurisdiction: "zone", matchDesignations: ["Chief Engineer"], matchRoleLevels: ["CE"], officeCopy: true, corporationAddressed: true, order: 2 },
+  { key: "deputy_controller_finance", title: "Deputy Controller (Finance)", level: "Zone Level", group: "BBMP Zone & Division Officers", jurisdiction: "state", matchDesignations: ["Deputy Controller (Finance)", "Deputy Controller"], matchRoleLevels: [], officeCopy: true, corporationAddressed: true, order: 3 },
+  { key: "executive_engineer", title: "Executive Engineer", level: "Division Level", group: "BBMP Zone & Division Officers", jurisdiction: "division", matchDesignations: ["Executive Engineer"], matchRoleLevels: ["EE"], officeCopy: true, corporationAddressed: true, order: 4 },
+  { key: "assistant_executive_engineer", title: "Assistant Executive Engineer", level: "Sub-Division Level", group: "BBMP Zone & Division Officers", jurisdiction: "subdivision", matchDesignations: ["Assistant Executive Engineer"], matchRoleLevels: ["AEE"], officeCopy: true, corporationAddressed: true, order: 5 },
   // ── Escalation-ladder authorities (GBA / State Government / statutory bodies).
   //    Fixed offices, resolved globally by designation from the contact directory
   //    (the incumbent's name/address when one is on record; title-only otherwise).
@@ -74,9 +81,10 @@ export const COMPLAINT_RECIPIENT_ROLES: RecipientRoleDescriptor[] = [
   { key: "principal_secretary_udd", title: "The Principal Secretary", level: "Urban Development Department, Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Principal Secretary"], matchRoleLevels: [], officeCopy: false, order: 7 },
   { key: "chief_secretary", title: "The Chief Secretary", level: "Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Secretary"], matchRoleLevels: [], officeCopy: false, order: 8 },
   { key: "minister_incharge_gba", title: "The Minister in-charge", level: "GBA & BWSSB, Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Minister in-charge"], matchRoleLevels: [], officeCopy: false, order: 9 },
-  { key: "chief_minister", title: "The Chief Minister", level: "Government of Karnataka (Chairman, GBA)", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Minister"], matchRoleLevels: [], officeCopy: false, order: 10 },
-  { key: "lokayukta", title: "The Lokayukta", level: "Karnataka Lokayukta", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 11 },
-  { key: "acb_director", title: "The Director / ADGP", level: "Anti-Corruption Bureau (ACB), Karnataka", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Director / ADGP"], matchRoleLevels: [], officeCopy: false, order: 12 },
+  { key: "chief_minister", title: "The Chief Minister", level: "Government of Karnataka (Chairman, GBA), Room No. 323A, 3rd Floor, Vidhana Soudha, Dr. Ambedkar Veedhi, Bengaluru, Karnataka - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Minister"], matchRoleLevels: [], officeCopy: false, order: 10 },
+  { key: "lokayukta", title: "The Honorable Lokayukta", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 11 },
+  { key: "deputy_lokayukta", title: "The Deputy Lokayukta", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Deputy Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 12 },
+  { key: "acb_director", title: "The Director / ADGP", level: "Anti-Corruption Bureau (ACB), Karnataka", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Director / ADGP"], matchRoleLevels: [], officeCopy: false, order: 13 },
 ];
 
 const BY_KEY = new Map(COMPLAINT_RECIPIENT_ROLES.map((r) => [r.key, r]));
@@ -92,6 +100,13 @@ export function isRecipientRoleKey(key: string): key is RecipientRoleKey {
 /** The keys of every role in the mandatory internal Office Copy distribution. */
 export function officeCopyRoleKeys(): RecipientRoleKey[] {
   return COMPLAINT_RECIPIENT_ROLES.filter((r) => r.officeCopy).map((r) => r.key);
+}
+
+/** The keys of the zonal officers whose Copy-To address is a GBA city-corporation
+ *  office (chosen once per letter from the 5 corporations). Excludes the
+ *  fixed-address Deputy Controller (Finance). */
+export function corporationAddressedRoleKeys(): RecipientRoleKey[] {
+  return COMPLAINT_RECIPIENT_ROLES.filter((r) => r.corporationAddressed).map((r) => r.key);
 }
 
 /** "Bengaluru South" (corporations.name) -> "Bengaluru South City Corporation"

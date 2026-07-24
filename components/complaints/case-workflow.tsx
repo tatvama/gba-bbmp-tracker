@@ -23,9 +23,10 @@ import { LegalNoticeSenderDialog } from "@/components/complaints/legal-notice-se
 import { RecipientSelector } from "@/components/complaints/recipient-selector";
 import { TvccCopyOption, type TvccCopySelection } from "@/components/complaints/tvcc-copy-option";
 import { TvccCopyDialog, type TvccCopyConfirm } from "@/components/complaints/tvcc-copy-dialog";
+import { ZonalAddressOption, type ZonalAddressSelection } from "@/components/complaints/zonal-address-option";
 import { useRecipientSelection } from "@/lib/complaints/client/use-recipient-selection";
-import { corporationOfficeName } from "@/lib/complaints/recipient-roles";
-import { corporationCodeFromName, TVCC_DIVISION_OPTIONS } from "@/lib/distribution/tvcc";
+import { corporationAddressedRoleKeys, corporationOfficeName, type RecipientRoleKey } from "@/lib/complaints/recipient-roles";
+import { corporationCodeFromName, TVCC_DIVISION_OPTIONS, TVCC_OFFICES } from "@/lib/distribution/tvcc";
 import { DocumentSummaryModal } from "@/components/complaints/document-summary-modal";
 import { EscalationDeadlineBadge } from "@/components/complaints/escalation-deadline-badge";
 import { openDraftPdf } from "@/lib/print-letter";
@@ -58,6 +59,26 @@ import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import type { ComplaintDocument } from "@/lib/types";
 import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage, type LegalNoticeSender, type CorporationCode } from "@/lib/constants";
+
+/** Zonal officers whose Copy-To address is a chosen GBA city-corporation office. */
+const ZONAL_ADDRESS_KEYS = corporationAddressedRoleKeys();
+const isZonalActive = (recipients: RecipientRoleKey[]) => recipients.some((k) => ZONAL_ADDRESS_KEYS.includes(k));
+
+/** Office text shown against the zonal roles in the Copy-To checklist + preview:
+ *  the chosen corporation's office name once a zonal address division is picked,
+ *  else the complaint's own corporation for the Commissioner (prior behaviour). */
+function zonalOfficeOverrides(
+  zonalDivision: CorporationCode | null,
+  corporationName?: string | null,
+): Partial<Record<RecipientRoleKey, string>> | undefined {
+  if (zonalDivision) {
+    const name = corporationOfficeName(TVCC_OFFICES[zonalDivision].corporationName);
+    const overrides: Partial<Record<RecipientRoleKey, string>> = {};
+    for (const k of ZONAL_ADDRESS_KEYS) overrides[k] = name;
+    return overrides;
+  }
+  return corporationName ? { zonal_commissioner: corporationOfficeName(corporationName) } : undefined;
+}
 
 export interface WorkflowLetter {
   letterId: string | null;
@@ -900,9 +921,10 @@ function CounterReplyPanel({
   const [selectedKind, setSelectedKind] = React.useState<ComplaintDraftKind>("counter_reply");
   const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, selectedKind);
   const [tvccCopy, setTvccCopy] = React.useState<TvccCopySelection>({ division: null, language: "Kannada" });
+  const [zonalAddress, setZonalAddress] = React.useState<ZonalAddressSelection>({ division: null, language: "Kannada" });
   const recipientOfficeOverrides = React.useMemo(
-    () => (corporationName ? { zonal_commissioner: corporationOfficeName(corporationName) } : undefined),
-    [corporationName],
+    () => zonalOfficeOverrides(zonalAddress.division, corporationName),
+    [zonalAddress.division, corporationName],
   );
 
   // Load existing draft if any on mount or when selectedKind changes
@@ -1046,8 +1068,8 @@ function CounterReplyPanel({
     setError(null);
     setSavedMsg(null);
     const r = selectedKind === "counter_reply"
-      ? await fileCounterReplyAction(complaintId, draft, { recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language })
-      : await fileCommunicationDraftAction(complaintId, draft, selectedKind, { recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language });
+      ? await fileCounterReplyAction(complaintId, draft, { recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language, zonalDivision: zonalAddress.division, zonalLanguage: zonalAddress.language })
+      : await fileCommunicationDraftAction(complaintId, draft, selectedKind, { recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language, zonalDivision: zonalAddress.division, zonalLanguage: zonalAddress.language });
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file."); return; }
     clearRecipients();
@@ -1308,6 +1330,7 @@ function CounterReplyPanel({
             </p>
           )}
           <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} officeOverrides={recipientOfficeOverrides} />
+          <ZonalAddressOption active={isZonalActive(recipients)} defaultDivision={defaultTvccDivision ?? null} onChange={setZonalAddress} />
           <TvccCopyOption defaultDivision={defaultTvccDivision ?? null} onChange={setTvccCopy} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>
@@ -1416,9 +1439,10 @@ function EscalatePanel({
   const [filing, setFiling] = React.useState(false);
   const { selected: recipients, toggle: toggleRecipient, clear: clearRecipients, setSelectedAll: setRecipientsAll } = useRecipientSelection(complaintId, "escalate");
   const [tvccCopy, setTvccCopy] = React.useState<TvccCopySelection>({ division: null, language: "Kannada" });
+  const [zonalAddress, setZonalAddress] = React.useState<ZonalAddressSelection>({ division: null, language: "Kannada" });
   const recipientOfficeOverrides = React.useMemo(
-    () => (corporationName ? { zonal_commissioner: corporationOfficeName(corporationName) } : undefined),
-    [corporationName],
+    () => zonalOfficeOverrides(zonalAddress.division, corporationName),
+    [zonalAddress.division, corporationName],
   );
 
   // Load existing escalation draft if any on mount
@@ -1439,7 +1463,7 @@ function EscalatePanel({
     setFiling(true);
     setError(null);
     setSavedMsg(null);
-    const r = await fileEscalationAction(complaintId, draft, { kind, title: COMPLAINT_DRAFT_KINDS[kind], recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language });
+    const r = await fileEscalationAction(complaintId, draft, { kind, title: COMPLAINT_DRAFT_KINDS[kind], recipients, tvccDivision: tvccCopy.division, tvccLanguage: tvccCopy.language, zonalDivision: zonalAddress.division, zonalLanguage: zonalAddress.language });
     setFiling(false);
     if (!r.ok) { setError(r.error ?? "Could not file the escalation."); return; }
     clearRecipients();
@@ -1536,6 +1560,7 @@ function EscalatePanel({
             </p>
           )}
           <RecipientSelector selected={recipients} onToggle={toggleRecipient} onSelectAll={setRecipientsAll} officeOverrides={recipientOfficeOverrides} />
+          <ZonalAddressOption active={isZonalActive(recipients)} defaultDivision={defaultTvccDivision ?? null} onChange={setZonalAddress} />
           <TvccCopyOption defaultDivision={defaultTvccDivision ?? null} onChange={setTvccCopy} />
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:bg-slate-900/10">
             <Button size="sm" onClick={() => setEditorOpen(true)}>

@@ -1152,7 +1152,7 @@ export async function getLatestComplaintAiDraft(
 export async function fileCounterReplyAction(
   complaintId: string,
   content: string,
-  opts?: { language?: string; recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; tvccLanguage?: string },
+  opts?: { language?: string; recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; tvccLanguage?: string; zonalDivision?: CorporationCode | null; zonalLanguage?: string },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
@@ -1167,6 +1167,7 @@ export async function fileCounterReplyAction(
 
   // Render the recipient copy (with the selected Copy-To) + the mandatory office
   // copy (full distribution), store both linked, via the Distribution service.
+  const offices = opts?.tvccDivision || opts?.zonalDivision ? await getTvccOffices() : null;
   let filed: Awaited<ReturnType<typeof fileLetterWithCopies>>;
   try {
     filed = await fileLetterWithCopies(complaintDistributionDeps(admin), {
@@ -1178,7 +1179,10 @@ export async function fileCounterReplyAction(
       recipients: opts?.recipients,
       tvccDivision: opts?.tvccDivision ?? null,
       tvccLanguage: opts?.tvccLanguage ?? opts?.language ?? null,
-      tvccOffice: opts?.tvccDivision ? (await getTvccOffices())[opts.tvccDivision] : null,
+      tvccOffice: opts?.tvccDivision ? offices?.[opts.tvccDivision] : null,
+      zonalDivision: opts?.zonalDivision ?? null,
+      zonalLanguage: opts?.zonalLanguage ?? opts?.language ?? null,
+      zonalOffice: opts?.zonalDivision ? offices?.[opts.zonalDivision] : null,
       uploadedBy: user.id,
       aiSummaryStatus: isAiConfigured() ? "generating" : "none",
     });
@@ -1253,7 +1257,7 @@ export async function fileCommunicationDraftAction(
   complaintId: string,
   content: string,
   kind: ComplaintDraftKind,
-  opts?: { recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; language?: string; tvccLanguage?: string },
+  opts?: { recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; language?: string; tvccLanguage?: string; zonalDivision?: CorporationCode | null; zonalLanguage?: string },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   if (kind === "counter_reply") {
     return fileCounterReplyAction(complaintId, content, {
@@ -1261,6 +1265,8 @@ export async function fileCommunicationDraftAction(
       tvccDivision: opts?.tvccDivision ?? null,
       language: opts?.language,
       tvccLanguage: opts?.tvccLanguage,
+      zonalDivision: opts?.zonalDivision ?? null,
+      zonalLanguage: opts?.zonalLanguage,
     });
   }
 
@@ -1276,6 +1282,7 @@ export async function fileCommunicationDraftAction(
     .single();
 
   const label = COMPLAINT_DRAFT_KINDS[kind];
+  const offices = opts?.tvccDivision || opts?.zonalDivision ? await getTvccOffices() : null;
   let filed: Awaited<ReturnType<typeof fileLetterWithCopies>>;
   try {
     filed = await fileLetterWithCopies(complaintDistributionDeps(admin), {
@@ -1287,7 +1294,10 @@ export async function fileCommunicationDraftAction(
       recipients: opts?.recipients,
       tvccDivision: opts?.tvccDivision ?? null,
       tvccLanguage: opts?.tvccLanguage ?? null,
-      tvccOffice: opts?.tvccDivision ? (await getTvccOffices())[opts.tvccDivision] : null,
+      tvccOffice: opts?.tvccDivision ? offices?.[opts.tvccDivision] : null,
+      zonalDivision: opts?.zonalDivision ?? null,
+      zonalLanguage: opts?.zonalLanguage ?? opts?.language ?? null,
+      zonalOffice: opts?.zonalDivision ? offices?.[opts.zonalDivision] : null,
       uploadedBy: user.id,
       aiSummaryStatus: isAiConfigured() ? "generating" : "none",
     });
@@ -1367,7 +1377,7 @@ export async function fileCommunicationDraftAction(
 export async function fileEscalationAction(
   complaintId: string,
   content: string,
-  opts?: { kind?: ComplaintDraftKind; title?: string; language?: string; recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; tvccLanguage?: string },
+  opts?: { kind?: ComplaintDraftKind; title?: string; language?: string; recipients?: RecipientRoleKey[]; tvccDivision?: CorporationCode | null; tvccLanguage?: string; zonalDivision?: CorporationCode | null; zonalLanguage?: string },
 ): Promise<{ ok: boolean; documentId?: string; error?: string }> {
   const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
   if ("error" in a) return { ok: false, error: a.error };
@@ -1381,6 +1391,7 @@ export async function fileEscalationAction(
     .eq("id", complaintId)
     .single();
 
+  const offices = opts?.tvccDivision || opts?.zonalDivision ? await getTvccOffices() : null;
   let filed: Awaited<ReturnType<typeof fileLetterWithCopies>>;
   try {
     filed = await fileLetterWithCopies(complaintDistributionDeps(admin), {
@@ -1392,7 +1403,10 @@ export async function fileEscalationAction(
       recipients: opts?.recipients,
       tvccDivision: opts?.tvccDivision ?? null,
       tvccLanguage: opts?.tvccLanguage ?? opts?.language ?? null,
-      tvccOffice: opts?.tvccDivision ? (await getTvccOffices())[opts.tvccDivision] : null,
+      tvccOffice: opts?.tvccDivision ? offices?.[opts.tvccDivision] : null,
+      zonalDivision: opts?.zonalDivision ?? null,
+      zonalLanguage: opts?.zonalLanguage ?? opts?.language ?? null,
+      zonalOffice: opts?.zonalDivision ? offices?.[opts.zonalDivision] : null,
       uploadedBy: user.id,
       aiSummaryStatus: isAiConfigured() ? "generating" : "none",
     });

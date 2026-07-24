@@ -2,10 +2,10 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { R2_STORAGE_SENTINEL, type CorporationCode } from "@/lib/constants";
-import { officeCopyRoleKeys, type RecipientRoleKey } from "@/lib/complaints/recipient-roles";
+import { corporationAddressedRoleKeys, officeCopyRoleKeys, type RecipientRoleKey } from "@/lib/complaints/recipient-roles";
 import { DOCUMENT_VARIANTS } from "./document-variants";
 import { applyCopyTo, buildCopyToBlock, officeCopyBody, toRecipientList, type RecipientEnrichment } from "./copy-to";
-import { tvccAddresseeBlock, tvccRecipientSnapshot, TVCC_OFFICES, type TvccOffice } from "./tvcc";
+import { corporationOfficeAddress, tvccAddresseeBlock, tvccRecipientSnapshot, TVCC_OFFICES, type TvccOffice } from "./tvcc";
 import { readdressLetterToTvcc } from "./tvcc-copy";
 import type { StoragePort, VariantRenderer, RecipientResolver } from "./ports";
 
@@ -44,6 +44,13 @@ export interface FileLetterInput {
   tvccLanguage?: string | null; // language for the TVCC addressee block ("en" default)
   /** The resolved (saved-or-seed) office for tvccDivision; seed used if omitted. */
   tvccOffice?: TvccOffice | null;
+  /** When set, the zonal Copy-To officers (Commissioner / Chief Engineer / EE /
+   *  AEE) are addressed to this GBA city-corporation's office — its postal
+   *  address is stamped onto their Copy-To (and the office copy) lines. */
+  zonalDivision?: CorporationCode | null;
+  zonalLanguage?: string | null; // language for the stamped corporation address ("en" default)
+  /** The resolved (saved-or-seed) office for zonalDivision; seed used if omitted. */
+  zonalOffice?: TvccOffice | null;
 }
 
 export interface FileLetterResult {
@@ -120,6 +127,19 @@ export async function fileTvccCopy(
 export async function fileLetterWithCopies(deps: DistributionDeps, input: FileLetterInput): Promise<FileLetterResult> {
   const recipients = input.recipients ?? [];
   const enrich: RecipientEnrichment = await deps.resolve(input.complaintId).catch(() => ({}));
+
+  // Stamp the chosen GBA city-corporation office address onto every zone &
+  // division officer (Commissioner / Chief Engineer / Deputy Controller / EE /
+  // AEE) — overriding the resolver's per-complaint guess. Applies to both the
+  // recipient copy and the office copy since both render from `enrich`.
+  if (input.zonalDivision) {
+    const office = input.zonalOffice ?? TVCC_OFFICES[input.zonalDivision];
+    const address = corporationOfficeAddress(office, input.zonalLanguage ?? null);
+    for (const key of corporationAddressedRoleKeys()) {
+      const existing = enrich[key];
+      enrich[key] = { name: existing?.name ?? null, designation: existing?.designation ?? null, office: address, address };
+    }
+  }
 
   const recipientContent = applyCopyTo(input.content, buildCopyToBlock(recipients, enrich));
   const officeContent = officeCopyBody(input.content, enrich);

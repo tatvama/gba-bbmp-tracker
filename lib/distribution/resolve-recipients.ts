@@ -11,7 +11,7 @@ import type { RecipientEnrichment } from "./copy-to";
  * division, or sub-division) for a contact whose role_level or designation
  * matches the descriptor. Degrades silently to {} — the Copy-To then shows role
  * titles only, which is the accepted design (role_level is sparsely populated,
- * "Accounts Officer" / zone officers frequently absent). Never throws.
+ * zone / sub-division officers frequently absent). Never throws.
  */
 const SELECT =
   "full_name, designation, office_address, role_level, corporation_id, division_id, eng_subdivision_id, division:divisions!division_id(name), corporation:corporations!corporation_id(name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name)";

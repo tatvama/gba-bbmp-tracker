@@ -153,6 +153,23 @@ export function tvccAddresseeBlock(office: TvccOffice, language?: string | null)
 }
 
 /**
+ * The GBA city-corporation OFFICE address as a single line, for stamping onto a
+ * zonal officer's Copy-To entry (Zonal Commissioner / Chief Engineer / Executive
+ * Engineer / Assistant Executive Engineer). Same 5 corporation offices as the
+ * TVCC sheet, minus the T.V.C.C. designation — just the postal address. Bilingual
+ * joins the English and Kannada renderings with " / ".
+ */
+export function corporationOfficeAddress(office: TvccOffice, language?: string | null): string {
+  const join = (lines: string[]) => lines.map((l) => l.trim()).filter(Boolean).join(" ");
+  const en = join(office.addressLinesEn);
+  const kn = join(office.addressLinesKn);
+  const mode = resolveTvccLanguage(language);
+  if (mode === "kn") return kn;
+  if (mode === "both") return `${en} / ${kn}`;
+  return en;
+}
+
+/**
  * The recipient (TO) lines for the AI draft's recipientOverride — the designation
  * + address WITHOUT the leading "To," (the draft pipeline adds its own TO label
  * and the letter renderer prints the block at the top).

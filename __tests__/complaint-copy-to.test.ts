@@ -8,6 +8,7 @@ import {
 import {
   COMPLAINT_RECIPIENT_ROLES,
   officeCopyRoleKeys,
+  corporationAddressedRoleKeys,
   roleByKey,
   isRecipientRoleKey,
   corporationOfficeName,
@@ -21,11 +22,11 @@ describe("recipient-roles registry", () => {
     const orders = COMPLAINT_RECIPIENT_ROLES.map((r) => r.order);
     expect(new Set(orders).size).toBe(orders.length);
   });
-  it("office-copy distribution is exactly the 5 internal engineering roles", () => {
+  it("office-copy distribution is exactly the 5 internal BBMP officer roles", () => {
     expect(officeCopyRoleKeys()).toEqual([
       "zonal_commissioner",
       "zonal_chief_engineer",
-      "accounts_officer",
+      "deputy_controller_finance",
       "executive_engineer",
       "assistant_executive_engineer",
     ]);
@@ -46,6 +47,15 @@ describe("recipient-roles registry", () => {
       expect(officeCopy).not.toContain(k);
     }
   });
+  it("corporation-addressed roles are the 5 BBMP zone & division officers (incl. Deputy Controller (Finance))", () => {
+    expect(corporationAddressedRoleKeys()).toEqual([
+      "zonal_commissioner",
+      "zonal_chief_engineer",
+      "deputy_controller_finance",
+      "executive_engineer",
+      "assistant_executive_engineer",
+    ]);
+  });
   it("every role declares a group that is one of the known groups", () => {
     const groups = new Set(["BBMP Zone & Division Officers", "GBA & State Government", "Statutory / Oversight Bodies"]);
     for (const r of COMPLAINT_RECIPIENT_ROLES) expect(groups.has(r.group)).toBe(true);
@@ -55,7 +65,7 @@ describe("recipient-roles registry", () => {
     expect(roleByKey("principal_secretary_udd")?.title).toBe("The Principal Secretary");
     expect(roleByKey("chief_secretary")?.level).toBe("Government of Karnataka");
     expect(roleByKey("nope")).toBeUndefined();
-    expect(isRecipientRoleKey("accounts_officer")).toBe(true);
+    expect(isRecipientRoleKey("deputy_controller_finance")).toBe(true);
     expect(isRecipientRoleKey("chief_secretary")).toBe(true);
     expect(isRecipientRoleKey("mayor")).toBe(false);
   });
@@ -96,10 +106,10 @@ describe("buildCopyToBlock", () => {
     expect(buildCopyToBlock([])).toBe("");
   });
   it("renders selected roles in canonical order with title + level", () => {
-    const out = buildCopyToBlock(["executive_engineer", "accounts_officer"]);
-    // accounts_officer (order 3) precedes executive_engineer (order 4)
+    const out = buildCopyToBlock(["executive_engineer", "deputy_controller_finance"]);
+    // deputy_controller_finance (order 3) precedes executive_engineer (order 4)
     expect(out).toBe(
-      "## Copy To\n\n1. Accounts Officer - Division Level\n2. Executive Engineer - Division Level",
+      "## Copy To\n\n1. Deputy Controller (Finance) - Zone Level\n2. Executive Engineer - Division Level",
     );
   });
   it("enriches with officer name and office when supplied", () => {
@@ -107,6 +117,14 @@ describe("buildCopyToBlock", () => {
       executive_engineer: { name: "Sri A. Kumar", office: "South Division, BBMP" },
     });
     expect(out).toContain("Executive Engineer - Division Level, Sri A. Kumar (South Division, BBMP)");
+  });
+  it("stamps a chosen corporation office address onto a zonal officer (the zonalDivision overlay path)", () => {
+    const out = buildCopyToBlock(["zonal_commissioner"], {
+      zonal_commissioner: { office: "Bengaluru North City Corporation, Amruthahalli Main Road, Bengaluru - 560092." },
+    });
+    expect(out).toBe(
+      "## Copy To\n\n1. Zonal Commissioner - Zone Level (Bengaluru North City Corporation, Amruthahalli Main Road, Bengaluru - 560092.)",
+    );
   });
 });
 
@@ -145,15 +163,27 @@ describe("dynamic Commissioner office in Copy To", () => {
         "## Copy To",
         "",
         "1. The Chief Commissioner - Greater Bengaluru Authority (GBA)",
-        "2. The Chief Minister - Government of Karnataka (Chairman, GBA)",
-        "3. The Lokayukta - Karnataka Lokayukta",
+        "2. The Chief Minister - Government of Karnataka (Chairman, GBA), Room No. 323A, 3rd Floor, Vidhana Soudha, Dr. Ambedkar Veedhi, Bengaluru, Karnataka - 560001",
+        "3. The Honorable Lokayukta - Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)",
         "4. The Director / ADGP - Anti-Corruption Bureau (ACB), Karnataka",
       ].join("\n"),
     );
   });
   it("enriches a statutory authority with the incumbent's name when resolved", () => {
     const out = buildCopyToBlock(["lokayukta"], { lokayukta: { name: "Justice B.S. Patil", designation: "Lokayukta", office: null, address: "Bengaluru" } });
-    expect(out).toBe("## Copy To\n\n1. The Lokayukta - Karnataka Lokayukta, Justice B.S. Patil");
+    expect(out).toBe("## Copy To\n\n1. The Honorable Lokayukta - Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha), Justice B.S. Patil");
+  });
+  it("renders the Honorable Lokayukta and Deputy Lokayukta together at the Karnataka Lokayukta office", () => {
+    const out = buildCopyToBlock(["deputy_lokayukta", "lokayukta"]);
+    // lokayukta (order 11) precedes deputy_lokayukta (order 12)
+    expect(out).toBe(
+      [
+        "## Copy To",
+        "",
+        "1. The Honorable Lokayukta - Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)",
+        "2. The Deputy Lokayukta - Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)",
+      ].join("\n"),
+    );
   });
 });
 
