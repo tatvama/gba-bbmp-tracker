@@ -32,13 +32,7 @@ export const SAMPLE_WARDS = {
 
 export const SAMPLE_ENGINEERS = {
   note: "Sample fallback contacts — not real records.",
-  by_eng_subdiv: {
-    Yelahanka: { name: "Sample AEE Yelahanka", designation: "Assistant Executive Engineer", phone: "9000000001", address: "Yelahanka Sub-Division Office", verified: false },
-    Vijayanagar: { name: "Sample EE Vijayanagar", designation: "Executive Engineer", phone: "9000000002", address: "Vijayanagar Sub-Division Office", verified: true },
-    "Shanthi Nagar": { name: "Sample Ward Engineer", designation: "Ward Engineer", phone: "9000000003", address: "Shanthinagar Ward Office", verified: false },
-    Bommanahalli: { name: "Sample JE Bommanahalli", designation: "Junior Engineer", phone: "9000000004", address: "Bommanahalli Office", verified: true },
-    Jayanagar: { name: "Sample Health Officer", designation: "Health Officer", phone: "9000000005", address: "Jayanagar Office", verified: true },
-  },
+  by_eng_subdiv: {},
 };
 
 export const SAMPLE_COMPLAINTS = [

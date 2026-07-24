@@ -187,6 +187,7 @@ export function ComplaintForm({
               const officerDesignations = [
                 "Health Officer",
                 "Revenue Officer",
+                "Assistant Revenue Officer",
                 "Office Staff",
               ];
               setEngineers(contactsList.filter((c) => engineerDesignations.includes(c.designation)));
@@ -328,6 +329,7 @@ export function ComplaintForm({
           const officerDesignations = [
             "Health Officer",
             "Revenue Officer",
+            "Assistant Revenue Officer",
             "Office Staff",
           ];
           setEngineers(contactsList.filter((c) => engineerDesignations.includes(c.designation)));

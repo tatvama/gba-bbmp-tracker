@@ -1101,6 +1101,9 @@ function CounterReplyPanel({
   let counterState: "locked" | "active" | "completed" = "locked";
   if (hasInboundReply) {
     counterState = hasCounterReplyDoc ? "completed" : "active";
+  } else {
+    // Force active for testing as requested by the user (using 'as any' to prevent type-narrowing error)
+    counterState = (hasCounterReplyDoc ? "completed" : "active") as any;
   }
 
   // Determine Reminder Letter Button State
@@ -1114,12 +1117,9 @@ function CounterReplyPanel({
   let reminderState: "locked" | "waiting" | "active" | "completed" = "locked";
   if (hasReminderSent) {
     reminderState = "completed";
-  } else if (hasAcknowledge && !hasInboundReply) {
-    if (effectiveStage === "awaiting_reply") {
-      reminderState = diffDays <= 0 ? "active" : "waiting";
-    } else {
-      reminderState = "locked";
-    }
+  } else {
+    // Force active for testing as requested by the user (using 'as any' to prevent type-narrowing error)
+    reminderState = "active" as any;
   }
 
   // Determine Legal Notice Button State
@@ -1152,7 +1152,7 @@ function CounterReplyPanel({
     }
   } else if (counterState === "active") {
     counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response. Available now.";
-    counterLabel = "Counter Reply 🔵";
+    counterLabel = hasInboundReply ? "Counter Reply 🔵" : "Counter Reply (Active for test) 🔵";
   } else if (counterState === "completed") {
     counterTooltip = "Counter-reply has been drafted and filed to the case.";
     counterLabel = "Counter Reply ✓";
@@ -1173,7 +1173,8 @@ function CounterReplyPanel({
     reminderLabel = `Reminder Letter (in ${diffDays > 0 ? diffDays : 0}d)`;
   } else if (reminderState === "active") {
     reminderTooltip = "Generate a reminder letter requesting the department to respond to the complaint. Available now (0 days remaining).";
-    reminderLabel = "Reminder Letter 🔵";
+    const isActuallyActive = hasAcknowledge && !hasInboundReply && effectiveStage === "awaiting_reply" && diffDays <= 0;
+    reminderLabel = isActuallyActive ? "Reminder Letter 🔵" : "Reminder Letter (Active for test) 🔵";
   } else if (reminderState === "completed") {
     reminderTooltip = "Reminder letter has already been generated and filed.";
     reminderLabel = "Reminder Letter ✓";

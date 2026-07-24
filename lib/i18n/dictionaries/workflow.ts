@@ -129,6 +129,7 @@ const en = {
   "JE": "Junior Engineer (JE)",
   "Health Officer": "Health Officer",
   "Revenue Officer": "Revenue Officer",
+  "Assistant Revenue Officer": "Assistant Revenue Officer",
   "Commissioner": "Commissioner",
   "Special Commissioner": "Special Commissioner",
 
@@ -362,6 +363,7 @@ const kn: Record<keyof typeof en, string> = {
   "JE": "ಕಿರಿಯ ಇಂಜಿನಿಯರ್ (JE)",
   "Health Officer": "ಆರೋಗ್ಯ ಅಧಿಕಾರಿ",
   "Revenue Officer": "ಕಂದಾಯ ಅಧಿಕಾರಿ",
+  "Assistant Revenue Officer": "ಸಹಾಯಕ ಕಂದಾಯ ಅಧಿಕಾರಿ",
   "Commissioner": "ಆಯುಕ್ತರು",
   "Special Commissioner": "ವಿಶೇಷ ಆಯುಕ್ತರು",
 
