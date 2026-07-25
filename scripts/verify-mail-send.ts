@@ -63,6 +63,35 @@ async function main() {
     process.exit(1);
   }
 
+  // --recipients <complaintId>: dump the merged recipient options and assert the
+  // React keys are unique. No mail involved.
+  const recipIndex = process.argv.indexOf("--recipients");
+  if (recipIndex >= 0) {
+    const cid = process.argv[recipIndex + 1];
+    if (!cid) {
+      console.error("--recipients needs a complaint id");
+      process.exit(1);
+    }
+    const { listRecipientOptions } = await import("@/lib/mail/queries");
+    const { options, resolutionReason } = await listRecipientOptions(cid);
+    console.log(`\n── Recipient options for ${cid} ──`);
+    console.log(`  options        : ${options.length}`);
+    console.log(`  distinct keys  : ${new Set(options.map((o) => o.email)).size}`);
+    console.log(`  resolution     : ${resolutionReason ?? "(an officer resolved)"}`);
+    const shared = options.filter((o) => o.officers.length > 1);
+    console.log(`  shared mailboxes: ${shared.length}`);
+    for (const s of shared) {
+      console.log(`    ${s.email} -> ${s.officers.map((p) => p.name).join(", ")} | attributed=${s.name ?? "(none, correctly)"}`);
+    }
+    const dupes = options.map((o) => o.email).filter((e, i, a) => a.indexOf(e) !== i);
+    if (dupes.length) {
+      console.error(`\n✗ DUPLICATE KEYS STILL PRESENT: ${dupes.join(", ")}`);
+      process.exit(1);
+    }
+    console.log("\n✓ every option key is unique — the React duplicate-key crash cannot recur");
+    process.exit(0);
+  }
+
   console.log("\n── SMTP handshake (authenticates, sends nothing) ──");
   const verified = await verifyMailTransport();
   if (!verified.ok) {

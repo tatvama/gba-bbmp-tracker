@@ -1,8 +1,10 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { officerDisplayName } from "@/lib/contacts/officer-recipient";
 import { isValidEmail } from "./message";
 import { resolveComplaintEmailRecipients } from "./recipients";
+import { mergeRecipientOptions, type ContactEmailRow, type RecipientOption } from "./recipient-options";
+
+export type { RecipientOption } from "./recipient-options";
 
 /**
  * Reads for the letter-email UI.
@@ -55,23 +57,12 @@ export async function listLetterEmails(complaintId: string, limit = 20): Promise
   }
 }
 
-export interface RecipientOption {
-  contactId: string | null;
-  name: string;
-  designation: string | null;
-  email: string;
-  /** True for the officer the system itself would have written to. */
-  suggested: boolean;
-  /** Why this one is suggested, for the UI to explain the pick. */
-  note: string | null;
-}
-
 /**
- * Candidate recipients: the officer the system resolves for this complaint first
- * (when there is one), then every directory contact holding a usable email.
+ * Candidate recipients, one per ADDRESS (see lib/mail/recipient-options.ts for why
+ * merging matters — shared office mailboxes are common in this directory).
  *
- * The suggested entry matters because it is the one the automatic send would have
- * used — showing it lets the user confirm rather than retype.
+ * The suggested entry is the one the automatic send would have used, so showing it
+ * lets the user confirm rather than retype.
  */
 export async function listRecipientOptions(
   complaintId: string,
@@ -86,28 +77,8 @@ export async function listRecipientOptions(
       .not("email", "is", null)
       .order("full_name");
 
-    const rows = (data as
-      | { id: string; full_name: string | null; official_title: string | null; designation: string | null; email: string | null; officer_status: string | null }[]
-      | null) ?? [];
-
-    const suggestedIds = new Set(resolved.officerId ? [resolved.officerId] : []);
-    const options: RecipientOption[] = [];
-
-    for (const r of rows) {
-      if (!isValidEmail(r.email)) continue;
-      options.push({
-        contactId: r.id,
-        name: officerDisplayName(r) || "(unnamed)",
-        designation: r.designation ?? null,
-        email: String(r.email).trim().toLowerCase(),
-        suggested: suggestedIds.has(r.id),
-        note: suggestedIds.has(r.id) ? "Resolved for this complaint" : r.officer_status && r.officer_status !== "Active" ? r.officer_status : null,
-      });
-    }
-
-    // Suggested first, then alphabetical — the list is long and the pick that
-    // matters should not need scrolling for.
-    options.sort((a, b) => (a.suggested === b.suggested ? a.name.localeCompare(b.name) : a.suggested ? -1 : 1));
+    const rows = (data as ContactEmailRow[] | null) ?? [];
+    const options = mergeRecipientOptions(rows, isValidEmail, resolved.officerId);
 
     return { options, resolutionReason: resolved.to.length ? null : resolved.reason };
   } catch (e) {

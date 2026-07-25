@@ -85,8 +85,11 @@ export function LetterEmailPanel({
 
   const [options, setOptions] = React.useState<RecipientOption[]>([]);
   const [resolutionReason, setResolutionReason] = React.useState<string | null>(null);
+  // Selection is by ADDRESS, which is coherent only because options are merged
+  // one-per-address — see lib/mail/recipient-options.ts.
   const [picked, setPicked] = React.useState<string[]>([]);
   const [ccPicked, setCcPicked] = React.useState<string[]>([]);
+  const [search, setSearch] = React.useState("");
   const [manual, setManual] = React.useState<ManualRow[]>([]);
   const [letterKind, setLetterKind] = React.useState<string>(SELECTABLE_LETTER_KINDS[0]);
   const [history, setHistory] = React.useState<LetterEmailRow[]>(initialHistory);
@@ -97,7 +100,10 @@ export function LetterEmailPanel({
   /** Load the picker lazily — the contact list is the whole directory. */
   const load = React.useCallback(async () => {
     setLoading(true);
+    // Clear the previous attempt's messages — reopening the panel should not show
+    // a stale "Sent to …" from ten minutes ago.
     setError(null);
+    setResult(null);
     const r = await listRecipientOptionsAction(complaintId);
     setLoading(false);
     if (r.error) {
@@ -110,8 +116,12 @@ export function LetterEmailPanel({
     // click rather than a search.
     const suggested = (r.options ?? []).filter((o) => o.suggested).map((o) => o.email);
     setPicked((prev) => (prev.length ? prev : suggested));
-    // Nothing on record → start them off with one blank row to type into.
-    if (!suggested.length && !(r.options ?? []).length) setManual((prev) => (prev.length ? prev : [{ ...BLANK_ROW }]));
+    // No officer resolved for this case → open with a blank row ready to type
+    // into. Note this triggers whenever nothing is SUGGESTED, not only when the
+    // directory is empty: the common situation is that 61 addresses exist but none
+    // of them belongs to this complaint's ward, which is precisely when the user
+    // needs to type one in.
+    if (!suggested.length) setManual((prev) => (prev.length ? prev : [{ ...BLANK_ROW }]));
   }, [complaintId]);
 
   function toggle(list: string[], setList: (v: string[]) => void, email: string) {
@@ -119,7 +129,22 @@ export function LetterEmailPanel({
   }
 
   const manualValid = manual.filter((m) => emailLooksValid(m.email));
-  const totalTo = picked.length + manualValid.length;
+  // A typed address that duplicates a ticked one is one recipient, not two — the
+  // server de-duplicates, so the count must agree with what actually goes out.
+  const manualNew = manualValid.filter((m) => !picked.includes(m.email.trim().toLowerCase()));
+  const totalTo = picked.length + manualNew.length;
+
+  const visibleOptions = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.email.includes(q) ||
+        o.label.toLowerCase().includes(q) ||
+        (o.designation ?? "").toLowerCase().includes(q) ||
+        o.officers.some((p) => p.name.toLowerCase().includes(q)),
+    );
+  }, [options, search]);
 
   async function send() {
     setSending(true);
@@ -127,15 +152,21 @@ export function LetterEmailPanel({
     setResult(null);
 
     const byEmail = new Map(options.map((o) => [o.email, o]));
+    // For a shared mailbox the option carries name/designation = null, so the
+    // letter opens generically instead of naming one of two officers.
+    const fromOption = (e: string) => {
+      const o = byEmail.get(e);
+      return { name: o?.name ?? null, designation: o?.designation ?? null, email: e };
+    };
     const to = [
-      ...picked.map((e) => ({ name: byEmail.get(e)?.name ?? null, email: e })),
-      ...manualValid.map((m) => ({
+      ...picked.map(fromOption),
+      ...manualNew.map((m) => ({
         name: m.name.trim() || null,
         designation: m.designation.trim() || null,
         email: m.email.trim(),
       })),
     ];
-    const cc = ccPicked.filter((e) => !picked.includes(e)).map((e) => ({ name: byEmail.get(e)?.name ?? null, email: e }));
+    const cc = ccPicked.filter((e) => !picked.includes(e)).map(fromOption);
 
     const r = await sendLetterEmailAction({ complaintId, documentId, letterKind, to, cc });
     setSending(false);
@@ -267,40 +298,64 @@ export function LetterEmailPanel({
               )}
 
               {options.length > 0 && (
-                <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
-                  {options.map((o) => (
-                    <div key={o.email} className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
-                        checked={picked.includes(o.email)}
-                        onChange={() => toggle(picked, setPicked, o.email)}
-                        aria-label={`Send to ${o.name}`}
-                      />
-                      <div className="min-w-0 flex-1 text-xs">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{o.name}</span>
-                          {o.suggested && <Badge variant="info">Suggested</Badge>}
-                          {o.note && !o.suggested && <Badge variant="muted">{o.note}</Badge>}
-                        </div>
-                        <div className="truncate text-muted-foreground">
-                          {o.designation ? `${o.designation} · ` : ""}
-                          {o.email}
-                        </div>
-                      </div>
-                      <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
+                <>
+                  {options.length > 8 && (
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Filter by name, designation or address…"
+                      className="mb-2 h-9"
+                      aria-label="Filter officers"
+                    />
+                  )}
+                  <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
+                    {visibleOptions.map((o) => (
+                      // Keyed by address: options are merged one-per-address, which
+                      // is what makes this unique. Keying by contact id would put
+                      // two rows on one shared mailbox again.
+                      <div key={o.email} className="flex items-start gap-2">
                         <input
                           type="checkbox"
-                          className="h-3.5 w-3.5 cursor-pointer accent-primary"
-                          checked={ccPicked.includes(o.email)}
-                          disabled={picked.includes(o.email)}
-                          onChange={() => toggle(ccPicked, setCcPicked, o.email)}
+                          className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
+                          checked={picked.includes(o.email)}
+                          onChange={() => toggle(picked, setPicked, o.email)}
+                          aria-label={`Send to ${o.label} at ${o.email}`}
                         />
-                        Cc
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                        <div className="min-w-0 flex-1 text-xs">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-medium text-slate-700 dark:text-slate-300">{o.label}</span>
+                            {o.suggested && <Badge variant="info">Suggested</Badge>}
+                            {o.note && !o.suggested && <Badge variant="muted">{o.note}</Badge>}
+                          </div>
+                          <div className="truncate text-muted-foreground">
+                            {o.designation ? `${o.designation} · ` : ""}
+                            {o.email}
+                          </div>
+                          {/* A shared mailbox reaches more than one officer — say so,
+                              rather than showing one name and quietly meaning two. */}
+                          {o.officers.length > 1 && (
+                            <div className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+                              Reaches {o.officers.map((p) => p.name).join(", ")}
+                            </div>
+                          )}
+                        </div>
+                        <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                            checked={ccPicked.includes(o.email)}
+                            disabled={picked.includes(o.email)}
+                            onChange={() => toggle(ccPicked, setCcPicked, o.email)}
+                          />
+                          Cc
+                        </label>
+                      </div>
+                    ))}
+                    {!visibleOptions.length && (
+                      <p className="py-2 text-xs text-muted-foreground">No officer matches “{search}”.</p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
@@ -417,7 +472,7 @@ export function LetterEmailPanel({
         {history.length > 0 && (
           <div className="border-t pt-3">
             <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-500">
-              Email history ({history.length})
+              Email history{history.length > 6 ? ` — latest 6 of ${history.length}` : ` (${history.length})`}
             </p>
             <ul className="space-y-1.5">
               {history.slice(0, 6).map((h) => {
