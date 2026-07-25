@@ -44,6 +44,12 @@ export interface MailConfig {
   fromName: string;
   /** Optional Reply-To, so officer replies can land somewhere staffed. */
   replyTo: string;
+  /** SMTP port. 587 (STARTTLS) by default — see PORT_DEFAULT below. */
+  port: number;
+  /** true = implicit TLS from the first byte (465); false = STARTTLS upgrade (587).
+   *  Either way TLS is mandatory; the transport sets requireTLS so a failed
+   *  upgrade aborts rather than sending credentials in the clear. */
+  secure: boolean;
 }
 
 /** Only the variables this module cares about — pass process.env in production
@@ -57,10 +63,27 @@ export interface MailEnv {
   MAIL_REDIRECT_TO?: string | undefined;
   MAIL_FROM_NAME?: string | undefined;
   MAIL_REPLY_TO?: string | undefined;
+  MAIL_SMTP_PORT?: string | undefined;
   [key: string]: string | undefined;
 }
 
 const DEFAULT_FROM_NAME = "GBA / BBMP Complaint Tracker";
+
+/**
+ * 587 + STARTTLS, not 465 + implicit TLS.
+ *
+ * Both are valid Gmail endpoints, but 465 is the one that consumer security
+ * software breaks. Measured on the deployment machine: Norton Web/Mail Shield
+ * intercepts SMTP, and on 465 it re-signs with a root literally called "Norton
+ * Web/Mail Shield UNTRUSTED Root" — which is deliberately absent from the Windows
+ * trust store, so the handshake cannot be made to verify (UNABLE_TO_VERIFY_LEAF_
+ * SIGNATURE) by any client-side configuration. On 587 the same product signs with
+ * its trusted "Norton Web/Mail Shield Root" and the chain validates.
+ *
+ * 587 is also the port every firewall and cloud host expects to be open. Override
+ * with MAIL_SMTP_PORT=465 if a deployment prefers implicit TLS.
+ */
+const PORT_DEFAULT = 587;
 
 const clean = (v: string | undefined): string => (v == null ? "" : String(v)).trim();
 
@@ -81,12 +104,17 @@ export function resolveMailConfig(env: MailEnv): MailConfig {
   const fromName = clean(env.MAIL_FROM_NAME) || DEFAULT_FROM_NAME;
   const replyTo = clean(env.MAIL_REPLY_TO);
 
+  const parsedPort = Number.parseInt(clean(env.MAIL_SMTP_PORT), 10);
+  const port = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535 ? parsedPort : PORT_DEFAULT;
+  // Only 465 is implicit-TLS; everything else negotiates via STARTTLS.
+  const secure = port === 465;
+
   // Deliberately exact: a truthy-ish value like "1" or "yes" must NOT enable
   // outbound mail. Opting in to sending real letters should require getting the
   // spelling right.
   const enabled = clean(env.MAIL_ENABLED) === "true";
 
-  const base = { user, password, redirectTo, fromName, replyTo };
+  const base = { user, password, redirectTo, fromName, replyTo, port, secure };
 
   if (!enabled) return { ...base, mode: "disabled" };
   if (!user || !password) return { ...base, mode: "unconfigured" };

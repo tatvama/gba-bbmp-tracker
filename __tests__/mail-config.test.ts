@@ -60,6 +60,33 @@ describe("resolveMailConfig", () => {
   });
 });
 
+describe("SMTP port selection", () => {
+  it("defaults to 587 with STARTTLS, not 465", () => {
+    // Not cosmetic: Norton Web/Mail Shield re-signs port 465 with an untrusted
+    // root and the handshake cannot be made to verify. 587 validates.
+    const c = resolveMailConfig({ MAIL_ENABLED: "true", ...CREDS });
+    expect(c.port).toBe(587);
+    expect(c.secure).toBe(false);
+  });
+
+  it("treats 465 — and only 465 — as implicit TLS", () => {
+    expect(resolveMailConfig({ MAIL_SMTP_PORT: "465" }).secure).toBe(true);
+    for (const p of ["587", "25", "2525"]) {
+      expect(resolveMailConfig({ MAIL_SMTP_PORT: p }).secure, `port ${p}`).toBe(false);
+    }
+  });
+
+  it("honours a valid override", () => {
+    expect(resolveMailConfig({ MAIL_SMTP_PORT: "2525" }).port).toBe(2525);
+  });
+
+  it("falls back to 587 for anything unusable rather than crashing the send", () => {
+    for (const bad of ["", "  ", "abc", "0", "-1", "70000", undefined]) {
+      expect(resolveMailConfig({ MAIL_SMTP_PORT: bad }).port, `port=${JSON.stringify(bad)}`).toBe(587);
+    }
+  });
+});
+
 describe("canSend / skipReason", () => {
   it("permits sending only in redirect and live modes", () => {
     const modes = {

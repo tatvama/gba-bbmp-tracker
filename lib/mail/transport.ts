@@ -29,7 +29,7 @@ const globalForMail = globalThis as unknown as {
 /** Identifies the credential set a cached transport was built for, so an env
  *  change in dev rebuilds instead of silently reusing the old mailbox. The
  *  password is reduced to a length, never stored in full. */
-const fingerprintOf = (c: MailConfig): string => `${c.user}:${c.password.length}:${c.mode}`;
+const fingerprintOf = (c: MailConfig): string => `${c.user}:${c.password.length}:${c.mode}:${c.port}`;
 
 export function getMailConfig(): MailConfig {
   return resolveMailConfig(process.env);
@@ -60,8 +60,12 @@ export function getMailTransport(config: MailConfig = getMailConfig()): Transpor
 
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    port: config.port,
+    secure: config.secure,
+    // With secure:false (587) nodemailer would happily fall back to plaintext if
+    // STARTTLS were unavailable — which would put the app password on the wire in
+    // the clear. requireTLS makes a failed upgrade an error instead.
+    requireTLS: !config.secure,
     auth: { user: config.user, pass: config.password },
     // One connection reused for a burst of letters, then released.
     pool: true,
