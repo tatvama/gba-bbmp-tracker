@@ -1,6 +1,7 @@
 import { registerJobHandler } from "@/lib/jobs/registry";
 import type { JobHandlerContext, JobHandlerOutcome } from "@/lib/jobs/types";
 import { sendLetterEmail, type SendLetterEmailInput } from "@/lib/mail/send";
+import { isPermanentSmtpError } from "@/lib/mail/smtp-errors";
 
 /**
  * Emails a filed letter to the responsible officer, as a background job.
@@ -23,6 +24,9 @@ async function handleEmailSend(ctx: JobHandlerContext): Promise<JobHandlerOutcom
   const result = await sendLetterEmail(ctx.admin, {
     ...input,
     userId: input.userId ?? ctx.userId,
+    // Makes a retry idempotent: a send that Gmail accepted but whose 250 we never
+    // read is recognised instead of repeated. See migration 0048.
+    jobId: ctx.jobId,
   });
 
   if (result.status === "sent") {
@@ -45,8 +49,7 @@ async function handleEmailSend(ctx: JobHandlerContext): Promise<JobHandlerOutcom
   // amount of retrying fixes a wrong app password or a mistyped mailbox, and
   // Gmail counts repeated auth failures against the account.
   const message = result.error ?? "Send failed.";
-  const permanent = /EAUTH|invalid login|username and password not accepted|no recipients|55\d\s/i.test(message);
-  return { error: message, retryable: !permanent };
+  return { error: message, retryable: !isPermanentSmtpError(message, result.responseCode) };
 }
 
 registerJobHandler("email_send", handleEmailSend);

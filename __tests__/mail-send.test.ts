@@ -76,6 +76,10 @@ const MANY_LETTERS = [
 
 let docsOnCase: ReturnType<typeof doc>[] = ONE_LETTER;
 
+/** A prior successful send for the same job id, as the idempotency guard reads it.
+ *  null = this job has not delivered yet. */
+let priorSentForJob: { id: string; to_addresses: string[]; redirected: boolean } | null = null;
+
 function makeAdmin(recorded: Recorded[]) {
   const complaint = {
     id: "c1",
@@ -91,13 +95,38 @@ function makeAdmin(recorded: Recorded[]) {
   const builder = (table: string) => {
     const chain: Record<string, unknown> = {};
     const self = () => chain;
+    // Honour .in() rather than ignoring it. A mock that treats every filter as a
+    // no-op makes query-level guarantees untestable — the attachment-safety guard
+    // lives in the .in("document_type", …) allowlist, so a permissive mock would
+    // report a leak that cannot actually happen (and, worse, would hide a real
+    // one if the allowlist were dropped).
+    let inFilter: { column: string; values: unknown[] } | null = null;
     Object.assign(chain, {
       select: self,
       eq: self,
-      in: self,
-      order: () => ({ data: table === "complaint_documents" ? documents : [], error: null }),
+      in: (column: string, values: unknown[]) => {
+        inFilter = { column, values };
+        return chain;
+      },
+      order: () => {
+        if (table !== "complaint_documents") return { data: [], error: null };
+        const rows =
+          inFilter && inFilter.column === "document_type"
+            ? documents.filter((d) => (inFilter as { values: unknown[] }).values.includes(d.document_type))
+            : documents;
+        return { data: rows, error: null };
+      },
       maybeSingle: async () => ({
-        data: table === "complaints" ? complaint : table === "letter_emails" ? { id: "outbox-1" } : null,
+        data:
+          table === "complaints"
+            ? complaint
+            : table === "complaint_documents"
+              ? (documents[0] ?? null)
+              : // letter_emails reached via the chain is ONLY the idempotency
+                // lookup — the insert supplies its own .select().maybeSingle().
+                table === "letter_emails"
+                ? priorSentForJob
+                : null,
         error: null,
       }),
       insert: (payload: unknown) => {
@@ -133,6 +162,92 @@ beforeEach(() => {
   sendMail.mockResolvedValue({ messageId: "<abc@gmail.com>" });
   recipients = { ...officer };
   docsOnCase = ONE_LETTER;
+  priorSentForJob = null;
+});
+
+describe("retry idempotency", () => {
+  // Gmail can accept the DATA payload and then drop the pooled connection before
+  // nodemailer reads the 250. That surfaces as a retryable error for a send that
+  // actually happened; without this guard each retry delivers another copy, up to
+  // 1 + maxRetries = 4 letters to the same official.
+  it("does not re-send when this job already delivered", async () => {
+    config = configs.redirect;
+    priorSentForJob = { id: "outbox-earlier", to_addresses: ["mani96462@gmail.com"], redirected: true };
+    const recorded: Recorded[] = [];
+
+    const r = await sendLetterEmail(makeAdmin(recorded), { complaintId: "c1", jobId: "job-1" });
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(r.status).toBe("sent");
+    expect(r.ok).toBe(true);
+    expect(r.outboxId).toBe("outbox-earlier");
+    // No duplicate audit rows either.
+    expect(recorded.filter((x) => x.table === "letter_emails" && x.op === "insert")).toHaveLength(0);
+    expect(recorded.filter((x) => x.table === "communication_logs")).toHaveLength(0);
+  });
+
+  it("sends normally when the job has not delivered yet", async () => {
+    config = configs.redirect;
+    priorSentForJob = null;
+    const r = await sendLetterEmail(makeAdmin([]), { complaintId: "c1", jobId: "job-1" });
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(r.status).toBe("sent");
+  });
+
+  it("records the job id on the outbox row so the guard can find it", async () => {
+    config = configs.redirect;
+    const recorded: Recorded[] = [];
+    await sendLetterEmail(makeAdmin(recorded), { complaintId: "c1", jobId: "job-42" });
+    expect(outboxInsert(recorded).job_id).toBe("job-42");
+  });
+
+  it("skips the guard entirely when no job id is supplied", async () => {
+    config = configs.redirect;
+    priorSentForJob = { id: "outbox-earlier", to_addresses: ["x@y.com"], redirected: true };
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1" });
+    // A manual send with no jobId must not be blocked by an unrelated prior row.
+    expect(sendMail).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("attachment content type", () => {
+  it("declares a DOCX as wordprocessingml, not as a PDF", async () => {
+    config = configs.redirect;
+    docsOnCase = [
+      {
+        ...doc("doc-docx", "Generated complaint letter", "letter.docx"),
+        mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      },
+    ];
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", letterKind: "Complaint letter" });
+    const sent = sendMail.mock.calls[0]![0] as { attachments?: { contentType: string; filename: string }[] };
+    expect(sent.attachments![0]!.contentType).toContain("wordprocessingml");
+    expect(sent.attachments![0]!.filename).toBe("letter.docx");
+  });
+
+  it("declares a PDF as application/pdf", async () => {
+    config = configs.redirect;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", letterKind: "Complaint letter" });
+    const sent = sendMail.mock.calls[0]![0] as { attachments?: { contentType: string }[] };
+    expect(sent.attachments![0]!.contentType).toBe("application/pdf");
+  });
+});
+
+describe("attachment safety", () => {
+  it("never picks a TVCC or PIL document via the untyped fallback", async () => {
+    // The Submit panel puts "Prepare TVCC copy" directly above "Record the
+    // submission". The fallback takes the NEWEST document, so before this guard a
+    // TVCC vigilance copy — a complaint ABOUT this officer's division — could be
+    // emailed to that officer under a note saying "the complaint letter".
+    config = configs.redirect;
+    docsOnCase = [
+      doc("doc-tvcc", "TVCC copy (PDF)", "tvcc-copy-KENDRA-123.pdf"),
+      doc("doc-pil", "Legal notice", "pil.pdf"),
+      doc("doc-orig", "Generated complaint letter (PDF)", "complaint.pdf"),
+    ];
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", letterKind: "Some Unmapped Kind" });
+    expect(attachedName()).toBe("complaint.pdf");
+  });
 });
 
 const attachedName = () =>
@@ -199,6 +314,27 @@ describe("sendLetterEmail — test mode (MAIL_REDIRECT_TO set)", () => {
     expect(sent.cc).toBeUndefined();
     expect(JSON.stringify(sent.to)).not.toContain("bbmp.gov.in");
     expect(sent.subject.startsWith("[TEST] ")).toBe(true);
+  });
+
+  it("puts no officer address ANYWHERE in the payload handed to nodemailer", async () => {
+    // This assertion used to inspect only `to`, so adding a line like
+    // `bcc: envelope.intendedTo` to send.ts would have leaked an officer address
+    // with every test still passing. Scan every routing field instead, and pin
+    // the exact set of delivery-bearing keys so a new one must be added here
+    // deliberately.
+    config = configs.redirect;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1" });
+    const payload = sendMail.mock.calls[0]![0] as Record<string, unknown>;
+
+    const routing = Object.fromEntries(
+      Object.entries(payload).filter(([k]) => !["subject", "text", "html", "attachments"].includes(k)),
+    );
+    expect(JSON.stringify(routing)).not.toContain("bbmp.gov.in");
+
+    const deliveryKeys = Object.keys(payload)
+      .filter((k) => /^(to|cc|bcc|envelope|sender)$/.test(k) && payload[k] !== undefined)
+      .sort();
+    expect(deliveryKeys).toEqual(["to"]);
   });
 
   it("records who would have been written to", async () => {

@@ -2,62 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES } from "@/lib/constants";
-import { startJob } from "@/lib/jobs/runner";
-// Side-effect import: registers the "email_send" handler. NEVER import this from
-// instrumentation.ts or lib/startup/* — see the bundler note in instrumentation.ts.
-import "@/lib/jobs/handlers";
 import { resolveMailConfig, type MailMode } from "@/lib/mail/config";
 import { verifyMailTransport } from "@/lib/mail/transport";
+import { queueLetterEmail, type QueueLetterEmailInput } from "@/lib/mail/queue";
 
 /**
- * Server actions for emailing filed letters.
+ * User-facing server actions for letter email.
  *
- * The letter is emailed by a background job rather than inline, so a slow or
- * stalled Gmail handshake can never hold up (or fail) the filing that triggered
- * it. queueLetterEmail is the internal entry point used by the filing actions;
- * sendLetterEmailAction is the user-facing "send it again" button.
+ * EVERY export of this module is a dispatchable HTTP endpoint, so every export
+ * here authorizes first. The un-gated enqueue helper deliberately lives in
+ * lib/mail/queue.ts, which is not a `"use server"` module and therefore cannot be
+ * called over the wire.
  */
-
-export interface QueueLetterEmailInput {
-  complaintId: string;
-  documentId?: string | null;
-  letterKind?: string | null;
-  submittedOn?: string | null;
-}
-
-/**
- * Enqueue the send. Callers treat this as best-effort: it returns a result rather
- * than throwing, and a false `ok` must never fail the caller's own operation.
- *
- * NOTE on dedupe: background_jobs has a partial unique index on
- * (type, entity_type, entity_id) while status is queued/running, so a second
- * send for the same complaint while one is still in flight silently REUSES the
- * first job instead of sending twice (lib/jobs/runner.ts catches 23505). That is
- * the behaviour we want here — double-filing a letter should not double-email an
- * officer — and it is why `reused` is surfaced to the caller.
- */
-export async function queueLetterEmail(
-  input: QueueLetterEmailInput,
-  userId: string,
-): Promise<{ ok: boolean; jobId?: string; reused?: boolean; error?: string }> {
-  try {
-    const admin = createAdminClient();
-    return await startJob(admin, {
-      type: "email_send",
-      title: `Email ${input.letterKind?.trim() || "complaint letter"} to officer`,
-      entityType: "complaint",
-      entityId: input.complaintId,
-      input: { ...input, userId },
-      userId,
-      link: `/complaints/${input.complaintId}`,
-    });
-  } catch (e) {
-    console.warn("[mail] could not queue the letter email", input.complaintId, e);
-    return { ok: false, error: e instanceof Error ? e.message : "Could not queue the email." };
-  }
-}
 
 /** Manually (re)send the letter email for a complaint. */
 export async function sendLetterEmailAction(
@@ -69,7 +26,12 @@ export async function sendLetterEmailAction(
   } catch (e) {
     return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
-  const r = await queueLetterEmail(input, user.id);
+  // Only the complaint id and the letter identity are honoured — letterKind is
+  // used verbatim in the subject, so it is not taken from the caller here.
+  const r = await queueLetterEmail(
+    { complaintId: input.complaintId, documentId: input.documentId ?? null, letterKind: input.letterKind ?? null },
+    user.id,
+  );
   revalidatePath(`/complaints/${input.complaintId}`);
   return r;
 }

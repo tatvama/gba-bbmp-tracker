@@ -22,15 +22,25 @@ import { resolveComplaintEmailRecipients } from "./recipients";
  * complaint that has genuinely been submitted.
  */
 
-/** Letter document types that are worth attaching, newest first when several. */
-const LETTER_DOC_TYPES = [
+/**
+ * Types the untyped fallback may pick from — the officer-addressed primary letter
+ * and nothing else.
+ *
+ * Deliberately EXCLUDES "TVCC copy (PDF)", "Legal notice" and "Escalation letter".
+ * Those are addressed over the officer's head, and the fallback picks the NEWEST
+ * document on the case: preparing a TVCC vigilance copy and then recording the
+ * submission (adjacent controls in the Submit panel) would otherwise email the
+ * ward officer the vigilance complaint about their own division, under a covering
+ * note reading "please find attached the complaint letter". That is precisely the
+ * harm lib/mail/routing.ts exists to prevent, and routing.ts gates only the
+ * triggering kind — not attachment selection. A letter of one of those kinds can
+ * still be attached, but only when letterKind explicitly maps to it below.
+ */
+const FALLBACK_DOC_TYPES = [
   "Generated complaint letter (PDF)",
-  "Reminder letter",
-  "Legal notice",
-  "Escalation letter",
-  "Counter-reply",
-  "TVCC copy (PDF)",
   "Generated complaint letter",
+  "Reminder letter",
+  "Counter-reply",
 ];
 
 /**
@@ -70,6 +80,9 @@ export interface SendLetterEmailInput {
   userId?: string | null;
   /** Shown in the covering note when the letter was also physically submitted. */
   submittedOn?: string | null;
+  /** The background job driving this send. Supplying it makes a retry idempotent
+   *  — see the guard at the top of sendLetterEmail. */
+  jobId?: string | null;
 }
 
 export interface SendLetterEmailResult {
@@ -81,6 +94,9 @@ export interface SendLetterEmailResult {
   to: string[];
   redirected: boolean;
   error?: string;
+  /** The SMTP reply code, when the failure carried one. Authoritative for
+   *  retryability — see lib/mail/smtp-errors.ts. */
+  responseCode?: number | null;
 }
 
 interface DocRow {
@@ -99,7 +115,7 @@ async function loadAttachment(
   complaintId: string,
   documentId: string | null | undefined,
   letterKind: string,
-): Promise<{ filename: string; content: Buffer; documentId: string } | null> {
+): Promise<{ filename: string; content: Buffer; documentId: string; contentType: string } | null> {
   try {
     let doc: DocRow | null = null;
 
@@ -108,16 +124,27 @@ async function loadAttachment(
         .from("complaint_documents")
         .select("id, document_type, original_file_name, storage_bucket, storage_path, mime_type")
         .eq("id", documentId)
+        // Scoped to the complaint as well as the id: this runs on the admin
+        // client, so RLS is not a backstop, and a mismatched pair would email one
+        // case's document to another case's officer.
+        .eq("complaint_id", complaintId)
         .maybeSingle();
       doc = (data as DocRow | null) ?? null;
     } else {
+      // Query the types this letter kind maps to, plus the safe fallback set —
+      // never every letter type on the case.
+      const candidates = [...new Set([...preferredDocTypes(letterKind), ...FALLBACK_DOC_TYPES])];
       const { data } = await admin
         .from("complaint_documents")
         .select("id, document_type, original_file_name, storage_bucket, storage_path, mime_type")
         .eq("complaint_id", complaintId)
-        .in("document_type", LETTER_DOC_TYPES)
+        .in("document_type", candidates)
         .order("created_at", { ascending: false });
-      const rows = (data as DocRow[] | null) ?? [];
+      // Defence in depth: re-apply the allowlist in memory so the guarantee does
+      // not rest solely on the query being right.
+      const rows = ((data as DocRow[] | null) ?? []).filter(
+        (r) => r.document_type != null && candidates.includes(r.document_type),
+      );
       const isPdf = (r: DocRow) => (r.mime_type ?? "").includes("pdf");
 
       // Match the letter being sent, in the order those types are preferred, and
@@ -134,11 +161,16 @@ async function loadAttachment(
 
     if (!doc) return null;
 
-    const filename = doc.original_file_name?.trim() || `${doc.document_type ?? "letter"}.pdf`;
+    // Declare the type the file actually is. A forensic import can yield the DOCX
+    // with no PDF sibling, and labelling that "application/pdf" makes Gmail and
+    // Outlook show a PDF icon and fail to preview it.
+    const contentType = doc.mime_type?.trim() || "application/pdf";
+    const ext = contentType.includes("wordprocessingml") ? "docx" : contentType.includes("pdf") ? "pdf" : "bin";
+    const filename = doc.original_file_name?.trim() || `${doc.document_type ?? "letter"}.${ext}`;
 
     if (doc.storage_bucket === R2_STORAGE_SENTINEL) {
       const content = await downloadFromR2ByKey(doc.storage_path);
-      return content ? { filename, content, documentId: doc.id } : null;
+      return content ? { filename, content, documentId: doc.id, contentType } : null;
     }
 
     // Supabase Storage fallback (pre-R2 documents).
@@ -146,7 +178,7 @@ async function loadAttachment(
     if (!url) return null;
     const res = await fetch(url);
     if (!res.ok) return null;
-    return { filename, content: Buffer.from(await res.arrayBuffer()), documentId: doc.id };
+    return { filename, content: Buffer.from(await res.arrayBuffer()), documentId: doc.id, contentType };
   } catch (e) {
     console.warn("[mail] attachment load failed", complaintId, documentId, e);
     return null;
@@ -159,6 +191,31 @@ export async function sendLetterEmail(
 ): Promise<SendLetterEmailResult> {
   const config = getMailConfig();
   const letterKind = input.letterKind?.trim() || "Complaint letter";
+
+  // ── Idempotency guard ────────────────────────────────────────────────────
+  // Gmail can accept the message and then drop the connection before nodemailer
+  // reads the 250, which surfaces as a retryable error for a send that actually
+  // happened. Without this check each retry delivers another copy to the same
+  // official. Cheap: one indexed lookup per send.
+  if (input.jobId) {
+    const { data: already } = await admin
+      .from("letter_emails")
+      .select("id, to_addresses, redirected")
+      .eq("job_id", input.jobId)
+      .eq("status", "sent")
+      .maybeSingle();
+    const prior = already as { id: string; to_addresses: string[] | null; redirected: boolean } | null;
+    if (prior) {
+      console.warn(`[mail] job ${input.jobId} already delivered (outbox ${prior.id}) — not re-sending`);
+      return {
+        ok: true,
+        outboxId: prior.id,
+        status: "sent",
+        to: prior.to_addresses ?? [],
+        redirected: Boolean(prior.redirected),
+      };
+    }
+  }
 
   // ── Gather context ───────────────────────────────────────────────────────
   const { data: complaintRow } = await admin
@@ -239,6 +296,7 @@ export async function sendLetterEmail(
       status: skip ? "skipped" : "sending",
       error: skip,
       mail_mode: config.mode,
+      job_id: input.jobId ?? null,
       created_by: input.userId ?? null,
     })
     .select("id")
@@ -264,7 +322,7 @@ export async function sendLetterEmail(
       subject: envelope.subject,
       text: envelope.text,
       attachments: attachment
-        ? [{ filename: attachment.filename, content: attachment.content, contentType: "application/pdf" }]
+        ? [{ filename: attachment.filename, content: attachment.content, contentType: attachment.contentType }]
         : undefined,
     });
 
@@ -296,10 +354,21 @@ export async function sendLetterEmail(
     return { ok: true, outboxId, status: "sent", to: envelope.to, redirected: envelope.redirected };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    // nodemailer attaches the SMTP reply code — far more reliable for deciding
+    // retryability than parsing the prose, so surface it to the caller.
+    const responseCode = (e as { responseCode?: number }).responseCode ?? null;
     if (outboxId) {
       await admin.from("letter_emails").update({ status: "failed", error: message }).eq("id", outboxId);
     }
     console.warn("[mail] send failed", input.complaintId, message);
-    return { ok: false, outboxId, status: "failed", to: envelope.to, redirected: envelope.redirected, error: message };
+    return {
+      ok: false,
+      outboxId,
+      status: "failed",
+      to: envelope.to,
+      redirected: envelope.redirected,
+      error: message,
+      responseCode,
+    };
   }
 }

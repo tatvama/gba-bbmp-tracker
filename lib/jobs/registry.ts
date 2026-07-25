@@ -32,9 +32,12 @@ export const JOB_CONFIG: Record<JobType, JobConfig> = {
   source_fetch: { maxDurationMs: 20 * 60_000, maxRetries: 1, retryableErrorPatterns: RETRYABLE_TRANSIENT, concurrencyLimit: 1 },
   // Gmail SMTP. concurrencyLimit 1 because every message authenticates as the
   // same single mailbox and Google throttles parallel sessions from one account.
-  // EAUTH is deliberately NOT retryable — a wrong app password never fixes
-  // itself, and repeated auth failures count against the account. The handler
-  // classifies that case explicitly via outcome.retryable.
+  //
+  // NOTE these patterns are a fallback only. decideRetry resolves
+  // `explicitRetryable ?? patterns.some(...)` (lib/jobs/retry-policy.ts) and the
+  // email_send handler ALWAYS returns an explicit flag, computed from the SMTP
+  // reply code by lib/mail/smtp-errors.ts. Editing this list will not change
+  // email retry behaviour — change isPermanentSmtpError instead.
   email_send: { maxDurationMs: 2 * 60_000, maxRetries: 3, retryableErrorPatterns: RETRYABLE_SMTP, concurrencyLimit: 1 },
 };
 

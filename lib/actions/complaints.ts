@@ -38,7 +38,7 @@ import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
 import { triggerCaseIntelligenceRebuild } from "@/lib/actions/case-intelligence";
-import { queueLetterEmail } from "@/lib/actions/mail";
+import { queueLetterEmail } from "@/lib/mail/queue";
 import { mayAutoEmailOfficer } from "@/lib/mail/routing";
 import { fileLetterWithCopies, fileTvccCopy } from "@/lib/distribution/distribution-service";
 import { complaintDistributionDeps } from "@/lib/distribution/complaint-deps";
