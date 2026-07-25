@@ -33,6 +33,33 @@ const LETTER_DOC_TYPES = [
   "Generated complaint letter",
 ];
 
+/**
+ * The document type each letterKind should attach.
+ *
+ * Without this the newest letter PDF on the case wins, which is wrong whenever a
+ * case has more than one letter: a filing announced as a "Complaint letter" would
+ * arrive carrying the most recent counter-reply. Observed for real on
+ * DM-CMP-2026-000011, which is why this map exists.
+ */
+const KIND_TO_DOC_TYPE: Record<string, string[]> = {
+  "complaint letter": ["Generated complaint letter (PDF)", "Generated complaint letter"],
+  "counter-reply": ["Counter-reply"],
+  "reminder letter": ["Reminder letter"],
+  "legal notice": ["Legal notice"],
+  "escalation letter": ["Escalation letter"],
+  "tvcc complaint": ["TVCC copy (PDF)"],
+};
+
+/** Document types to prefer for this letter kind, best first. */
+function preferredDocTypes(letterKind: string): string[] {
+  const key = letterKind.trim().toLowerCase();
+  if (KIND_TO_DOC_TYPE[key]) return KIND_TO_DOC_TYPE[key]!;
+  // An unmapped kind (a new draft kind, or a label with a suffix) — match by
+  // prefix so "Reminder letter (no reply received)" still finds its document.
+  const loose = Object.keys(KIND_TO_DOC_TYPE).find((k) => key.startsWith(k) || k.startsWith(key));
+  return loose ? KIND_TO_DOC_TYPE[loose]! : [];
+}
+
 export interface SendLetterEmailInput {
   complaintId: string;
   /** Attach this specific document. When omitted the newest letter PDF is used. */
@@ -70,8 +97,9 @@ interface DocRow {
 async function loadAttachment(
   admin: SupabaseClient,
   complaintId: string,
-  documentId?: string | null,
-): Promise<{ filename: string; content: Buffer } | null> {
+  documentId: string | null | undefined,
+  letterKind: string,
+): Promise<{ filename: string; content: Buffer; documentId: string } | null> {
   try {
     let doc: DocRow | null = null;
 
@@ -90,9 +118,18 @@ async function loadAttachment(
         .in("document_type", LETTER_DOC_TYPES)
         .order("created_at", { ascending: false });
       const rows = (data as DocRow[] | null) ?? [];
+      const isPdf = (r: DocRow) => (r.mime_type ?? "").includes("pdf");
+
+      // Match the letter being sent, in the order those types are preferred, and
+      // only then fall back to "newest letter on the case".
+      for (const wanted of preferredDocTypes(letterKind)) {
+        const matches = rows.filter((r) => r.document_type === wanted);
+        doc = matches.find(isPdf) ?? matches[0] ?? null;
+        if (doc) break;
+      }
       // Prefer a PDF over the DOCX of the same letter — an officer can always
       // open a PDF, and it is the version that was physically submitted.
-      doc = rows.find((r) => (r.mime_type ?? "").includes("pdf")) ?? rows[0] ?? null;
+      if (!doc) doc = rows.find(isPdf) ?? rows[0] ?? null;
     }
 
     if (!doc) return null;
@@ -101,7 +138,7 @@ async function loadAttachment(
 
     if (doc.storage_bucket === R2_STORAGE_SENTINEL) {
       const content = await downloadFromR2ByKey(doc.storage_path);
-      return content ? { filename, content } : null;
+      return content ? { filename, content, documentId: doc.id } : null;
     }
 
     // Supabase Storage fallback (pre-R2 documents).
@@ -109,7 +146,7 @@ async function loadAttachment(
     if (!url) return null;
     const res = await fetch(url);
     if (!res.ok) return null;
-    return { filename, content: Buffer.from(await res.arrayBuffer()) };
+    return { filename, content: Buffer.from(await res.arrayBuffer()), documentId: doc.id };
   } catch (e) {
     console.warn("[mail] attachment load failed", complaintId, documentId, e);
     return null;
@@ -139,7 +176,11 @@ export async function sendLetterEmail(
   } | null;
 
   const recipients = await resolveComplaintEmailRecipients(admin, input.complaintId);
-  const attachment = await loadAttachment(admin, input.complaintId, input.documentId);
+  const attachment = await loadAttachment(admin, input.complaintId, input.documentId, letterKind);
+  // Record the document that was actually attached, not the one that was asked
+  // for — when documentId is null the picker chooses, and an audit row pointing
+  // at nothing (or at a different letter) would misrepresent what was sent.
+  const attachedDocumentId = attachment?.documentId ?? input.documentId ?? null;
 
   const wardLabel = complaint?.ward
     ? [complaint.ward.new_no, complaint.ward.new_name].filter((v) => v != null && v !== "").join(" - ")
@@ -184,7 +225,7 @@ export async function sendLetterEmail(
     .from("letter_emails")
     .insert({
       complaint_id: input.complaintId,
-      document_id: input.documentId ?? null,
+      document_id: attachedDocumentId,
       letter_kind: letterKind,
       to_addresses: envelope.to,
       cc_addresses: envelope.cc,
@@ -248,7 +289,7 @@ export async function sendLetterEmail(
       phone_or_email: envelope.to.join(", "),
       contact_person: recipients.officerName,
       officer_id: recipients.officerId,
-      document_id: input.documentId ?? null,
+      document_id: attachedDocumentId,
       created_by: input.userId ?? null,
     });
 

@@ -55,6 +55,27 @@ const { sendLetterEmail } = await import("@/lib/mail/send");
 // ── A minimal recording stand-in for the Supabase admin client ──────────────
 interface Recorded { table: string; op: string; payload?: unknown }
 
+const doc = (id: string, type: string, file: string) => ({
+  id,
+  document_type: type,
+  original_file_name: file,
+  storage_bucket: "r2",
+  storage_path: `complaints/c1/${file}`,
+  mime_type: "application/pdf",
+});
+
+const ONE_LETTER = [doc("doc-1", "Generated complaint letter (PDF)", "complaint-letter.pdf")];
+
+/** A case that has accumulated several letters, newest first — the real shape
+ *  that exposed the wrong-attachment bug on DM-CMP-2026-000011. */
+const MANY_LETTERS = [
+  doc("doc-cr", "Counter-reply", "counter-reply-1784797872143.pdf"),
+  doc("doc-rem", "Reminder letter", "reminder.pdf"),
+  doc("doc-orig", "Generated complaint letter (PDF)", "Job_209-26-000007_complaint_KN.pdf"),
+];
+
+let docsOnCase: ReturnType<typeof doc>[] = ONE_LETTER;
+
 function makeAdmin(recorded: Recorded[]) {
   const complaint = {
     id: "c1",
@@ -64,14 +85,8 @@ function makeAdmin(recorded: Recorded[]) {
     job_number: "206-24-000004",
     ward: { new_no: 209, new_name: "Gottigere" },
   };
-  const document = {
-    id: "doc-1",
-    document_type: "Generated complaint letter (PDF)",
-    original_file_name: "complaint-letter.pdf",
-    storage_bucket: "r2",
-    storage_path: "complaints/c1/letter.pdf",
-    mime_type: "application/pdf",
-  };
+  // Newest first, as the real .order("created_at", {ascending:false}) returns.
+  const documents = docsOnCase;
 
   const builder = (table: string) => {
     const chain: Record<string, unknown> = {};
@@ -80,7 +95,7 @@ function makeAdmin(recorded: Recorded[]) {
       select: self,
       eq: self,
       in: self,
-      order: () => ({ data: table === "complaint_documents" ? [document] : [], error: null }),
+      order: () => ({ data: table === "complaint_documents" ? documents : [], error: null }),
       maybeSingle: async () => ({
         data: table === "complaints" ? complaint : table === "letter_emails" ? { id: "outbox-1" } : null,
         error: null,
@@ -117,6 +132,56 @@ beforeEach(() => {
   sendMail.mockReset();
   sendMail.mockResolvedValue({ messageId: "<abc@gmail.com>" });
   recipients = { ...officer };
+  docsOnCase = ONE_LETTER;
+});
+
+const attachedName = () =>
+  (sendMail.mock.calls[0]![0] as { attachments?: { filename: string }[] }).attachments?.[0]?.filename;
+
+describe("attachment selection when a case has several letters", () => {
+  // Regression: this used to take the newest letter PDF regardless of kind, so a
+  // filing announced as a "Complaint letter" arrived carrying the counter-reply.
+  it("attaches the letter matching the kind being sent, not merely the newest", async () => {
+    config = configs.redirect;
+    docsOnCase = MANY_LETTERS;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", letterKind: "Complaint letter" });
+    expect(attachedName()).toBe("Job_209-26-000007_complaint_KN.pdf");
+  });
+
+  it.each([
+    ["Counter-reply", "counter-reply-1784797872143.pdf"],
+    ["Reminder letter", "reminder.pdf"],
+    ["Complaint letter", "Job_209-26-000007_complaint_KN.pdf"],
+  ])("attaches the right document for %s", async (kind, expected) => {
+    config = configs.redirect;
+    docsOnCase = MANY_LETTERS;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", letterKind: kind });
+    expect(attachedName()).toBe(expected);
+  });
+
+  it("matches a kind carrying a descriptive suffix", async () => {
+    config = configs.redirect;
+    docsOnCase = MANY_LETTERS;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", letterKind: "Reminder letter (no reply received)" });
+    expect(attachedName()).toBe("reminder.pdf");
+  });
+
+  it("falls back to the newest letter for an unmapped kind rather than sending nothing", async () => {
+    config = configs.redirect;
+    docsOnCase = MANY_LETTERS;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", letterKind: "Some New Draft Kind" });
+    expect(attachedName()).toBe("counter-reply-1784797872143.pdf");
+  });
+
+  it("records the document actually attached on the audit row", async () => {
+    config = configs.redirect;
+    docsOnCase = MANY_LETTERS;
+    const recorded: Recorded[] = [];
+    // No documentId supplied, so the picker chooses — the row must point at its
+    // choice, not at null.
+    await sendLetterEmail(makeAdmin(recorded), { complaintId: "c1", letterKind: "Complaint letter" });
+    expect(outboxInsert(recorded).document_id).toBe("doc-orig");
+  });
 });
 
 describe("sendLetterEmail — test mode (MAIL_REDIRECT_TO set)", () => {

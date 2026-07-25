@@ -16,6 +16,13 @@ import { getMailConfig, getMailTransport, fromHeader, verifyMailTransport } from
 import { applyRedirect, buildLetterEmail } from "@/lib/mail/message";
 
 const send = process.argv.includes("--send");
+/** --complaint <uuid> runs the REAL sendLetterEmail orchestrator for that
+ *  complaint (recipient resolution, PDF attachment from R2, outbox row,
+ *  correspondence log) instead of the synthetic message. */
+const complaintArg = (() => {
+  const i = process.argv.indexOf("--complaint");
+  return i >= 0 ? (process.argv[i + 1] ?? null) : null;
+})();
 
 function loadEnv() {
   try {
@@ -71,6 +78,46 @@ async function main() {
   if (!send) {
     console.log("\n(Handshake only. Re-run with --send to deliver one test message.)");
     process.exit(0);
+  }
+
+  // ── The real production orchestrator, for one complaint ───────────────────
+  if (complaintArg) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { sendLetterEmail } = await import("@/lib/mail/send");
+    const admin = createAdminClient();
+
+    console.log(`\n── Running the app's own sendLetterEmail for ${complaintArg} ──`);
+    const result = await sendLetterEmail(admin, {
+      complaintId: complaintArg,
+      letterKind: "Complaint letter",
+      submittedOn: new Date().toISOString().slice(0, 10),
+    });
+
+    console.log(`  status      : ${result.status}`);
+    console.log(`  delivered to: ${result.to.join(", ") || "(none)"}`);
+    console.log(`  redirected  : ${result.redirected}`);
+    console.log(`  outbox row  : ${result.outboxId ?? "(none written)"}`);
+    if (result.error) console.log(`  reason      : ${result.error}`);
+
+    if (result.outboxId) {
+      const { data } = await admin
+        .from("letter_emails")
+        .select("status, to_addresses, intended_to, redirected, attachment_name, subject, mail_mode, message_id, error")
+        .eq("id", result.outboxId)
+        .maybeSingle();
+      console.log("\n── letter_emails row as stored ──");
+      console.log(JSON.stringify(data, null, 2));
+
+      const stored = (data ?? {}) as { to_addresses?: string[] };
+      const leakedRow = (stored.to_addresses ?? []).filter((a) => a.endsWith("@bbmp.gov.in"));
+      if (leakedRow.length) {
+        console.error(`\n✗ SAFETY INVARIANT VIOLATED — official address was delivered to: ${leakedRow.join(", ")}`);
+        process.exit(1);
+      }
+    }
+
+    console.log(result.status === "sent" ? "\n✓ app path delivered" : `\n(app path did not send: ${result.status})`);
+    process.exit(result.status === "failed" ? 1 : 0);
   }
 
   // ── One real message, through the real builders ────────────────────────────
