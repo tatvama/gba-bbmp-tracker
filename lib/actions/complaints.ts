@@ -38,6 +38,8 @@ import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { type ComplaintDraftKind } from "@/lib/ai/complaint-document-analyzer";
 import { triggerAdvisorAnalysis } from "@/lib/actions/ai-advisor";
 import { triggerCaseIntelligenceRebuild } from "@/lib/actions/case-intelligence";
+import { queueLetterEmail } from "@/lib/actions/mail";
+import { mayAutoEmailOfficer } from "@/lib/mail/routing";
 import { fileLetterWithCopies, fileTvccCopy } from "@/lib/distribution/distribution-service";
 import { complaintDistributionDeps } from "@/lib/distribution/complaint-deps";
 import type { RecipientRoleKey } from "@/lib/complaints/recipient-roles";
@@ -486,6 +488,15 @@ export async function fileComplaint(input: {
     changedBy: user.id,
     changes: [{ field: "status", oldValue: "Draft", newValue: "Filed" }],
   });
+  // Email the letter to the responsible officer. Best-effort and deliberately
+  // not awaited for its outcome: the complaint IS filed by this point, and a
+  // refused SMTP connection must not turn a successful filing into an error the
+  // user has to re-attempt. Failures land in letter_emails + the Task Center.
+  void queueLetterEmail(
+    { complaintId: input.complaintId, letterKind: "Complaint letter", submittedOn: submitted },
+    user.id,
+  );
+
   revalidatePath(`/complaints/${input.complaintId}`);
   revalidatePath("/complaints");
   void triggerAdvisorAnalysis(input.complaintId);
@@ -1247,6 +1258,9 @@ export async function fileCounterReplyAction(
     complaint_document_id: documentId,
   });
 
+  // Best-effort email of the filed letter — see the note in fileComplaint.
+  void queueLetterEmail({ complaintId, documentId, letterKind: "Counter-reply" }, user.id);
+
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
   void triggerCaseIntelligenceRebuild(complaintId);
@@ -1359,6 +1373,13 @@ export async function fileCommunicationDraftAction(
     createdBy: user.id,
   });
 
+  // Best-effort email — but ONLY for letters actually addressed to this
+  // complaint's officer. A legal notice (a PIL letter-petition to the Chief
+  // Justice) must never be auto-emailed to the officer it complains about.
+  if (mayAutoEmailOfficer(kind)) {
+    void queueLetterEmail({ complaintId, documentId, letterKind: label }, user.id);
+  }
+
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);
   void triggerCaseIntelligenceRebuild(complaintId);
@@ -1439,6 +1460,11 @@ export async function fileEscalationAction(
     relatedDocumentId: documentId,
     createdBy: user.id,
   });
+
+  // Deliberately NOT auto-emailed: an escalation letter is addressed to the NEXT
+  // authority above this officer, so the case's own officer is the wrong
+  // recipient. Send it explicitly (sendLetterEmailAction) once that authority's
+  // address is on record. See lib/mail/routing.ts.
 
   revalidatePath(`/complaints/${complaintId}`);
   void triggerAdvisorAnalysis(complaintId);

@@ -10,6 +10,7 @@ import "./ai-draft";
 import "./ocr";
 import "./vision-scan";
 import "./source-fetch";
+import "./email-send";
 // Stage 7: import "./export";
 
 export {};

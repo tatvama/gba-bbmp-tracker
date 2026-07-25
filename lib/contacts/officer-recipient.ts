@@ -27,8 +27,11 @@ export interface OfficerRecipient {
 
 const clean = (s: unknown): string => (s == null ? "" : String(s)).trim();
 
-/** "Sri" + "Nataraj" → "Sri Nataraj"; no honorific → just the name. */
-export function officerDisplayName(contact: Pick<Contact, "official_title" | "full_name">): string {
+/** "Sri" + "Nataraj" → "Sri Nataraj"; no honorific → just the name.
+ *  Takes a loose shape rather than Pick<Contact, …> so callers holding a partial
+ *  row (e.g. lib/mail/recipients.ts's narrowed select) can use it without
+ *  re-deriving the constrained OFFICIAL_TITLES / DESIGNATIONS unions. */
+export function officerDisplayName(contact: { official_title?: string | null; full_name?: string | null }): string {
   const title = clean(contact.official_title);
   const name = clean(contact.full_name);
   return title ? `${title} ${name}`.trim() : name;

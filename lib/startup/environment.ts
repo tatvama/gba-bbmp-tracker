@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { StartupTask } from "./types";
 import { StartupLogger } from "./logger";
+import { resolveMailConfig } from "@/lib/mail/config";
 
 const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url("NEXT_PUBLIC_SUPABASE_URL must be a valid URL"),
@@ -39,6 +40,34 @@ export class EnvironmentValidationTask implements StartupTask {
 
     if (!process.env.CRON_SECRET) {
       StartupLogger.warn(this.name, "CRON_SECRET is not set. Scheduled routes will be inaccessible.");
+    }
+
+    // Outbound letter email. Deliberately warn-only: mail is optional, and
+    // adding it to the schema above would break every existing deployment on
+    // boot. The last branch is the important one — it is the only place the app
+    // announces that filing a letter will now write to a real official.
+    const mail = resolveMailConfig(process.env);
+    switch (mail.mode) {
+      case "unconfigured":
+        StartupLogger.warn(
+          this.name,
+          "MAIL_ENABLED is \"true\" but GMAIL_USER / GMAIL_APP_PASSWORD are not both set. Letters will be recorded, not emailed.",
+        );
+        break;
+      case "redirect":
+        StartupLogger.warn(
+          this.name,
+          `Letter email is in TEST MODE — every message goes to ${mail.redirectTo}. Officials will NOT be contacted (unset MAIL_REDIRECT_TO to go live).`,
+        );
+        break;
+      case "live":
+        StartupLogger.warn(
+          this.name,
+          `Letter email is LIVE — filed letters will be emailed to the officials on record, from ${mail.user}. Set MAIL_REDIRECT_TO to divert to a test inbox.`,
+        );
+        break;
+      default:
+        break;
     }
   }
 }

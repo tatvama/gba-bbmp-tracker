@@ -21,6 +21,7 @@ export const MODULE_LABEL: Record<JobType, string> = {
   vision_scan: "Vision Scan",
   export: "Export",
   source_fetch: "Source Search",
+  email_send: "Email",
 };
 
 /** Where "Open Result" should take the user once a background_jobs-sourced
@@ -31,6 +32,7 @@ export function resultLinkForRow(type: string, entityType: string | null, entity
       return entityType === "complaint" && entityId ? `/complaints/${entityId}` : null;
     case "ocr":
     case "export":
+    case "email_send":
       return entityType === "complaint" && entityId ? `/complaints/${entityId}` : null;
     case "vision_scan":
       return "/complaints/duplicate-photos";
