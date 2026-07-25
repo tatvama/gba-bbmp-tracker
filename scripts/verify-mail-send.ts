@@ -95,16 +95,22 @@ async function main() {
         ? process.argv[toArgIndex + 1]!
             .split(",")
             .map((pair) => {
+              // "Designation|Name:email" or "Name:email" or "email"
               const at = pair.lastIndexOf(":");
-              return at > 0
-                ? { name: pair.slice(0, at).trim(), email: pair.slice(at + 1).trim() }
-                : { name: null, email: pair.trim() };
+              const email = at > 0 ? pair.slice(at + 1).trim() : pair.trim();
+              const who = at > 0 ? pair.slice(0, at) : "";
+              const bar = who.indexOf("|");
+              return {
+                designation: bar >= 0 ? who.slice(0, bar).trim() : null,
+                name: (bar >= 0 ? who.slice(bar + 1) : who).trim() || null,
+                email,
+              };
             })
             .filter((r) => r.email)
         : null;
 
     if (toOverride) {
-      console.log(`  override to : ${toOverride.map((r) => `${r.name ?? "(no name)"} <${r.email}>`).join(", ")}`);
+      console.log(`  override to : ${toOverride.map((r) => `${[r.designation, r.name].filter(Boolean).join(" / ") || "(no name)"} <${r.email}>`).join(", ")}`);
     }
 
     const result = await sendLetterEmail(admin, {

@@ -49,9 +49,13 @@ function cleanRecipients(list: ManualRecipient[] | null | undefined): ManualReci
     const email = typeof r?.email === "string" ? r.email.trim().toLowerCase() : "";
     if (!isValidEmail(email) || seen.has(email)) continue;
     seen.add(email);
-    // Names ride into the salutation, so cap the length and drop line breaks.
-    const name = typeof r?.name === "string" ? r.name.replace(/\s+/g, " ").trim().slice(0, 120) : null;
-    out.push({ name: name || null, email });
+    // Name and designation ride into the salutation, so cap the length and
+    // collapse whitespace. sanitizeHeaderText handles the subject separately;
+    // these only reach the body.
+    const trim = (v: unknown) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, 120) : "");
+    const name = trim(r?.name);
+    const designation = trim(r?.designation);
+    out.push({ name: name || null, designation: designation || null, email });
     if (out.length >= MAX_RECIPIENTS) break;
   }
   return out;

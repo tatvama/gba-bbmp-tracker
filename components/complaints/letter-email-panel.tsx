@@ -22,9 +22,28 @@ const selectCls =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 interface ManualRow {
+  /** Kept separate from the name so the letter can open formally —
+   *  "To, The Executive Engineer" rather than a bare personal name. */
+  designation: string;
   name: string;
   email: string;
 }
+
+const BLANK_ROW: ManualRow = { designation: "", name: "", email: "" };
+
+/** Designations offered as quick picks; the field stays free text for anything else. */
+const COMMON_DESIGNATIONS = [
+  "Executive Engineer",
+  "Assistant Executive Engineer",
+  "Assistant Engineer",
+  "Chief Engineer",
+  "Superintending Engineer",
+  "Joint Commissioner",
+  "Deputy Commissioner",
+  "Assistant Revenue Officer",
+  "Chief Health Officer",
+  "Chief Town Planner",
+];
 
 const emailLooksValid = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
@@ -92,7 +111,7 @@ export function LetterEmailPanel({
     const suggested = (r.options ?? []).filter((o) => o.suggested).map((o) => o.email);
     setPicked((prev) => (prev.length ? prev : suggested));
     // Nothing on record → start them off with one blank row to type into.
-    if (!suggested.length && !(r.options ?? []).length) setManual((prev) => (prev.length ? prev : [{ name: "", email: "" }]));
+    if (!suggested.length && !(r.options ?? []).length) setManual((prev) => (prev.length ? prev : [{ ...BLANK_ROW }]));
   }, [complaintId]);
 
   function toggle(list: string[], setList: (v: string[]) => void, email: string) {
@@ -110,7 +129,11 @@ export function LetterEmailPanel({
     const byEmail = new Map(options.map((o) => [o.email, o]));
     const to = [
       ...picked.map((e) => ({ name: byEmail.get(e)?.name ?? null, email: e })),
-      ...manualValid.map((m) => ({ name: m.name.trim() || null, email: m.email.trim() })),
+      ...manualValid.map((m) => ({
+        name: m.name.trim() || null,
+        designation: m.designation.trim() || null,
+        email: m.email.trim(),
+      })),
     ];
     const cc = ccPicked.filter((e) => !picked.includes(e)).map((e) => ({ name: byEmail.get(e)?.name ?? null, email: e }));
 
@@ -291,29 +314,48 @@ export function LetterEmailPanel({
                   Nobody added by hand. Use this when the officer&apos;s details are not on record.
                 </p>
               )}
+              {manual.length > 0 && (
+                <div className="hidden gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-455 dark:text-slate-500 sm:grid sm:grid-cols-[1.1fr_1fr_1.3fr_auto]">
+                  <span>Designation</span>
+                  <span>Name (optional)</span>
+                  <span>Email</span>
+                  <span className="w-9" />
+                </div>
+              )}
               {manual.map((row, i) => {
                 const bad = row.email.trim().length > 0 && !emailLooksValid(row.email);
+                const set = (patch: Partial<ManualRow>) =>
+                  setManual((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
                 return (
-                  <div key={i} className="grid grid-cols-[1fr_1.4fr_auto] items-center gap-2">
+                  <div key={i} className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[1.1fr_1fr_1.3fr_auto]">
+                    <div>
+                      <Input
+                        value={row.designation}
+                        onChange={(e) => set({ designation: e.target.value })}
+                        placeholder="Executive Engineer"
+                        list="letter-email-designations"
+                        className="h-9"
+                        aria-label="Officer designation"
+                      />
+                      <span className="text-[10px] text-muted-foreground">Opens the letter formally</span>
+                    </div>
                     <Input
                       value={row.name}
-                      onChange={(e) =>
-                        setManual((prev) => prev.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))
-                      }
-                      placeholder="Officer name / designation"
+                      onChange={(e) => set({ name: e.target.value })}
+                      placeholder="Sri / Smt name"
                       className="h-9"
+                      aria-label="Officer name"
                     />
                     <div>
                       <Input
                         value={row.email}
-                        onChange={(e) =>
-                          setManual((prev) => prev.map((r, j) => (j === i ? { ...r, email: e.target.value } : r)))
-                        }
+                        onChange={(e) => set({ email: e.target.value })}
                         placeholder="officer@bbmp.gov.in"
                         type="email"
                         inputMode="email"
                         className={`h-9 ${bad ? "border-destructive" : ""}`}
                         aria-invalid={bad}
+                        aria-label="Officer email address"
                       />
                       {bad && <span className="text-[10px] text-destructive">Not a valid email address</span>}
                     </div>
@@ -329,11 +371,16 @@ export function LetterEmailPanel({
                   </div>
                 );
               })}
+              <datalist id="letter-email-designations">
+                {COMMON_DESIGNATIONS.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setManual((prev) => [...prev, { name: "", email: "" }])}
+                onClick={() => setManual((prev) => [...prev, { ...BLANK_ROW }])}
               >
                 <Plus className="h-4 w-4" /> Add recipient
               </Button>

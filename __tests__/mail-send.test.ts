@@ -281,13 +281,35 @@ describe("explicit recipient override", () => {
     expect(row.officer_id).toBeNull();
   });
 
-  it("records the typed names, not just the addresses", async () => {
+  it("records the typed names and designations, not just the addresses", async () => {
     config = configs.redirect;
     const recorded: Recorded[] = [];
-    await sendLetterEmail(makeAdmin(recorded), { complaintId: "c1", toOverride: [OFFICER_A] });
+    await sendLetterEmail(makeAdmin(recorded), {
+      complaintId: "c1",
+      toOverride: [{ ...OFFICER_A, designation: "Executive Engineer" }],
+    });
     expect(outboxInsert(recorded).recipients).toEqual([
-      { name: "Sri A", email: "a@bbmp.gov.in", source: "manual", role: "to" },
+      { name: "Sri A", designation: "Executive Engineer", email: "a@bbmp.gov.in", source: "manual", role: "to" },
     ]);
+  });
+
+  it("opens the letter formally from a typed designation", async () => {
+    // "To, The Executive Engineer" is how these letters are addressed; a bare
+    // personal name reads wrong on official correspondence.
+    config = configs.redirect;
+    await sendLetterEmail(makeAdmin([]), {
+      complaintId: "c1",
+      toOverride: [{ name: "Sri M. Lokesh", designation: "Executive Engineer", email: "ee@bbmp.gov.in" }],
+    });
+    const text = (sendMail.mock.calls[0]![0] as { text: string }).text;
+    expect(text).toContain("The Executive Engineer");
+    expect(text).toContain("Sri M. Lokesh");
+  });
+
+  it("falls back to a neutral opening when only an email is typed", async () => {
+    config = configs.redirect;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", toOverride: [{ email: "x@bbmp.gov.in" }] });
+    expect((sendMail.mock.calls[0]![0] as { text: string }).text).toContain("The concerned officer");
   });
 
   it("names the addressee in the salutation only when there is exactly one", async () => {

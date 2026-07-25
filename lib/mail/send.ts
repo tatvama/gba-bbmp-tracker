@@ -100,6 +100,10 @@ export interface SendLetterEmailInput {
 /** An address a user picked from the directory or typed in by hand. */
 export interface ManualRecipient {
   name?: string | null;
+  /** "Executive Engineer", "Chief Engineer (Road Infrastructure)" … Used for the
+   *  formal salutation ("To, The Executive Engineer"), which is how these letters
+   *  are addressed — a bare personal name reads wrong on official correspondence. */
+  designation?: string | null;
   email: string;
 }
 
@@ -263,7 +267,7 @@ export async function sendLetterEmail(
         // A name only makes sense in the salutation when there is ONE addressee;
         // with several, the letter opens generically rather than naming one of them.
         officerName: manualTo.length === 1 ? (manualTo[0]!.name?.trim() || null) : null,
-        officerDesignation: null,
+        officerDesignation: manualTo.length === 1 ? (manualTo[0]!.designation?.trim() || null) : null,
         // Not a directory contact, so no FK to record.
         officerId: null,
         reason: null as string | null,
@@ -344,12 +348,25 @@ export async function sendLetterEmail(
       // Names alongside the addresses — a bare gmail address with no officer_id is
       // unreadable as an audit record a year later.
       recipients: [
-        ...manualTo.map((r) => ({ name: r.name?.trim() || null, email: r.email.trim().toLowerCase(), source: "manual", role: "to" })),
-        ...manualCc.map((r) => ({ name: r.name?.trim() || null, email: r.email.trim().toLowerCase(), source: "manual", role: "cc" })),
+        ...manualTo.map((r) => ({
+          name: r.name?.trim() || null,
+          designation: r.designation?.trim() || null,
+          email: r.email.trim().toLowerCase(),
+          source: "manual",
+          role: "to",
+        })),
+        ...manualCc.map((r) => ({
+          name: r.name?.trim() || null,
+          designation: r.designation?.trim() || null,
+          email: r.email.trim().toLowerCase(),
+          source: "manual",
+          role: "cc",
+        })),
         ...(manualTo.length
           ? []
           : recipients.to.map((email) => ({
               name: recipients.officerName,
+              designation: recipients.officerDesignation,
               email,
               source: "directory",
               role: "to",

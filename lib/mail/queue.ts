@@ -28,8 +28,8 @@ export interface QueueLetterEmailInput {
   submittedOn?: string | null;
   /** User-chosen recipients. Callers MUST validate these first — see
    *  lib/actions/mail.ts, which is the only path that accepts them from a client. */
-  toOverride?: { name?: string | null; email: string }[] | null;
-  ccOverride?: { name?: string | null; email: string }[] | null;
+  toOverride?: { name?: string | null; designation?: string | null; email: string }[] | null;
+  ccOverride?: { name?: string | null; designation?: string | null; email: string }[] | null;
 }
 
 export interface QueueLetterEmailResult {
