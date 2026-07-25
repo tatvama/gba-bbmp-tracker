@@ -2,47 +2,151 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES } from "@/lib/constants";
 import { resolveMailConfig, type MailMode } from "@/lib/mail/config";
 import { verifyMailTransport } from "@/lib/mail/transport";
-import { queueLetterEmail, type QueueLetterEmailInput } from "@/lib/mail/queue";
+import { isValidEmail } from "@/lib/mail/message";
+import { sanitizeLetterKind } from "@/lib/mail/routing";
+import { sendLetterEmail, type ManualRecipient } from "@/lib/mail/send";
+import { listLetterEmails, listRecipientOptions, type LetterEmailRow, type RecipientOption } from "@/lib/mail/queries";
 
 /**
  * User-facing server actions for letter email.
  *
  * EVERY export of this module is a dispatchable HTTP endpoint, so every export
- * here authorizes first. The un-gated enqueue helper deliberately lives in
- * lib/mail/queue.ts, which is not a `"use server"` module and therefore cannot be
- * called over the wire.
+ * authorizes first and validates its own input. The un-gated enqueue helper used
+ * by the automatic path lives in lib/mail/queue.ts, which is NOT a `"use server"`
+ * module and therefore cannot be called over the wire.
  */
 
-/** Manually (re)send the letter email for a complaint. */
+/** No single letter needs more addressees than this; the cap is an abuse limit. */
+const MAX_RECIPIENTS = 20;
+
+export interface SendLetterEmailActionInput {
+  complaintId: string;
+  documentId?: string | null;
+  letterKind?: string | null;
+  to?: ManualRecipient[] | null;
+  cc?: ManualRecipient[] | null;
+}
+
+export interface SendLetterEmailActionResult {
+  ok: boolean;
+  status?: "sent" | "skipped" | "failed";
+  /** Where it actually went — the test inbox while MAIL_REDIRECT_TO is set. */
+  to?: string[];
+  redirected?: boolean;
+  error?: string;
+}
+
+/** Keep only well-formed addresses, cap the count, and trim the names. */
+function cleanRecipients(list: ManualRecipient[] | null | undefined): ManualRecipient[] {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set<string>();
+  const out: ManualRecipient[] = [];
+  for (const r of list) {
+    const email = typeof r?.email === "string" ? r.email.trim().toLowerCase() : "";
+    if (!isValidEmail(email) || seen.has(email)) continue;
+    seen.add(email);
+    // Names ride into the salutation, so cap the length and drop line breaks.
+    const name = typeof r?.name === "string" ? r.name.replace(/\s+/g, " ").trim().slice(0, 120) : null;
+    out.push({ name: name || null, email });
+    if (out.length >= MAX_RECIPIENTS) break;
+  }
+  return out;
+}
+
+/**
+ * Send the letter email now, to the recipients the user chose or typed.
+ *
+ * Runs INLINE rather than as a background job, unlike the automatic send on
+ * filing. Two reasons: the user is waiting and should be told "sent" or exactly
+ * why not; and background_jobs dedupes on (type, complaint) while queued/running,
+ * so a deliberate send could otherwise be silently folded into an in-flight
+ * automatic one.
+ */
 export async function sendLetterEmailAction(
-  input: QueueLetterEmailInput,
-): Promise<{ ok: boolean; jobId?: string; reused?: boolean; error?: string }> {
+  input: SendLetterEmailActionInput,
+): Promise<SendLetterEmailActionResult> {
   let user;
   try {
     user = await requireRole(COMPLAINT_FIELD_ROLES);
   } catch (e) {
     return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
-  // Only the complaint id and the letter identity are honoured — letterKind is
-  // used verbatim in the subject, so it is not taken from the caller here.
-  const r = await queueLetterEmail(
-    { complaintId: input.complaintId, documentId: input.documentId ?? null, letterKind: input.letterKind ?? null },
-    user.id,
-  );
-  revalidatePath(`/complaints/${input.complaintId}`);
-  return r;
+
+  const complaintId = typeof input?.complaintId === "string" ? input.complaintId.trim() : "";
+  if (!complaintId) return { ok: false, error: "No complaint given." };
+
+  const to = cleanRecipients(input.to);
+  const cc = cleanRecipients(input.cc).filter((c) => !to.some((t) => t.email === c.email));
+
+  if (!to.length) {
+    return {
+      ok: false,
+      error: "Add at least one valid recipient email address before sending.",
+    };
+  }
+
+  try {
+    const admin = createAdminClient();
+    const result = await sendLetterEmail(admin, {
+      complaintId,
+      documentId: typeof input.documentId === "string" ? input.documentId : null,
+      // Never trust a caller-supplied subject fragment — this lands in the
+      // Subject header verbatim.
+      letterKind: sanitizeLetterKind(input.letterKind),
+      userId: user.id,
+      toOverride: to,
+      ccOverride: cc,
+    });
+
+    revalidatePath(`/complaints/${complaintId}`);
+    return {
+      ok: result.status === "sent",
+      status: result.status,
+      to: result.to,
+      redirected: result.redirected,
+      error: result.error,
+    };
+  } catch (e) {
+    // sendLetterEmail is documented never to throw, but this is the outermost
+    // boundary of a public endpoint — do not leak a stack to the client.
+    console.warn("[mail] sendLetterEmailAction failed", complaintId, e);
+    return { ok: false, status: "failed", error: "The email could not be sent. Check the server log." };
+  }
+}
+
+/** Send history for the complaint, for the panel's "past attempts" list. */
+export async function listLetterEmailsAction(
+  complaintId: string,
+): Promise<{ rows?: LetterEmailRow[]; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  return { rows: await listLetterEmails(complaintId) };
+}
+
+/** Selectable recipients plus, when nothing resolved, the reason why. */
+export async function listRecipientOptionsAction(
+  complaintId: string,
+): Promise<{ options?: RecipientOption[]; resolutionReason?: string | null; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const { options, resolutionReason } = await listRecipientOptions(complaintId);
+  return { options, resolutionReason };
 }
 
 export interface MailStatus {
   mode: MailMode;
-  /** The authenticated sending mailbox, or "" when unset. */
   sender: string;
-  /** Where everything is diverted to, when in redirect mode. */
   redirectTo: string;
-  /** Plain-English summary for the UI. */
   summary: string;
 }
 

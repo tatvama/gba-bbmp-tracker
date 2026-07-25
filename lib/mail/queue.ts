@@ -26,6 +26,10 @@ export interface QueueLetterEmailInput {
   documentId?: string | null;
   letterKind?: string | null;
   submittedOn?: string | null;
+  /** User-chosen recipients. Callers MUST validate these first — see
+   *  lib/actions/mail.ts, which is the only path that accepts them from a client. */
+  toOverride?: { name?: string | null; email: string }[] | null;
+  ccOverride?: { name?: string | null; email: string }[] | null;
 }
 
 export interface QueueLetterEmailResult {

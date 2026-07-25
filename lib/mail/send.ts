@@ -5,7 +5,7 @@ import { downloadFromR2ByKey } from "@/lib/storage/r2-upload";
 import { getSignedUrl } from "@/lib/storage/supabase-upload";
 import { getMailConfig, getMailTransport, fromHeader } from "./transport";
 import { canSend, skipReason } from "./config";
-import { applyRedirect, buildLetterEmail, type IntendedEnvelope } from "./message";
+import { applyRedirect, buildLetterEmail, isValidEmail, normalizeAddressList, type IntendedEnvelope } from "./message";
 import { resolveComplaintEmailRecipients } from "./recipients";
 
 /**
@@ -83,6 +83,24 @@ export interface SendLetterEmailInput {
   /** The background job driving this send. Supplying it makes a retry idempotent
    *  — see the guard at the top of sendLetterEmail. */
   jobId?: string | null;
+  /**
+   * Recipients chosen or typed by a user. When this holds at least one valid
+   * address it REPLACES directory resolution entirely — which is the point: the
+   * directory frequently has no email for the responsible officer (wards outside
+   * the imported ARO range, unassigned cases), and a letter should still be
+   * sendable to an address the user knows.
+   *
+   * These are intent, not delivery. They flow into the IntendedEnvelope and pass
+   * through applyRedirect like anything else, so test mode still diverts them.
+   */
+  toOverride?: ManualRecipient[] | null;
+  ccOverride?: ManualRecipient[] | null;
+}
+
+/** An address a user picked from the directory or typed in by hand. */
+export interface ManualRecipient {
+  name?: string | null;
+  email: string;
 }
 
 export interface SendLetterEmailResult {
@@ -232,7 +250,33 @@ export async function sendLetterEmail(
     ward: { new_no: number | null; new_name: string | null } | null;
   } | null;
 
-  const recipients = await resolveComplaintEmailRecipients(admin, input.complaintId);
+  // Explicit recipients win over the directory. Resolution is skipped entirely in
+  // that case — it would only produce a reason string nobody needs.
+  const manualTo = (input.toOverride ?? []).filter((r) => isValidEmail(r.email));
+  const manualCc = (input.ccOverride ?? []).filter((r) => isValidEmail(r.email));
+  const directory = manualTo.length ? null : await resolveComplaintEmailRecipients(admin, input.complaintId);
+
+  const recipients = manualTo.length
+    ? {
+        to: normalizeAddressList(manualTo.map((r) => r.email)),
+        cc: normalizeAddressList(manualCc.map((r) => r.email)),
+        // A name only makes sense in the salutation when there is ONE addressee;
+        // with several, the letter opens generically rather than naming one of them.
+        officerName: manualTo.length === 1 ? (manualTo[0]!.name?.trim() || null) : null,
+        officerDesignation: null,
+        // Not a directory contact, so no FK to record.
+        officerId: null,
+        reason: null as string | null,
+      }
+    : {
+        to: directory!.to,
+        cc: normalizeAddressList([...directory!.cc, ...manualCc.map((r) => r.email)]),
+        officerName: directory!.officerName,
+        officerDesignation: directory!.officerDesignation,
+        officerId: directory!.officerId,
+        reason: directory!.reason,
+      };
+
   const attachment = await loadAttachment(admin, input.complaintId, input.documentId, letterKind);
   // Record the document that was actually attached, not the one that was asked
   // for — when documentId is null the picker chooses, and an audit row pointing
@@ -297,6 +341,20 @@ export async function sendLetterEmail(
       error: skip,
       mail_mode: config.mode,
       job_id: input.jobId ?? null,
+      // Names alongside the addresses — a bare gmail address with no officer_id is
+      // unreadable as an audit record a year later.
+      recipients: [
+        ...manualTo.map((r) => ({ name: r.name?.trim() || null, email: r.email.trim().toLowerCase(), source: "manual", role: "to" })),
+        ...manualCc.map((r) => ({ name: r.name?.trim() || null, email: r.email.trim().toLowerCase(), source: "manual", role: "cc" })),
+        ...(manualTo.length
+          ? []
+          : recipients.to.map((email) => ({
+              name: recipients.officerName,
+              email,
+              source: "directory",
+              role: "to",
+            }))),
+      ],
       created_by: input.userId ?? null,
     })
     .select("id")

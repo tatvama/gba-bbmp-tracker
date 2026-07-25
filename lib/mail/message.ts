@@ -157,6 +157,20 @@ export interface BuiltEmail {
   text: string;
 }
 
+/**
+ * Strip anything that could terminate a header line.
+ *
+ * A subject is assembled from a complaint title, an officer name and a job code —
+ * all user- or import-supplied. A CR/LF in any of them would end the Subject
+ * header and let the rest be read as additional headers (a Bcc, say). Nodemailer
+ * does encode headers, but this is the kind of guarantee that belongs at the point
+ * the string is built rather than trusted downstream.
+ */
+export function sanitizeHeaderText(value: string): string {
+  const CONTROL = new RegExp("[\u0000-\u001F\u007F]+", "g");
+  return value.replace(CONTROL, " ").replace(/\s{2,}/g, " ").trim();
+}
+
 const ref = (input: LetterEmailInput): string => {
   const parts = [
     input.complaintNumber ? `Complaint No. ${input.complaintNumber}` : null,
@@ -173,7 +187,9 @@ const ref = (input: LetterEmailInput): string => {
 export function buildLetterEmail(input: LetterEmailInput): BuiltEmail {
   const reference = ref(input);
   const subjectBits = [input.letterKind, reference || null, input.ward ? `Ward ${input.ward}` : null].filter(Boolean);
-  const subject = subjectBits.join(" — ");
+  // Every part is user- or import-supplied, so sanitize once at the point the
+  // header is assembled rather than trusting nodemailer to encode it.
+  const subject = sanitizeHeaderText(subjectBits.join(" — "));
 
   const salutation = input.officerDesignation
     ? `To,\nThe ${input.officerDesignation}${input.officerName ? `\n${input.officerName}` : ""}`

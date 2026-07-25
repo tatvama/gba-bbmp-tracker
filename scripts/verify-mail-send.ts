@@ -87,10 +87,31 @@ async function main() {
     const admin = createAdminClient();
 
     console.log(`\n── Running the app's own sendLetterEmail for ${complaintArg} ──`);
+    // --to "Name:email,Name2:email2" exercises the explicit-recipient override,
+    // i.e. the path the UI panel uses when the directory has no officer email.
+    const toArgIndex = process.argv.indexOf("--to");
+    const toOverride =
+      toArgIndex >= 0 && process.argv[toArgIndex + 1]
+        ? process.argv[toArgIndex + 1]!
+            .split(",")
+            .map((pair) => {
+              const at = pair.lastIndexOf(":");
+              return at > 0
+                ? { name: pair.slice(0, at).trim(), email: pair.slice(at + 1).trim() }
+                : { name: null, email: pair.trim() };
+            })
+            .filter((r) => r.email)
+        : null;
+
+    if (toOverride) {
+      console.log(`  override to : ${toOverride.map((r) => `${r.name ?? "(no name)"} <${r.email}>`).join(", ")}`);
+    }
+
     const result = await sendLetterEmail(admin, {
       complaintId: complaintArg,
       letterKind: "Complaint letter",
       submittedOn: new Date().toISOString().slice(0, 10),
+      toOverride,
     });
 
     console.log(`  status      : ${result.status}`);

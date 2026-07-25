@@ -6,8 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/print-button";
 import { ComplaintTabs } from "@/components/complaints/complaint-tabs";
 import { CaseWorkflow } from "@/components/complaints/case-workflow";
+import { LetterEmailPanel } from "@/components/complaints/letter-email-panel";
 import { AIInsightsPanel } from "@/components/ai/AIInsightsPanel";
 import { getComplaintAiRecommendationAction } from "@/lib/actions/ai-advisor";
+import { getMailStatusAction, type MailStatus } from "@/lib/actions/mail";
+import { listLetterEmails } from "@/lib/mail/queries";
 import { cn } from "@/lib/utils";
 import {
   getComplaint, listComplaintDocuments, listComplaintTimeline, listComplaintReplies,
@@ -79,6 +82,13 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
     canField: hasRole(user, COMPLAINT_FIELD_ROLES),
     aiConfigured: isAiConfigured(),
   };
+
+  // letter_emails is deny-by-default under RLS and readable only via the admin
+  // client, so it is fetched here rather than from the client component. Gated on
+  // the same role set as sendLetterEmailAction.
+  const mailStatusRaw = flags.canField ? await getMailStatusAction() : null;
+  const mailStatus: MailStatus | null = mailStatusRaw && !("error" in mailStatusRaw) ? mailStatusRaw : null;
+  const letterEmails = flags.canField ? await listLetterEmails(id) : [];
 
   return (
     <div className="mx-auto max-w-5xl px-4 md:px-6 space-y-6">
@@ -180,6 +190,15 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
           submittedDate={complaint.date_submitted ?? null}
           submissionChannel={complaint.complaint_mode ?? null}
           corporationName={complaint.corporation?.name ?? null}
+        />
+      )}
+
+      {flags.canField && (
+        <LetterEmailPanel
+          complaintId={complaint.id}
+          documentId={letter.pdfDocId}
+          mailStatus={mailStatus}
+          initialHistory={letterEmails}
         />
       )}
 

@@ -41,3 +41,41 @@ export function mayAutoEmailOfficer(kind: ComplaintDraftKind | string | null | u
   if (!kind) return false;
   return (OFFICER_ADDRESSED_DRAFT_KINDS as readonly string[]).includes(kind);
 }
+
+/**
+ * The letter descriptions a user may choose from when sending manually.
+ *
+ * letterKind lands verbatim in the email subject, so it must not be free text
+ * coming off the wire: a `"use server"` export is a public endpoint, and an
+ * unvalidated subject is both a header-injection surface and a way to send
+ * official-looking mail saying anything at all.
+ */
+export const SELECTABLE_LETTER_KINDS = [
+  "Complaint letter",
+  "Reminder letter",
+  "Counter-reply",
+  "Follow-up letter",
+  "Action Taken Report request",
+  "Site inspection request",
+  "Clarification request",
+] as const;
+export type SelectableLetterKind = (typeof SELECTABLE_LETTER_KINDS)[number];
+
+/**
+ * Coerce a caller-supplied letter kind to something safe.
+ *
+ * Anything not on the list becomes "Complaint letter" rather than being rejected,
+ * because the internal filing actions legitimately pass richer labels (e.g.
+ * "Reminder letter (no reply received)") and a hard failure there would lose the
+ * email over a cosmetic mismatch. A prefix match keeps those working.
+ */
+export function sanitizeLetterKind(kind: string | null | undefined): string {
+  const raw = (kind ?? "").replace(/[\r\n]+/g, " ").trim();
+  if (!raw) return "Complaint letter";
+  const exact = SELECTABLE_LETTER_KINDS.find((k) => k.toLowerCase() === raw.toLowerCase());
+  if (exact) return exact;
+  const prefixed = SELECTABLE_LETTER_KINDS.find(
+    (k) => raw.toLowerCase().startsWith(k.toLowerCase()) || k.toLowerCase().startsWith(raw.toLowerCase()),
+  );
+  return prefixed ?? "Complaint letter";
+}

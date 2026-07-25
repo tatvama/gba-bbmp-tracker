@@ -233,6 +233,101 @@ describe("attachment content type", () => {
   });
 });
 
+describe("explicit recipient override", () => {
+  const OFFICER_A = { name: "Sri A", email: "a@bbmp.gov.in" };
+  const OFFICER_B = { name: "Sri B", email: "b@bbmp.gov.in" };
+
+  it("STILL diverts to the test inbox — an override is intent, not delivery", async () => {
+    // The whole point of the override is that the directory has no address. It
+    // must not become a back door around test mode.
+    config = configs.redirect;
+    const recorded: Recorded[] = [];
+    const r = await sendLetterEmail(makeAdmin(recorded), {
+      complaintId: "c1",
+      toOverride: [OFFICER_A, OFFICER_B],
+    });
+
+    expect(r.status).toBe("sent");
+    const sent = sendMail.mock.calls[0]![0] as { to: string[]; cc?: string[] };
+    expect(sent.to).toEqual(["mani96462@gmail.com"]);
+    expect(JSON.stringify([sent.to, sent.cc])).not.toContain("bbmp.gov.in");
+    expect(outboxInsert(recorded).intended_to).toEqual([OFFICER_A.email, OFFICER_B.email]);
+  });
+
+  it("addresses every override recipient in live mode", async () => {
+    config = configs.live;
+    await sendLetterEmail(makeAdmin([]), {
+      complaintId: "c1",
+      toOverride: [OFFICER_A, OFFICER_B],
+      ccOverride: [{ name: "Cc", email: "cc@bbmp.gov.in" }],
+    });
+    const sent = sendMail.mock.calls[0]![0] as { to: string[]; cc?: string[] };
+    expect(sent.to).toEqual([OFFICER_A.email, OFFICER_B.email]);
+    expect(sent.cc).toEqual(["cc@bbmp.gov.in"]);
+  });
+
+  it("bypasses directory resolution entirely, so an unresolvable complaint can still be emailed", async () => {
+    // This is the case the user actually has: ward 209, no assigned officer.
+    config = configs.live;
+    recipients = { ...officer, to: [], officerId: null, officerName: null, officerDesignation: null, reason: "No officer with an email address is on this complaint." };
+    const recorded: Recorded[] = [];
+
+    const r = await sendLetterEmail(makeAdmin(recorded), { complaintId: "c1", toOverride: [OFFICER_A] });
+
+    expect(r.status).toBe("sent");
+    const row = outboxInsert(recorded);
+    expect(row.error).toBeNull();
+    // Not a directory contact, so no FK is asserted.
+    expect(row.officer_id).toBeNull();
+  });
+
+  it("records the typed names, not just the addresses", async () => {
+    config = configs.redirect;
+    const recorded: Recorded[] = [];
+    await sendLetterEmail(makeAdmin(recorded), { complaintId: "c1", toOverride: [OFFICER_A] });
+    expect(outboxInsert(recorded).recipients).toEqual([
+      { name: "Sri A", email: "a@bbmp.gov.in", source: "manual", role: "to" },
+    ]);
+  });
+
+  it("names the addressee in the salutation only when there is exactly one", async () => {
+    config = configs.redirect;
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", toOverride: [OFFICER_A] });
+    expect((sendMail.mock.calls[0]![0] as { text: string }).text).toContain("Sri A");
+
+    sendMail.mockClear();
+    await sendLetterEmail(makeAdmin([]), { complaintId: "c1", toOverride: [OFFICER_A, OFFICER_B] });
+    const text = (sendMail.mock.calls[0]![0] as { text: string }).text;
+    expect(text).toContain("The concerned officer");
+    // Addressing two people by one of their names would be wrong.
+    expect(text.split("Yours faithfully")[0]).not.toContain("Sri A");
+  });
+
+  it("ignores malformed override addresses and falls back to the directory when none survive", async () => {
+    config = configs.live;
+    const recorded: Recorded[] = [];
+    await sendLetterEmail(makeAdmin(recorded), {
+      complaintId: "c1",
+      toOverride: [{ name: "Broken", email: "not-an-email" }],
+    });
+    // officer.to from the directory mock, not the junk address.
+    expect((sendMail.mock.calls[0]![0] as { to: string[] }).to).toEqual(["cemajroad@bbmp.gov.in"]);
+    expect(outboxInsert(recorded).officer_id).toBe("officer-1");
+  });
+
+  it("de-duplicates an address appearing in both to and cc", async () => {
+    config = configs.live;
+    await sendLetterEmail(makeAdmin([]), {
+      complaintId: "c1",
+      toOverride: [OFFICER_A],
+      ccOverride: [OFFICER_A],
+    });
+    const sent = sendMail.mock.calls[0]![0] as { to: string[]; cc?: string[] };
+    expect(sent.to).toEqual([OFFICER_A.email]);
+    expect(sent.cc).toBeUndefined();
+  });
+});
+
 describe("attachment safety", () => {
   it("never picks a TVCC or PIL document via the untyped fallback", async () => {
     // The Submit panel puts "Prepare TVCC copy" directly above "Record the
