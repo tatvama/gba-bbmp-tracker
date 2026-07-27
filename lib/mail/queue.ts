@@ -60,6 +60,40 @@ export async function queueLetterEmail(
     const admin = createAdminClient();
     const letterKind = input.letterKind?.trim() || "Complaint letter";
 
+    // Already-sent guard. The embedded Submit-step panel lets a user send this
+    // exact letter manually, and moments later "Mark as filed" fires this same
+    // automatic path — without this check that is a genuine double-send, not a
+    // race: two independent, unrelated triggers for the identical
+    // (complaint, letter kind). Scoped to `sent` only, so a prior `failed` or
+    // `skipped` attempt never blocks a real retry.
+    const { data: already } = await admin
+      .from("letter_emails")
+      .select("id, to_addresses, redirected")
+      .eq("complaint_id", input.complaintId)
+      .eq("letter_kind", letterKind)
+      .eq("status", "sent")
+      .limit(1)
+      .maybeSingle();
+    if (already) {
+      const prior = already as { id: string; to_addresses: string[] | null; redirected: boolean };
+      await admin
+        .from("letter_emails")
+        .insert({
+          complaint_id: input.complaintId,
+          document_id: input.documentId ?? null,
+          letter_kind: letterKind,
+          status: "skipped",
+          error: `Already emailed to ${(prior.to_addresses ?? []).join(", ") || "the recipient"} — not sending a duplicate.`,
+          mail_mode: "already-sent",
+          created_by: userId,
+        })
+        .then(
+          () => undefined,
+          (e: unknown) => console.warn("[mail] could not record an already-sent row", e),
+        );
+      return { ok: true, reused: true };
+    }
+
     const started = await startJob(admin, {
       type: "email_send",
       title: `Email ${letterKind.toLowerCase()} to officer`,
