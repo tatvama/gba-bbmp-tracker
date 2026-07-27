@@ -813,7 +813,12 @@ function SubmitPanel({
       {/* Email the letter to the officers who should receive it, before or after
           recording the physical submission — the two are independent actions;
           filing must never wait on or be blocked by a failed/absent email. */}
-      <LetterEmailPanel complaintId={complaintId} documentId={letter?.pdfDocId ?? null} variant="embedded" />
+      <LetterEmailPanel
+        complaintId={complaintId}
+        documentId={letter?.pdfDocId ?? null}
+        documentName={letter?.fileName ?? null}
+        variant="embedded"
+      />
 
       {/* Record the submission */}
       {filed ? (

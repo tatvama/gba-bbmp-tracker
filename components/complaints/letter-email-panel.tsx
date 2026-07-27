@@ -72,6 +72,7 @@ const STATUS_LABEL: Record<LetterEmailRow["status"], { text: string; variant: "s
 export function LetterEmailPanel({
   complaintId,
   documentId,
+  documentName = null,
   mailStatus: mailStatusProp = null,
   initialHistory = [],
   variant = "standalone",
@@ -79,6 +80,11 @@ export function LetterEmailPanel({
   complaintId: string;
   /** The letter PDF to attach; null lets the server pick the right one. */
   documentId: string | null;
+  /** Display name for `documentId`, for the embedded "View letter" button —
+   *  standalone resolves its own filename via previewLetterAttachmentAction,
+   *  so this only matters when embedded (the caller there already has it on
+   *  the `letter` object it fetched, no separate lookup needed). */
+  documentName?: string | null;
   mailStatus?: MailStatus | null;
   initialHistory?: LetterEmailRow[];
   /** "embedded" renders inside the Submit step: opens immediately, self-fetches
@@ -203,10 +209,12 @@ export function LetterEmailPanel({
    *  action gets its own labelled button instead. A function returning JSX
    *  (called inline, not rendered as a JSX component) so it does not create a
    *  new component identity on every render. */
-  const viewLetterButton = (preview: AttachmentPreview) => (
+  const viewLetterButton = (preview: { documentId: string; filename: string; mimeType?: string }) => (
     <button
       type="button"
-      onClick={() => setViewTarget({ documentId: preview.documentId, title: preview.filename, fileName: preview.filename })}
+      onClick={() =>
+        setViewTarget({ documentId: preview.documentId, title: preview.filename, fileName: preview.filename, mimeType: preview.mimeType })
+      }
       className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
     >
       <Eye className="h-3 w-3" /> View
@@ -676,7 +684,17 @@ export function LetterEmailPanel({
           <Mail className="h-4 w-4 text-muted-foreground" /> Email the complaint letter to officers
         </p>
         {mailStatus?.summary && <p className="text-xs text-muted-foreground">{mailStatus.summary}</p>}
+        {/* No kind picker here (always the letter just drafted), but the same
+            "which letter is this" question still applies — the caller already
+            knows documentId + its filename, so no server round-trip needed. */}
+        {documentId && (
+          <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+            <span>{documentName || "Complaint letter"}</span>
+            {viewLetterButton({ documentId, filename: documentName || "Complaint letter", mimeType: "application/pdf" })}
+          </p>
+        )}
         {body}
+        <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
       </div>
     );
   }
