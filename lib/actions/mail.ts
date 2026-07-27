@@ -8,7 +8,7 @@ import { resolveMailConfig, type MailMode } from "@/lib/mail/config";
 import { verifyMailTransport } from "@/lib/mail/transport";
 import { isValidEmail } from "@/lib/mail/message";
 import { sanitizeLetterKind } from "@/lib/mail/routing";
-import { sendLetterEmail, type ManualRecipient } from "@/lib/mail/send";
+import { sendLetterEmail, resolveAttachmentPreview, type ManualRecipient, type AttachmentPreview } from "@/lib/mail/send";
 import {
   listLetterEmails,
   listRecipientOptions,
@@ -180,6 +180,23 @@ export async function listDepartmentRecipientsAction(): Promise<{ options?: Reci
   }
   const admin = createAdminClient();
   return { options: await listDepartmentRecipients(admin) };
+}
+
+/** "If I send this now, which stored letter actually goes out?" — lets the
+ *  panel show the real letter (filename, when it was filed) the moment the
+ *  user picks a kind from the dropdown, instead of leaving them to guess. */
+export async function previewLetterAttachmentAction(
+  complaintId: string,
+  letterKind: string,
+): Promise<{ preview?: AttachmentPreview | null; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  const preview = await resolveAttachmentPreview(admin, complaintId, sanitizeLetterKind(letterKind));
+  return { preview };
 }
 
 export interface MailStatus {

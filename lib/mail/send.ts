@@ -70,6 +70,44 @@ function preferredDocTypes(letterKind: string): string[] {
   return loose ? KIND_TO_DOC_TYPE[loose]! : [];
 }
 
+/** Every document_type worth querying for a given letterKind: its own
+ *  preferred types plus the safe fallback set — exported so a caller building
+ *  the query (resolveAttachmentPreview below) uses the identical candidate
+ *  list loadAttachment does, rather than a second copy that could drift. */
+export function attachmentCandidateTypes(letterKind: string): string[] {
+  return [...new Set([...preferredDocTypes(letterKind), ...FALLBACK_DOC_TYPES])];
+}
+
+interface AttachmentCandidateRow {
+  id: string;
+  document_type: string | null;
+  original_file_name: string | null;
+  mime_type: string | null;
+}
+
+/**
+ * Pick the best-matching row among a complaint's candidate documents for a
+ * given letterKind — the exact selection loadAttachment uses to build the
+ * real attachment, pulled out so a "here's what will actually be attached"
+ * preview (shown before sending) can never disagree with what sending itself
+ * does. `matchedKind: false` means nothing of the REQUESTED kind exists yet
+ * and this is the fallback (newest letter of any kind) that would attach
+ * instead — worth surfacing to the user rather than silently substituting.
+ */
+export function pickAttachmentRow<T extends AttachmentCandidateRow>(
+  rows: readonly T[],
+  letterKind: string,
+): { row: T; matchedKind: boolean } | null {
+  const isPdf = (r: T) => (r.mime_type ?? "").includes("pdf");
+  for (const wanted of preferredDocTypes(letterKind)) {
+    const matches = rows.filter((r) => r.document_type === wanted);
+    const doc = matches.find(isPdf) ?? matches[0];
+    if (doc) return { row: doc, matchedKind: true };
+  }
+  const fallback = rows.find(isPdf) ?? rows[0];
+  return fallback ? { row: fallback, matchedKind: false } : null;
+}
+
 export interface SendLetterEmailInput {
   complaintId: string;
   /** Attach this specific document. When omitted the newest letter PDF is used. */
@@ -155,7 +193,7 @@ async function loadAttachment(
     } else {
       // Query the types this letter kind maps to, plus the safe fallback set —
       // never every letter type on the case.
-      const candidates = [...new Set([...preferredDocTypes(letterKind), ...FALLBACK_DOC_TYPES])];
+      const candidates = attachmentCandidateTypes(letterKind);
       const { data } = await admin
         .from("complaint_documents")
         .select("id, document_type, original_file_name, storage_bucket, storage_path, mime_type")
@@ -167,18 +205,7 @@ async function loadAttachment(
       const rows = ((data as DocRow[] | null) ?? []).filter(
         (r) => r.document_type != null && candidates.includes(r.document_type),
       );
-      const isPdf = (r: DocRow) => (r.mime_type ?? "").includes("pdf");
-
-      // Match the letter being sent, in the order those types are preferred, and
-      // only then fall back to "newest letter on the case".
-      for (const wanted of preferredDocTypes(letterKind)) {
-        const matches = rows.filter((r) => r.document_type === wanted);
-        doc = matches.find(isPdf) ?? matches[0] ?? null;
-        if (doc) break;
-      }
-      // Prefer a PDF over the DOCX of the same letter — an officer can always
-      // open a PDF, and it is the version that was physically submitted.
-      if (!doc) doc = rows.find(isPdf) ?? rows[0] ?? null;
+      doc = pickAttachmentRow(rows, letterKind)?.row ?? null;
     }
 
     if (!doc) return null;
@@ -205,6 +232,54 @@ async function loadAttachment(
     console.warn("[mail] attachment load failed", complaintId, documentId, e);
     return null;
   }
+}
+
+export interface AttachmentPreview {
+  documentId: string;
+  filename: string;
+  documentType: string | null;
+  createdAt: string | null;
+  /** false when nothing of the REQUESTED letterKind exists yet on this case,
+   *  and this is the fallback (newest letter of any kind) that would attach
+   *  instead if sent right now. */
+  matchedKind: boolean;
+}
+
+/**
+ * "If I send this now, which stored letter actually goes out?" — read-only,
+ * no byte download, for the letter-email panel's kind picker to show BEFORE
+ * the user commits to sending. Runs the identical query+selection
+ * loadAttachment's null-documentId branch does (attachmentCandidateTypes +
+ * pickAttachmentRow), so this can never show one letter while sending
+ * attaches another.
+ */
+export async function resolveAttachmentPreview(
+  admin: SupabaseClient,
+  complaintId: string,
+  letterKind: string,
+): Promise<AttachmentPreview | null> {
+  const candidates = attachmentCandidateTypes(letterKind);
+  const { data } = await admin
+    .from("complaint_documents")
+    .select("id, document_type, original_file_name, mime_type, created_at")
+    .eq("complaint_id", complaintId)
+    .in("document_type", candidates)
+    .order("created_at", { ascending: false });
+  const rows = ((data as (AttachmentCandidateRow & { created_at: string })[] | null) ?? []).filter(
+    (r) => r.document_type != null && candidates.includes(r.document_type),
+  );
+  const picked = pickAttachmentRow(rows, letterKind);
+  if (!picked) return null;
+  const { row, matchedKind } = picked;
+  const contentType = row.mime_type?.trim() || "application/pdf";
+  const ext = contentType.includes("wordprocessingml") ? "docx" : contentType.includes("pdf") ? "pdf" : "bin";
+  return {
+    documentId: row.id,
+    filename: row.original_file_name?.trim() || `${row.document_type ?? "letter"}.${ext}`,
+    documentType: row.document_type,
+    createdAt: (row as { created_at?: string }).created_at ?? null,
+    matchedKind,
+  };
 }
 
 export async function sendLetterEmail(

@@ -50,7 +50,7 @@ vi.mock("@/lib/mail/recipients", () => ({
   resolveComplaintEmailRecipients: async () => recipients,
 }));
 
-const { sendLetterEmail } = await import("@/lib/mail/send");
+const { sendLetterEmail, resolveAttachmentPreview, pickAttachmentRow } = await import("@/lib/mail/send");
 
 // ── A minimal recording stand-in for the Supabase admin client ──────────────
 interface Recorded { table: string; op: string; payload?: unknown }
@@ -413,6 +413,57 @@ describe("attachment selection when a case has several letters", () => {
     // choice, not at null.
     await sendLetterEmail(makeAdmin(recorded), { complaintId: "c1", letterKind: "Complaint letter" });
     expect(outboxInsert(recorded).document_id).toBe("doc-orig");
+  });
+});
+
+describe("pickAttachmentRow (pure) — the shared selection loadAttachment and resolveAttachmentPreview both use", () => {
+  const row = (id: string, type: string, mime = "application/pdf") => ({ id, document_type: type, original_file_name: `${id}.file`, mime_type: mime });
+
+  it("returns null for an empty row set", () => {
+    expect(pickAttachmentRow([], "Complaint letter")).toBeNull();
+  });
+
+  it("marks matchedKind true when a row of the requested kind exists", () => {
+    const rows = [row("a", "Reminder letter"), row("b", "Generated complaint letter (PDF)")];
+    const picked = pickAttachmentRow(rows, "Complaint letter");
+    expect(picked?.row.id).toBe("b");
+    expect(picked?.matchedKind).toBe(true);
+  });
+
+  it("prefers the PDF sibling over a DOCX of the same kind", () => {
+    const rows = [row("docx", "Generated complaint letter", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), row("pdf", "Generated complaint letter (PDF)", "application/pdf")];
+    const picked = pickAttachmentRow(rows, "Complaint letter");
+    expect(picked?.row.id).toBe("pdf");
+  });
+
+  it("marks matchedKind false and falls back to the newest candidate when nothing of the requested kind exists", () => {
+    const rows = [row("a", "Counter-reply"), row("b", "Reminder letter")];
+    const picked = pickAttachmentRow(rows, "Legal notice");
+    expect(picked?.row.id).toBe("a"); // newest-first order, as the real query returns
+    expect(picked?.matchedKind).toBe(false);
+  });
+});
+
+describe("resolveAttachmentPreview — 'which letter would this send actually attach'", () => {
+  it("reports the matching document, without sending anything", async () => {
+    docsOnCase = MANY_LETTERS;
+    const preview = await resolveAttachmentPreview(makeAdmin([]), "c1", "Counter-reply");
+    expect(preview?.filename).toBe("counter-reply-1784797872143.pdf");
+    expect(preview?.matchedKind).toBe(true);
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("flags matchedKind: false when the requested kind has nothing on file, so the UI can warn rather than silently substitute", async () => {
+    docsOnCase = [doc("doc-cr", "Counter-reply", "counter-reply.pdf")];
+    const preview = await resolveAttachmentPreview(makeAdmin([]), "c1", "Legal notice");
+    expect(preview?.filename).toBe("counter-reply.pdf");
+    expect(preview?.matchedKind).toBe(false);
+  });
+
+  it("returns null when the case has no letters at all", async () => {
+    docsOnCase = [];
+    const preview = await resolveAttachmentPreview(makeAdmin([]), "c1", "Complaint letter");
+    expect(preview).toBeNull();
   });
 });
 

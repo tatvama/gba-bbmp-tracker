@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, Loader2, Mail, Plus, Send, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Check, Eye, Loader2, Mail, Plus, Send, ShieldAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,14 @@ import {
   listLetterEmailsAction,
   listRecommendedRecipientsAction,
   listDepartmentRecipientsAction,
+  previewLetterAttachmentAction,
   getMailStatusAction,
   type MailStatus,
 } from "@/lib/actions/mail";
 import type { LetterEmailRow, RecipientOption, RecommendedRecipient } from "@/lib/mail/queries";
+import type { AttachmentPreview } from "@/lib/mail/send";
 import { SELECTABLE_LETTER_KINDS } from "@/lib/mail/routing";
+import { DocumentViewer, type ViewerTarget } from "@/components/complaints/document-viewer";
 
 const selectCls =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -108,6 +111,11 @@ export function LetterEmailPanel({
   const [manual, setManual] = React.useState<ManualRow[]>([]);
   const [letterKind, setLetterKind] = React.useState<string>(SELECTABLE_LETTER_KINDS[0]);
   const [history, setHistory] = React.useState<LetterEmailRow[]>(initialHistory);
+  // undefined = still checking; null = nothing on file at all. Re-fetched
+  // whenever the picked kind changes, so "which stored letter is this" is
+  // answered before the user commits to sending, not left for them to guess.
+  const [attachmentPreview, setAttachmentPreview] = React.useState<AttachmentPreview | null | undefined>(undefined);
+  const [viewTarget, setViewTarget] = React.useState<ViewerTarget | null>(null);
 
   const lastAttempt = history[0] ?? null;
   const notSent = lastAttempt && lastAttempt.status !== "sent" ? lastAttempt : null;
@@ -174,6 +182,36 @@ export function LetterEmailPanel({
     // re-sync against on every complaintId identity check.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded, complaintId]);
+
+  // Which stored letter would actually go out for the currently-picked kind —
+  // embedded has no kind picker (its documentId is fixed to the letter just
+  // drafted), so this only matters in standalone mode.
+  React.useEffect(() => {
+    if (embedded || !open) return;
+    let cancelled = false;
+    setAttachmentPreview(undefined);
+    void previewLetterAttachmentAction(complaintId, letterKind).then((r) => {
+      if (!cancelled) setAttachmentPreview(r.preview ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [embedded, open, complaintId, letterKind]);
+
+  /** Explicit "View" affordance for a resolved attachment — a plain filename
+   *  reads as informational text, not obviously clickable, so the view
+   *  action gets its own labelled button instead. A function returning JSX
+   *  (called inline, not rendered as a JSX component) so it does not create a
+   *  new component identity on every render. */
+  const viewLetterButton = (preview: AttachmentPreview) => (
+    <button
+      type="button"
+      onClick={() => setViewTarget({ documentId: preview.documentId, title: preview.filename, fileName: preview.filename })}
+      className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+    >
+      <Eye className="h-3 w-3" /> View
+    </button>
+  );
 
   function toggle(list: string[], setList: (v: string[]) => void, email: string) {
     setList(list.includes(email) ? list.filter((e) => e !== email) : [...list, email]);
@@ -310,9 +348,41 @@ export function LetterEmailPanel({
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Used in the subject line, and to pick which stored letter is attached.
-                </p>
+                {/* What will actually be attached if you hit send right now —
+                    answered concretely instead of leaving the kind label to
+                    speak for itself, which is the confusion this replaced. */}
+                <div className="mt-1.5 text-[11px]">
+                  {attachmentPreview === undefined && (
+                    <p className="text-muted-foreground">Checking which stored letter matches…</p>
+                  )}
+                  {attachmentPreview === null && (
+                    <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      No stored letter is on file for this case yet — sending now would go out with no attachment.
+                    </p>
+                  )}
+                  {attachmentPreview && !attachmentPreview.matchedKind && (
+                    <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>
+                        No {letterKind.toLowerCase()} is on file yet — sending now would instead attach the most
+                        recent letter on record: <span className="font-medium">{attachmentPreview.filename}</span>
+                        {attachmentPreview.createdAt && ` (filed ${formatDateTime(attachmentPreview.createdAt)})`}
+                        {" · "}
+                        {viewLetterButton(attachmentPreview)}
+                      </span>
+                    </p>
+                  )}
+                  {attachmentPreview && attachmentPreview.matchedKind && (
+                    <p className="flex flex-wrap items-center gap-x-1.5 text-muted-foreground">
+                      <span>
+                        Attaching: <span className="font-medium text-slate-700 dark:text-slate-300">{attachmentPreview.filename}</span>
+                        {attachmentPreview.createdAt && ` — filed ${formatDateTime(attachmentPreview.createdAt)}`}
+                      </span>
+                      {viewLetterButton(attachmentPreview)}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -645,6 +715,7 @@ export function LetterEmailPanel({
         }
       />
       <CardContent className="space-y-4 p-5">{body}</CardContent>
+      <DocumentViewer target={viewTarget} onClose={() => setViewTarget(null)} />
     </Card>
   );
 }
