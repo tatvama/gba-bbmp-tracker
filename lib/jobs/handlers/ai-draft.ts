@@ -20,6 +20,9 @@ export interface AiDraftJobInput {
   /** Petitioner identity for a `legal_notice` PIL (see startAiDraftJob). Passed
    *  straight through to runComplaintDraft, which uses it as the FROM block. */
   sender?: LegalNoticeSender;
+  /** Sender identity for a non-PIL department letter (`counter_reply`,
+   *  `reminder_letter`). Passed straight through to runComplaintDraft. */
+  senderOverride?: { name: string; address: string; mobile?: string | null };
 }
 
 /** Rough progress % per real pipeline stage — "drafting" then ramps toward 90

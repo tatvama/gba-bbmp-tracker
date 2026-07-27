@@ -27,11 +27,13 @@ import {
   CORP_NAME,
   COMPLAINT_DRAFT_KINDS,
   DEFAULT_LEGAL_NOTICE_SENDER,
+  DEFAULT_DEPT_LETTER_SENDER,
   type UserRole,
   type LegalNoticeSender,
+  type DeptLetterSender,
   type CorporationCode,
 } from "@/lib/constants";
-import { getComplaintSettings, getLegalNoticeSender, LEGAL_NOTICE_SENDER_KEY, getTvccOffices, TVCC_OFFICES_KEY, getTvccSender, TVCC_SENDER_KEY } from "@/lib/settings";
+import { getComplaintSettings, getLegalNoticeSender, LEGAL_NOTICE_SENDER_KEY, getDeptLetterSender, DEPT_LETTER_SENDER_KEY, getTvccOffices, TVCC_OFFICES_KEY, getTvccSender, TVCC_SENDER_KEY } from "@/lib/settings";
 import { mergeTvccOffices, tvccRecipientLines, DEFAULT_TVCC_SENDER, type TvccOffice, type TvccSender } from "@/lib/distribution/tvcc";
 import { addDays } from "@/lib/rti-deadlines";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
@@ -1012,6 +1014,41 @@ export async function saveLegalNoticeSenderAction(
   };
   const { error } = await a.admin.from("app_settings").upsert(
     { key: LEGAL_NOTICE_SENDER_KEY, value, updated_by: a.user.id, updated_at: new Date().toISOString() },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Read the saved default sender (name/address/mobile) for a department-facing
+ * letter (counter-reply, reminder letter) so the sender-details form can be
+ * pre-filled. Falls back to the seed default when unset or unreadable.
+ */
+export async function getDeptLetterSenderAction(): Promise<{ sender: DeptLetterSender }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { sender: DEFAULT_DEPT_LETTER_SENDER };
+  return { sender: await getDeptLetterSender() };
+}
+
+/**
+ * Persist the department-letter sender as the org-wide default, so the next
+ * sender-details form (counter-reply or reminder letter) is pre-filled with it.
+ * Stored in the generic app_settings key/value table — no dedicated schema.
+ */
+export async function saveDeptLetterSenderAction(
+  sender: DeptLetterSender,
+): Promise<{ ok: boolean; error?: string }> {
+  const a = await authed([...COMPLAINT_WRITE_ROLES, "FIELD_OFFICER"]);
+  if ("error" in a) return { ok: false, error: a.error };
+  const trim = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const value: DeptLetterSender = {
+    name: trim(sender.name) || DEFAULT_DEPT_LETTER_SENDER.name,
+    address: trim(sender.address) || DEFAULT_DEPT_LETTER_SENDER.address,
+    mobile: trim(sender.mobile),
+  };
+  const { error } = await a.admin.from("app_settings").upsert(
+    { key: DEPT_LETTER_SENDER_KEY, value, updated_by: a.user.id, updated_at: new Date().toISOString() },
     { onConflict: "key" },
   );
   if (error) return { ok: false, error: error.message };

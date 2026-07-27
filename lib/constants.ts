@@ -677,6 +677,31 @@ export const DEFAULT_LEGAL_NOTICE_SENDER: LegalNoticeSender = {
   email: "",
 };
 
+// ── Department-letter sender (counter-reply, reminder letter — NOT the PIL
+// legal notice) ─────────────────────────────────────────────────────────────
+/**
+ * Sender identity for department-facing letters (counter-reply, reminder
+ * letter) that are addressed to the ward officer, not the PIL legal notice's
+ * Hon'ble Chief Justice. Lighter than LegalNoticeSender — no age/parentage/
+ * organisation/capacity, since those PIL-petition fields don't apply to an
+ * ordinary departmental letter. Captured from the user at generation time (an
+ * editable form pre-filled from the saved default) and persisted as the
+ * app_settings 'dept_letter_sender' default, the same way the legal-notice
+ * sender is, so it's remembered across both draft kinds.
+ */
+export interface DeptLetterSender {
+  name: string;
+  address: string;
+  mobile?: string;
+}
+
+/** Default department-letter sender — seeded from the primary letter signatory. */
+export const DEFAULT_DEPT_LETTER_SENDER: DeptLetterSender = {
+  name: LETTER_SIGNATORIES.raghav_gowda.name,
+  address: LETTER_SIGNATORIES.raghav_gowda.address,
+  mobile: LETTER_SIGNATORIES.raghav_gowda.mobile ?? "",
+};
+
 /** Recipient (TO) block for the PIL legal notice — the Hon'ble Chief Justice. */
 export const HIGH_COURT_CHIEF_JUSTICE_TO: string[] = [
   "The Hon'ble Chief Justice",

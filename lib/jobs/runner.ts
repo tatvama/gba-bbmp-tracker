@@ -148,7 +148,7 @@ export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise
       .select("id, input")
       .maybeSingle();
     if (!claimed) return; // already claimed / cancelled / finished by someone else
-    publishJobChange(meta.userId);
+    publishJobChange(meta.userId ?? "");
 
     let lastStage: string | undefined;
     let lastWriteAt = 0;
@@ -156,7 +156,10 @@ export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise
       input: claimed.input,
       admin,
       jobId,
-      userId: meta.userId,
+      // Coerced to "" for a system-triggered job (no human to attribute it
+      // to) — every existing handler only ever receives a real id here in
+      // practice, since only the overdue-alert sweeper's jobs pass null.
+      userId: meta.userId ?? "",
       updateProgress: async (progress, stage, message, extra) => {
         const now = Date.now();
         const stageChanged = stage !== lastStage;
@@ -171,7 +174,7 @@ export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise
               .eq("id", jobId),
           )
           .catch(() => {});
-        publishJobChange(meta.userId);
+        publishJobChange(meta.userId ?? "");
       },
       isCancelled: async () => {
         const { data } = await admin.from("background_jobs").select("cancel_requested").eq("id", jobId).maybeSingle();
@@ -185,7 +188,7 @@ export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise
     const { data: latest } = await admin.from("background_jobs").select("cancel_requested").eq("id", jobId).maybeSingle();
     if (latest?.cancel_requested) {
       await admin.from("background_jobs").update({ status: "cancelled", finished_at: nowISO() }).eq("id", jobId);
-      publishJobChange(meta.userId);
+      publishJobChange(meta.userId ?? "");
       return;
     }
 
@@ -195,15 +198,17 @@ export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise
     }
 
     await admin.from("background_jobs").update({ status: "done", progress: 100, result: (outcome.result ?? {}) as never, finished_at: nowISO() }).eq("id", jobId);
-    publishJobChange(meta.userId);
-    await notifyUser(admin, meta.userId, {
-      type: "job_done",
-      title: `${meta.title} — complete`,
-      body: "Open it to review the result.",
-      link: meta.link ?? undefined,
-      entityType: meta.entityType,
-      entityId: meta.entityId,
-    });
+    publishJobChange(meta.userId ?? "");
+    if (meta.userId) {
+      await notifyUser(admin, meta.userId, {
+        type: "job_done",
+        title: `${meta.title} — complete`,
+        body: "Open it to review the result.",
+        link: meta.link ?? undefined,
+        entityType: meta.entityType,
+        entityId: meta.entityId,
+      });
+    }
   } catch (e) {
     await writeChain;
     const msg = e instanceof Error ? e.message : "Job failed";
@@ -231,20 +236,22 @@ async function failOrRetry(
       .from("background_jobs")
       .update({ status: "retrying", retry_count: retryCount + 1, next_retry_at: new Date(Date.now() + decision.backoffMs).toISOString(), error: errorMsg })
       .eq("id", jobId);
-    publishJobChange(meta.userId);
+    publishJobChange(meta.userId ?? "");
     return;
   }
 
   await admin.from("background_jobs").update({ status: "failed", error: errorMsg, finished_at: nowISO() }).eq("id", jobId);
-  publishJobChange(meta.userId);
-  await notifyUser(admin, meta.userId, {
-    type: "job_failed",
-    title: `${meta.title} — failed`,
-    body: errorMsg,
-    link: meta.link ?? undefined,
-    entityType: meta.entityType,
-    entityId: meta.entityId,
-  });
+  publishJobChange(meta.userId ?? "");
+  if (meta.userId) {
+    await notifyUser(admin, meta.userId, {
+      type: "job_failed",
+      title: `${meta.title} — failed`,
+      body: errorMsg,
+      link: meta.link ?? undefined,
+      entityType: meta.entityType,
+      entityId: meta.entityId,
+    });
+  }
 }
 
 export interface SweepResult {
@@ -253,11 +260,22 @@ export interface SweepResult {
 }
 
 /**
- * Called from instrumentation.ts's existing interval (stage 9). Two jobs:
+ * Called from instrumentation.ts's existing interval (stage 9). Three jobs:
  * (1) dead-job recovery — a 'running' row older than its type's
  *     maxDurationMs means the process that owned it died mid-run (crash,
  *     restart) with no chance to mark it failed itself.
  * (2) due retries — 'retrying' rows whose backoff window has elapsed.
+ * (3) fresh dispatch of 'queued' rows that were inserted directly rather than
+ *     through startJob() — startJob's own after() callback is the NORMAL,
+ *     immediate way a freshly queued job gets its first dispatch attempt, but
+ *     after() requires an active request/action context. A request-free
+ *     caller (the overdue-alert sweeper, itself already running off this same
+ *     instrumentation.ts interval — see lib/complaints/overdue-alert-scheduler.ts)
+ *     has no such context, so it inserts the row directly and relies on this
+ *     sweep to pick it up within one tick instead. Purely additive: a job
+ *     that DID go through startJob() is claimed by its own after() call the
+ *     instant it's inserted, long before this interval's next tick, so this
+ *     loop only ever finds jobs whose creator had no after() to call.
  * Mirrors the exact staleness-reclaim idea already used by
  * lib/import-queue/store.ts's requeueOrphanedProcessing and the AI Advisor's
  * stale-lock reclaim, generalized once here instead of reimplemented per type.
@@ -283,18 +301,41 @@ export async function sweepBackgroundJobs(admin: SupabaseClient): Promise<SweepR
     }
   }
 
+  type DueRow = { id: string; type: string; title: string | null; entity_type: string | null; entity_id: string | null; created_by: string | null };
+
   const { data: due } = await admin
     .from("background_jobs")
     .select("id, type, title, entity_type, entity_id, created_by")
     .eq("status", "retrying")
     .lte("next_retry_at", nowISO())
     .limit(20);
-  for (const row of (due ?? []) as { id: string; type: string; title: string | null; entity_type: string | null; entity_id: string | null; created_by: string | null }[]) {
-    if (!row.created_by) continue;
+  for (const row of (due ?? []) as DueRow[]) {
     retried++;
     void dispatchJob(row.id, {
       type: row.type as JobType,
+      // Nullable now — a system-triggered job (created_by null) has no user
+      // to notify, but is still dispatched; see the JobDispatchMeta comment.
       userId: row.created_by,
+      title: row.title ?? row.type,
+      entityType: row.entity_type,
+      entityId: row.entity_id,
+    });
+  }
+
+  // System-triggered jobs only: anything inserted with created_by null was
+  // never handed to startJob() (which requires an active request for its
+  // after() call), so it has no other path to its first dispatch attempt.
+  // A user-triggered job's after() call claims it well before this runs.
+  const { data: queued } = await admin
+    .from("background_jobs")
+    .select("id, type, title, entity_type, entity_id, created_by")
+    .eq("status", "queued")
+    .is("created_by", null)
+    .limit(20);
+  for (const row of (queued ?? []) as DueRow[]) {
+    void dispatchJob(row.id, {
+      type: row.type as JobType,
+      userId: null,
       title: row.title ?? row.type,
       entityType: row.entity_type,
       entityId: row.entity_id,
