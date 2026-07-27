@@ -1101,9 +1101,6 @@ function CounterReplyPanel({
   let counterState: "locked" | "active" | "completed" = "locked";
   if (hasInboundReply) {
     counterState = hasCounterReplyDoc ? "completed" : "active";
-  } else {
-    // Force active for testing as requested by the user (using 'as any' to prevent type-narrowing error)
-    counterState = (hasCounterReplyDoc ? "completed" : "active") as any;
   }
 
   // Determine Reminder Letter Button State
@@ -1117,9 +1114,12 @@ function CounterReplyPanel({
   let reminderState: "locked" | "waiting" | "active" | "completed" = "locked";
   if (hasReminderSent) {
     reminderState = "completed";
-  } else {
-    // Force active for testing as requested by the user (using 'as any' to prevent type-narrowing error)
-    reminderState = "active" as any;
+  } else if (hasAcknowledge && !hasInboundReply) {
+    if (effectiveStage === "awaiting_reply") {
+      reminderState = diffDays <= 0 ? "active" : "waiting";
+    } else {
+      reminderState = "locked";
+    }
   }
 
   // Determine Legal Notice Button State
@@ -1131,9 +1131,8 @@ function CounterReplyPanel({
   let legalState: "locked" | "waiting" | "active" | "completed" = "locked";
   if (hasLegalNoticeSent) {
     legalState = "completed";
-  } else {
-    // Force active for testing as requested by the user (using 'as any' to prevent type-narrowing error)
-    legalState = "active" as any;
+  } else if (effectiveStage === "reminder_sent" && !hasInboundReply) {
+    legalState = diffDays <= 0 ? "active" : "waiting";
   }
 
   // Tooltip content & label builders
@@ -1152,7 +1151,7 @@ function CounterReplyPanel({
     }
   } else if (counterState === "active") {
     counterTooltip = "Generate an AI-assisted counter reply based on the uploaded department response. Available now.";
-    counterLabel = hasInboundReply ? "Counter Reply 🔵" : "Counter Reply (Active for test) 🔵";
+    counterLabel = "Counter Reply 🔵";
   } else if (counterState === "completed") {
     counterTooltip = "Counter-reply has been drafted and filed to the case.";
     counterLabel = "Counter Reply ✓";
@@ -1173,8 +1172,7 @@ function CounterReplyPanel({
     reminderLabel = `Reminder Letter (in ${diffDays > 0 ? diffDays : 0}d)`;
   } else if (reminderState === "active") {
     reminderTooltip = "Generate a reminder letter requesting the department to respond to the complaint. Available now (0 days remaining).";
-    const isActuallyActive = hasAcknowledge && !hasInboundReply && effectiveStage === "awaiting_reply" && diffDays <= 0;
-    reminderLabel = isActuallyActive ? "Reminder Letter 🔵" : "Reminder Letter (Active for test) 🔵";
+    reminderLabel = "Reminder Letter 🔵";
   } else if (reminderState === "completed") {
     reminderTooltip = "Reminder letter has already been generated and filed.";
     reminderLabel = "Reminder Letter ✓";
@@ -1198,7 +1196,7 @@ function CounterReplyPanel({
     legalLabel = `Legal Notice (in ${diffDays > 0 ? diffDays : 0}d)`;
   } else if (legalState === "active") {
     legalTooltip = "Draft the legal notice as a Public Interest Litigation letter-petition to the Hon'ble Chief Justice, High Court of Karnataka. You confirm the petitioner (FROM) details before it generates.";
-    legalLabel = "Legal Notice (Active for test) 🔵";
+    legalLabel = "Legal Notice 🔵";
   } else if (legalState === "completed") {
     legalTooltip = "Legal Notice has already been generated and filed.";
     legalLabel = "Legal Notice ✓";
