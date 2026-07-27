@@ -12,8 +12,12 @@ import type { JobType } from "./types";
  *  point. Honest on purpose: a Cancel button only renders for a type in this
  *  list. ai_draft/ocr are a single streaming/OCR call with no clean midpoint
  *  to stop, so they're deliberately absent — vision_scan checks between every
- *  photo pair. */
-export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan", "source_fetch", "ai_draft", "ocr", "export"];
+ *  photo pair. email_send checks once, up front (lib/jobs/handlers/email-send.ts)
+ *  — its real failure mode isn't a slow in-flight SMTP call but a job stuck in
+ *  "retrying" waiting on a next_retry_at that never comes (e.g. sweep not
+ *  running), so Stop must work on a queued/retrying job even more than on a
+ *  running one — see cancelJobAction's queued/retrying handling. */
+export const CANCELLABLE_JOB_TYPES: JobType[] = ["vision_scan", "source_fetch", "ai_draft", "ocr", "export", "email_send"];
 
 export const MODULE_LABEL: Record<JobType, string> = {
   ai_draft: "AI Drafting",

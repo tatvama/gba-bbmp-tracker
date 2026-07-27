@@ -107,10 +107,12 @@ export async function listAllTasks(opts: { recentHours?: number } = {}): Promise
   return listAllTaskItems(admin, user.id, opts);
 }
 
-/** User-requested cancellation. A queued job (never claimed by a handler) is
- *  cancelled immediately; a running/retrying one is flagged and the handler's
- *  own ctx.isCancelled() check (where it loops — see lib/jobs/runner.ts)
- *  honors it cooperatively on its next check, since single-process Node can't
+/** User-requested cancellation. Nothing is actually executing for a queued OR
+ *  retrying job — retrying just means "waiting on next_retry_at," the same
+ *  as queued means "waiting to be claimed" — so both are cancelled
+ *  immediately. Only a running job is flagged instead: the handler's own
+ *  ctx.isCancelled() check (where it has one — see lib/jobs/runner.ts) honors
+ *  it cooperatively on its next check, since single-process Node can't
  *  forcibly kill an in-flight async function from the outside. */
 export async function cancelJobAction(jobId: string): Promise<{ ok: boolean; error?: string }> {
   const user = await getSessionUser();
@@ -121,7 +123,7 @@ export async function cancelJobAction(jobId: string): Promise<{ ok: boolean; err
   if (!["queued", "running", "retrying"].includes(job.status as string)) return { ok: true };
 
   await admin.from("background_jobs").update({ cancel_requested: true }).eq("id", jobId);
-  if (job.status === "queued") {
+  if (job.status === "queued" || job.status === "retrying") {
     await admin.from("background_jobs").update({ status: "cancelled", finished_at: nowISO() }).eq("id", jobId);
   }
   return { ok: true };

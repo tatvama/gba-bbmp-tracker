@@ -19,6 +19,14 @@ async function handleEmailSend(ctx: JobHandlerContext): Promise<JobHandlerOutcom
   const input = (ctx.input ?? {}) as SendLetterEmailInput;
   if (!input.complaintId) return { error: "No complaintId on the job input.", retryable: false };
 
+  // A queued/retrying job is cancelled immediately by cancelJobAction (nothing
+  // is in flight yet), so this only ever matters for the narrow race where a
+  // dispatch had already claimed the job (status -> "running") the instant
+  // before cancellation landed. dispatchJob's own post-handler check (lib/jobs/
+  // runner.ts) is what makes cancellation authoritative either way — this is
+  // just an early exit so that race doesn't cost a real SMTP attempt.
+  if (await ctx.isCancelled()) return { result: { status: "skipped", reason: "Cancelled" } };
+
   await ctx.updateProgress(10, "Resolving recipient", "Looking up the officer's email address");
 
   const result = await sendLetterEmail(ctx.admin, {
