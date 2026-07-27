@@ -54,6 +54,12 @@ describe("buildDepartmentDirectoryPlan — never duplicates an existing GBA_AUTH
   it("splits the corrected 'Principal Secretary' UDD post into ACS (update) + Secretary (new insert)", () => {
     const acsUpdate = plan.updates.find((u) => "designation" in u.matchBy && u.matchBy.designation === "Principal Secretary");
     expect(acsUpdate!.patch.email).toBe("asc-ud@karnataka.gov.in");
+    // The patch must actually rewrite designation, not just enrich email/address —
+    // matchBy.designation="Principal Secretary" is only how the row is FOUND (its
+    // old, wrong value); leaving the patch without a new designation would keep
+    // that non-existent title live in the salutation and in contactMatchesRole
+    // forever, silently defeating the very correction this update exists to make.
+    expect(acsUpdate!.patch.designation).toBe("Additional Chief Secretary");
     const secretaryInsert = plan.inserts.find((i) => i.designation === "Secretary" && i.department === "Urban Development Department");
     expect(secretaryInsert).toBeDefined();
     expect(secretaryInsert!.email).toBe("secy-ud@karnataka.gov.in");

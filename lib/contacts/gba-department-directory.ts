@@ -61,7 +61,7 @@ export interface DeptUpdate {
    *  identity for the GBA_AUTHORITIES overlaps, or by an exact existing email
    *  for a near-duplicate/conflict annotation. */
   matchBy: { source: string; designation: string } | { email: string };
-  patch: Partial<Pick<DeptContactRow, "email" | "office_name" | "office_address" | "phone" | "verification_status" | "internal_notes">>;
+  patch: Partial<Pick<DeptContactRow, "designation" | "email" | "office_name" | "office_address" | "phone" | "verification_status" | "internal_notes">>;
   reason: string;
 }
 
@@ -240,6 +240,17 @@ export function buildDepartmentDirectoryPlan(): DepartmentDirectoryPlan {
     updates.push({
       matchBy: { source: GBA_AUTHORITY_SOURCE, designation: "Principal Secretary" },
       patch: {
+        // The whole point of this update — matching lib/complaints/recipient-
+        // roles.ts's additional_chief_secretary_udd role, whose matchDesignations
+        // expects exactly this short form (same convention the other 5 enriched
+        // GBA_AUTHORITIES contacts already follow: "Chief Commissioner", "Chief
+        // Minister", "Lokayukta" are all short canonical forms, not the fuller
+        // official title). Omitting this left the contact's own designation
+        // column still reading the non-existent "Principal Secretary" — so the
+        // postal Copy-To resolver could never find this contact for its own
+        // corrected role, and an email to it would have wrongly saluted "The
+        // Principal Secretary" despite the row otherwise being fully corrected.
+        designation: "Additional Chief Secretary",
         email: acs.email,
         office_address: acs.address,
         phone: acs.phone,

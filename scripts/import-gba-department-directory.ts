@@ -54,12 +54,34 @@ async function main() {
   const { data: corpRows } = await admin.from("corporations").select("id, code");
   const corpIdByCode = new Map<string, string>((corpRows as { id: string; code: string }[] | null ?? []).map((c) => [c.code, c.id]));
 
-  let inserted = 0, insertFailed = 0;
+  // ── existing-row identity index, so this script is actually safe to re-run.
+  //    Without this, every plan.insert is unconditional — re-running --commit
+  //    a second time (e.g. to pick up a later addendum batch, or to re-apply
+  //    after fixing a bug in the plan) silently duplicated 61 contacts on
+  //    2026-07-27, caught only by a follow-up audit. Identity = (source,
+  //    full_name, designation), NOT (source, email) alone: several rows
+  //    legitimately share one mailbox (jdtp@bbmp.gov.in held by both "Sri.
+  //    Sunil" and "Sri. Girish"), and a handful have no email at all. ────────
+  const { data: existingRows } = await admin.from("contacts").select("source, full_name, designation").in("source", [...new Set(plan.inserts.map((r) => r.source))]);
+  const existingIdentities = new Set(
+    (existingRows as { source: string; full_name: string; designation: string }[] | null ?? []).map(
+      (r) => `${r.source}|${r.full_name.trim().toLowerCase()}|${r.designation.trim().toLowerCase()}`,
+    ),
+  );
+  const identityOf = (row: DeptContactRow) => `${row.source}|${row.full_name.trim().toLowerCase()}|${row.designation.trim().toLowerCase()}`;
+
+  let inserted = 0, insertFailed = 0, insertSkippedExisting = 0;
   let updated = 0, updateMissing = 0, updateFailed = 0;
   let deactivated = 0, deactivateMissing = 0, deactivateFailed = 0;
 
   console.log(`──────── INSERTS (${plan.inserts.length}) ────────`);
   for (const row of plan.inserts) {
+    if (existingIdentities.has(identityOf(row))) {
+      console.log(`  = already exists, skipped: ${describeRow(row)}`);
+      insertSkippedExisting++;
+      continue;
+    }
+
     const corporationId = row.corporation_code ? corpIdByCode.get(row.corporation_code) ?? null : null;
     if (row.corporation_code && !corporationId) {
       console.warn(`  ! unknown corporation code "${row.corporation_code}" for ${row.full_name} — inserting with corporation_id null`);
@@ -79,6 +101,10 @@ async function main() {
       continue;
     }
     inserted++;
+    // Re-running --commit in one process (not expected, but cheap to guard):
+    // record this identity as now-existing so a repeated identical row in
+    // the SAME plan can't double-insert against itself either.
+    existingIdentities.add(identityOf(row));
     console.log(`  + ${describeRow(row)}`);
   }
 
@@ -165,7 +191,7 @@ async function main() {
   }
 
   console.log("\n──────── SUMMARY ────────");
-  console.log(`Inserts:       ${COMMIT ? `${inserted} created` : `${plan.inserts.length} planned`}${insertFailed ? `, ${insertFailed} FAILED` : ""}`);
+  console.log(`Inserts:       ${COMMIT ? `${inserted} created` : `${plan.inserts.length} planned`}${insertSkippedExisting ? `, ${insertSkippedExisting} already existed (skipped)` : ""}${insertFailed ? `, ${insertFailed} FAILED` : ""}`);
   console.log(`Updates:       ${COMMIT ? `${updated} applied` : `${plan.updates.length} planned`}${updateMissing ? `, ${updateMissing} had no match` : ""}${updateFailed ? `, ${updateFailed} FAILED` : ""}`);
   console.log(`Deactivations: ${COMMIT ? `${deactivated} applied` : `${plan.deactivations.length} planned`}${deactivateMissing ? `, ${deactivateMissing} had no match` : ""}${deactivateFailed ? `, ${deactivateFailed} FAILED` : ""}`);
   console.log(`Needs review:  ${plan.needsReview.length} (never written by this script)`);

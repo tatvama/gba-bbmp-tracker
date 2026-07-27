@@ -86,7 +86,12 @@ export const COMPLAINT_RECIPIENT_ROLES: RecipientRoleDescriptor[] = [
   // sourced from karnataka.gov.in's own directory).
   { key: "additional_chief_secretary_udd", title: "The Additional Chief Secretary", level: "Urban Development Department, Room No. 436, 4th Floor, Vikasa Soudha, Bengaluru - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Additional Chief Secretary"], matchRoleLevels: [], officeCopy: false, order: 7 },
   { key: "secretary_udd", title: "The Secretary", level: "Urban Development Department, Room No. 434, 4th Floor, Vikasa Soudha, Bengaluru - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Secretary"], matchRoleLevels: [], officeCopy: false, order: 8 },
-  { key: "chief_secretary", title: "The Chief Secretary", level: "Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Secretary"], matchRoleLevels: [], officeCopy: false, order: 9 },
+  // The department-directory import (data/gba-department-directory.json,
+  // "oversight") gave this contact the fuller official title "Chief Secretary
+  // to Government" rather than the short form below — contactMatchesRole is
+  // an exact match, so both variants must be listed or the real contact (with
+  // a real address) silently falls back to the title-only fixed office.
+  { key: "chief_secretary", title: "The Chief Secretary", level: "Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Secretary", "Chief Secretary to Government"], matchRoleLevels: [], officeCopy: false, order: 9 },
   { key: "minister_incharge_gba", title: "The Minister in-charge", level: "GBA & BWSSB, Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Minister in-charge"], matchRoleLevels: [], officeCopy: false, order: 10 },
   { key: "chief_minister", title: "The Chief Minister", level: "Government of Karnataka (Chairman, GBA), Room No. 323A, 3rd Floor, Vidhana Soudha, Dr. Ambedkar Veedhi, Bengaluru, Karnataka - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Minister"], matchRoleLevels: [], officeCopy: false, order: 11 },
   { key: "lokayukta", title: "The Honorable Lokayukta", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 12 },
