@@ -1,0 +1,295 @@
+{
+  "source": "BBMP Officer Directory (user-supplied, 2026-07-25)",
+  "confidence": "MEDIUM",
+  "about": "A further BBMP officer email list supplied directly by the user, in the same session as data/gba-department-directory.json (which was extracted from cited official sources and is confidence HIGH). Kept in a SEPARATE file rather than merged into that one because the two sources sometimes disagree, and the disagreement itself is worth preserving rather than silently resolved by whichever file happened to be read last.",
+  "howReconciliationWorks": [
+    "Every entry that matches an existing HIGH-confidence official email exactly (e.g. comm@bbmp.gov.in, eic@bbmp.gov.in) was left OUT of this file entirely — it carries no new information.",
+    "'reconciliation.type: near_duplicate' — the email looks like a spelling/naming variant of an official one already on record (e.g. cemajorroads@ vs the official cemajroad@). Recorded as an ALTERNATE email on the existing contact, never as a second competing contact.",
+    "'reconciliation.type: conflict' — a genuine factual disagreement with the official extraction (e.g. this list asserts ceelectrical@bbmp.gov.in exists; the official extraction explicitly found no head-office electrical mailbox in any cited source). Recorded with verification_status PENDING and both values kept in internal_notes, for a human to resolve in /contacts — never silently decided in code.",
+    "No 'reconciliation' field at all — a genuinely new post/address with no official-directory analog. Inserted as a new contact."
+  ],
+  "entries": [
+    {
+      "email": "spcommadmin@bbmp.gov.in",
+      "designation": "Special Commissioner (Administration)",
+      "department": "Administration",
+      "designationCategory": "Administration",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": null
+    },
+    {
+      "email": "spcommproj@bbmp.gov.in",
+      "designation": "Special Commissioner (Projects)",
+      "department": "Projects",
+      "designationCategory": "Administration",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": null
+    },
+    {
+      "email": "jchealth@bbmp.gov.in",
+      "designation": "Joint Commissioner (Health)",
+      "department": "Health",
+      "designationCategory": "Health",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": "jchealth@bbmp.gov.in was already known from the official e-mail directory, but only as a note under the Chief Health Officer entry — it never got its own contact row. This is that gap being filled."
+    },
+    {
+      "email": "jcbmtf@bbmp.gov.in",
+      "designation": "Joint Commissioner (BMTF)",
+      "department": "BMTF (Bangalore Metropolitan Task Force)",
+      "designationCategory": "Other",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": null
+    },
+    {
+      "email": "ceprojects@bbmp.gov.in",
+      "designation": "Chief Engineer (Projects)",
+      "department": "Projects",
+      "designationCategory": "Engineering",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "reconciliation": {
+        "type": "near_duplicate",
+        "of": "ceproj1@bbmp.gov.in",
+        "note": "Official directory's Projects entry uses department mailboxes ceproj1@ through ceproj5@bbmp.gov.in, not individually mapped to one post-holder. ceprojects@ (singular) may be a newer consolidated address for the same wing — recorded as an alternate on the existing Projects contact rather than a second one."
+      }
+    },
+    {
+      "email": "cemajorroads@bbmp.gov.in",
+      "designation": "Chief Engineer (Major Roads)",
+      "department": "Road Infrastructure / Major Roads",
+      "designationCategory": "Engineering",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "reconciliation": {
+        "type": "near_duplicate",
+        "of": "cemajroad@bbmp.gov.in",
+        "note": "Same post as the official Road Infrastructure / Major Roads entry (cemajroad@, no trailing 's') — a one-letter spelling variant, not a second mailbox."
+      }
+    },
+    {
+      "email": "ceelectrical@bbmp.gov.in",
+      "designation": "Chief Engineer (Electrical)",
+      "department": "Electrical (Street Lighting)",
+      "designationCategory": "Electrical",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "reconciliation": {
+        "type": "conflict",
+        "of": null,
+        "note": "The official extraction explicitly found NO head-office electrical mailbox in any cited official source — only zonal Executive Engineer (Electrical) addresses. This list asserts ceelectrical@bbmp.gov.in exists. Recorded but flagged PENDING rather than trusted outright, since it has no citation of its own."
+      }
+    },
+    {
+      "email": "cequalitycontrol@bbmp.gov.in",
+      "designation": "Chief Engineer (Quality Control)",
+      "department": "Quality Control",
+      "designationCategory": "Engineering",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": null
+    },
+    {
+      "email": "ceinfrastructure@bbmp.gov.in",
+      "designation": "Chief Engineer (Infrastructure)",
+      "department": "Infrastructure",
+      "designationCategory": "Engineering",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "reconciliation": {
+        "type": "conflict",
+        "of": "cemajroad@bbmp.gov.in",
+        "note": "Ambiguous against the official Road Infrastructure entry (cemajroad@) — 'Infrastructure' may be the same wing under a broader name, or a genuinely separate post. Not clearly a duplicate, not clearly new; flagged PENDING rather than guessed either way."
+      }
+    },
+    {
+      "email": "ceopticalfiber@bbmp.gov.in",
+      "designation": "Chief Engineer (Optical Fiber)",
+      "department": "Optical Fiber",
+      "designationCategory": "Engineering",
+      "officeType": "Head Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": null
+    },
+    {
+      "email": "dceast@bbmp.gov.in",
+      "designation": "Deputy Commissioner, East Zone",
+      "department": "East Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": "East Zone now sits across two GBA corporations per the official directory's own findings (Bengaluru Central / East) — not attributed to a single corporation_id rather than guessed."
+    },
+    {
+      "email": "dcsouth@bbmp.gov.in",
+      "designation": "Deputy Commissioner, South Zone",
+      "department": "South Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": "DAKSHINA",
+      "notes": null
+    },
+    {
+      "email": "dcwest@bbmp.gov.in",
+      "designation": "Deputy Commissioner, West Zone",
+      "department": "West Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "notes": "West Zone now sits across two GBA corporations per the official directory's own findings (Bengaluru West / Central) — not attributed to a single corporation_id rather than guessed."
+    },
+    {
+      "email": "dcmpura@bbmp.gov.in",
+      "designation": "Deputy Commissioner, Mahadevapura Zone",
+      "department": "Mahadevapura Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": "PURVA",
+      "notes": null
+    },
+    {
+      "email": "jcyelahanka@bbmp.gov.in",
+      "designation": "Joint Commissioner, Yelahanka Zone",
+      "department": "Yelahanka Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": "UTTARA",
+      "reconciliation": { "type": "near_duplicate", "of": "jcyel@bbmp.gov.in", "note": "Same Yelahanka Zone JC post as the official zonalOffices entry — a fuller spelling of the same address." }
+    },
+    {
+      "email": "jcbommanahalli@bbmp.gov.in",
+      "designation": "Joint Commissioner, Bommanahalli Zone",
+      "department": "Bommanahalli Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": "DAKSHINA",
+      "reconciliation": { "type": "near_duplicate", "of": "jcbhalli@bbmp.gov.in", "note": "Same Bommanahalli Zone JC post as the official zonalOffices entry — a fuller spelling of the same address." }
+    },
+    {
+      "email": "jcdasarahalli@bbmp.gov.in",
+      "designation": "Joint Commissioner, Dasarahalli Zone",
+      "department": "Dasarahalli Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "reconciliation": { "type": "near_duplicate", "of": "jcdhalli@bbmp.gov.in", "note": "Same Dasarahalli Zone JC post as the official zonalOffices entry — a fuller spelling of the same address. Dasarahalli sits across two GBA corporations (Bengaluru North / West) per the official directory, so corporation_id is left null rather than guessed." }
+    },
+    {
+      "email": "zc-east@bbmp.gov.in",
+      "designation": "Zonal Commissioner, East Zone",
+      "department": "East Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "reconciliation": { "type": "near_duplicate", "of": "jceast@bbmp.gov.in", "note": "An alternate/informal address offered for the same East Zone commissioner post already on record (official: jceast@bbmp.gov.in)." }
+    },
+    {
+      "email": "zc-west@bbmp.gov.in",
+      "designation": "Zonal Commissioner, West Zone",
+      "department": "West Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": null,
+      "reconciliation": { "type": "near_duplicate", "of": "jcwest@bbmp.gov.in", "note": "An alternate/informal address offered for the same West Zone commissioner post already on record (official: jcwest@bbmp.gov.in)." }
+    },
+    {
+      "email": "zc-south@bbmp.gov.in",
+      "designation": "Zonal Commissioner, South Zone",
+      "department": "South Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": "DAKSHINA",
+      "reconciliation": { "type": "near_duplicate", "of": "jcsouth@bbmp.gov.in", "note": "An alternate/informal address offered for the same South Zone commissioner post already on record (official: jcsouth@bbmp.gov.in)." }
+    },
+    {
+      "email": "zc-rrnagara@bbmp.gov.in",
+      "designation": "Zonal Commissioner, Rajarajeshwari Nagar Zone",
+      "department": "Rajarajeshwari Nagar Zone",
+      "designationCategory": "Administration",
+      "officeType": "Zone Office",
+      "officeName": null,
+      "officeAddress": null,
+      "phone": null,
+      "corporationCode": "PASHCHIMA",
+      "reconciliation": { "type": "near_duplicate", "of": "jcrrnagar@bbmp.gov.in", "note": "An alternate/informal address offered for the same R.R. Nagar Zone commissioner post already on record (official: jcrrnagar@bbmp.gov.in)." }
+    }
+  ],
+  "omittedAsExactDuplicates": [
+    "comm@bbmp.gov.in (Commissioner) — identical to the official Chief Commissioner entry",
+    "eic@bbmp.gov.in (Engineer-in-Chief) — identical to the official entry",
+    "jcadv@bbmp.gov.in (Advertisement) — identical to the official entry",
+    "jcmarket@bbmp.gov.in (Markets) — identical to the official entry",
+    "jdtp@bbmp.gov.in (Town Planning) — identical to the official entry",
+    "ceswd@bbmp.gov.in (Storm Water Drain / TVCC) — identical address to the official Storm Water Drain entry; the list's bundling of 'TVCC' into this designation is a labelling difference only, not a different mailbox — the official directory separately identified a distinct central TVCC head at setvcc@bbmp.gov.in",
+    "ceswm@bbmp.gov.in (Solid Waste Management) — identical to the official entry",
+    "spcommfin@bbmp.gov.in (Special Commissioner Finance) — identical to the official Finance entry",
+    "jceast@, jcsouth@, jcwest@, jcmpura@, jcrrnagar@bbmp.gov.in — identical to the official zonalOffices entries for those 5 zones"
+  ],
+  "notImported": [
+    "The informal gmail.com/rediffmail.com alternates offered in the same prose list (jceastzone@gmail.com, report.jcwest@rediffmail.com, bbmpacs@gmail.com, jcrrnagar@gmail.com, zcmdpbbmp@gmail.com, bbmpjcmahadevapura@gmail.com, zcbommanahalli@gmail.com, report.jcbom@rediffmail.com, zonalcommissionerdas@gmail.com, jcdasarahalli1@gmail.com, zcyel.bbmp@gmail.com, jcyel.bbmp@gmail.com) were not imported as separate contacts — they are personal-looking addresses for posts already represented above by an official or near-duplicate .bbmp.gov.in entry, and importing all of them would multiply near-identical rows without adding a genuinely new recipient."
+  ]
+}
