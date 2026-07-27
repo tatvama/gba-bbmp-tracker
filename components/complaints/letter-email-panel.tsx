@@ -12,10 +12,12 @@ import { formatDateTime } from "@/lib/format";
 import {
   sendLetterEmailAction,
   listLetterEmailsAction,
-  listRecipientOptionsAction,
+  listRecommendedRecipientsAction,
+  listDepartmentRecipientsAction,
+  getMailStatusAction,
   type MailStatus,
 } from "@/lib/actions/mail";
-import type { LetterEmailRow, RecipientOption } from "@/lib/mail/queries";
+import type { LetterEmailRow, RecipientOption, RecommendedRecipient } from "@/lib/mail/queries";
 import { SELECTABLE_LETTER_KINDS } from "@/lib/mail/routing";
 
 const selectCls =
@@ -67,24 +69,37 @@ const STATUS_LABEL: Record<LetterEmailRow["status"], { text: string; variant: "s
 export function LetterEmailPanel({
   complaintId,
   documentId,
-  mailStatus,
-  initialHistory,
+  mailStatus: mailStatusProp = null,
+  initialHistory = [],
+  variant = "standalone",
 }: {
   complaintId: string;
   /** The letter PDF to attach; null lets the server pick the right one. */
   documentId: string | null;
-  mailStatus: MailStatus | null;
-  initialHistory: LetterEmailRow[];
+  mailStatus?: MailStatus | null;
+  initialHistory?: LetterEmailRow[];
+  /** "embedded" renders inside the Submit step: opens immediately, self-fetches
+   *  everything (the caller there has none of this server-fetched already),
+   *  skips the card chrome, and locks the letter kind to the one being filed. */
+  variant?: "standalone" | "embedded";
 }) {
   const router = useRouter();
-  const [open, setOpen] = React.useState(false);
+  const embedded = variant === "embedded";
+  const [open, setOpen] = React.useState(embedded);
   const [loading, setLoading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<string | null>(null);
+  const [mailStatus, setMailStatus] = React.useState<MailStatus | null>(mailStatusProp);
 
-  const [options, setOptions] = React.useState<RecipientOption[]>([]);
+  // Scoped to THIS complaint's own division/sub-division/ward — never the whole
+  // directory. See lib/mail/recommend-recipients.ts: it unions the officer's own
+  // FK match with any ward-jurisdiction row that resolves into scope, and always
+  // includes the case's already-assigned officer even if their own jurisdiction
+  // match came up empty.
+  const [recommended, setRecommended] = React.useState<RecommendedRecipient[]>([]);
   const [resolutionReason, setResolutionReason] = React.useState<string | null>(null);
+  const [deptOptions, setDeptOptions] = React.useState<RecipientOption[]>([]);
   // Selection is by ADDRESS, which is coherent only because options are merged
   // one-per-address — see lib/mail/recipient-options.ts.
   const [picked, setPicked] = React.useState<string[]>([]);
@@ -97,32 +112,68 @@ export function LetterEmailPanel({
   const lastAttempt = history[0] ?? null;
   const notSent = lastAttempt && lastAttempt.status !== "sent" ? lastAttempt : null;
 
-  /** Load the picker lazily — the contact list is the whole directory. */
+  /**
+   * Load the picker — ONLY this complaint's own division/sub-division/ward
+   * recommendations, plus the cross-cutting head-office list (collapsed,
+   * separate). Deliberately NOT the whole contact directory: with the
+   * department/zone import landing ~70 more contacts in the same table, showing
+   * every emailable contact turned this into a wall the user had to search
+   * through to find the one or two people who actually matter for this case.
+   * Anyone genuinely not covered by either list is reachable via "Add an
+   * officer not in the system" below, not by browsing the full directory.
+   */
   const load = React.useCallback(async () => {
     setLoading(true);
     // Clear the previous attempt's messages — reopening the panel should not show
     // a stale "Sent to …" from ten minutes ago.
     setError(null);
     setResult(null);
-    const r = await listRecipientOptionsAction(complaintId);
+    const [recommendedRes, deptRes] = await Promise.all([
+      listRecommendedRecipientsAction(complaintId),
+      listDepartmentRecipientsAction(),
+    ]);
     setLoading(false);
-    if (r.error) {
-      setError(r.error);
+    if (recommendedRes.error) {
+      setError(recommendedRes.error);
       return;
     }
-    setOptions(r.options ?? []);
-    setResolutionReason(r.resolutionReason ?? null);
+    const recs = recommendedRes.recipients ?? [];
+    setRecommended(recs);
+    setResolutionReason(recommendedRes.resolutionReason ?? null);
+    setDeptOptions(deptRes.options ?? []);
+
     // Pre-tick the officer the system itself resolved, so the common case is one
-    // click rather than a search.
-    const suggested = (r.options ?? []).filter((o) => o.suggested).map((o) => o.email);
+    // click rather than a search. Every OTHER division-matched recommendation is
+    // shown with a reason but deliberately NOT pre-ticked — sending stays a
+    // choice the user makes, not one the system makes for them.
+    const suggested = recs.filter((r) => r.suggested).map((r) => r.email);
     setPicked((prev) => (prev.length ? prev : suggested));
-    // No officer resolved for this case → open with a blank row ready to type
-    // into. Note this triggers whenever nothing is SUGGESTED, not only when the
-    // directory is empty: the common situation is that 61 addresses exist but none
-    // of them belongs to this complaint's ward, which is precisely when the user
-    // needs to type one in.
-    if (!suggested.length) setManual((prev) => (prev.length ? prev : [{ ...BLANK_ROW }]));
+    // Nothing scoped to this complaint at all (no assigned officer, no
+    // division/ward match) → open with a blank row ready to type into. This is
+    // the common case for wards outside the imported ARO range.
+    if (!recs.length) setManual((prev) => (prev.length ? prev : [{ ...BLANK_ROW }]));
   }, [complaintId]);
+
+  // Embedded mode has none of this pre-fetched by its caller (SubmitPanel), so it
+  // self-loads immediately instead of waiting for a button click.
+  React.useEffect(() => {
+    if (!embedded) return;
+    void load();
+    if (!mailStatusProp) {
+      void getMailStatusAction().then((r) => {
+        if (!("error" in r)) setMailStatus(r);
+      });
+    }
+    if (!initialHistory.length) {
+      void listLetterEmailsAction(complaintId).then((r) => {
+        if (r.rows) setHistory(r.rows);
+      });
+    }
+    // Deliberately mount-only: embedded is a fixed prop for this render, and
+    // mailStatusProp/initialHistory are the CALLER's initial values, not state to
+    // re-sync against on every complaintId identity check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, complaintId]);
 
   function toggle(list: string[], setList: (v: string[]) => void, email: string) {
     setList(list.includes(email) ? list.filter((e) => e !== email) : [...list, email]);
@@ -134,24 +185,26 @@ export function LetterEmailPanel({
   const manualNew = manualValid.filter((m) => !picked.includes(m.email.trim().toLowerCase()));
   const totalTo = picked.length + manualNew.length;
 
-  const visibleOptions = React.useMemo(() => {
+  const visibleRecommended = React.useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter(
+    if (!q) return recommended;
+    return recommended.filter(
       (o) =>
         o.email.includes(q) ||
         o.label.toLowerCase().includes(q) ||
         (o.designation ?? "").toLowerCase().includes(q) ||
         o.officers.some((p) => p.name.toLowerCase().includes(q)),
     );
-  }, [options, search]);
+  }, [recommended, search]);
 
   async function send() {
     setSending(true);
     setError(null);
     setResult(null);
 
-    const byEmail = new Map(options.map((o) => [o.email, o]));
+    // A ticked address can come from either list rendered below — union both
+    // for attribution (name/designation in the salutation).
+    const byEmail = new Map([...recommended, ...deptOptions].map((o) => [o.email, o]));
     // For a shared mailbox the option carries name/designation = null, so the
     // letter opens generically instead of naming one of two officers.
     const fromOption = (e: string) => {
@@ -180,6 +233,10 @@ export function LetterEmailPanel({
           : `Sent to ${r.to?.join(", ")}.`,
       );
       setManual([]);
+      // Collapse to the one-line summary, same as the standalone panel shows
+      // once closed — embedded has no separate "Close" button, so this is the
+      // only way it stops looking like an open, actionable form after sending.
+      if (embedded) setOpen(false);
     } else {
       setError(r.error ?? "The email was not sent.");
     }
@@ -189,41 +246,8 @@ export function LetterEmailPanel({
     router.refresh();
   }
 
-  return (
-    <Card className="no-print border border-slate-150 dark:border-slate-850 shadow-xs rounded-xl mb-6">
-      <SectionHeader
-        icon={Mail}
-        title="Email this letter"
-        description={mailStatus?.summary ?? "Send the filed letter to the responsible officer."}
-        badge={
-          mailStatus?.mode === "redirect" ? (
-            <Badge variant="warning">Test mode</Badge>
-          ) : mailStatus?.mode === "live" ? (
-            <Badge variant="success">Live</Badge>
-          ) : mailStatus ? (
-            <Badge variant="muted">{mailStatus.mode === "disabled" ? "Off" : "Not configured"}</Badge>
-          ) : null
-        }
-        actions={
-          !open ? (
-            <Button
-              size="sm"
-              onClick={() => {
-                setOpen(true);
-                void load();
-              }}
-            >
-              <Send className="h-3.5 w-3.5" /> {notSent ? "Send it now" : "Email letter"}
-            </Button>
-          ) : (
-            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              Close
-            </Button>
-          )
-        }
-      />
-
-      <CardContent className="space-y-4 p-5">
+  const body = (
+    <>
         {/* Why the automatic send did not go out. This is the prompt the user asked for. */}
         {notSent && (
           <div className="flex flex-wrap items-start gap-2.5 rounded-md border border-amber-200 bg-amber-50/40 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
@@ -246,6 +270,13 @@ export function LetterEmailPanel({
             Last emailed {formatDateTime(lastAttempt.sent_at ?? lastAttempt.created_at)} to{" "}
             {(lastAttempt.to_addresses ?? []).join(", ")}
             {lastAttempt.redirected ? " (test mode)" : ""}
+            {/* Embedded has no header "Close" button to reopen from, so it needs
+                its own inline link back into the form. */}
+            {embedded && (
+              <button type="button" onClick={() => setOpen(true)} className="ml-1 underline text-muted-foreground hover:text-foreground">
+                Change
+              </button>
+            )}
           </p>
         )}
 
@@ -265,41 +296,50 @@ export function LetterEmailPanel({
               </p>
             )}
 
-            <div>
-              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-500">
-                What is being sent
-              </label>
-              <select className={selectCls} value={letterKind} onChange={(e) => setLetterKind(e.target.value)}>
-                {SELECTABLE_LETTER_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {k}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Used in the subject line, and to pick which stored letter is attached.
-              </p>
-            </div>
+            {/* Embedded only ever concerns the letter just drafted — no kind to
+                choose, so the dropdown (and its extra decision) is skipped. */}
+            {!embedded && (
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-455 dark:text-slate-500">
+                  What is being sent
+                </label>
+                <select className={selectCls} value={letterKind} onChange={(e) => setLetterKind(e.target.value)}>
+                  {SELECTABLE_LETTER_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Used in the subject line, and to pick which stored letter is attached.
+                </p>
+              </div>
+            )}
 
-            {/* Directory picker */}
+            {/* Recommended picker — scoped to THIS complaint's own division /
+                sub-division / ward. Never the full contact directory. */}
             <div className="rounded-lg border bg-card p-3 text-sm">
-              <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-1.5 dark:border-slate-800">
-                <span className="font-medium text-slate-800 dark:text-slate-200">
-                  Officers on record {options.length ? `(${options.length})` : ""}
-                </span>
-                {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+              <div className="mb-2 border-b border-slate-100 pb-1.5 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    Officers for this ward / division {recommended.length ? `(${recommended.length})` : ""}
+                  </span>
+                  {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                </div>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Scoped to this complaint&apos;s own division, sub-division and ward — not the full directory.
+                </p>
               </div>
 
-              {!loading && !options.length && (
+              {!loading && !recommended.length && (
                 <p className="text-xs text-muted-foreground">
-                  {resolutionReason ??
-                    "No contact in the directory has an email address. Add recipients by hand below."}
+                  {resolutionReason ?? "No officer covering this ward/division has an email on record. Add one by hand below."}
                 </p>
               )}
 
-              {options.length > 0 && (
+              {recommended.length > 0 && (
                 <>
-                  {options.length > 8 && (
+                  {recommended.length > 8 && (
                     <Input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -309,10 +349,80 @@ export function LetterEmailPanel({
                     />
                   )}
                   <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
-                    {visibleOptions.map((o) => (
-                      // Keyed by address: options are merged one-per-address, which
-                      // is what makes this unique. Keying by contact id would put
-                      // two rows on one shared mailbox again.
+                    {visibleRecommended.map((o) => {
+                      // Reasons other than "this is the officer already assigned
+                      // to the case" — shown as explanatory text regardless of
+                      // whether it's also the suggested pick, so a suggested
+                      // officer who ALSO matches by role still shows why.
+                      const extraReasons = o.reasons.filter((r) => r.kind !== "assigned");
+                      const showRecommendedBadge = extraReasons.length > 0 && !o.suggested;
+                      return (
+                        // Keyed by address: options are merged one-per-address,
+                        // which is what makes this unique. Keying by contact id
+                        // would put two rows on one shared mailbox again.
+                        <div key={o.email} className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
+                            checked={picked.includes(o.email)}
+                            onChange={() => toggle(picked, setPicked, o.email)}
+                            aria-label={`Send to ${o.label} at ${o.email}`}
+                          />
+                          <div className="min-w-0 flex-1 text-xs">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-medium text-slate-700 dark:text-slate-300">{o.label}</span>
+                              {o.suggested && <Badge variant="info">Suggested</Badge>}
+                              {showRecommendedBadge && <Badge variant="primary-subtle">Recommended</Badge>}
+                              {o.note && !o.suggested && <Badge variant="muted">{o.note}</Badge>}
+                            </div>
+                            <div className="truncate text-muted-foreground">
+                              {o.designation ? `${o.designation} · ` : ""}
+                              {o.email}
+                            </div>
+                            {extraReasons.length > 0 && (
+                              <div className="mt-0.5 text-[11px] text-primary/80">
+                                {extraReasons.map((r) => r.label).join(" · ")}
+                              </div>
+                            )}
+                            {/* A shared mailbox reaches more than one officer — say so,
+                                rather than showing one name and quietly meaning two. */}
+                            {o.officers.length > 1 && (
+                              <div className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+                                Reaches {o.officers.map((p) => p.name).join(", ")}
+                              </div>
+                            )}
+                          </div>
+                          <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                              checked={ccPicked.includes(o.email)}
+                              disabled={picked.includes(o.email)}
+                              onChange={() => toggle(ccPicked, setCcPicked, o.email)}
+                            />
+                            Cc
+                          </label>
+                        </div>
+                      );
+                    })}
+                    {!visibleRecommended.length && (
+                      <p className="py-2 text-xs text-muted-foreground">No officer matches “{search}”.</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Cross-cutting department-head / state-level contacts — collapsed by
+                  default. Relevant to every complaint regardless of division, so
+                  showing them expanded would bury the division-specific picks
+                  above under ~30 mostly-irrelevant entries. */}
+              {deptOptions.length > 0 && (
+                <details className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+                  <summary className="cursor-pointer text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
+                    Show head-office contacts ({deptOptions.length})
+                  </summary>
+                  <div className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pr-1">
+                    {deptOptions.map((o) => (
                       <div key={o.email} className="flex items-start gap-2">
                         <input
                           type="checkbox"
@@ -322,22 +432,11 @@ export function LetterEmailPanel({
                           aria-label={`Send to ${o.label} at ${o.email}`}
                         />
                         <div className="min-w-0 flex-1 text-xs">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-medium text-slate-700 dark:text-slate-300">{o.label}</span>
-                            {o.suggested && <Badge variant="info">Suggested</Badge>}
-                            {o.note && !o.suggested && <Badge variant="muted">{o.note}</Badge>}
-                          </div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">{o.label}</span>
                           <div className="truncate text-muted-foreground">
                             {o.designation ? `${o.designation} · ` : ""}
                             {o.email}
                           </div>
-                          {/* A shared mailbox reaches more than one officer — say so,
-                              rather than showing one name and quietly meaning two. */}
-                          {o.officers.length > 1 && (
-                            <div className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-                              Reaches {o.officers.map((p) => p.name).join(", ")}
-                            </div>
-                          )}
                         </div>
                         <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
                           <input
@@ -351,11 +450,8 @@ export function LetterEmailPanel({
                         </label>
                       </div>
                     ))}
-                    {!visibleOptions.length && (
-                      <p className="py-2 text-xs text-muted-foreground">No officer matches “{search}”.</p>
-                    )}
                   </div>
-                </>
+                </details>
               )}
             </div>
 
@@ -498,7 +594,57 @@ export function LetterEmailPanel({
             </ul>
           </div>
         )}
-      </CardContent>
+    </>
+  );
+
+  if (embedded) {
+    // Plain bordered block matching the visual level of the adjacent TVCC
+    // block in SubmitPanel, rather than a full Card nested inside one.
+    return (
+      <div className="space-y-2.5 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+        <p className="flex items-center gap-1.5 text-sm font-medium">
+          <Mail className="h-4 w-4 text-muted-foreground" /> Email the complaint letter to officers
+        </p>
+        {mailStatus?.summary && <p className="text-xs text-muted-foreground">{mailStatus.summary}</p>}
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Card className="no-print border border-slate-150 dark:border-slate-850 shadow-xs rounded-xl mb-6">
+      <SectionHeader
+        icon={Mail}
+        title="Email this letter"
+        description={mailStatus?.summary ?? "Send the filed letter to the responsible officer."}
+        badge={
+          mailStatus?.mode === "redirect" ? (
+            <Badge variant="warning">Test mode</Badge>
+          ) : mailStatus?.mode === "live" ? (
+            <Badge variant="success">Live</Badge>
+          ) : mailStatus ? (
+            <Badge variant="muted">{mailStatus.mode === "disabled" ? "Off" : "Not configured"}</Badge>
+          ) : null
+        }
+        actions={
+          !open ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setOpen(true);
+                void load();
+              }}
+            >
+              <Send className="h-3.5 w-3.5" /> {notSent ? "Send it now" : "Email letter"}
+            </Button>
+          ) : (
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+              Close
+            </Button>
+          )
+        }
+      />
+      <CardContent className="space-y-4 p-5">{body}</CardContent>
     </Card>
   );
 }

@@ -6,6 +6,14 @@ import { mergeRecipientOptions, type ContactEmailRow, type RecipientOption } fro
 
 export type { RecipientOption } from "./recipient-options";
 
+export {
+  listRecommendedRecipients,
+  listDepartmentRecipients,
+  GBA_DEPARTMENT_DIRECTORY_SOURCE,
+  GBA_DEPARTMENT_DIRECTORY_ADDENDUM_SOURCE,
+} from "./recommend-queries";
+export type { RecommendedRecipient, RecommendReason } from "./recommend-recipients";
+
 /**
  * Reads for the letter-email UI.
  *

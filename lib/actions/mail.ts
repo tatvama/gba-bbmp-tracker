@@ -9,7 +9,15 @@ import { verifyMailTransport } from "@/lib/mail/transport";
 import { isValidEmail } from "@/lib/mail/message";
 import { sanitizeLetterKind } from "@/lib/mail/routing";
 import { sendLetterEmail, type ManualRecipient } from "@/lib/mail/send";
-import { listLetterEmails, listRecipientOptions, type LetterEmailRow, type RecipientOption } from "@/lib/mail/queries";
+import {
+  listLetterEmails,
+  listRecipientOptions,
+  listRecommendedRecipients,
+  listDepartmentRecipients,
+  type LetterEmailRow,
+  type RecipientOption,
+  type RecommendedRecipient,
+} from "@/lib/mail/queries";
 
 /**
  * User-facing server actions for letter email.
@@ -145,6 +153,33 @@ export async function listRecipientOptionsAction(
   }
   const { options, resolutionReason } = await listRecipientOptions(complaintId);
   return { options, resolutionReason };
+}
+
+/** Officers recommended for this complaint's own division/sub-division, each
+ *  labelled with why — see lib/mail/recommend-recipients.ts. */
+export async function listRecommendedRecipientsAction(
+  complaintId: string,
+): Promise<{ recipients?: RecommendedRecipient[]; resolutionReason?: string | null; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  const { recipients, resolutionReason } = await listRecommendedRecipients(admin, complaintId);
+  return { recipients, resolutionReason };
+}
+
+/** Cross-cutting department-head / state-level candidates, the same for every
+ *  complaint — shown collapsed behind a "Show head-office contacts" toggle. */
+export async function listDepartmentRecipientsAction(): Promise<{ options?: RecipientOption[]; error?: string }> {
+  try {
+    await requireRole(COMPLAINT_FIELD_ROLES);
+  } catch (e) {
+    return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
+  }
+  const admin = createAdminClient();
+  return { options: await listDepartmentRecipients(admin) };
 }
 
 export interface MailStatus {

@@ -17,13 +17,14 @@ export type RecipientRoleKey =
   | "executive_engineer"
   | "assistant_executive_engineer"
   | "chief_commissioner_gba"
-  | "principal_secretary_udd"
+  | "additional_chief_secretary_udd"
+  | "secretary_udd"
   | "chief_secretary"
   | "minister_incharge_gba"
   | "chief_minister"
   | "lokayukta"
   | "deputy_lokayukta"
-  | "acb_director";
+  | "lokayukta_police_adgp";
 
 /** Which jurisdiction FK on the complaint scopes the officer lookup. There is no
  *  zone entity in the schema — corporation is the de-facto zone tier. "state" is
@@ -78,14 +79,43 @@ export const COMPLAINT_RECIPIENT_ROLES: RecipientRoleDescriptor[] = [
   //    (the incumbent's name/address when one is on record; title-only otherwise).
   //    NOT part of the mandatory internal Office Copy — selectable Copy-To only. ──
   { key: "chief_commissioner_gba", title: "The Chief Commissioner", level: "Greater Bengaluru Authority (GBA)", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Commissioner"], matchRoleLevels: [], officeCopy: false, order: 6 },
-  { key: "principal_secretary_udd", title: "The Principal Secretary", level: "Urban Development Department, Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Principal Secretary"], matchRoleLevels: [], officeCopy: false, order: 7 },
-  { key: "chief_secretary", title: "The Chief Secretary", level: "Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Secretary"], matchRoleLevels: [], officeCopy: false, order: 8 },
-  { key: "minister_incharge_gba", title: "The Minister in-charge", level: "GBA & BWSSB, Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Minister in-charge"], matchRoleLevels: [], officeCopy: false, order: 9 },
-  { key: "chief_minister", title: "The Chief Minister", level: "Government of Karnataka (Chairman, GBA), Room No. 323A, 3rd Floor, Vidhana Soudha, Dr. Ambedkar Veedhi, Bengaluru, Karnataka - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Minister"], matchRoleLevels: [], officeCopy: false, order: 10 },
-  { key: "lokayukta", title: "The Honorable Lokayukta", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 11 },
-  { key: "deputy_lokayukta", title: "The Deputy Lokayukta", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Deputy Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 12 },
-  { key: "acb_director", title: "The Director / ADGP", level: "Anti-Corruption Bureau (ACB), Karnataka", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Director / ADGP"], matchRoleLevels: [], officeCopy: false, order: 13 },
+  // "Principal Secretary (BBMP & Coordination)" was replaced 2026-07 — the
+  // official Government of Karnataka contact directory confirms no such post
+  // exists. The real UDD hierarchy is Additional Chief Secretary -> Secretary
+  // (data/gba-department-directory.json, "oversight" section, both entries
+  // sourced from karnataka.gov.in's own directory).
+  { key: "additional_chief_secretary_udd", title: "The Additional Chief Secretary", level: "Urban Development Department, Room No. 436, 4th Floor, Vikasa Soudha, Bengaluru - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Additional Chief Secretary"], matchRoleLevels: [], officeCopy: false, order: 7 },
+  { key: "secretary_udd", title: "The Secretary", level: "Urban Development Department, Room No. 434, 4th Floor, Vikasa Soudha, Bengaluru - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Secretary"], matchRoleLevels: [], officeCopy: false, order: 8 },
+  { key: "chief_secretary", title: "The Chief Secretary", level: "Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Secretary"], matchRoleLevels: [], officeCopy: false, order: 9 },
+  { key: "minister_incharge_gba", title: "The Minister in-charge", level: "GBA & BWSSB, Government of Karnataka", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Minister in-charge"], matchRoleLevels: [], officeCopy: false, order: 10 },
+  { key: "chief_minister", title: "The Chief Minister", level: "Government of Karnataka (Chairman, GBA), Room No. 323A, 3rd Floor, Vidhana Soudha, Dr. Ambedkar Veedhi, Bengaluru, Karnataka - 560001", group: "GBA & State Government", jurisdiction: "state", matchDesignations: ["Chief Minister"], matchRoleLevels: [], officeCopy: false, order: 11 },
+  { key: "lokayukta", title: "The Honorable Lokayukta", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 12 },
+  { key: "deputy_lokayukta", title: "The Deputy Lokayukta", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Deputy Lokayukta"], matchRoleLevels: [], officeCopy: false, order: 13 },
+  // "Director / ADGP, Anti-Corruption Bureau" was replaced 2026-07 — the ACB was
+  // abolished by the Karnataka High Court on 11 August 2022; its cases and
+  // Prevention of Corruption Act powers reverted to the Karnataka Lokayukta
+  // Police (data/gba-department-directory.json, "oversight" section, sourced
+  // from the Lokayukta's own telephone directory, dated 2026-07-10).
+  { key: "lokayukta_police_adgp", title: "The Additional Director General of Police", level: "Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001", group: "Statutory / Oversight Bodies", jurisdiction: "state", matchDesignations: ["Additional Director General of Police", "Director / ADGP"], matchRoleLevels: [], officeCopy: false, order: 14 },
 ];
+
+/**
+ * Does this contact match a role's designation/role_level criteria? Extracted out
+ * of lib/distribution/resolve-recipients.ts's inline predicate so the postal
+ * single-match resolver and lib/mail/recommend-recipients.ts's multi-match
+ * recommender share one rule instead of two copies that can drift.
+ */
+export function contactMatchesRole(
+  contact: { designation?: string | null; role_level?: string | null },
+  role: Pick<RecipientRoleDescriptor, "matchDesignations" | "matchRoleLevels">,
+): boolean {
+  const levels = new Set(role.matchRoleLevels.map((l) => l.toLowerCase()));
+  const desigs = new Set(role.matchDesignations.map((d) => d.toLowerCase()));
+  return (
+    (!!contact.role_level && levels.has(contact.role_level.toLowerCase())) ||
+    (!!contact.designation && desigs.has(contact.designation.toLowerCase()))
+  );
+}
 
 const BY_KEY = new Map(COMPLAINT_RECIPIENT_ROLES.map((r) => [r.key, r]));
 

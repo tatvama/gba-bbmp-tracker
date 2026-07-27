@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { COMPLAINT_RECIPIENT_ROLES, corporationOfficeName } from "@/lib/complaints/recipient-roles";
+import { COMPLAINT_RECIPIENT_ROLES, corporationOfficeName, contactMatchesRole } from "@/lib/complaints/recipient-roles";
 import { matchOfficerByDesignation, type OfficerMatchRow } from "./officer-match";
 import type { RecipientEnrichment } from "./copy-to";
 
@@ -51,13 +51,7 @@ export async function resolveComplaintRecipients(
       // fixed offices — resolved globally by designation below, not per-complaint.
       if (role.jurisdiction === "state") continue;
       const pool = buckets[role.jurisdiction];
-      const levels = new Set(role.matchRoleLevels.map((l) => l.toLowerCase()));
-      const desigs = new Set(role.matchDesignations.map((d) => d.toLowerCase()));
-      const match = pool.find(
-        (o) =>
-          (o.role_level && levels.has(o.role_level.toLowerCase())) ||
-          (o.designation && desigs.has(o.designation.toLowerCase())),
-      );
+      const match = pool.find((o) => contactMatchesRole(o, role));
       if (match) {
         const office =
           [match.eng_subdivision?.name, match.division?.name, match.corporation?.name].filter(Boolean).join(", ") || null;

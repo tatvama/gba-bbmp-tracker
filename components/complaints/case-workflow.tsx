@@ -20,6 +20,7 @@ import { LetterPreview } from "@/components/complaints/letter-preview";
 import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
 import { LegalNoticeSenderDialog } from "@/components/complaints/legal-notice-sender-dialog";
+import { LetterEmailPanel } from "@/components/complaints/letter-email-panel";
 import { RecipientSelector } from "@/components/complaints/recipient-selector";
 import { TvccCopyOption, type TvccCopySelection } from "@/components/complaints/tvcc-copy-option";
 import { TvccCopyDialog, type TvccCopyConfirm } from "@/components/complaints/tvcc-copy-dialog";
@@ -805,6 +806,11 @@ function SubmitPanel({
           )}
         </div>
       )}
+
+      {/* Email the letter to the officers who should receive it, before or after
+          recording the physical submission — the two are independent actions;
+          filing must never wait on or be blocked by a failed/absent email. */}
+      <LetterEmailPanel complaintId={complaintId} documentId={letter?.pdfDocId ?? null} variant="embedded" />
 
       {/* Record the submission */}
       {filed ? (

@@ -34,12 +34,13 @@ describe("recipient-roles registry", () => {
   it("the escalation / GBA / statutory authority roles are selectable but NOT in the office-copy distribution", () => {
     const authorityKeys = [
       "chief_commissioner_gba",
-      "principal_secretary_udd",
+      "additional_chief_secretary_udd",
+      "secretary_udd",
       "chief_secretary",
       "minister_incharge_gba",
       "chief_minister",
       "lokayukta",
-      "acb_director",
+      "lokayukta_police_adgp",
     ] as const;
     const officeCopy = officeCopyRoleKeys();
     for (const k of authorityKeys) {
@@ -62,7 +63,8 @@ describe("recipient-roles registry", () => {
   });
   it("roleByKey / isRecipientRoleKey work", () => {
     expect(roleByKey("executive_engineer")?.title).toBe("Executive Engineer");
-    expect(roleByKey("principal_secretary_udd")?.title).toBe("The Principal Secretary");
+    expect(roleByKey("additional_chief_secretary_udd")?.title).toBe("The Additional Chief Secretary");
+    expect(roleByKey("secretary_udd")?.title).toBe("The Secretary");
     expect(roleByKey("chief_secretary")?.level).toBe("Government of Karnataka");
     expect(roleByKey("nope")).toBeUndefined();
     expect(isRecipientRoleKey("deputy_controller_finance")).toBe(true);
@@ -129,10 +131,11 @@ describe("buildCopyToBlock", () => {
 });
 
 describe("buildOfficeDistributionBlock", () => {
-  it("lists the 5 internal roles regardless of selection, and excludes the 2 escalation authorities", () => {
+  it("lists the 5 internal roles regardless of selection, and excludes the escalation authorities", () => {
     const out = buildOfficeDistributionBlock();
     for (const r of COMPLAINT_RECIPIENT_ROLES.filter((x) => x.officeCopy)) expect(out).toContain(r.title);
-    expect(out).not.toContain("The Principal Secretary");
+    expect(out).not.toContain("The Additional Chief Secretary");
+    expect(out).not.toContain("The Secretary");
     expect(out).not.toContain("The Chief Secretary");
     expect(out.startsWith("## Copy To")).toBe(true);
   });
@@ -151,13 +154,14 @@ describe("dynamic Commissioner office in Copy To", () => {
     const out = buildCopyToBlock(["zonal_commissioner"]);
     expect(out).toBe("## Copy To\n\n1. Zonal Commissioner - Zone Level");
   });
-  it("the 2 new escalation-authority roles render with no enrichment expected", () => {
-    const out = buildCopyToBlock(["chief_secretary", "principal_secretary_udd"]);
-    expect(out).toContain("The Principal Secretary - Urban Development Department, Government of Karnataka");
+  it("the UDD escalation-authority roles render with no enrichment expected", () => {
+    const out = buildCopyToBlock(["chief_secretary", "additional_chief_secretary_udd", "secretary_udd"]);
+    expect(out).toContain("The Additional Chief Secretary - Urban Development Department, Room No. 436, 4th Floor, Vikasa Soudha, Bengaluru - 560001");
+    expect(out).toContain("The Secretary - Urban Development Department, Room No. 434, 4th Floor, Vikasa Soudha, Bengaluru - 560001");
     expect(out).toContain("The Chief Secretary - Government of Karnataka");
   });
   it("the GBA / statutory authority roles render title-only, in canonical order", () => {
-    const out = buildCopyToBlock(["acb_director", "lokayukta", "chief_commissioner_gba", "chief_minister"]);
+    const out = buildCopyToBlock(["lokayukta_police_adgp", "lokayukta", "chief_commissioner_gba", "chief_minister"]);
     expect(out).toBe(
       [
         "## Copy To",
@@ -165,7 +169,7 @@ describe("dynamic Commissioner office in Copy To", () => {
         "1. The Chief Commissioner - Greater Bengaluru Authority (GBA)",
         "2. The Chief Minister - Government of Karnataka (Chairman, GBA), Room No. 323A, 3rd Floor, Vidhana Soudha, Dr. Ambedkar Veedhi, Bengaluru, Karnataka - 560001",
         "3. The Honorable Lokayukta - Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001 (Near Vidhana Soudha)",
-        "4. The Director / ADGP - Anti-Corruption Bureau (ACB), Karnataka",
+        "4. The Additional Director General of Police - Karnataka Lokayukta, M.S. Building, Dr. B.R. Ambedkar Road (Ambedkar Veedhi), Bengaluru - 560001",
       ].join("\n"),
     );
   });
