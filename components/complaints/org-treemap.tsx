@@ -103,7 +103,10 @@ interface NodeCardProps {
   isSiblingInactive?: boolean;
 }
 
-function NodeCard({
+// Memoized — this is rendered once per corp/division/sub-division/ward/
+// engineer/officer node on screen; without memo, typing in the hierarchy
+// search box or hovering a single node re-renders every visible tile.
+const NodeCard = React.memo(function NodeCard({
   label, sublabel, count, countUnit, tint,
   active, hovered, onClick, onHover, nodeRef, size = "md", className,
   icon: Icon, progress, isExpanded, onToggleExpand, isMatched,
@@ -326,7 +329,7 @@ function NodeCard({
       )}
     </button>
   );
-}
+});
 
 /* ── mode toggle ─────────────────────────────────────────────────── */
 type Mode = "gba" | "bbmp";

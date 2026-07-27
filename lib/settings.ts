@@ -11,6 +11,8 @@ import {
   type ForensicsRules,
   DEFAULT_LEGAL_NOTICE_SENDER,
   type LegalNoticeSender,
+  DEFAULT_DEPT_LETTER_SENDER,
+  type DeptLetterSender,
   type CorporationCode,
 } from "@/lib/constants";
 import { mergeTvccOffices, DEFAULT_TVCC_SENDER, type TvccOffice, type TvccSender } from "@/lib/distribution/tvcc";
@@ -20,6 +22,7 @@ export const COMPLAINT_SETTINGS_KEY = "complaint_settings";
 export const PHOTO_DEDUPE_RULES_KEY = "photo_dedupe_rules";
 export const FORENSICS_RULES_KEY = "forensics_rules";
 export const LEGAL_NOTICE_SENDER_KEY = "legal_notice_sender";
+export const DEPT_LETTER_SENDER_KEY = "dept_letter_sender";
 export const TVCC_OFFICES_KEY = "tvcc_offices";
 export const TVCC_SENDER_KEY = "tvcc_sender";
 
@@ -97,6 +100,27 @@ export async function getLegalNoticeSender(): Promise<LegalNoticeSender> {
     return { ...DEFAULT_LEGAL_NOTICE_SENDER, ...value };
   } catch {
     return DEFAULT_LEGAL_NOTICE_SENDER;
+  }
+}
+
+/**
+ * Read the saved default sender for a department-facing letter (counter-reply,
+ * reminder letter), merged over defaults. Used to pre-fill the sender-details
+ * form shown before those letters are drafted — see lib/ai/complaint-draft.ts's
+ * `senderOverride`.
+ */
+export async function getDeptLetterSender(): Promise<DeptLetterSender> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", DEPT_LETTER_SENDER_KEY)
+      .maybeSingle();
+    const value = (data?.value ?? {}) as Partial<DeptLetterSender>;
+    return { ...DEFAULT_DEPT_LETTER_SENDER, ...value };
+  } catch {
+    return DEFAULT_DEPT_LETTER_SENDER;
   }
 }
 

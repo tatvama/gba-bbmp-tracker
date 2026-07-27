@@ -1,6 +1,7 @@
 # Memory Index
 
 - [BBMP stack override](bbmp-stack-override.md) — uses Supabase-native + Supabase Auth, NOT Prisma/local PG as the BUILD_PROMPT said
+- [BBMP boot bootstrap](bbmp-boot-bootstrap.md) — app self-migrates + seeds on server boot (StartupManager); requires 9 env vars incl. Cloudflare R2; do NOT manually run db:migrate/seed against live DB; SETUP_GUIDE.md stale
 - [BBMP data model facts](bbmp-data-model-facts.md) — seed counts, AC→corp derivation, PDF verification (ward 222 fix), GBA 369-ward Kannada→English (gba_wards table), how to OCR the scanned PDFs
 - [BBMP UI preferences](bbmp-ui-preferences.md) — minimal nav (5+2 links), professional/search-first/⌘K, no Kannada in UI; Tree Map (/explorer) interactive treemap
 - [BBMP Phase 2 RTI](bbmp-phase2-rti.md) — RTI module built (migration 0003, deadline engine, AI wrapper, /rti/*); decisions + remaining slice roadmap

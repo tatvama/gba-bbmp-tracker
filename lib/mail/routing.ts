@@ -49,16 +49,31 @@ export function mayAutoEmailOfficer(kind: ComplaintDraftKind | string | null | u
  * coming off the wire: a `"use server"` export is a public endpoint, and an
  * unvalidated subject is both a header-injection surface and a way to send
  * official-looking mail saying anything at all.
+ *
+ * Limited to the kinds a REAL, distinctly-typed document exists for in
+ * complaint_documents (see KIND_TO_DOC_TYPE, lib/mail/send.ts) — the only ones
+ * this panel can attach correctly (it passes documentId: null so that lookup
+ * actually runs — see the standalone <LetterEmailPanel> in
+ * app/complaints/[id]/page.tsx). Escalation letter and Legal notice are
+ * included despite being excluded from OFFICER_ADDRESSED_DRAFT_KINDS above —
+ * that exclusion is about auto-emailing them to the complaint's own officer
+ * over their head, not about this panel, where the user manually picks the
+ * actual recipient (the next authority / vigilance cell) via "Add an officer
+ * not in the system". (Legal notice needed a fix alongside this: it used to
+ * share "Escalation letter" as its stored document_type — see
+ * fileEscalationAction, lib/actions/complaints.ts.)
+ *
+ * Complaint letter is deliberately NOT here: filing it is the very first step
+ * of the case, always auto-emailed at that point, so there is nothing for
+ * this manual fallback panel to retry it for. Every OTHER draft kind
+ * (follow-up letter, Action Taken Report request, site inspection request,
+ * clarification request …) already gets emailed automatically, with its own
+ * correct attachment, the moment it's filed from the AI Draft tab (see
+ * mayAutoEmailOfficer above) — this manual panel is a fallback for when THAT
+ * send was skipped, not a second way to pick among document types it cannot
+ * actually attach.
  */
-export const SELECTABLE_LETTER_KINDS = [
-  "Complaint letter",
-  "Reminder letter",
-  "Counter-reply",
-  "Follow-up letter",
-  "Action Taken Report request",
-  "Site inspection request",
-  "Clarification request",
-] as const;
+export const SELECTABLE_LETTER_KINDS = ["Reminder letter", "Counter-reply", "Escalation letter", "Legal notice"] as const;
 export type SelectableLetterKind = (typeof SELECTABLE_LETTER_KINDS)[number];
 
 /**

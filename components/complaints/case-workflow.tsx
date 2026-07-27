@@ -21,6 +21,7 @@ import { LetterEditorModal } from "@/components/complaints/letter-editor-modal";
 import { LanguageChoiceButton } from "@/components/complaints/language-choice-button";
 import { LegalNoticeSenderDialog } from "@/components/complaints/legal-notice-sender-dialog";
 import { LetterEmailPanel } from "@/components/complaints/letter-email-panel";
+import { ReplySenderDialog } from "@/components/complaints/reply-sender-dialog";
 import { RecipientSelector } from "@/components/complaints/recipient-selector";
 import { TvccCopyOption, type TvccCopySelection } from "@/components/complaints/tvcc-copy-option";
 import { TvccCopyDialog, type TvccCopyConfirm } from "@/components/complaints/tvcc-copy-dialog";
@@ -53,13 +54,15 @@ import {
   getDocumentViewUrl,
   getLegalNoticeSenderAction,
   saveLegalNoticeSenderAction,
+  getDeptLetterSenderAction,
+  saveDeptLetterSenderAction,
   type ReplyFile,
 } from "@/lib/actions/complaints";
 import { markLetterPrintedAction, undoLetterPrintedAction } from "@/lib/actions/print-queue";
 import { analyzeReplyGapAction } from "@/lib/actions/lifecycle";
 import type { ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import type { ComplaintDocument } from "@/lib/types";
-import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage, type LegalNoticeSender, type CorporationCode } from "@/lib/constants";
+import { COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind, type DraftLanguage, type LegalNoticeSender, type DeptLetterSender, type CorporationCode } from "@/lib/constants";
 
 /** Zonal officers whose Copy-To address is a chosen GBA city-corporation office. */
 const ZONAL_ADDRESS_KEYS = corporationAddressedRoleKeys();
@@ -1011,7 +1014,12 @@ function CounterReplyPanel({
   // draft surface uses) instead of a direct blocking generateComplaintDraft
   // call — the generation now survives navigation, and the useTask effect
   // above picks up the result whenever it finishes.
-  async function generate(kind: ComplaintDraftKind, language: DraftLanguage, sender?: LegalNoticeSender) {
+  async function generate(
+    kind: ComplaintDraftKind,
+    language: DraftLanguage,
+    sender?: LegalNoticeSender,
+    senderOverride?: { name: string; address: string; mobile?: string | null },
+  ) {
     setSelectedKind(kind);
     setError(null);
     setSavedMsg(null);
@@ -1019,7 +1027,7 @@ function CounterReplyPanel({
     setTruncated(false);
     setSavedAt(null);
     setStarting(true);
-    const start = await startAiDraftJob({ complaintId, kind, language, sender });
+    const start = await startAiDraftJob({ complaintId, kind, language, sender, senderOverride });
     setStarting(false);
     if (!start.ok || !start.jobId) {
       setError(start.error ?? "Could not generate the letter (is the AI key configured?).");
@@ -1055,6 +1063,42 @@ function CounterReplyPanel({
     setLegalSender(sender); // remember for the rest of the session (and re-open pre-fill)
     void saveLegalNoticeSenderAction(sender); // persist as the org-wide default
     await generate("legal_notice", language, sender);
+  }
+
+  // Counter-reply / reminder letter = department-facing letters addressed to
+  // the ward officer (not the PIL legal notice), whose FROM / signature block
+  // is likewise captured from the user each time (pre-filled from the saved
+  // default) — see ReplySenderDialog. Opening the dialog fetches the saved
+  // default once; confirming persists it and starts the draft.
+  const [replySenderOpen, setReplySenderOpen] = React.useState(false);
+  const [replySenderKind, setReplySenderKind] = React.useState<"counter_reply" | "reminder_letter">("counter_reply");
+  const [deptSender, setDeptSender] = React.useState<DeptLetterSender | null>(null);
+  const [deptSenderLoading, setDeptSenderLoading] = React.useState(false);
+
+  async function openReplySenderDialog(kind: "counter_reply" | "reminder_letter") {
+    setError(null);
+    setReplySenderKind(kind);
+    if (!deptSender) {
+      setDeptSenderLoading(true);
+      try {
+        const r = await getDeptLetterSenderAction();
+        setDeptSender(r.sender);
+      } finally {
+        setDeptSenderLoading(false);
+      }
+    }
+    setReplySenderOpen(true);
+  }
+
+  async function confirmReplySender(sender: DeptLetterSender, language: DraftLanguage) {
+    setReplySenderOpen(false);
+    setDeptSender(sender); // remember for the rest of the session (and re-open pre-fill)
+    void saveDeptLetterSenderAction(sender); // persist as the org-wide default
+    await generate(replySenderKind, language, undefined, {
+      name: sender.name,
+      address: sender.address,
+      mobile: sender.mobile || null,
+    });
   }
 
   async function save() {
@@ -1227,20 +1271,31 @@ function CounterReplyPanel({
       )}
       <div className="flex flex-wrap gap-2 items-center select-none pt-2">
         <TooltipProvider>
-          {/* Button 1: Counter Reply */}
+          {/* Button 1: Counter Reply — opens the sender-details form (FROM
+              block for the department letter) instead of firing immediately;
+              language is chosen inside that dialog. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
-                <LanguageChoiceButton
+                <Button
                   size="sm"
                   variant={counterState === "active" ? "default" : "outline"}
-                  busy={generating && selectedKind === "counter_reply"}
-                  disabled={counterState !== "active" || !aiConfigured}
-                  icon={MessageSquareReply}
-                  onChoose={(lang) => generate("counter_reply", lang)}
+                  disabled={
+                    counterState !== "active" ||
+                    !aiConfigured ||
+                    (deptSenderLoading && replySenderKind === "counter_reply") ||
+                    (generating && selectedKind === "counter_reply")
+                  }
+                  onClick={() => openReplySenderDialog("counter_reply")}
                 >
+                  {(deptSenderLoading && replySenderKind === "counter_reply") ||
+                  (generating && selectedKind === "counter_reply") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageSquareReply className="h-4 w-4" />
+                  )}
                   {counterLabel}
-                </LanguageChoiceButton>
+                </Button>
               </span>
             </TooltipTrigger>
             <TooltipContent align="start" className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
@@ -1248,20 +1303,31 @@ function CounterReplyPanel({
             </TooltipContent>
           </Tooltip>
 
-          {/* Button 2: Reminder Letter */}
+          {/* Button 2: Reminder Letter — opens the sender-details form (FROM
+              block for the department letter) instead of firing immediately;
+              language is chosen inside that dialog. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
-                <LanguageChoiceButton
+                <Button
                   size="sm"
                   variant={reminderState === "active" ? "default" : "outline"}
-                  busy={generating && selectedKind === "reminder_letter"}
-                  disabled={reminderState !== "active" || !aiConfigured}
-                  icon={Bell}
-                  onChoose={(lang) => generate("reminder_letter", lang)}
+                  disabled={
+                    reminderState !== "active" ||
+                    !aiConfigured ||
+                    (deptSenderLoading && replySenderKind === "reminder_letter") ||
+                    (generating && selectedKind === "reminder_letter")
+                  }
+                  onClick={() => openReplySenderDialog("reminder_letter")}
                 >
+                  {(deptSenderLoading && replySenderKind === "reminder_letter") ||
+                  (generating && selectedKind === "reminder_letter") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bell className="h-4 w-4" />
+                  )}
                   {reminderLabel}
-                </LanguageChoiceButton>
+                </Button>
               </span>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs text-center font-semibold text-slate-800 dark:text-slate-200">
@@ -1303,6 +1369,16 @@ function CounterReplyPanel({
         initial={legalSender}
         busy={generating && selectedKind === "legal_notice"}
         onConfirm={confirmLegalNotice}
+      />
+
+      <ReplySenderDialog
+        open={replySenderOpen}
+        onOpenChange={setReplySenderOpen}
+        kind={replySenderKind}
+        initial={deptSender}
+        icon={replySenderKind === "counter_reply" ? MessageSquareReply : Bell}
+        busy={generating && selectedKind === replySenderKind}
+        onConfirm={confirmReplySender}
       />
 
       {error && <p className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {error}</p>}

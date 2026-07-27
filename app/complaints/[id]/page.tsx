@@ -38,16 +38,26 @@ const getBadgeStyles = (status: string) => {
   return "bg-slate-50 text-slate-700 border-slate-200";
 };
 
-export default async function ComplaintDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ComplaintDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  /** `from=jobs` when arriving via the Job-Number Forensic Audits page's
+   *  "Case details" link — points the breadcrumb back there instead of the
+   *  generic complaints list. */
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { id } = await params;
-  const complaint = await getComplaint(id);
-  if (!complaint) notFound();
+  const { from } = await searchParams;
+  const fromJobs = from === "jobs";
 
   const { t, locale } = await getTranslations("complaints");
   const { t: tc } = await getTranslations("common");
 
-  const [documents, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, options, letterDraft, user, aiRecommendation] =
+  const [complaint, documents, timeline, replies, actions, communications, reminders, escalations, aiDrafts, audit, options, letterDraft, user, aiRecommendation] =
     await Promise.all([
+      getComplaint(id),
       listComplaintDocuments(id),
       listComplaintTimeline(id),
       listComplaintReplies(id),
@@ -62,6 +72,7 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
       getSessionUser(),
       getComplaintAiRecommendationAction(id),
     ]);
+  if (!complaint) notFound();
 
   const jobDocuments = complaint.job_number ? await getJobDocumentsByNumber(complaint.job_number) : [];
 
@@ -95,7 +106,11 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
       {/* Sticky Action Toolbar & Breadcrumbs */}
       <div className="no-print sticky top-0 z-30 flex flex-wrap items-center justify-between gap-4 border-b border-slate-150 bg-background/95 py-3.5 backdrop-blur dark:border-slate-850">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 select-none">
-          <Link href="/complaints" className="hover:text-primary transition-colors">{t("detailPage.breadcrumbComplaints")}</Link>
+          {fromJobs ? (
+            <Link href="/complaints/jobs" className="hover:text-primary transition-colors">Job-Number Forensic Audits</Link>
+          ) : (
+            <Link href="/complaints" className="hover:text-primary transition-colors">{t("detailPage.breadcrumbComplaints")}</Link>
+          )}
           <span className="text-slate-350">/</span>
           <span className="text-slate-800 dark:text-slate-200 font-bold">{t("detailPage.breadcrumbCaseDetails")}</span>
         </div>
@@ -196,7 +211,14 @@ export default async function ComplaintDetailPage({ params }: { params: Promise<
       {flags.canField && (
         <LetterEmailPanel
           complaintId={complaint.id}
-          documentId={letter.pdfDocId}
+          // null, not letter.pdfDocId: this standalone panel lets the user pick
+          // ANY letter kind from SELECTABLE_LETTER_KINDS (reminder, counter-reply,
+          // escalation letter, legal notice …), not only the original complaint
+          // letter. Passing a fixed documentId would attach that one document
+          // regardless of the kind picked; null lets sendLetterEmail's own
+          // KIND_TO_DOC_TYPE lookup (lib/mail/send.ts) find the document that
+          // actually matches whichever kind is selected.
+          documentId={null}
           mailStatus={mailStatus}
           initialHistory={letterEmails}
         />

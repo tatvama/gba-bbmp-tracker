@@ -32,12 +32,14 @@ export default async function ComplaintPrintPage({
 }) {
   const { id } = await params;
   const { lang } = await searchParams;
-  const c = await getComplaint(id);
+  const [c, timeline, documents] = await Promise.all([
+    getComplaint(id),
+    listComplaintTimeline(id),
+    listComplaintDocuments(id),
+  ]);
   if (!c) notFound();
   const pageLang: Locale = lang === "en" || lang === "kn" ? lang : await getLocale();
   const t = (key: string, p?: Record<string, string | number>) => translate("complaints", key, pageLang, p);
-
-  const [timeline, documents] = await Promise.all([listComplaintTimeline(id), listComplaintDocuments(id)]);
 
   // English mode: translate the case's own free-text (often Kannada) content.
   let trMap = new Map<string, string>();

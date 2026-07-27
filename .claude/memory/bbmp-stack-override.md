@@ -20,6 +20,6 @@ The BBMP/GBA Ward & Engineer platform (D:\Tatvam\BBMP) is built per `BUILD_PROMP
 
 **DB connection gotcha:** Supabase direct host `db.<ref>.supabase.co` is IPv6-only — does NOT resolve on IPv4 (ENOTFOUND). Must use the **Session pooler** URI: `postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres` (region appears to be ap-south-1). Scripts use `pg` + `DATABASE_URL`; runtime uses supabase-js + anon key.
 
-**Status as of 2026-06-14:** Full app built; typecheck/lint/build/26 tests all green. `npm run db:migrate` + `npm run db:seed` NOT yet run against live DB — blocked because the safety classifier denied an agent-reconstructed connection string. Resolution: user must paste their exact Session-pooler URI into `.env` (and add `SUPABASE_SERVICE_ROLE_KEY` for create-admin), then run migrate + seed.
+**Status update 2026-07-23 (RESOLVED):** Live DB is fully provisioned — migrated through `0046` and seeded (verified via a clean boot). The old "migrate/seed not yet run" blocker is obsolete: the app **auto-applies migrations + seeds on server boot**, so manual migrate/seed against the live DB is neither needed nor advisable. See [[bbmp-boot-bootstrap]].
 
 See [[bbmp-data-model-facts]].

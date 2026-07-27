@@ -60,11 +60,10 @@ export default async function RtiDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const rti = await getRti(id);
-  if (!rti) notFound();
 
-  const [firstAppeals, secondAppeals, documents, comms, audit, rules, user] =
+  const [rti, firstAppeals, secondAppeals, documents, comms, audit, rules, user] =
     await Promise.all([
+      getRti(id),
       listFirstAppeals(id),
       listSecondAppeals(id),
       listRtiDocuments(id),
@@ -73,6 +72,8 @@ export default async function RtiDetailPage({
       getDeadlineRules(),
       getSessionUser(),
     ]);
+  if (!rti) notFound();
+
   const canEdit = hasRole(user, RTI_WRITE_ROLES);
   const canVerify = hasRole(user, VERIFY_ROLES);
 

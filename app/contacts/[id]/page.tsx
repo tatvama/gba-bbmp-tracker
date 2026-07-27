@@ -24,13 +24,13 @@ export default async function ContactDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const contact = await getContact(id);
-  if (!contact) notFound();
-
-  const [audit, user] = await Promise.all([
-    listAuditLogs({ entityType: "contact", entityId: contact.id }, 50),
+  const [contact, audit, user] = await Promise.all([
+    getContact(id),
+    listAuditLogs({ entityType: "contact", entityId: id }, 50),
     getSessionUser(),
   ]);
+  if (!contact) notFound();
+
   const canEdit = hasRole(user, WRITE_ROLES);
   const canVerify = hasRole(user, VERIFY_ROLES);
 

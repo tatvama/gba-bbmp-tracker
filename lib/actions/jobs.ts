@@ -57,6 +57,9 @@ export async function startAiDraftJob(input: {
   /** Petitioner identity for a `legal_notice` PIL — persisted into the job input
    *  so the (possibly deferred) handler drafts with the sender the user chose. */
   sender?: LegalNoticeSender;
+  /** Sender identity for a non-PIL department letter (`counter_reply`,
+   *  `reminder_letter`) — see lib/ai/complaint-draft.ts's `senderOverride`. */
+  senderOverride?: { name: string; address: string; mobile?: string | null };
 }): Promise<{ ok: boolean; jobId?: string; error?: string }> {
   let user;
   try {

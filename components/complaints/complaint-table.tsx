@@ -278,7 +278,9 @@ const AnimatedNumber = ({ value }: { value: number }) => {
   return <span>{displayValue.toLocaleString()}</span>;
 };
 
-function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }) {
+// Memoized — one instance per row on the mobile card view; without memo, every
+// search/sort/filter keystroke (local state, not `data`) re-renders every card.
+const ComplaintCard = React.memo(function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }) {
   const { t } = useTranslation("complaints");
   const { t: tCommon } = useTranslation("common");
   const [expanded, setExpanded] = React.useState(false);
@@ -387,7 +389,7 @@ function ComplaintCard({ c, router }: { c: ComplaintWithRelations; router: any }
       </CardContent>
     </Card>
   );
-}
+});
 
 export function ComplaintTable({
   data,
@@ -514,14 +516,25 @@ export function ComplaintTable({
     setSelectedIds([]);
   };
 
-  // Pre-calculated stats for KPIs
+  // Pre-calculated stats for KPIs — memoized so a search/sort/filter keystroke
+  // (which changes local state, not `data`) doesn't re-scan the full array.
   const totalCount = data.length;
-  const openCount = data.filter((c) => c.status !== "Resolved" && c.status !== "Closed").length;
-  const awaitingReplyCount = data.filter((c) => ["Acknowledged", "Under Review", "Assigned To Engineer", "Site Visit Pending", "Site Visit Done", "Work In Progress"].includes(c.status)).length;
-  const overdueCount = data.filter((c) => c.next_follow_up_date && c.next_follow_up_date < today && c.status !== "Resolved" && c.status !== "Closed").length;
-  const resolvedCount = data.filter((c) => c.status === "Resolved" || c.status === "Closed").length;
-  const printQueueCount = data.filter((c) => c.status === "Draft").length;
-  const aiReviewPendingCount = data.filter((c) => c.status === "Filed").length;
+  const openCount = React.useMemo(() => data.filter((c) => c.status !== "Resolved" && c.status !== "Closed").length, [data]);
+  const awaitingReplyCount = React.useMemo(() => data.filter((c) => ["Acknowledged", "Under Review", "Assigned To Engineer", "Site Visit Pending", "Site Visit Done", "Work In Progress"].includes(c.status)).length, [data]);
+  const overdueCount = React.useMemo(() => data.filter((c) => c.next_follow_up_date && c.next_follow_up_date < today && c.status !== "Resolved" && c.status !== "Closed").length, [data]);
+  const resolvedCount = React.useMemo(() => data.filter((c) => c.status === "Resolved" || c.status === "Closed").length, [data]);
+  const printQueueCount = React.useMemo(() => data.filter((c) => c.status === "Draft").length, [data]);
+  const aiReviewPendingCount = React.useMemo(() => data.filter((c) => c.status === "Filed").length, [data]);
+
+  // Category Breakdown sidebar counts — same "recomputed on every render" issue
+  // as the KPIs above (this runs 5 full-array scans directly in JSX otherwise).
+  const categoryCounts = React.useMemo(() => ({
+    roadInfrastructure: data.filter((c) => c.type === "Road Infrastructure").length,
+    stormWaterDrains: data.filter((c) => c.type === "Storm Water Drain").length,
+    electricalLakes: data.filter((c) => c.type === "Electrical" || c.type === "Lakes").length,
+    horticultureHealth: data.filter((c) => c.type === "Horticulture" || c.type === "Health").length,
+    planningRevenueLegal: data.filter((c) => c.type === "Town Planning" || c.type === "Revenue" || c.type === "Legal" || c.type === "IT").length,
+  }), [data]);
 
   // Intelligence banner AI recommendation helper
   const topDivision = React.useMemo(() => {
@@ -1303,11 +1316,11 @@ export function ComplaintTable({
               <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Category Breakdown</span>
             </div>
             <CardContent className="p-4 space-y-3.5">
-              <CategoryProgress label="Road Infrastructure" count={data.filter(c => c.type === "Road Infrastructure").length} total={totalCount} color="bg-primary" />
-              <CategoryProgress label="Storm Water Drains" count={data.filter(c => c.type === "Storm Water Drain").length} total={totalCount} color="bg-blue-500" />
-              <CategoryProgress label="Electrical & Lakes" count={data.filter(c => c.type === "Electrical" || c.type === "Lakes").length} total={totalCount} color="bg-amber-500" />
-              <CategoryProgress label="Horticulture & Health" count={data.filter(c => c.type === "Horticulture" || c.type === "Health").length} total={totalCount} color="bg-emerald-500" />
-              <CategoryProgress label="Planning, Revenue & Legal" count={data.filter(c => c.type === "Town Planning" || c.type === "Revenue" || c.type === "Legal" || c.type === "IT").length} total={totalCount} color="bg-teal" />
+              <CategoryProgress label="Road Infrastructure" count={categoryCounts.roadInfrastructure} total={totalCount} color="bg-primary" />
+              <CategoryProgress label="Storm Water Drains" count={categoryCounts.stormWaterDrains} total={totalCount} color="bg-blue-500" />
+              <CategoryProgress label="Electrical & Lakes" count={categoryCounts.electricalLakes} total={totalCount} color="bg-amber-500" />
+              <CategoryProgress label="Horticulture & Health" count={categoryCounts.horticultureHealth} total={totalCount} color="bg-emerald-500" />
+              <CategoryProgress label="Planning, Revenue & Legal" count={categoryCounts.planningRevenueLegal} total={totalCount} color="bg-teal" />
             </CardContent>
           </Card>
 

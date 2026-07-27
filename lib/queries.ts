@@ -81,30 +81,28 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     return c ?? 0;
   };
 
-  const [corporations, bbmp225Wards, divisions, subdivisions, contacts, verified, pending] =
-    await Promise.all([
-      count("corporations"),
-      count("wards"),
-      count("divisions"),
-      count("eng_subdivisions"),
-      count("contacts"),
-      count("contacts", (q) => q.eq("verification_status", "VERIFIED")),
-      count("contacts", (q) => q.eq("verification_status", "PENDING")),
-    ]);
-
-  // The five reads below are independent of each other (none depends on
-  // another's result) -> fetched in parallel instead of one-by-one.
-  const [{ data: corps }, { data: oldRows }, missingContactInfo, { data: subWithContact }, { data: wardSubs }] =
-    await Promise.all([
-      // GBA wards = sum of corporation ward_count (369)
-      supabase.from("corporations").select("ward_count"),
-      // Old-198 represented = distinct old_wards entries across all wards
-      supabase.from("wards").select("old_wards"),
-      count("contacts", (q) => q.or("phone.is.null,email.is.null,office_address.is.null")),
-      // wards whose eng sub-division has no contact
-      supabase.from("contacts").select("eng_subdivision_id").not("eng_subdivision_id", "is", null),
-      supabase.from("wards").select("eng_subdivision_id"),
-    ]);
+  // All 12 reads below are independent of each other (none depends on another's
+  // result) -> fetched in one parallel batch instead of two sequential ones.
+  const [
+    corporations, bbmp225Wards, divisions, subdivisions, contacts, verified, pending,
+    { data: corps }, { data: oldRows }, missingContactInfo, { data: subWithContact }, { data: wardSubs },
+  ] = await Promise.all([
+    count("corporations"),
+    count("wards"),
+    count("divisions"),
+    count("eng_subdivisions"),
+    count("contacts"),
+    count("contacts", (q) => q.eq("verification_status", "VERIFIED")),
+    count("contacts", (q) => q.eq("verification_status", "PENDING")),
+    // GBA wards = sum of corporation ward_count (369)
+    supabase.from("corporations").select("ward_count"),
+    // Old-198 represented = distinct old_wards entries across all wards
+    supabase.from("wards").select("old_wards"),
+    count("contacts", (q) => q.or("phone.is.null,email.is.null,office_address.is.null")),
+    // wards whose eng sub-division has no contact
+    supabase.from("contacts").select("eng_subdivision_id").not("eng_subdivision_id", "is", null),
+    supabase.from("wards").select("eng_subdivision_id"),
+  ]);
 
   const gbaWards = (corps ?? []).reduce(
     (s: number, c: { ward_count: number }) => s + (c.ward_count ?? 0),
@@ -2370,6 +2368,11 @@ export async function getOverdueCounts(): Promise<{ complaintsOverdue: number; r
 export interface JobNumberWithAudit {
   jobNumber: string;
   complaints: number;
+  /** The one linked complaint's id, when this job number has exactly one —
+   *  lets the jobs list link straight to its case detail page. Null when a
+   *  job number has zero or (rarely) more than one linked complaint, since
+   *  there'd be no single unambiguous target to link to. */
+  soleComplaintId: string | null;
   audit: { riskBand: string | null; riskScore: number; findingCount: number; redFlagCount: number } | null;
 }
 
@@ -2380,16 +2383,21 @@ export interface JobNumberWithAudit {
 export async function listJobNumbersWithAudits(): Promise<JobNumberWithAudit[]> {
   const supabase = await sb();
   const [compRes, auditRes] = await Promise.all([
-    supabase.from("complaints").select("job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
+    supabase.from("complaints").select("id, job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
     supabase.from("job_audits").select("job_number, risk_band, risk_score, finding_count, red_flag_count, created_at").order("created_at", { ascending: false }).limit(5000),
   ]);
   logErr("listJobNumbersWithAudits:complaints", compRes.error);
   logErr("listJobNumbersWithAudits:audits", auditRes.error);
 
   const counts = new Map<string, number>();
+  const soleIds = new Map<string, string | null>();
   for (const r of compRes.data ?? []) {
-    const j = (r as { job_number: string }).job_number;
-    if (j) counts.set(j, (counts.get(j) ?? 0) + 1);
+    const { id, job_number: j } = r as { id: string; job_number: string };
+    if (!j) continue;
+    counts.set(j, (counts.get(j) ?? 0) + 1);
+    // First complaint seen for this job number seeds the candidate id; a
+    // second one clears it back to null (no longer a "sole" complaint).
+    soleIds.set(j, soleIds.has(j) ? null : id);
   }
   const latest = new Map<string, JobNumberWithAudit["audit"]>();
   for (const a of auditRes.data ?? []) {
@@ -2404,7 +2412,12 @@ export async function listJobNumbersWithAudits(): Promise<JobNumberWithAudit[]> 
     });
   }
   return [...counts.entries()]
-    .map(([jobNumber, complaints]) => ({ jobNumber, complaints, audit: latest.get(jobNumber) ?? null }))
+    .map(([jobNumber, complaints]) => ({
+      jobNumber,
+      complaints,
+      soleComplaintId: complaints === 1 ? (soleIds.get(jobNumber) ?? null) : null,
+      audit: latest.get(jobNumber) ?? null,
+    }))
     .sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
 }
 

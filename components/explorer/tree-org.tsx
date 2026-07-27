@@ -41,7 +41,9 @@ interface NodeCardProps {
   className?: string;
 }
 
-function NodeCard({
+// Memoized — one instance per visible corp/division/sub-division node;
+// without memo, hovering any single node re-renders every tile in the tree.
+const NodeCard = React.memo(function NodeCard({
   label, sublabel, count, countUnit, tint,
   active, hovered, onClick, onHover, nodeRef, size = "md", className,
 }: NodeCardProps) {
@@ -111,7 +113,7 @@ function NodeCard({
       )}
     </button>
   );
-}
+});
 
 /* ── mode toggle ─────────────────────────────────────────────────── */
 type Mode = "gba" | "bbmp";

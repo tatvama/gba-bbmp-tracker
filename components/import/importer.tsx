@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import * as XLSX from "xlsx";
 import { UploadCloud, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,6 +45,9 @@ export function Importer() {
     setFileName(file.name);
     setResult(null);
     const buf = await file.arrayBuffer();
+    // xlsx (~2.5MB) dynamically imported so it's only fetched once a file is
+    // actually chosen, not bundled into this admin-only page's initial load.
+    const XLSX = await import("xlsx");
     const wb = XLSX.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]!];
     const aoa = XLSX.utils.sheet_to_json<string[]>(sheet!, { header: 1, blankrows: false, defval: "" });

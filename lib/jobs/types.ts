@@ -63,10 +63,17 @@ export interface JobConfig {
 
 /** Metadata needed to (re)dispatch a job — stored redundantly on the job row
  *  itself so a retry or a sweep pickup doesn't need the original caller's
- *  closure state. */
+ *  closure state.
+ *
+ *  userId is nullable for the rare system-triggered job that no human
+ *  started (e.g. the overdue-alert sweeper's queued email_send jobs) — there
+ *  is no one to attribute it to or notify. dispatchJob skips the in-app
+ *  notification for those and coerces to "" for the handler context, which
+ *  every existing handler already tolerates since only a system job ever
+ *  supplies it. */
 export interface JobDispatchMeta {
   type: JobType;
-  userId: string;
+  userId: string | null;
   title: string;
   entityType?: string | null;
   entityId?: string | null;

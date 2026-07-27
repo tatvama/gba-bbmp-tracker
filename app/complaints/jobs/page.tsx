@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldAlert, ScrollText } from "lucide-react";
+import { ShieldAlert, ScrollText, FileText } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,10 @@ export default async function JobsPage() {
   if (!hasRole(user, COMPLAINT_VERIFY_ROLES)) {
     return (
       <div>
-        <PageHeader title="Job-Number Forensic Audits" />
+        <PageHeader
+          title="Job-Number Forensic Audits"
+          breadcrumbs={[{ label: "Complaints", href: "/complaints" }, { label: "Job-Number Forensic Audits" }]}
+        />
         <EmptyState title="Not permitted" description="Your role cannot view forensic audits." />
       </div>
     );
@@ -40,6 +43,7 @@ export default async function JobsPage() {
       <PageHeader
         title="Job-Number Forensic Audits"
         description="Each government job number aggregates all linked complaints and their documents into one forensic audit. Run the audit, then draft a Kannada bill-stop / Lokayukta / RTI letter from the findings."
+        breadcrumbs={[{ label: "Complaints", href: "/complaints" }, { label: "Job-Number Forensic Audits" }]}
       />
       {jobs.length === 0 ? (
         <EmptyState title="No job numbers yet" description="Set a job number on complaints (in the complaint form) to group their documents for a job-level audit." />
@@ -60,6 +64,11 @@ export default async function JobsPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={b.variant}>{b.label}{a ? ` · ${a.riskScore}` : ""}</Badge>
+                    {j.soleComplaintId && (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/complaints/${j.soleComplaintId}?from=jobs`}><FileText className="h-4 w-4" /> Case details</Link>
+                      </Button>
+                    )}
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/complaints/job/${encodeURIComponent(j.jobNumber)}/audit`}><ShieldAlert className="h-4 w-4" /> Audit</Link>
                     </Button>

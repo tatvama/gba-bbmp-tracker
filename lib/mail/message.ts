@@ -171,7 +171,7 @@ export function sanitizeHeaderText(value: string): string {
   return value.replace(CONTROL, " ").replace(/\s{2,}/g, " ").trim();
 }
 
-const ref = (input: LetterEmailInput): string => {
+const ref = (input: { complaintNumber?: string | null; jobNumber?: string | null }): string => {
   const parts = [
     input.complaintNumber ? `Complaint No. ${input.complaintNumber}` : null,
     input.jobNumber ? `Job Code ${input.jobNumber}` : null,
@@ -230,6 +230,94 @@ export function buildLetterEmail(input: LetterEmailInput): BuiltEmail {
   if (input.attachmentName) {
     body.push("", `Attachment: ${input.attachmentName}`);
   }
+
+  return { subject, text: body.join("\n") };
+}
+
+// ── The overdue alert ────────────────────────────────────────────────────────
+
+/** One overdue complaint an officer is accountable for, as one line of their
+ *  digest. */
+export interface OverdueAlertComplaintItem {
+  /** Case identifiers the officer can quote back at us. */
+  complaintNumber?: string | null;
+  jobNumber?: string | null;
+  /** Free-text subject of the underlying complaint. */
+  complaintSubject?: string | null;
+  ward?: string | null;
+  /** ISO date (YYYY-MM-DD) the reply/follow-up was expected by. */
+  followUpDate?: string | null;
+  /** Whole days elapsed since followUpDate, when known — for the "N days
+   *  overdue" phrase. Omit rather than guess when the date can't be parsed. */
+  daysOverdue?: number | null;
+}
+
+export interface OverdueAlertEmailInput {
+  /** The officer being written to, for the salutation. */
+  officerName?: string | null;
+  officerDesignation?: string | null;
+  /** Every currently-overdue complaint this one officer is accountable for —
+   *  one email lists all of them, rather than one email per complaint, so an
+   *  officer responsible for several overdue cases gets a single digest. */
+  complaints: OverdueAlertComplaintItem[];
+  /** Signature block — who is writing. */
+  senderName: string;
+  senderContact?: string | null;
+}
+
+/**
+ * A short, formal notice that one or more complaints have gone overdue — no
+ * attached letter, no "please find attached"; the point is the alert itself.
+ * Same formal shape as buildLetterEmail() (To, / Respected Sir, Madam / body /
+ * Yours faithfully) so it reads as the same kind of official correspondence,
+ * not a different, less formal notification. Handles a single complaint (the
+ * common case) and a digest of several identically — the body is always a
+ * numbered list, just with one line when there is only one.
+ */
+export function buildOverdueAlertEmail(input: OverdueAlertEmailInput): BuiltEmail {
+  const count = input.complaints.length;
+  const only = count === 1 ? input.complaints[0] : null;
+
+  const subjectBits = only
+    ? ["Overdue Alert", ref(only) || null, only.ward ? `Ward ${only.ward}` : null]
+    : ["Overdue Alert", `${count} complaint${count === 1 ? "" : "s"}`];
+  const subject = sanitizeHeaderText(subjectBits.filter(Boolean).join(" — "));
+
+  const salutation = input.officerDesignation
+    ? `To,\nThe ${input.officerDesignation}${input.officerName ? `\n${input.officerName}` : ""}`
+    : input.officerName
+      ? `To,\n${input.officerName}`
+      : "To,\nThe concerned officer";
+
+  const body: string[] = [salutation, "", "Respected Sir / Madam,", ""];
+
+  body.push(
+    count === 1
+      ? "This is to bring to your kind notice that the following complaint remains without a satisfactory reply and is now overdue:"
+      : `This is to bring to your kind notice that the following ${count} complaints, assigned to your office, remain without a satisfactory reply and are now overdue:`,
+  );
+  body.push("");
+
+  input.complaints.forEach((c, i) => {
+    const reference = ref(c);
+    const bits = [reference, c.complaintSubject].filter(Boolean);
+    const wardBit = c.ward ? ` (Ward ${c.ward})` : "";
+    const dueBit = c.followUpDate ? `, due ${c.followUpDate}` : "";
+    const overdueBit =
+      c.daysOverdue != null && c.daysOverdue > 0 ? `, ${c.daysOverdue} day${c.daysOverdue === 1 ? "" : "s"} overdue` : "";
+    body.push(`${i + 1}. ${bits.join(" — ") || "Complaint"}${wardBit}${dueBit}${overdueBit}`);
+  });
+
+  body.push(
+    "",
+    count === 1
+      ? "Kindly treat this as urgent and arrange for a suitable reply / necessary action at the earliest, under the applicable rules. This email is a follow-up alert and does not replace any physical submission already made."
+      : "Kindly treat this as urgent and arrange for a suitable reply / necessary action on each of the above at the earliest, under the applicable rules. This email is a follow-up alert and does not replace any physical submission already made.",
+    "",
+    "Yours faithfully,",
+    input.senderName,
+  );
+  if (input.senderContact) body.push(input.senderContact);
 
   return { subject, text: body.join("\n") };
 }

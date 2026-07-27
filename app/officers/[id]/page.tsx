@@ -18,14 +18,15 @@ export const dynamic = "force-dynamic";
 
 export default async function OfficerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [officer, user] = await Promise.all([getOfficer(id), getSessionUser()]);
-  if (!officer) notFound();
-
-  const [scorecard, transfers, reports] = await Promise.all([
+  const [officer, user, scorecard, transfers, reports] = await Promise.all([
+    getOfficer(id),
+    getSessionUser(),
     getOfficerScorecard(id),
     listOfficerTransfers(id),
     listDirectReports(id),
   ]);
+  if (!officer) notFound();
+
   const canWrite = hasRole(user, WRITE_ROLES);
 
   const posting =
