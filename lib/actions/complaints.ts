@@ -1450,11 +1450,18 @@ export async function fileEscalationAction(
     .single();
 
   const offices = opts?.tvccDivision || opts?.zonalDivision ? await getTvccOffices() : null;
+  // A legal notice needs its OWN document_type: lib/mail/send.ts's
+  // KIND_TO_DOC_TYPE looks up "Legal notice" specifically when a user manually
+  // emails one from the case, and it must not collide with an actual
+  // escalation letter on the same case. Every other escalation-adjacent kind
+  // here (Lokayukta, Chief Secretary, CM office, records-preservation) has no
+  // such lookup yet, so they keep the shared "Escalation letter" type.
+  const documentType = opts?.kind === "legal_notice" ? "Legal notice" : "Escalation letter";
   let filed: Awaited<ReturnType<typeof fileLetterWithCopies>>;
   try {
     filed = await fileLetterWithCopies(complaintDistributionDeps(admin), {
       complaintId,
-      documentType: "Escalation letter",
+      documentType,
       title: label,
       content,
       reference: escalationCase?.internal_case_number ?? null,

@@ -211,7 +211,14 @@ export default async function ComplaintDetailPage({
       {flags.canField && (
         <LetterEmailPanel
           complaintId={complaint.id}
-          documentId={letter.pdfDocId}
+          // null, not letter.pdfDocId: this standalone panel lets the user pick
+          // ANY letter kind from SELECTABLE_LETTER_KINDS (reminder, counter-reply,
+          // escalation letter, legal notice …), not only the original complaint
+          // letter. Passing a fixed documentId would attach that one document
+          // regardless of the kind picked; null lets sendLetterEmail's own
+          // KIND_TO_DOC_TYPE lookup (lib/mail/send.ts) find the document that
+          // actually matches whichever kind is selected.
+          documentId={null}
           mailStatus={mailStatus}
           initialHistory={letterEmails}
         />
