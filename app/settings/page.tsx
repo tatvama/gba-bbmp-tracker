@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ModeToggle } from "@/components/mode-toggle";
 import { CreateUserForm } from "@/components/settings/create-user-form";
+import { ManageUsersPanel } from "@/components/settings/manage-users-panel";
 import { DetailRow } from "@/components/detail-row";
 import { EmptyState } from "@/components/empty-state";
 import { getSessionUser } from "@/lib/auth";
+import { listUsers } from "@/lib/actions/users";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,7 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 
 export default async function SettingsPage() {
   const user = await getSessionUser();
+  const existingUsers = user?.role === "ADMIN" ? await listUsers() : null;
 
   if (!user) {
     return (
@@ -69,6 +72,22 @@ export default async function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <CreateUserForm />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Existing users</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Change a user&apos;s role, or add/change their phone number so they can also sign in by phone.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {existingUsers?.error ? (
+                  <p className="text-sm text-destructive">{existingUsers.error}</p>
+                ) : (
+                  <ManageUsersPanel users={existingUsers?.users ?? []} />
+                )}
               </CardContent>
             </Card>
           </>
