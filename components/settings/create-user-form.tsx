@@ -41,6 +41,11 @@ export function CreateUserForm() {
           <Input name="password" type="password" minLength={8} required />
         </div>
         <div className="space-y-1.5">
+          <Label>Phone number</Label>
+          <Input name="phone" type="tel" inputMode="numeric" placeholder="98765 43210" autoComplete="tel" />
+          <p className="text-xs text-muted-foreground">Optional — lets this user also sign in by phone.</p>
+        </div>
+        <div className="space-y-1.5">
           <Label>Role</Label>
           <select name="role" defaultValue="VIEWER" className={selectCls}>
             {USER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}

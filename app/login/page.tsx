@@ -30,8 +30,17 @@ export default function LoginPage() {
               </div>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required />
+              <Label htmlFor="identifier">Email or phone number</Label>
+              {/* One field, either identifier — which one it is is detected
+                  server-side (signInAction), not chosen via a mode switch. */}
+              <Input
+                id="identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                placeholder="Email or phone number"
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
