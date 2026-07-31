@@ -60,7 +60,9 @@ const handler: JobHandler = async (ctx) => {
 
   // The generated letter is fresh correspondence — re-run the advisor so its
   // next-step reasoning reflects what we just sent.
-  await runAdvisorAnalysis(ctx.admin, input.complaintId).catch(() => {});
+  await runAdvisorAnalysis(ctx.admin, input.complaintId).catch((e) => {
+    console.warn(`[ai_draft] advisor refresh failed for complaint ${input.complaintId}:`, e);
+  });
 
   return { result: { text: r.text, lintWarning: r.lintWarning ?? null, truncated: r.truncated ?? false, qualityReport: r.qualityReport ?? null } };
 };

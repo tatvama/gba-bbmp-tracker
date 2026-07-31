@@ -9,7 +9,29 @@ export class DatabaseMigrationTask implements StartupTask {
   name = "Database Migrations";
   critical = true;
 
+  /**
+   * Auto-migrating on every boot is safe for local/dev convenience but is a
+   * real production risk: a bad migration file or a mid-incident restart
+   * would otherwise silently alter schema or crash-loop the app (this task
+   * is `critical`, so a failure here calls process.exit(1)). RUN_MIGRATIONS_ON_BOOT
+   * is an explicit override in either direction; absent it, default to
+   * "skip in production, run everywhere else" so nothing changes for dev/test.
+   */
+  static shouldRunAutoMigrations(): boolean {
+    const override = process.env.RUN_MIGRATIONS_ON_BOOT;
+    if (override === "true") return true;
+    if (override === "false") return false;
+    return process.env.NODE_ENV !== "production";
+  }
+
   async run(): Promise<void> {
+    if (!DatabaseMigrationTask.shouldRunAutoMigrations()) {
+      StartupLogger.info(
+        `Skipping automatic migrations (NODE_ENV=${process.env.NODE_ENV ?? "unset"}). Run "npm run db:migrate" manually, or set RUN_MIGRATIONS_ON_BOOT=true to opt back in.`,
+      );
+      return;
+    }
+
     const url = process.env.DATABASE_URL;
     if (!url) {
       throw new Error("DATABASE_URL is not set.");

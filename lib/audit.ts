@@ -38,7 +38,8 @@ export type AuditEntityType =
   | "escalation"
   | "template"
   | "attachment"
-  | "bbmp_work";
+  | "bbmp_work"
+  | "user";
 
 /** Write one audit_logs row per changed field. Called on EVERY tracked mutation. */
 export async function writeAudit(

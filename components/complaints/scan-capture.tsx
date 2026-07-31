@@ -63,6 +63,12 @@ export function ScanCapture({
   const [internalDocDate, setInternalDocDate] = React.useState(todayLocal());
   const activeDocDate = docDate !== undefined ? docDate : internalDocDate;
   const [pages, setPages] = React.useState<Page[]>([]);
+  // Mirrors `pages` for the unmount-cleanup effect below, which must always
+  // revoke the *current* object URLs, not whatever `pages` was at mount time.
+  const pagesRef = React.useRef<Page[]>(pages);
+  React.useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
   const [busy, setBusy] = React.useState(false);
   const [statusMsg, setStatusMsg] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
@@ -152,12 +158,13 @@ export function ScanCapture({
     if (file) addFiles([file]);
   }
 
+  // Cleanup streams + object URLs on unmount. Reads pagesRef (always current)
+  // rather than `pages` (which this closure would otherwise capture at mount).
   React.useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      pages.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+      pagesRef.current.forEach((p) => p.url && URL.revokeObjectURL(p.url));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function submit() {

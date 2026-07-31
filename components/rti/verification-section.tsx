@@ -152,7 +152,7 @@ export function VerificationSection({ rti, isPending }: VerificationSectionProps
         {extRefNo.value && renderVerificationRow(t("field.referenceNumber"), true, info.extractedInfo?.referenceNumber)}
       </div>
     );
-  }, [info, rti, renderVerificationRow, getDisplayValueAndPage]);
+  }, [info, rti, renderVerificationRow, getDisplayValueAndPage, t]);
 
   // Recommended Action Banner Styling
   const bannerMarkup = React.useMemo(() => {

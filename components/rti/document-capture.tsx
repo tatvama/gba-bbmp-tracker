@@ -71,6 +71,12 @@ export function DocumentCapture({
   const [title, setTitle] = React.useState("");
   const [docDate, setDocDate] = React.useState(todayLocal());
   const [pages, setPages] = React.useState<Page[]>([]);
+  // Mirrors `pages` for the unmount-cleanup effect below, which must always
+  // revoke the *current* object URLs, not whatever `pages` was at mount time.
+  const pagesRef = React.useRef<Page[]>(pages);
+  React.useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
   const [busy, setBusy] = React.useState(false);
   // Tracked as a stable stage key (not the translated text itself) so the
   // interval below can keep advancing the sequence regardless of locale.
@@ -195,13 +201,13 @@ export function DocumentCapture({
     );
   }
 
-  // Cleanup streams + object URLs on unmount.
+  // Cleanup streams + object URLs on unmount. Reads pagesRef (always current)
+  // rather than `pages` (which this closure would otherwise capture at mount).
   React.useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      pages.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+      pagesRef.current.forEach((p) => p.url && URL.revokeObjectURL(p.url));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function submit() {

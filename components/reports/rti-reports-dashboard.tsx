@@ -229,25 +229,28 @@ export function RtiReportsDashboard({ rtis, firstAppeals, secondAppeals, rules }
   }, [rtis, mapRtiRow, now]);
 
   // Global search filtering
-  const filterRows = <T extends Record<string, any>>(rows: T[]): T[] => {
-    if (!globalFilter.trim()) return rows;
-    const q = globalFilter.toLowerCase();
-    return rows.filter(
-      (r) =>
-        (r.ref && r.ref.toLowerCase().includes(q)) ||
-        (r.subject && r.subject.toLowerCase().includes(q)) ||
-        (r.status && r.status.toLowerCase().includes(q)),
-    );
-  };
+  const filterRows = React.useCallback(
+    <T extends Record<string, any>>(rows: T[]): T[] => {
+      if (!globalFilter.trim()) return rows;
+      const q = globalFilter.toLowerCase();
+      return rows.filter(
+        (r) =>
+          (r.ref && r.ref.toLowerCase().includes(q)) ||
+          (r.subject && r.subject.toLowerCase().includes(q)) ||
+          (r.status && r.status.toLowerCase().includes(q)),
+      );
+    },
+    [globalFilter],
+  );
 
-  const filteredOverdue = React.useMemo(() => filterRows(overdue), [overdue, globalFilter]);
-  const filteredDueIn7 = React.useMemo(() => filterRows(dueIn7), [dueIn7, globalFilter]);
-  const filteredNoReply = React.useMemo(() => filterRows(noReply), [noReply, globalFilter]);
-  const filteredIncomplete = React.useMemo(() => filterRows(incompleteReply), [incompleteReply, globalFilter]);
-  const filteredFirstAppeals = React.useMemo(() => filterRows(firstAppealsPending), [firstAppealsPending, globalFilter]);
-  const filteredSecondAppeals = React.useMemo(() => filterRows(secondAppealsPending), [secondAppealsPending, globalFilter]);
-  const filteredComplaintsFiled = React.useMemo(() => filterRows(complaintsFiled), [complaintsFiled, globalFilter]);
-  const filteredClosed = React.useMemo(() => filterRows(closedThisMonth), [closedThisMonth, globalFilter]);
+  const filteredOverdue = React.useMemo(() => filterRows(overdue), [overdue, filterRows]);
+  const filteredDueIn7 = React.useMemo(() => filterRows(dueIn7), [dueIn7, filterRows]);
+  const filteredNoReply = React.useMemo(() => filterRows(noReply), [noReply, filterRows]);
+  const filteredIncomplete = React.useMemo(() => filterRows(incompleteReply), [incompleteReply, filterRows]);
+  const filteredFirstAppeals = React.useMemo(() => filterRows(firstAppealsPending), [firstAppealsPending, filterRows]);
+  const filteredSecondAppeals = React.useMemo(() => filterRows(secondAppealsPending), [secondAppealsPending, filterRows]);
+  const filteredComplaintsFiled = React.useMemo(() => filterRows(complaintsFiled), [complaintsFiled, filterRows]);
+  const filteredClosed = React.useMemo(() => filterRows(closedThisMonth), [closedThisMonth, filterRows]);
 
   // Total results count matching all filters
   const totalFilteredCount = React.useMemo(() => {

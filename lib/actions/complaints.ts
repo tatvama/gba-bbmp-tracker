@@ -816,11 +816,22 @@ export async function deleteComplaintDocument(documentId: string, complaintId: s
   // Best-effort storage cleanup — a failed delete never blocks the row removal.
   try {
     if (doc.storage_bucket === R2_STORAGE_SENTINEL) {
-      await deleteFromR2(doc.storage_path).catch(() => {});
+      await deleteFromR2(doc.storage_path).catch((e) => {
+        console.warn(`[deleteComplaintDocument] R2 cleanup failed for document ${documentId} (${doc.storage_path})`, e);
+      });
     }
     const supabaseFiles = [doc.processed_storage_path, doc.thumbnail_storage_path].filter((p): p is string => !!p);
     if (supabaseFiles.length) {
-      await admin.storage.from(STORAGE_BUCKETS.processed).remove(supabaseFiles).catch(() => {});
+      await admin
+        .storage.from(STORAGE_BUCKETS.processed).remove(supabaseFiles)
+        .then(({ error: storageErr }) => {
+          if (storageErr) {
+            console.warn(`[deleteComplaintDocument] Supabase Storage cleanup failed for document ${documentId}`, storageErr);
+          }
+        })
+        .catch((e) => {
+          console.warn(`[deleteComplaintDocument] Supabase Storage cleanup threw for document ${documentId}`, e);
+        });
     }
   } catch (e) {
     console.warn("[deleteComplaintDocument] storage cleanup failed (row already removed)", e);

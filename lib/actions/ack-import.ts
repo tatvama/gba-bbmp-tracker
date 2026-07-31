@@ -815,14 +815,18 @@ async function deleteOneAckBatch(admin: ReturnType<typeof createAdminClient>, ba
 
   // 4. Delete files from R2 (best-effort — the DB row is already gone)
   if (originalUrl) {
-    await deleteFromR2(originalUrl).catch(() => {});
+    await deleteFromR2(originalUrl).catch((e) => {
+      console.warn(`[ack-import] R2 cleanup failed for batch ${batchId} (original ${originalUrl}):`, e);
+    });
   }
   if (items && items.length > 0) {
     for (const item of items) {
       const paths = (item as { thumb_paths?: string[] | null })?.thumb_paths;
       if (paths && Array.isArray(paths)) {
         for (const path of paths) {
-          await deleteFromR2(path).catch(() => {});
+          await deleteFromR2(path).catch((e) => {
+            console.warn(`[ack-import] R2 cleanup failed for batch ${batchId} (thumb ${path}):`, e);
+          });
         }
       }
     }

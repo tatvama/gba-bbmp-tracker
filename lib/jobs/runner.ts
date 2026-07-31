@@ -173,7 +173,9 @@ export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise
               .update({ progress, result: { stage: stage ?? null, message: message ?? null, ...(extra ?? {}) } })
               .eq("id", jobId),
           )
-          .catch(() => {});
+          .catch((e) => {
+            console.warn(`[jobs] progress write failed for job ${jobId}`, e);
+          });
         publishJobChange(meta.userId ?? "");
       },
       isCancelled: async () => {

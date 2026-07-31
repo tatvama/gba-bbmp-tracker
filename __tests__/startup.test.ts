@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EnvironmentValidationTask } from "@/lib/startup/environment";
+import { DatabaseMigrationTask } from "@/lib/startup/migrations";
 import { StartupManager } from "@/lib/startup/manager";
 import { StartupLogger } from "@/lib/startup/logger";
 
@@ -61,6 +62,47 @@ describe("Startup System", () => {
       await task.run();
       
       expect(warnSpy).toHaveBeenCalledWith("Environment Validation", expect.stringContaining("CRON_SECRET is not set"));
+    });
+  });
+
+  describe("DatabaseMigrationTask — boot-time auto-migration gate", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("skips by default when NODE_ENV=production", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      delete process.env.RUN_MIGRATIONS_ON_BOOT;
+      expect(DatabaseMigrationTask.shouldRunAutoMigrations()).toBe(false);
+    });
+
+    it("runs by default outside production", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      delete process.env.RUN_MIGRATIONS_ON_BOOT;
+      expect(DatabaseMigrationTask.shouldRunAutoMigrations()).toBe(true);
+    });
+
+    it("RUN_MIGRATIONS_ON_BOOT=true overrides even in production", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      process.env.RUN_MIGRATIONS_ON_BOOT = "true";
+      expect(DatabaseMigrationTask.shouldRunAutoMigrations()).toBe(true);
+    });
+
+    it("RUN_MIGRATIONS_ON_BOOT=false overrides even outside production", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      process.env.RUN_MIGRATIONS_ON_BOOT = "false";
+      expect(DatabaseMigrationTask.shouldRunAutoMigrations()).toBe(false);
+    });
+
+    it("run() skips without touching DATABASE_URL when gated off", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      delete process.env.RUN_MIGRATIONS_ON_BOOT;
+      delete process.env.DATABASE_URL; // would throw if the gate check weren't first
+
+      const infoSpy = vi.spyOn(StartupLogger, "info");
+      const task = new DatabaseMigrationTask();
+      await expect(task.run()).resolves.toBeUndefined();
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining("Skipping automatic migrations"));
     });
   });
 

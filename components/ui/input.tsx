@@ -151,7 +151,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         list.push(d);
       }
       return list;
-    }, [year, month, daysInMonth, firstDayIndex]);
+    }, [daysInMonth, firstDayIndex]);
 
     const activeDay = React.useMemo(() => {
       const val = resolvedRef.current?.value || value || defaultValue || "";
@@ -162,7 +162,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         }
       }
       return null;
-    }, [value, defaultValue, resolvedRef, year, month, showCalendar]);
+    }, [value, defaultValue, resolvedRef, year, month]);
 
     const isToday = (d: number) => {
       const today = new Date();

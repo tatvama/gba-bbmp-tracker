@@ -85,20 +85,22 @@ export function LetterEditorModal({
   const [showFindReplace, setShowFindReplace] = React.useState(false);
   const [findText, setFindText] = React.useState("");
   const [replaceText, setReplaceText] = React.useState("");
-  const [savedScrollPos, setSavedScrollPos] = React.useState(0);
   const [history, setHistory] = React.useState<string[]>([value]);
   const [historyIndex, setHistoryIndex] = React.useState(0);
 
   const taRef = React.useRef<HTMLTextAreaElement>(null);
+  // Imperative-only value (never rendered) — a ref instead of state so
+  // capturing it doesn't itself re-trigger this effect.
+  const savedScrollPosRef = React.useRef(0);
 
   // Lock body scroll and restore on close
   React.useEffect(() => {
     if (open) {
-      setSavedScrollPos(window.scrollY);
+      savedScrollPosRef.current = window.scrollY;
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
-      window.scrollTo(0, savedScrollPos);
+      window.scrollTo(0, savedScrollPosRef.current);
     }
     return () => {
       document.body.style.overflow = "";

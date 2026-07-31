@@ -6,6 +6,7 @@ import { requireRole, AuthorizationError } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { USER_ROLES } from "@/lib/constants";
 import { isValidIndianMobile, normalizePhone } from "@/lib/phone";
+import { writeAudit, diffFields } from "@/lib/audit";
 import type { ActionState } from "@/lib/actions/contacts";
 
 const createUserSchema = z.object({
@@ -27,8 +28,9 @@ export async function createUser(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  let actingAdmin;
   try {
-    await requireRole(["ADMIN"]);
+    actingAdmin = await requireRole(["ADMIN"]);
   } catch (e) {
     return { error: e instanceof AuthorizationError ? e.message : "Admins only" };
   }
@@ -80,6 +82,15 @@ export async function createUser(
       { id: data.user.id, email: parsed.data.email, name: parsed.data.name ?? "", role: parsed.data.role, phone: e164Phone },
       { onConflict: "id" },
     );
+    await writeAudit(admin, {
+      entityType: "user",
+      entityId: data.user.id,
+      changedBy: actingAdmin.id,
+      changes: [
+        { field: "created", oldValue: null, newValue: parsed.data.email },
+        { field: "role", oldValue: null, newValue: parsed.data.role },
+      ],
+    });
   }
   return { success: true };
 }
@@ -125,8 +136,9 @@ export async function updateUserPhone(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  let actingAdmin;
   try {
-    await requireRole(["ADMIN"]);
+    actingAdmin = await requireRole(["ADMIN"]);
   } catch (e) {
     return { error: e instanceof AuthorizationError ? e.message : "Admins only" };
   }
@@ -143,6 +155,8 @@ export async function updateUserPhone(
     return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY." };
   }
 
+  const { data: before } = await admin.from("profiles").select("phone").eq("id", userId).maybeSingle();
+
   const e164Phone = `+91${normalizePhone(parsed.data.phone)}`;
   const { error } = await admin.auth.admin.updateUserById(userId, { phone: e164Phone, phone_confirm: true });
   if (error) {
@@ -153,6 +167,12 @@ export async function updateUserPhone(
   }
 
   await admin.from("profiles").update({ phone: e164Phone }).eq("id", userId);
+  await writeAudit(admin, {
+    entityType: "user",
+    entityId: userId,
+    changedBy: actingAdmin.id,
+    changes: diffFields(before ?? null, { phone: e164Phone }),
+  });
   revalidatePath("/settings");
   return { success: true };
 }
@@ -166,8 +186,9 @@ export async function updateUserRole(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  let actingAdmin;
   try {
-    await requireRole(["ADMIN"]);
+    actingAdmin = await requireRole(["ADMIN"]);
   } catch (e) {
     return { error: e instanceof AuthorizationError ? e.message : "Admins only" };
   }
@@ -185,12 +206,22 @@ export async function updateUserRole(
   }
 
   const { data: current } = await admin.auth.admin.getUserById(userId);
+  const { data: before } = await admin.from("profiles").select("role").eq("id", userId).maybeSingle();
   const { error } = await admin.auth.admin.updateUserById(userId, {
     user_metadata: { ...current?.user?.user_metadata, role: parsed.data.role },
   });
   if (error) return { error: error.message };
 
   await admin.from("profiles").update({ role: parsed.data.role }).eq("id", userId);
+  // Role changes are the most security-sensitive user-management action
+  // (e.g. granting ADMIN) — always worth an audit row even for a same-role no-op,
+  // unlike other entities' diff-only auditing.
+  await writeAudit(admin, {
+    entityType: "user",
+    entityId: userId,
+    changedBy: actingAdmin.id,
+    changes: [{ field: "role", oldValue: before?.role ?? null, newValue: parsed.data.role }],
+  });
   revalidatePath("/settings");
   return { success: true };
 }

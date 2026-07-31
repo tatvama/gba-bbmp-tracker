@@ -586,7 +586,7 @@ export function ComplaintTable({
           IconCls,
         };
       });
-  }, [data]);
+  }, [data, t]);
 
   const columns = React.useMemo<ColumnDef<ComplaintWithRelations>[]>(() => [
     {

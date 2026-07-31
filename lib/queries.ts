@@ -1083,6 +1083,7 @@ export async function listRepliesDueSoon(withinDays = 5, limit = 8): Promise<Rep
   const { data, error } = await supabase
     .from("complaints")
     .select("id, internal_case_number, title, escalation_stage, escalation_stage_deadline")
+    .is("deleted_at", null)
     .in("escalation_stage", ACTIVE_ESCALATION_LADDER_STAGES)
     .gte("escalation_stage_deadline", now.toISOString())
     .lte("escalation_stage_deadline", until.toISOString())
