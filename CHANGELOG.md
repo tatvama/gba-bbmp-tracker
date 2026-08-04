@@ -22,6 +22,10 @@ Entries are grouped by date and derived from
 
 - **changelog:** generate CHANGELOG.md from git history on every commit
 
+### Documentation
+
+- **memory:** record the Android TWA, Web Push and the canvas gotcha
+
 ## 2026-07-31
 
 ### Features

@@ -18,6 +18,8 @@ slice of the project's architecture, decisions, and hard-won gotchas:
 | `bbmp-phase3-complaints.md` | Complaint mgmt — migration 0004, OCR, AI extraction, Storage, soft-delete |
 | `bbmp-design-system.md` | CSS/component rework — button/card/badge/table/input/tabs/sidebar |
 | `bbmp-mcp-and-road-work.md` | MCP server (16 tools) + road-work letter generator + 4 accountability features |
+| `bbmp-android-twa-push.md` | Android app (TWA) — why deploying the web app ships the app, the signing key, assetlinks, Web Push |
+| `napi-canvas-blocked-locally.md` | Local-only gotcha: Application Control blocks the canvas binding and fakes code bugs |
 
 > These are working notes, not formal docs. The authoritative reference for
 > setup and usage is the top-level [`README.md`](../../README.md).
