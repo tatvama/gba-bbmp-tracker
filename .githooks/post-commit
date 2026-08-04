@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Regenerate CHANGELOG.md and fold it into the commit that was just made, so every
+# commit carries its own changelog entry.
+#
+# WHY post-commit AND NOT prepare-commit-msg
+# -----------------------------------------
+# The obvious design is prepare-commit-msg: the message exists there, and the tree
+# has supposedly not been written yet, so `git add CHANGELOG.md` should land in the
+# commit. It does not. Git snapshots the index before running that hook, so the
+# add applies to the index but NOT to the commit being created — measured on
+# git 2.x here: the changelog ended up staged for the *next* commit while the
+# commit that introduced it did not contain it. pre-commit stages reliably (that is
+# how lint-staged works) but runs before the message exists, so it cannot describe
+# the change.
+#
+# post-commit runs after HEAD exists, which means the generator reads the real
+# commit out of `git log` — no guessing at a pending message — and the changelog is
+# folded in with `--amend`. The commit has not been pushed at this point, so
+# amending it is local and safe.
+#
+# This hook must never break anything. Every failure path exits 0.
+
+# Recursion guard: our own --amend below re-triggers post-commit. --no-verify does
+# NOT skip post-commit, so this env var is what stops the loop.
+[ "$CHANGELOG_SKIP" = "1" ] && exit 0
+
+command -v npx >/dev/null 2>&1 || exit 0
+
+GIT_DIR_PATH=$(git rev-parse --git-dir 2>/dev/null) || exit 0
+
+# Mid-rebase / mid-merge / cherry-pick: amending rewrites the wrong thing, and a
+# replayed commit would churn the file for no benefit.
+if [ -d "$GIT_DIR_PATH/rebase-merge" ] || [ -d "$GIT_DIR_PATH/rebase-apply" ] ||
+   [ -f "$GIT_DIR_PATH/MERGE_HEAD" ] || [ -f "$GIT_DIR_PATH/CHERRY_PICK_HEAD" ]; then
+  exit 0
+fi
+
+# A merge commit has no subject worth logging, and amending one is a bad idea.
+if git rev-parse --verify --quiet HEAD^2 >/dev/null 2>&1; then
+  exit 0
+fi
+
+# SAFETY: refuse to amend if anything else is staged. After a normal `git commit`
+# the index matches HEAD, so this is clean. But `git commit -- <path>` commits only
+# that path and leaves other staged changes behind — amending there would silently
+# absorb work the author deliberately held back.
+if ! git diff --cached --quiet HEAD 2>/dev/null; then
+  echo "changelog: other changes are staged — not amending. Run 'npm run changelog' and commit it." >&2
+  exit 0
+fi
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$REPO_ROOT" || exit 0
+
+if ! npx --no-install tsx scripts/update-changelog.ts >/dev/null 2>&1; then
+  echo "changelog: generator failed — commit left as is" >&2
+  exit 0
+fi
+
+# Nothing to fold in: either already current, or this very commit was the amend.
+if git diff --quiet HEAD -- CHANGELOG.md 2>/dev/null && [ -z "$(git status --porcelain -- CHANGELOG.md)" ]; then
+  exit 0
+fi
+
+git add CHANGELOG.md 2>/dev/null || exit 0
+
+# --no-edit keeps the message; --no-verify skips pre-commit/commit-msg (they already
+# ran for this content). CHANGELOG_SKIP stops this hook re-entering.
+CHANGELOG_SKIP=1 git commit --amend --no-edit --no-verify >/dev/null 2>&1 ||
+  echo "changelog: amend failed — CHANGELOG.md is staged, commit it yourself" >&2
+
+exit 0

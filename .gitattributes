@@ -1,0 +1,17 @@
+# Git hooks must keep LF endings.
+#
+# This machine has core.autocrlf=true, which rewrites checked-out files to CRLF.
+# For a /bin/sh script that is fatal rather than cosmetic: the shebang becomes
+# "#!/bin/sh\r" and the shell reports
+#     bad interpreter: /bin/sh^M: no such file or directory
+# so the hook silently stops running and the changelog quietly stops updating.
+.githooks/** text eol=lf
+
+# Same reasoning for the Gradle wrapper script, which is also run by sh.
+android-twa/gradlew text eol=lf
+
+# The wrapper jar and the signed Android artifacts are binary — never touch them.
+*.jar binary
+*.apk binary
+*.aab binary
+*.keystore binary
