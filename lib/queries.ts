@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CORP_NAME, CORPORATION_CODES, COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
@@ -36,9 +37,16 @@ import type {
 } from "@/lib/types";
 
 /**
- * All read queries hit RLS-public tables (anon key is fine). Each is wrapped so
- * a missing table / pre-migration DB yields an empty result + a server log,
- * never a crashed page.
+ * Most read queries here hit RLS-public tables (anon key is fine). Each is
+ * wrapped so a missing table / pre-migration DB yields an empty result + a
+ * server log, never a crashed page.
+ *
+ * Known exceptions, verified against this database: `reminders`, `job_audits`
+ * and `profiles` return ZERO rows to the anon role, and RLS denial arrives as an
+ * empty result rather than an error — so a query touching them from a
+ * session-less context looks successful and reports nothing. Any caller without
+ * a signed-in user must pass the admin client explicitly; see
+ * getNotificationDigest() below, which is where this actually bit.
  */
 async function sb() {
   return createClient();
@@ -1541,9 +1549,25 @@ export interface NotificationDigest {
   counts: { overdueRtis: number; overdueComplaints: number; dueReminders: number; highRiskAudits: number };
 }
 
-/** Everything currently due/overdue — for the scheduled notification job. */
-export async function getNotificationDigest(): Promise<NotificationDigest> {
-  const supabase = await sb();
+/**
+ * Everything currently due/overdue — for the notifications bell and the
+ * scheduled notification job.
+ *
+ * `client` exists because the two callers have different auth. In-app (the bell)
+ * there is a signed-in user, so the default cookie client is right. From
+ * app/api/cron/notifications/route.ts there is NO session, and the file-header
+ * note above ("all read queries hit RLS-public tables") does not hold for two of
+ * the four sections: `reminders` and `job_audits` are not anon-readable, so a
+ * session-less call silently returned dueReminders: 0 and highRiskAudits: 0
+ * — measured against this database, 0 instead of the true 5 and 2, with the two
+ * suppressed audits both in the `bill_stop` band. Not an error, just absent
+ * rows, so nothing surfaced it. Cron therefore passes the service-role admin
+ * client (which bypasses RLS) rather than this being re-derived somewhere else.
+ */
+export async function getNotificationDigest(
+  client?: SupabaseClient,
+): Promise<NotificationDigest> {
+  const supabase = client ?? (await sb());
   const rules = await getDeadlineRules();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);

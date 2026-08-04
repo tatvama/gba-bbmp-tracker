@@ -42,6 +42,33 @@ export class EnvironmentValidationTask implements StartupTask {
       StartupLogger.warn(this.name, "CRON_SECRET is not set. Scheduled routes will be inaccessible.");
     }
 
+    // Web Push for the Android app / installed PWA. Warn-only for the same
+    // reason as mail below: push is optional, and adding it to the schema above
+    // would break every existing deployment on boot.
+    //
+    // The half-configured branch is the one that matters. The opt-in toggle
+    // (components/nav/push-toggle.tsx) renders on the presence of the PUBLIC key
+    // alone — that is all a browser needs to subscribe — while sending needs the
+    // private key too. So with only the public key set, staff can switch alerts
+    // on, the subscription is stored, and nothing is ever delivered, with no
+    // error anywhere. Naming the missing variable at boot is the cheapest place
+    // to catch that.
+    const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+    if (!vapidPublic && !vapidPrivate) {
+      StartupLogger.warn(
+        this.name,
+        "VAPID keys are not set. Phone push notifications are off (letter email + notify webhook are unaffected).",
+      );
+    } else if (!vapidPublic || !vapidPrivate) {
+      StartupLogger.warn(
+        this.name,
+        `Web Push is HALF-CONFIGURED — ${
+          vapidPublic ? "VAPID_PRIVATE_KEY" : "NEXT_PUBLIC_VAPID_PUBLIC_KEY"
+        } is missing. Staff can enable alerts that will never be delivered. Set both, or neither.`,
+      );
+    }
+
     // Outbound letter email. Deliberately warn-only: mail is optional, and
     // adding it to the schema above would break every existing deployment on
     // boot. The last branch is the important one — it is the only place the app

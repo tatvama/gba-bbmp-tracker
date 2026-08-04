@@ -15,6 +15,7 @@ Entries are grouped by date and derived from
 
 ### Features
 
+- **notifications:** Web Push to staff devices, and fix the cron digest running as anon
 - **mobile:** installable PWA and Android TWA shell, distributed as a signed APK
 
 ### Scripts & tooling
