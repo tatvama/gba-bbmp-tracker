@@ -37,3 +37,19 @@ Thumbs.db
 
 # archives shipped with the repo
 files.zip
+
+# Android TWA shell (android-twa/) — the project source IS committed so the APK
+# is reproducible; only build output and machine-specific paths are ignored.
+android-twa/build/
+android-twa/app/build/
+android-twa/.gradle/
+android-twa/local.properties
+# Signed artifacts: multi-MB binaries, published to R2 by `npm run apk:publish`
+# rather than carried in git history.
+android-twa/dist/
+
+# Signing keys must never be committed. The real keystore lives OUTSIDE this
+# repo (D:\gba-bbmp-tracker\secrets\); this is a backstop against a stray copy.
+*.keystore
+*.jks
+keystore-password.txt

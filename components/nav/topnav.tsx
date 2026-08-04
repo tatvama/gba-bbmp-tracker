@@ -109,7 +109,7 @@ export function TopNav({ email, role }: UserMenuProps) {
 
       <div className="flex items-center gap-1.5">
         <TaskCenter />
-        <NotificationsBell />
+        <NotificationsBell signedIn={!!email} />
         <LanguageSwitcher />
         <ModeToggle />
         <UserMenu email={email} role={role} />

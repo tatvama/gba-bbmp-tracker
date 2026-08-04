@@ -24,7 +24,12 @@
     "db:seed-sr": "tsx scripts/seed-sr-rates.ts",
     "import:zip": "tsx --tsconfig scripts/tsconfig.pipeline.json scripts/import-forensic-zip.ts",
     "job:delete": "tsx --tsconfig scripts/tsconfig.pipeline.json scripts/delete-job-case.ts",
-    "mcp:start": "tsx mcp/bbmp-server.ts"
+    "mcp:start": "tsx mcp/bbmp-server.ts",
+    "icons:gen": "tsx scripts/gen-app-icons.ts",
+    "apk:publish": "tsx --tsconfig scripts/tsconfig.pipeline.json scripts/publish-apk.ts",
+    "changelog": "tsx scripts/update-changelog.ts",
+    "hooks:install": "tsx scripts/install-hooks.ts",
+    "prepare": "tsx scripts/install-hooks.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -72,6 +77,7 @@
     "tailwind-merge": "2.6.0",
     "tailwindcss-animate": "1.0.7",
     "tesseract.js": "^7.0.0",
+    "web-push": "^3.6.7",
     "xlsx": "0.18.5",
     "zod": "^3.25.0"
   },
@@ -83,6 +89,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "19.0.7",
     "@types/react-dom": "19.0.3",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "4.3.4",
     "autoprefixer": "10.4.20",
     "cross-env": "^10.1.0",

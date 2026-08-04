@@ -27,8 +27,10 @@ A full-stack civic accountability platform for Bengaluru — tracking ward restr
 15. [OCR Pipeline](#ocr-pipeline)
 16. [API Reference](#api-reference)
 17. [Deployment](#deployment)
-18. [Development Guide](#development-guide)
-19. [Project Memory](#project-memory)
+18. [Android App (TWA)](#android-app-twa)
+19. [Changelog](#changelog)
+20. [Development Guide](#development-guide)
+21. [Project Memory](#project-memory)
 
 ---
 
@@ -696,6 +698,75 @@ npm start          # :3000
 - [ ] Supabase Storage bucket policies verified as private
 - [ ] `NEXT_PUBLIC_SITE_URL` set to production domain
 - [ ] RLS policies reviewed in Supabase → Auth → Policies
+- [ ] `/.well-known/assetlinks.json` reachable (required by the Android app — see below)
+
+---
+
+## Android App (TWA)
+
+`android-twa/` is a ~1 MB Android wrapper that opens this site full-screen inside
+Chrome, with its own launcher icon and no browser UI. It is a **Trusted Web
+Activity**, not a copy of the app.
+
+**Deploying the web app IS shipping the Android update.** The APK holds no app
+code, so any change deployed here appears on every phone at the next screen load
+— no rebuild, no reinstall, no Play Store review. Rebuild the APK only to change
+the app name, icon, splash colours or target SDK.
+
+Because the shell is real Chrome, the browser-dependent features keep working
+untouched: `getUserMedia` document scanning, client-generated PDF/DOCX/XLSX
+downloads (`blob:` + `a.download`, which silently fail in a plain WebView), file
+pickers and Web Push.
+
+| Piece | Where |
+|---|---|
+| Web manifest | `app/manifest.ts` → `/manifest.webmanifest` |
+| Launcher icons | `npm run icons:gen` → `public/icons/` |
+| Service worker | `public/sw.js` (offline fallback + push handlers) |
+| Digital Asset Links | `public/.well-known/assetlinks.json` |
+| Android project | `android-twa/` — see its README for build steps |
+| Publish a build | `npm run apk:publish` (uploads to R2) |
+| Install page | `/app` — public, resolves the current release at request time |
+
+`public/.well-known/assetlinks.json` pins the APK's signing certificate. Chrome
+fetches it on launch to confirm the app and this domain share a publisher; on a
+match it drops the address bar. **If it is not deployed, the app still works but
+shows a URL bar.**
+
+Web Push is optional and inert without `NEXT_PUBLIC_VAPID_PUBLIC_KEY` /
+`VAPID_PRIVATE_KEY`. When set, `/api/cron/notifications` also pushes the digest to
+staff who enabled alerts from the notifications bell.
+
+> The signing keystore lives **outside this repo** (`../secrets/`). Losing it means
+> installed apps can never be updated. Back it up.
+
+Full detail — launch flow, service-worker rules, push internals, release pipeline,
+troubleshooting: **[`MOBILE_APP_ARCHITECTURE.md`](MOBILE_APP_ARCHITECTURE.md)**.
+
+---
+
+## Changelog
+
+[`CHANGELOG.md`](CHANGELOG.md) maintains itself — **do not edit it by hand.**
+
+`.githooks/post-commit` regenerates it from git history after every commit and folds
+the result into that same commit, so each commit carries its own changelog entry.
+This works identically whether a human or an AI agent is committing; neither has to
+remember. Hooks install automatically via `npm install`.
+
+```bash
+npm run changelog              # regenerate manually
+npm run changelog -- --check   # exit 1 if stale (CI guard)
+CHANGELOG_SKIP=1 git commit …  # skip once
+```
+
+Entries are grouped by date and derived from
+[Conventional Commits](https://www.conventionalcommits.org/) subjects, so
+`fix(rti): correct the appeal deadline` becomes a **Fixes** entry with an `rti`
+scope. Write a good subject and the changelog takes care of itself.
+
+Setup, section mapping, deliberate no-ops and known limitations:
+**[`CHANGELOG_AUTOMATION.md`](CHANGELOG_AUTOMATION.md)**.
 
 ---
 
@@ -780,6 +851,8 @@ Index: [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md)
 | [`bbmp-phase3-complaints.md`](.claude/memory/bbmp-phase3-complaints.md) | Complaint mgmt — migration 0004, OCR, AI extraction, Storage, soft-delete |
 | [`bbmp-design-system.md`](.claude/memory/bbmp-design-system.md) | CSS/component rework |
 | [`bbmp-mcp-and-road-work.md`](.claude/memory/bbmp-mcp-and-road-work.md) | MCP server (16 tools) + road-work generator + 4 accountability features |
+| [`bbmp-android-twa-push.md`](.claude/memory/bbmp-android-twa-push.md) | Android app (TWA), live-update model, signing key, assetlinks, Web Push |
+| [`napi-canvas-blocked-locally.md`](.claude/memory/napi-canvas-blocked-locally.md) | Local-only gotcha: Application Control blocks the canvas native binding |
 
 ---
 

@@ -7,3 +7,8 @@ node_modules
 !.env.example
 *.log
 .npm
+# The Android shell plays no part in the web image — keep the Gradle project,
+# its build output and any signed APK/AAB out of the build context entirely.
+android-twa
+*.keystore
+*.jks

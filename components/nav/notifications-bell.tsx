@@ -6,13 +6,20 @@ import { Bell } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu";
 import { listMyNotifications, markNotificationRead, markAllNotificationsRead, type AppNotification } from "@/lib/actions/jobs";
 import { formatDateTime } from "@/lib/format";
+import { PushToggle } from "./push-toggle";
 
 /**
  * In-app alerts bell (top bar, every page). Polls the current user's
  * notifications; every finished/automated job drops a message here. Clicking one
  * marks it read and opens the linked page.
+ *
+ * `signedIn` gates only the Web Push toggle in the footer: a subscription is
+ * stored against a user id, so offering it to a signed-out visitor would prompt
+ * for notification permission and then fail. The permission prompt is one-shot
+ * per origin, so spending it on a request that cannot succeed would leave the
+ * user unable to enable alerts later.
  */
-export function NotificationsBell() {
+export function NotificationsBell({ signedIn = false }: { signedIn?: boolean }) {
   const router = useRouter();
   const [items, setItems] = React.useState<AppNotification[]>([]);
   const [unread, setUnread] = React.useState(0);
@@ -83,6 +90,7 @@ export function NotificationsBell() {
             ))}
           </ul>
         )}
+        {signedIn && <PushToggle />}
       </DropdownMenuContent>
     </DropdownMenu>
   );

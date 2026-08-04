@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.taatvam.rti",
+      "sha256_cert_fingerprints": [
+        "94:90:41:7E:D7:A6:C2:F8:96:50:2C:6E:3E:25:16:94:13:50:4E:3A:CE:99:05:60:D8:94:DE:59:7E:B2:2D:1C"
+      ]
+    }
+  }
+]
