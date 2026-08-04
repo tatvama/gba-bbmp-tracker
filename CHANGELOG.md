@@ -13,6 +13,10 @@ Entries are grouped by date and derived from
 
 ## 2026-08-04
 
+### Features
+
+- **mobile:** installable PWA and Android TWA shell, distributed as a signed APK
+
 ### Scripts & tooling
 
 - **changelog:** generate CHANGELOG.md from git history on every commit

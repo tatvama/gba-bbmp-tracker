@@ -1,0 +1,43 @@
+{
+  "packageId": "com.taatvam.rti",
+  "host": "rti.taatvam.com",
+  "name": "GBA · BBMP Ward & Engineer Tracker",
+  "launcherName": "GBA Tracker",
+  "display": "standalone",
+  "themeColor": "#1e40af",
+  "themeColorDark": "#1e40af",
+  "navigationColor": "#1e40af",
+  "navigationColorDark": "#1e40af",
+  "navigationDividerColor": "#1e40af",
+  "navigationDividerColorDark": "#1e40af",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://rti.taatvam.com/icons/icon-512.png",
+  "maskableIconUrl": "https://rti.taatvam.com/icons/maskable-512.png",
+  "appVersionName": "1.0.0",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://rti.taatvam.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://rti.taatvam.com/",
+  "minSdkVersion": 23,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "D:/gba-bbmp-tracker/secrets/gba-twa.keystore",
+    "alias": "gba-twa"
+  }
+}
