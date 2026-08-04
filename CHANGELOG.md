@@ -18,6 +18,10 @@ Entries are grouped by date and derived from
 - **notifications:** Web Push to staff devices, and fix the cron digest running as anon
 - **mobile:** installable PWA and Android TWA shell, distributed as a signed APK
 
+### Fixes
+
+- **changelog:** stop --check failing on every fresh checkout
+
 ### Scripts & tooling
 
 - **changelog:** generate CHANGELOG.md from git history on every commit

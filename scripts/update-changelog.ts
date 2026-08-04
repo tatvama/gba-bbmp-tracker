@@ -171,13 +171,24 @@ function formatEntry(e: Entry): string {
   return `- ${scope}${e.subject}`;
 }
 
+/**
+ * Compare on content, not bytes. We always WRITE lf, but a checkout under
+ * `core.autocrlf=true` (this repo's setting) leaves crlf on disk, so a byte
+ * comparison reports every line as changed and `--check` fails on a clean clone.
+ * .gitattributes pins CHANGELOG.md to lf as the real fix; this keeps the script
+ * honest for anyone whose git is configured differently.
+ */
+function sameContent(a: string, b: string): boolean {
+  return a.replace(/\r\n/g, "\n") === b.replace(/\r\n/g, "\n");
+}
+
 function main() {
   const entries = gitLog();
   const next = render(entries);
   const current = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
 
   if (CHECK_ONLY) {
-    if (current === next) {
+    if (sameContent(current, next)) {
       console.log("✓ CHANGELOG.md is up to date");
       return;
     }
@@ -185,7 +196,7 @@ function main() {
     process.exit(1);
   }
 
-  if (current === next) {
+  if (sameContent(current, next)) {
     console.log(`✓ CHANGELOG.md already current (${entries.length} commits)`);
     return;
   }

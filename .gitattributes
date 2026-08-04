@@ -10,6 +10,14 @@
 # Same reasoning for the Gradle wrapper script, which is also run by sh.
 android-twa/gradlew text eol=lf
 
+# CHANGELOG.md is generated, and the generator writes LF. Without this, autocrlf
+# rewrites the working copy to CRLF on every checkout while the committed blob stays
+# LF, so `npm run changelog -- --check` compares LF-generated text against a CRLF
+# file and reports the whole file as stale — a CI guard that always fails. Git sees
+# no change either way (it normalizes on commit), so this only affects the on-disk
+# copy the generator actually compares against.
+CHANGELOG.md text eol=lf
+
 # The wrapper jar and the signed Android artifacts are binary — never touch them.
 *.jar binary
 *.apk binary
