@@ -17,6 +17,10 @@ Entries are grouped by date and derived from
 
 - **db:** replace Supabase with our own PostgreSQL server
 
+### Refactoring
+
+- **db:** one source of truth for the database connection
+
 ## 2026-08-04
 
 ### Features

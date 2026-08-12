@@ -3,6 +3,7 @@ const path = typeof window === "undefined" ? eval('require("path")') : null;
 const pg = typeof window === "undefined" ? eval('require("pg")') : null;
 import type { StartupTask } from "./types";
 import { StartupLogger } from "./logger";
+import { requireStartupDbSettings } from "./db-config";
 import { buildAcNumberToCorp, deriveCorporation } from "@/lib/derive";
 import { DESIGNATIONS } from "@/lib/constants";
 import { computeRtiDeadlines } from "@/lib/rti-deadlines";
@@ -135,20 +136,11 @@ export class DatabaseSeedingTask implements StartupTask {
       return;
     }
 
-    const url = process.env.DATABASE_URL;
-    if (!url) {
-      throw new Error("DATABASE_URL is not set.");
-    }
-
     if (!pg) {
       throw new Error("pg module is not available.");
     }
-    // TLS is opt-in via DB_SSL: requesting it from a server that does not offer
-    // it fails the connection outright, and the current one does not.
-    const client = new pg.Client({
-      connectionString: url,
-      ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-    });
+    // Accepts DB_* or DATABASE_URL — see lib/startup/db-config.ts.
+    const client = new pg.Client(requireStartupDbSettings());
 
     await client.connect();
 

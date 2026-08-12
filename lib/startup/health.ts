@@ -3,6 +3,7 @@ const pg = typeof window === "undefined" ? eval('require("pg")') : null;
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import type { StartupTask } from "./types";
 import { StartupLogger } from "./logger";
+import { resolveStartupDbSettings } from "./db-config";
 
 export class ExternalServicesHealthCheckTask implements StartupTask {
   name = "External Services Health Checks";
@@ -10,17 +11,13 @@ export class ExternalServicesHealthCheckTask implements StartupTask {
 
   async run(): Promise<void> {
     // 1. Check Database Latency
-    const dbUrl = process.env.DATABASE_URL;
-    if (dbUrl) {
+    // Accepts DB_* or DATABASE_URL — see lib/startup/db-config.ts.
+    const dbSettings = resolveStartupDbSettings();
+    if (dbSettings) {
       if (!pg) {
         throw new Error("pg module is not available.");
       }
-      // TLS is opt-in via DB_SSL: requesting it from a server that does not
-      // offer it fails the connection outright, and the current one does not.
-      const client = new pg.Client({
-        connectionString: dbUrl,
-        ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-      });
+      const client = new pg.Client(dbSettings);
       try {
         const t0 = Date.now();
         await client.connect();

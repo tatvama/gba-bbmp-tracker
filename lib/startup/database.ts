@@ -14,6 +14,7 @@ import "server-only";
  */
 const pg = typeof window === "undefined" ? eval('require("pg")') : null;
 import type { StartupTask } from "./types";
+import { requireStartupDbSettings } from "./db-config";
 
 /**
  * Startup checks for the application's own Postgres server.
@@ -24,40 +25,13 @@ import type { StartupTask } from "./types";
  * the database — so the first validates configuration and the second queries.
  */
 
-/** Connection settings, duplicated here only because lib/db/pool cannot be imported (see above). */
-function connectionSettings(): { connectionString: string; ssl: false | { rejectUnauthorized: boolean } } {
-  const { DATABASE_URL, DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-
-  let connectionString = DATABASE_URL ?? "";
-  if (!connectionString) {
-    const missing = Object.entries({ DB_HOST, DB_USER, DB_PASSWORD, DB_NAME })
-      .filter(([, v]) => !v)
-      .map(([k]) => k);
-    if (missing.length) {
-      throw new Error(
-        `Database is not configured — missing ${missing.join(", ")}. ` +
-          "Set DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME, or a single DATABASE_URL.",
-      );
-    }
-    const auth = `${encodeURIComponent(DB_USER!)}:${encodeURIComponent(DB_PASSWORD!)}`;
-    connectionString = `postgresql://${auth}@${DB_HOST}:${DB_PORT ?? 5432}/${DB_NAME}`;
-  }
-
-  return {
-    connectionString,
-    // TLS is opt-in: requesting it from a server that does not offer it fails
-    // every connection, and the current server does not offer it.
-    ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-  };
-}
-
 export class DatabaseConfigurationTask implements StartupTask {
   name = "Database Configuration";
   critical = true;
 
   async run(): Promise<void> {
     // Throws with a message naming whichever variable is missing.
-    connectionSettings();
+    requireStartupDbSettings();
   }
 }
 
@@ -68,7 +42,7 @@ export class DatabaseConnectivityTask implements StartupTask {
   async run(): Promise<void> {
     if (!pg) throw new Error("pg module is not available.");
 
-    const client = new pg.Client(connectionSettings());
+    const client = new pg.Client(requireStartupDbSettings());
     try {
       await client.connect();
       const res = await client.query("select 1 as ping;");
