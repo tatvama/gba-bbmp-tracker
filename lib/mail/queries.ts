@@ -1,5 +1,5 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { isValidEmail } from "./message";
 import { resolveComplaintEmailRecipients } from "./recipients";
 import { mergeRecipientOptions, type ContactEmailRow, type RecipientOption } from "./recipient-options";

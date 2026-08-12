@@ -1,7 +1,7 @@
 import "server-only";
 import { StartupLogger } from "./logger";
 import { EnvironmentValidationTask } from "./environment";
-import { SupabaseClientTask, DatabaseConnectivityTask } from "./supabase";
+import { DatabaseConfigurationTask, DatabaseConnectivityTask } from "./database";
 import { DatabaseMigrationTask } from "./migrations";
 import { DatabaseSeedingTask } from "./seed";
 import { StorageInitializationTask } from "./storage";
@@ -16,7 +16,7 @@ const STARTUP_IN_PROGRESS_KEY = "__gbaStartupInProgress__";
 export class StartupManager {
   private static tasks: StartupTask[] = [
     new EnvironmentValidationTask(),
-    new SupabaseClientTask(),
+    new DatabaseConfigurationTask(),
     new DatabaseConnectivityTask(),
     new DatabaseMigrationTask(),
     new DatabaseSeedingTask(),

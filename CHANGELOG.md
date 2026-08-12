@@ -11,6 +11,12 @@ commit; change the commit message instead. See
 Entries are grouped by date and derived from
 [Conventional Commits](https://www.conventionalcommits.org/) subjects.
 
+## 2026-08-12
+
+### Features
+
+- **db:** replace Supabase with our own PostgreSQL server
+
 ## 2026-08-04
 
 ### Features

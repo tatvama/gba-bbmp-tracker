@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 
 /**
  * Self-contained query helpers for this feature (kept separate from
@@ -24,8 +24,8 @@ function logErr(where: string, error: unknown) {
  * side only.
  */
 export async function listRecentSearches(limit = 20): Promise<SearchHistoryRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const db = await createClient();
+  const { data, error } = await db
     .from("search_history")
     .select("*")
     .order("searched_at", { ascending: false })

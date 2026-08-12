@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES } from "@/lib/constants";
 import { resolveMailConfig, type MailMode } from "@/lib/mail/config";
 import { verifyMailTransport } from "@/lib/mail/transport";

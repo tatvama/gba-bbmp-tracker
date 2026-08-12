@@ -1,7 +1,7 @@
 "use server";
 
 import { requireRole, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_VERIFY_ROLES, type LetterVariant, type SignatoryKey } from "@/lib/constants";
 import { generateText, isAiConfigured } from "@/lib/ai/provider";
 import { buildLetterPrompt } from "@/lib/ai/letter-builder";

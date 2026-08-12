@@ -1,6 +1,6 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { safeName } from "@/lib/storage/supabase-upload";
+import type { DbClient } from "@/lib/db";
+import { safeName } from "@/lib/storage/object-store";
 
 /** Lowercase, hyphenated slug of a document type (e.g. "Department reply" -> "department-reply"). */
 export function slugifyDocType(s: string): string {
@@ -35,7 +35,7 @@ export function extFromUpload(mime: string, originalName: string): string {
  * reply) don't silently look identical in the document list.
  */
 export async function buildComplaintDocumentFileName(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
   docType: string,
   ext: string,

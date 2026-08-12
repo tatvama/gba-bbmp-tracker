@@ -1,14 +1,14 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DbClient } from "@/lib/db";
+import { createAdminClient } from "@/lib/db";
 import type { SrRate } from "@/lib/forensics/rate-check";
 
 /**
  * Load the full Schedule-of-Rates book, paginated to defeat the PostgREST
  * 1000-row default cap (a plain .limit(5000) silently returns ≤1000).
  */
-export async function loadSrRates(client: SupabaseClient): Promise<SrRate[]> {
+export async function loadSrRates(client: DbClient): Promise<SrRate[]> {
   const out: SrRate[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await client

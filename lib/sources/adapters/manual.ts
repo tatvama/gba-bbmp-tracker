@@ -16,7 +16,7 @@ import "server-only";
  * runs automatically; recordManualCitation() below is the actual write path,
  * called directly by the admin manual-entry form.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { ingestFacts } from "@/lib/sources/ingest";
 import { registerSourceAdapter } from "@/lib/sources/registry";
 import type { SourceFact, SourceId, WorkSourceAdapter } from "@/lib/sources/types";
@@ -55,7 +55,7 @@ for (const id of MANUAL_SOURCE_IDS) {
  *  validation (Phase 4), not here — this is a thin, direct wrapper over
  *  ingestFacts. */
 export async function recordManualCitation(
-  supabase: SupabaseClient,
+  db: DbClient,
   params: {
     jobNumber: string;
     sourceId: SourceId;
@@ -67,7 +67,7 @@ export async function recordManualCitation(
     userId: string;
   },
 ): Promise<string> {
-  return ingestFacts(supabase, {
+  return ingestFacts(db, {
     jobNumber: params.jobNumber,
     facts: params.facts,
     citation: {

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import * as dotenv from "dotenv";
 import path from "path";
 import {
@@ -17,7 +17,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const db = createDbClient();
 
 // R2 Config
 const accountId = process.env.R2_ACCOUNT_ID!;
@@ -29,7 +29,7 @@ const hasR2Config = accountId && accessKeyId && secretAccessKey && bucket;
 
 async function deleteTableData(tableName: string) {
   console.log(`Deleting all records from table: ${tableName}...`);
-  const { error } = await supabase
+  const { error } = await db
     .from(tableName)
     .delete()
     .neq("id", "00000000-0000-0000-0000-000000000000");
@@ -101,7 +101,7 @@ async function run() {
   // 1. Fetch job numbers from complaints before deleting database rows
   let jobNumbers: string[] = [];
   try {
-    const { data: complaints, error } = await supabase
+    const { data: complaints, error } = await db
       .from("complaints")
       .select("job_number")
       .not("job_number", "is", null);

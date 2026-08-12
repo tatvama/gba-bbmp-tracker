@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { buildComplaintDraftPrompt } from "@/lib/ai/complaint-document-analyzer";
 import { generateTextStream } from "@/lib/ai/provider";
 import { sanitizeDraft } from "@/lib/letters/safe-language";
@@ -34,7 +34,7 @@ import {
 const LEGAL_NOTICE_SENDER_KEY = "legal_notice_sender";
 
 /** Request-free read of the saved default PIL sender, merged over defaults. */
-async function loadLegalNoticeSender(admin: SupabaseClient): Promise<LegalNoticeSender> {
+async function loadLegalNoticeSender(admin: DbClient): Promise<LegalNoticeSender> {
   try {
     const { data } = await admin
       .from("app_settings")
@@ -181,7 +181,7 @@ function complaintContext(
 
 /** Dated case-history block (chronology + replies + actions + escalations +
  *  linked job-audit findings) so every draft argues from the real timeline. */
-async function buildCaseHistory(admin: SupabaseClient, complaintId: string, jobNumber: string | null): Promise<string> {
+async function buildCaseHistory(admin: DbClient, complaintId: string, jobNumber: string | null): Promise<string> {
   const [timeline, replies, actions, escalations] = await Promise.all([
     admin.from("complaint_timeline").select("event_date,event_type,title,summary").eq("complaint_id", complaintId).order("event_date", { ascending: true }).limit(40),
     admin.from("complaint_replies").select("reply_date,replied_by_name,reply_summary,issues_remaining,is_satisfactory").eq("complaint_id", complaintId).order("reply_date", { ascending: true }).limit(20),
@@ -225,7 +225,7 @@ async function buildCaseHistory(admin: SupabaseClient, complaintId: string, jobN
 }
 
 export async function runComplaintDraft(
-  admin: SupabaseClient,
+  admin: DbClient,
   input: ComplaintDraftInput,
   onProgress?: (p: DraftProgress) => void,
 ): Promise<{ ok: boolean; text?: string; error?: string; lintWarning?: string; truncated?: boolean; qualityReport?: QualityReport; legalCitationWarning?: string }> {

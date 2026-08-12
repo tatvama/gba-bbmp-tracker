@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -11,13 +11,13 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const db = createDbClient();
 
 async function run() {
   console.log("Starting deletion of ALL complaints and related data from database (leaving R2 untouched)...");
 
   // 1. Fetch all complaints
-  const { data: complaints, error: fetchErr } = await supabase
+  const { data: complaints, error: fetchErr } = await db
     .from("complaints")
     .select("id, internal_case_number, job_number");
 
@@ -41,7 +41,7 @@ async function run() {
     ];
 
     for (const table of childTables) {
-      const { error } = await supabase
+      const { error } = await db
         .from(table)
         .delete()
         .in("complaint_id", idsToDelete);
@@ -54,7 +54,7 @@ async function run() {
     }
 
     // 3. Delete the main complaints
-    const { error: compErr } = await supabase
+    const { error: compErr } = await db
       .from("complaints")
       .delete()
       .in("id", idsToDelete);
@@ -73,7 +73,7 @@ async function run() {
     "job_download_runs"
   ];
   for (const table of jobTables) {
-    const { error } = await supabase
+    const { error } = await db
       .from(table)
       .delete()
       .neq("id", "00000000-0000-0000-0000-000000000000");
@@ -82,14 +82,14 @@ async function run() {
   }
 
   // 5. Clear import batches & background jobs to prevent automated re-triggers
-  const { error: batchErr } = await supabase
+  const { error: batchErr } = await db
     .from("forensic_import_batches")
     .delete()
     .neq("id", "00000000-0000-0000-0000-000000000000");
   if (batchErr) console.error("Error clearing forensic_import_batches:", batchErr.message);
   else console.log("Cleared forensic_import_batches.");
 
-  const { error: bgErr } = await supabase
+  const { error: bgErr } = await db
     .from("background_jobs")
     .delete()
     .neq("id", "00000000-0000-0000-0000-000000000000");

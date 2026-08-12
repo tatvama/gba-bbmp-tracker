@@ -50,7 +50,7 @@ interface Recorded {
 }
 
 /**
- * Minimal stand-in for the supabase-js query builder: chainable, awaitable, and
+ * Minimal stand-in for the lib/db query builder: chainable, awaitable, and
  * it records what was asked of it so the assertions can be about intent
  * ("this endpoint was deleted") rather than about call order.
  */

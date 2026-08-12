@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { requireRole, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_WRITE_ROLES, STORAGE_BUCKETS, R2_STORAGE_SENTINEL } from "@/lib/constants";
 import { buildMergedPdf, extractPdfPages } from "@/lib/pdf/merge";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { analyzeDocumentById } from "@/lib/ocr/process-document";
 import { uploadToR2, downloadFromR2 } from "@/lib/storage/r2-upload";
-import { buildPath } from "@/lib/storage/supabase-upload";
+import { buildPath } from "@/lib/storage/object-store";
 import { getComplaintSettings } from "@/lib/settings";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { detectComplaintLetters } from "@/lib/ai/complaint-letter-detector";

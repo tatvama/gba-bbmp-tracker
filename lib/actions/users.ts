@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
+import {
+  createAuthUser,
+  updateAuthUserPhone,
+  updateAuthUserRole,
+} from "@/lib/db/auth";
 import { USER_ROLES } from "@/lib/constants";
 import { isValidIndianMobile, normalizePhone } from "@/lib/phone";
 import { writeAudit, diffFields } from "@/lib/audit";
@@ -46,52 +51,31 @@ export async function createUser(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch {
-    return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY — cannot create users." };
-  }
-
-  // E.164 for Supabase Auth's phone identifier — same +91 assumption
+  // E.164 for the phone sign-in identifier — same +91 assumption
   // lib/phone.ts's telLink/waLink already make for a contact number.
   const e164Phone = parsed.data.phone ? `+91${normalizePhone(parsed.data.phone)}` : null;
 
-  const { data, error } = await admin.auth.admin.createUser({
+  // Creates the account AND its profile row in one transaction. There is no
+  // separate confirmation step: an admin-created account is confirmed by
+  // definition, and no SMS provider is involved in phone sign-in.
+  const { id, error } = await createAuthUser({
     email: parsed.data.email,
     password: parsed.data.password,
-    email_confirm: true,
-    // phone_confirm bypasses the SMS-verification step admin-created accounts
-    // have no need for — see app/login for how this becomes a sign-in option.
-    ...(e164Phone ? { phone: e164Phone, phone_confirm: true } : {}),
-    user_metadata: { name: parsed.data.name ?? "", role: parsed.data.role },
+    name: parsed.data.name ?? "",
+    role: parsed.data.role,
+    phone: e164Phone,
   });
-  if (error) {
-    // Supabase rejects a phone identifier outright when the project's Phone
-    // auth provider isn't enabled (Dashboard → Authentication → Providers) —
-    // surface that as an actionable message rather than a raw API error.
-    if (e164Phone && /phone/i.test(error.message)) {
-      return { error: `${error.message} — enable the Phone provider in Supabase Dashboard → Authentication → Providers to allow phone sign-in.` };
-    }
-    return { error: error.message };
-  }
+  if (error || !id) return { error: error ?? "Could not create the account." };
 
-  // Ensure the profile reflects the chosen role (trigger sets it on insert).
-  if (data.user) {
-    await admin.from("profiles").upsert(
-      { id: data.user.id, email: parsed.data.email, name: parsed.data.name ?? "", role: parsed.data.role, phone: e164Phone },
-      { onConflict: "id" },
-    );
-    await writeAudit(admin, {
-      entityType: "user",
-      entityId: data.user.id,
-      changedBy: actingAdmin.id,
-      changes: [
-        { field: "created", oldValue: null, newValue: parsed.data.email },
-        { field: "role", oldValue: null, newValue: parsed.data.role },
-      ],
-    });
-  }
+  await writeAudit(createAdminClient(), {
+    entityType: "user",
+    entityId: id,
+    changedBy: actingAdmin.id,
+    changes: [
+      { field: "created", oldValue: null, newValue: parsed.data.email },
+      { field: "role", oldValue: null, newValue: parsed.data.role },
+    ],
+  });
   return { success: true };
 }
 
@@ -112,13 +96,7 @@ export async function listUsers(): Promise<{ users?: AdminUserRow[]; error?: str
     return { error: e instanceof AuthorizationError ? e.message : "Admins only" };
   }
 
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch {
-    return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY." };
-  }
-
+  const admin = createAdminClient();
   const { data, error } = await admin.from("profiles").select("id, email, name, role, phone").order("email");
   if (error) return { error: error.message };
   return { users: (data as AdminUserRow[] | null) ?? [] };
@@ -148,25 +126,14 @@ export async function updateUserPhone(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch {
-    return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY." };
-  }
-
+  const admin = createAdminClient();
   const { data: before } = await admin.from("profiles").select("phone").eq("id", userId).maybeSingle();
 
   const e164Phone = `+91${normalizePhone(parsed.data.phone)}`;
-  const { error } = await admin.auth.admin.updateUserById(userId, { phone: e164Phone, phone_confirm: true });
-  if (error) {
-    if (/phone/i.test(error.message)) {
-      return { error: `${error.message} — enable the Phone provider in Supabase Dashboard → Authentication → Providers to allow phone sign-in.` };
-    }
-    return { error: error.message };
-  }
+  // Writes the identifier to app_users and mirrors it onto profiles, which is
+  // what app/login reads when someone signs in by phone.
+  await updateAuthUserPhone(userId, e164Phone);
 
-  await admin.from("profiles").update({ phone: e164Phone }).eq("id", userId);
   await writeAudit(admin, {
     entityType: "user",
     entityId: userId,
@@ -198,21 +165,12 @@ export async function updateUserRole(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch {
-    return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY." };
-  }
-
-  const { data: current } = await admin.auth.admin.getUserById(userId);
+  const admin = createAdminClient();
   const { data: before } = await admin.from("profiles").select("role").eq("id", userId).maybeSingle();
-  const { error } = await admin.auth.admin.updateUserById(userId, {
-    user_metadata: { ...current?.user?.user_metadata, role: parsed.data.role },
-  });
-  if (error) return { error: error.message };
+  // Updates profiles.role (what authorization actually reads) and keeps the
+  // copy in app_users' metadata aligned with it.
+  await updateAuthUserRole(userId, parsed.data.role);
 
-  await admin.from("profiles").update({ role: parsed.data.role }).eq("id", userId);
   // Role changes are the most security-sensitive user-management action
   // (e.g. granting ADMIN) — always worth an audit row even for a same-role no-op,
   // unlike other entities' diff-only auditing.

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest, after } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/supabase-upload";
+import { createAdminClient } from "@/lib/db";
+import { uploadBuffer, validateUpload, buildPath } from "@/lib/storage/object-store";
 import { buildComplaintDocumentFileName, extFromUpload } from "@/lib/complaints/document-naming";
 import { analyzeDocumentById } from "@/lib/ocr/process-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";

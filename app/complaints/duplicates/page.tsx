@@ -10,7 +10,7 @@ import {
   type DuplicateCluster,
   type ResponsibleOfficer,
 } from "@/lib/dedupe-photos";
-import { getSignedUrl } from "@/lib/storage/supabase-upload";
+import { getSignedUrl } from "@/lib/storage/object-store";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { formatDate } from "@/lib/format";

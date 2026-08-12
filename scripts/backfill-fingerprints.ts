@@ -9,7 +9,8 @@
  * Uses the SAME fingerprint code as the upload route (lib/ocr/image-fingerprint),
  * so backfilled hashes match newly-uploaded ones exactly.
  */
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
+import { downloadBuffer } from "../lib/storage/object-store";
 import { loadEnv } from "./db";
 import { fingerprintImage } from "../lib/ocr/image-fingerprint";
 
@@ -24,7 +25,7 @@ async function main() {
     console.error("\n✗ NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in .env.\n");
     process.exit(1);
   }
-  const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  const admin = createDbClient();
 
   // 1) Fingerprint every document missing a SHA.
   let done = 0, failed = 0;
@@ -42,14 +43,11 @@ async function main() {
 
     for (const d of data) {
       try {
-        const { data: blob, error: dlErr } = await admin.storage
-          .from(d.storage_bucket as string)
-          .download(d.storage_path as string);
-        if (dlErr || !blob) {
+        const buffer = await downloadBuffer(d.storage_bucket as string, d.storage_path as string);
+        if (!buffer) {
           failed++;
           continue;
         }
-        const buffer = Buffer.from(await blob.arrayBuffer());
         const fp = await fingerprintImage(buffer, (d.mime_type as string) ?? null);
         await admin
           .from("complaint_documents")

@@ -25,7 +25,7 @@ vi.mock("@/lib/storage/r2-upload", () => ({
   downloadFromR2ByKey: vi.fn(async () => Buffer.from("%PDF-1.4 fake")),
 }));
 
-vi.mock("@/lib/storage/supabase-upload", () => ({ getSignedUrl: vi.fn(async () => null) }));
+vi.mock("@/lib/storage/object-store", () => ({ getSignedUrl: vi.fn(async () => null) }));
 
 interface Recipients {
   to: string[];

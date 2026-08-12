@@ -14,7 +14,7 @@ import path from "path";
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
 
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 
 const jobNumbers = process.argv.slice(2);
 if (!jobNumbers.length) {
@@ -28,7 +28,7 @@ if (!url || !serviceKey) {
   console.error("\n✗ NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required (.env / .env.local).\n");
   process.exit(1);
 }
-const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+const admin = createDbClient();
 
 async function main() {
   console.log(`Clearing R2-flagged document rows for job number(s): ${jobNumbers.join(", ")}\n`);

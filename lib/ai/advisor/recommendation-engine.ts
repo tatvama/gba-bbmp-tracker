@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { notifyUser } from "@/lib/notifications";
 import { buildAdvisorContext } from "./context-builder";
@@ -66,7 +66,7 @@ const STALE_LOCK_MS = 120_000;
  * after() callback, the cron sweep) treat this as best-effort.
  */
 export async function runAdvisorAnalysis(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
   opts?: { language?: AdvisorLanguage },
 ): Promise<RunAdvisorResult> {
@@ -281,7 +281,7 @@ export async function runAdvisorAnalysis(
  * concurrent full run can safely overwrite it with the same result.
  */
 export async function resolveAdvisorLanguage(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
   language: AdvisorLanguage,
 ): Promise<{ status: "promoted" | "needs-regen" | "not-found" }> {

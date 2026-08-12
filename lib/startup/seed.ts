@@ -140,13 +140,14 @@ export class DatabaseSeedingTask implements StartupTask {
       throw new Error("DATABASE_URL is not set.");
     }
 
-    const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     if (!pg) {
       throw new Error("pg module is not available.");
     }
+    // TLS is opt-in via DB_SSL: requesting it from a server that does not offer
+    // it fails the connection outright, and the current one does not.
     const client = new pg.Client({
       connectionString: url,
-      ssl: isLocal ? false : { rejectUnauthorized: false },
+      ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
     });
 
     await client.connect();

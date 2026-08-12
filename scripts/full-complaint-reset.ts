@@ -15,7 +15,7 @@ import * as readline from "node:readline/promises";
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
 
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,7 +34,7 @@ if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
   process.exit(1);
 }
 
-const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+const admin = createDbClient();
 const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${accountId}.r2.cloudflarestorage.com`,

@@ -4,7 +4,7 @@
  */
 import * as dotenv from "dotenv";
 import path from "path";
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import {
   S3Client,
   ListObjectsV2Command,
@@ -26,7 +26,7 @@ if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !supabaseUrl ||
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const db = createDbClient();
 const s3Client = new S3Client({
   region: "auto",
   endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
@@ -35,7 +35,7 @@ const s3Client = new S3Client({
 
 async function deleteR2FilesByJobNumbers() {
   console.log("Fetching complaints from database to retrieve job numbers...");
-  const { data: complaints, error } = await supabase
+  const { data: complaints, error } = await db
     .from("complaints")
     .select("job_number")
     .not("job_number", "is", null);

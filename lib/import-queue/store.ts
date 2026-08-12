@@ -1,6 +1,6 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DbClient } from "@/lib/db";
+import { createAdminClient } from "@/lib/db";
 import { publishImportChange } from "./bus";
 import { publishJobChange } from "@/lib/jobs/bus";
 import type { ImportUploadEvent, ImportUploadSnapshot, ImportUploadStatus } from "./types";
@@ -45,7 +45,7 @@ const SELECT_COLS =
   "id, kind, file_name, file_size, fingerprint, chunk_size, received_bytes, status, stage, progress, message, error, events, auto_commit, batch_id, job_codes, complaint_ids, created_by, created_at, finished_at, staged_path";
 
 export async function getImportSession(
-  admin: SupabaseClient,
+  admin: DbClient,
   id: string,
 ): Promise<(ImportUploadSnapshot & { stagedPath: string | null; createdBy: string | null }) | null> {
   const { data } = await admin.from("import_uploads").select(SELECT_COLS).eq("id", id).maybeSingle();
@@ -72,7 +72,7 @@ const MAX_HISTORY_SESSIONS = 50;
  * uploading/queued in the DB. Active sessions are effectively uncapped (a
  * generous safety limit only); history is capped and kept to the most recent.
  */
-export async function listImportSessions(admin: SupabaseClient, userId: string): Promise<ImportUploadSnapshot[]> {
+export async function listImportSessions(admin: DbClient, userId: string): Promise<ImportUploadSnapshot[]> {
   const cutoff = new Date(Date.now() - DONE_VISIBLE_HOURS * 3600 * 1000).toISOString();
   const [{ data: active }, { data: history }] = await Promise.all([
     admin
@@ -100,7 +100,7 @@ export async function listImportSessions(admin: SupabaseClient, userId: string):
  * never throws (progress reporting must not kill the pipeline it reports on).
  */
 export async function updateImportSession(
-  admin: SupabaseClient,
+  admin: DbClient,
   id: string,
   patch: Record<string, unknown>,
   event?: { stage: string; msg: string },
@@ -135,7 +135,7 @@ export async function updateImportSession(
  * atomic enough for the single-process dev/server runtime.
  */
 export async function claimNextQueued(
-  admin: SupabaseClient,
+  admin: DbClient,
 ): Promise<(ImportUploadSnapshot & { stagedPath: string | null; createdBy: string | null }) | null> {
   const { data: candidates } = await admin
     .from("import_uploads")
@@ -168,7 +168,7 @@ export async function claimNextQueued(
  * re-queued (their staged file is still on disk) so work continues without the
  * user doing anything. Called once per process from the worker.
  */
-export async function requeueOrphanedProcessing(admin: SupabaseClient): Promise<number> {
+export async function requeueOrphanedProcessing(admin: DbClient): Promise<number> {
   const { data } = await admin
     .from("import_uploads")
     .update({ status: "queued", stage: "Waiting in queue", message: "Server restarted — resuming from the queue." })
@@ -182,6 +182,6 @@ export async function requeueOrphanedProcessing(admin: SupabaseClient): Promise<
   return rows.length;
 }
 
-export function adminForQueue(): SupabaseClient {
+export function adminForQueue(): DbClient {
   return createAdminClient();
 }

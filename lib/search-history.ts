@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "./db";
 
 /** Logs a BBMP work-search query (rule 19). Called inline inside
  *  searchBBMPWork so every search is logged regardless of entry point
@@ -7,10 +7,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *  remember to make. Best-effort: a logging failure never fails the search
  *  itself. */
 export async function logSearchHistory(
-  supabase: SupabaseClient,
+  db: DbClient,
   params: { userId: string | null; queryParams: Record<string, unknown>; resultCount: number },
 ): Promise<void> {
-  const { error } = await supabase.from("search_history").insert({
+  const { error } = await db.from("search_history").insert({
     user_id: params.userId,
     query_params: params.queryParams,
     result_count: params.resultCount,

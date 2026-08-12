@@ -21,7 +21,7 @@ interface Recorded {
 let alreadySentRow: { complaint_id: string; letter_kind: string; status: string; to_addresses: string[] | null; redirected: boolean } | null = null;
 let recorded: Recorded[] = [];
 
-vi.mock("@/lib/supabase/admin", () => ({
+vi.mock("@/lib/db", () => ({
   createAdminClient: () => ({
     from(table: string) {
       const filters: Record<string, unknown> = {};

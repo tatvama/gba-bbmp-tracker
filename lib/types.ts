@@ -1,6 +1,6 @@
 /**
- * Database row types (snake_case, matching the Supabase/Postgres columns).
- * Hand-maintained to mirror `supabase/migrations/0001_init.sql`.
+ * Database row types (snake_case, matching the Postgres columns).
+ * Hand-maintained to mirror `db/migrations/0001_init.sql`.
  */
 import type {
   ComplaintStatus,

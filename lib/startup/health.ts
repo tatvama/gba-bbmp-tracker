@@ -12,13 +12,14 @@ export class ExternalServicesHealthCheckTask implements StartupTask {
     // 1. Check Database Latency
     const dbUrl = process.env.DATABASE_URL;
     if (dbUrl) {
-      const isLocal = dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
       if (!pg) {
         throw new Error("pg module is not available.");
       }
+      // TLS is opt-in via DB_SSL: requesting it from a server that does not
+      // offer it fails the connection outright, and the current one does not.
       const client = new pg.Client({
         connectionString: dbUrl,
-        ssl: isLocal ? false : { rejectUnauthorized: false },
+        ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
       });
       try {
         const t0 = Date.now();

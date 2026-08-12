@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { buildMergedPdf } from "@/lib/pdf/merge";
 import { uploadToR2 } from "@/lib/storage/r2-upload";
 import { processAckBatch } from "@/lib/complaints/ack-runner";

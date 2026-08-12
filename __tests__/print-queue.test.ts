@@ -33,7 +33,7 @@ const letterDraftsResult = { data: null as FakeRow[] | null };
 const complaintDocumentsResult = { data: [] as FakeRow[] };
 let letterDraftsBuilder: ReturnType<typeof makeQueryBuilder>;
 
-vi.mock("@/lib/supabase/server", () => ({
+vi.mock("@/lib/db", () => ({
   createClient: vi.fn(async () => ({
     from: (table: string) => {
       if (table === "letter_drafts") return letterDraftsBuilder;

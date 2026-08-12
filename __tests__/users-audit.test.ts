@@ -13,16 +13,6 @@ const profilesTable: Record<string, { role?: string; phone?: string | null }> = 
 
 function makeAdminClient() {
   return {
-    auth: {
-      admin: {
-        createUser: vi.fn(async (opts: { email: string }) => ({
-          data: { user: { id: "new-user-1", email: opts.email } },
-          error: null,
-        })),
-        updateUserById: vi.fn(async () => ({ data: {}, error: null })),
-        getUserById: vi.fn(async () => ({ data: { user: { user_metadata: { role: "VIEWER" } } } })),
-      },
-    },
     from: (table: string) => {
       if (table === "audit_logs") {
         return {
@@ -62,7 +52,25 @@ function makeAdminClient() {
 }
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => makeAdminClient()) }));
+vi.mock("@/lib/db", () => ({ createAdminClient: vi.fn(() => makeAdminClient()) }));
+/**
+ * Account writes moved out of the Supabase admin API into lib/db/auth (which
+ * talks to Postgres directly), so that is the seam these tests stub now. The
+ * stubs also record into profilesTable, because updateUserRole/Phone read the
+ * previous value from profiles to build the audit diff.
+ */
+vi.mock("@/lib/db/auth", () => ({
+  createAuthUser: vi.fn(async (input: { email: string; role: string; phone: string | null }) => {
+    profilesTable["new-user-1"] = { role: input.role, phone: input.phone };
+    return { id: "new-user-1" };
+  }),
+  updateAuthUserRole: vi.fn(async (userId: string, role: string) => {
+    profilesTable[userId] = { ...profilesTable[userId], role };
+  }),
+  updateAuthUserPhone: vi.fn(async (userId: string, phone: string) => {
+    profilesTable[userId] = { ...profilesTable[userId], phone };
+  }),
+}));
 vi.mock("@/lib/auth", () => ({
   requireRole: vi.fn(async () => ({ id: "acting-admin-1", email: "admin@example.com", profile: null, role: "ADMIN" })),
   AuthorizationError: class AuthorizationError extends Error {},

@@ -1,8 +1,8 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { R2_STORAGE_SENTINEL } from "@/lib/constants";
 import { downloadFromR2ByKey } from "@/lib/storage/r2-upload";
-import { getSignedUrl } from "@/lib/storage/supabase-upload";
+import { getSignedUrl } from "@/lib/storage/object-store";
 import { getMailConfig, getMailTransport, fromHeader } from "./transport";
 import { canSend, skipReason } from "./config";
 import { applyRedirect, buildLetterEmail, isValidEmail, normalizeAddressList, type IntendedEnvelope } from "./message";
@@ -171,7 +171,7 @@ interface DocRow {
 /** Pull the letter's bytes so it can ride along as a real attachment rather than
  *  a link the officer would need an account to open. */
 async function loadAttachment(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
   documentId: string | null | undefined,
   letterKind: string,
@@ -222,7 +222,7 @@ async function loadAttachment(
       return content ? { filename, content, documentId: doc.id, contentType } : null;
     }
 
-    // Supabase Storage fallback (pre-R2 documents).
+    // Bucket+path fallback (documents predating the bare-key convention).
     const url = await getSignedUrl(doc.storage_bucket, doc.storage_path, 300);
     if (!url) return null;
     const res = await fetch(url);
@@ -254,7 +254,7 @@ export interface AttachmentPreview {
  * attaches another.
  */
 export async function resolveAttachmentPreview(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
   letterKind: string,
 ): Promise<AttachmentPreview | null> {
@@ -283,7 +283,7 @@ export async function resolveAttachmentPreview(
 }
 
 export async function sendLetterEmail(
-  admin: SupabaseClient,
+  admin: DbClient,
   input: SendLetterEmailInput,
 ): Promise<SendLetterEmailResult> {
   const config = getMailConfig();

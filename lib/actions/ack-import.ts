@@ -8,7 +8,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { requireRole, AuthorizationError, type SessionUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { getR2SignedUrl, downloadFromR2, deleteFromR2 } from "@/lib/storage/r2-upload";
 import { extractPdfPages } from "@/lib/pdf/merge";

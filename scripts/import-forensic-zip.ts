@@ -22,7 +22,7 @@ loadEnv();
 
 async function main() {
   // Dynamic imports AFTER loadEnv so lib modules see the env vars.
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const { extractZipFileToTempDir } = await import("@/lib/forensic/zip-stream");
   const { processForensicBatch } = await import("@/lib/forensic/import-runner");
   const { commitForensicJobs } = await import("@/lib/forensic/commit-runner");

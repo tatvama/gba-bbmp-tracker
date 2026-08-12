@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "../../db";
 
 /**
  * Stage 1 — Ingest. Gathers ALL raw case material (complaint + its documents +
@@ -53,7 +53,7 @@ export interface RawCaseMaterial {
 const asText = (r: any): string => ((r?.ocr_clean_text as string) || (r?.ocr_raw_text as string) || "").trim();
 
 export async function ingestCaseMaterial(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
 ): Promise<RawCaseMaterial | null> {
   const { data: complaint } = await admin

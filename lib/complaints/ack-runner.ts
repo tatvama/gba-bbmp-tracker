@@ -13,7 +13,7 @@ import "server-only";
  * where OCR text is too weak to fill fields), match against the complaint pool
  * (scoreAckMatch), and persist an ack_import_items row. Finally flip to `review`.
  */
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { downloadFromR2, uploadToR2 } from "@/lib/storage/r2-upload";
 import { extractPdfPages } from "@/lib/pdf/merge";
 import { pdfRenderer } from "@/lib/pdf/pdf-renderer";

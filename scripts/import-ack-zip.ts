@@ -51,7 +51,7 @@ interface BatchSummary {
 }
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const { buildMergedPdf } = await import("@/lib/pdf/merge");
   const { uploadToR2 } = await import("@/lib/storage/r2-upload");
   const { processAckBatch } = await import("@/lib/complaints/ack-runner");

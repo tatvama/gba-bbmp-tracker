@@ -20,7 +20,7 @@ loadEnv();
 
 async function main() {
   // Dynamic import AFTER loadEnv so lib modules see the env vars.
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
 
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");

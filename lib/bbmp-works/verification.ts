@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "../db";
 import type { WorkVerificationStatus } from "./types";
 import { normalizeAmount, normalizeDate, normalizePhoneNumber } from "./normalize";
 
@@ -63,8 +63,8 @@ export function detectConflicts(
 /** Recompute + persist official_source_count/verification_status for one
  *  work from its current work_sources rows. Call after every work_sources
  *  insert (source adapters, manual-entry form). */
-export async function recomputeVerification(supabase: SupabaseClient, workId: string): Promise<void> {
-  const { data: sources, error } = await supabase
+export async function recomputeVerification(db: DbClient, workId: string): Promise<void> {
+  const { data: sources, error } = await db
     .from("work_sources")
     .select("is_official, field_snapshot")
     .eq("work_id", workId);
@@ -76,7 +76,7 @@ export async function recomputeVerification(supabase: SupabaseClient, workId: st
   const officialSourceCount = rows.filter((s) => s.is_official).length;
   const conflicting = detectConflicts(rows.map((s) => ({ fieldSnapshot: s.field_snapshot as Record<string, unknown> | null })));
   const verificationStatus = getVerificationStatus(officialSourceCount, conflicting);
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from("bbmp_works")
     .update({ official_source_count: officialSourceCount, verification_status: verificationStatus })
     .eq("id", workId);

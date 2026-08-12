@@ -38,7 +38,7 @@ async function runEscalationSweep(): Promise<void> {
 async function runJobSweep(): Promise<void> {
   try {
     const { sweepBackgroundJobs } = await import("@/lib/jobs/runner");
-    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { createAdminClient } = await import("@/lib/db");
     const admin = createAdminClient();
     const result = await sweepBackgroundJobs(admin);
     if (result.reclaimed || result.retried) {

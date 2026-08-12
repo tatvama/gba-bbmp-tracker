@@ -111,7 +111,7 @@ async function main() {
 
   // ── The real production orchestrator, for one complaint ───────────────────
   if (complaintArg) {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { createAdminClient } = await import("@/lib/db");
     const { sendLetterEmail } = await import("@/lib/mail/send");
     const admin = createAdminClient();
 

@@ -46,7 +46,7 @@ function makeAdminClient() {
     },
   };
 }
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => makeAdminClient()) }));
+vi.mock("@/lib/db", () => ({ createAdminClient: vi.fn(() => makeAdminClient()) }));
 
 describe("deleteComplaint — real function, soft-delete + RBAC", () => {
   beforeEach(() => {

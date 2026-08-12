@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { IMPORT_CHUNK_SIZE, MAX_IMPORT_ZIP_BYTES } from "@/lib/import-queue/types";
 import { listImportSessions, rowToSnapshot } from "@/lib/import-queue/store";
 import { stagedPathFor, stagedSize } from "@/lib/import-queue/staging";
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     // Same rule as processForensicBatch: a job case whose complaint was
     // soft-deleted was explicitly discarded — re-import is allowed. (The join
-    // is many-to-one but supabase-js may type/return it as an array.)
+    // is many-to-one but the PostgREST client could type/return it as an array.)
     const d = dup as unknown as { complaint_id: string | null; complaints: { deleted_at: string | null } | { deleted_at: string | null }[] | null } | null;
     const complaint = Array.isArray(d?.complaints) ? d.complaints[0] : d?.complaints;
     if (d && !(d.complaint_id && complaint?.deleted_at)) duplicateJobNumber = filenameJobCode;

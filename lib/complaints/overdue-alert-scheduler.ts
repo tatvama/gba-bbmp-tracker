@@ -60,8 +60,8 @@ import "server-only";
  * today, not yet sent). A complaint that stays overdue for a week is mentioned
  * once a day, in whichever digest covers it that day, not once per sweep tick.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DbClient } from "@/lib/db";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
 
 const OVERDUE_ALERT_KIND = "Overdue alert";

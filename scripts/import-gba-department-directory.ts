@@ -30,7 +30,7 @@ function describeRow(row: DeptContactRow): string {
 }
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const admin = createAdminClient();
 
   const plan = buildDepartmentDirectoryPlan();

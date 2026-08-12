@@ -10,23 +10,36 @@ export function loadEnv() {
   }
 }
 
+/**
+ * DATABASE_URL, or one assembled from the discrete DB_* variables the app uses.
+ * Accepting both means `npm run db:migrate` works from the same .env as the app
+ * without duplicating the connection string.
+ */
 export function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
-  if (!url) {
-    console.error(
-      "\n✗ DATABASE_URL is not set in .env.\n" +
-        "  Add your Supabase Postgres connection string:\n" +
-        "  Dashboard → Project Settings → Database → Connection string → URI\n",
-    );
-    process.exit(1);
+  if (url) return url;
+
+  const { DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
+  if (DB_HOST && DB_USER && DB_PASSWORD && DB_NAME) {
+    const auth = `${encodeURIComponent(DB_USER)}:${encodeURIComponent(DB_PASSWORD)}`;
+    return `postgresql://${auth}@${DB_HOST}:${DB_PORT ?? 5432}/${DB_NAME}`;
   }
-  return url;
+
+  console.error(
+    "\n✗ No database configuration found in .env.\n" +
+      "  Set either DATABASE_URL, or DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME.\n",
+  );
+  process.exit(1);
 }
 
 export function makeClient(url: string): Client {
-  const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
+  // TLS is OFF unless DB_SSL=true. The previous rule — "SSL for anything that
+  // isn't localhost" — was right for Supabase, which required it, but the
+  // current server does not offer TLS at all and refuses the connection when it
+  // is requested. Set DB_SSL=true once the server terminates TLS.
+  const useSsl = process.env.DB_SSL === "true";
   return new Client({
     connectionString: url,
-    ssl: isLocal ? false : { rejectUnauthorized: false },
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
   });
 }

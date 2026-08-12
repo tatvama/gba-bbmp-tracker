@@ -4,17 +4,35 @@ import type { StartupTask } from "./types";
 import { StartupLogger } from "./logger";
 import { resolveMailConfig } from "@/lib/mail/config";
 
-const envSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url("NEXT_PUBLIC_SUPABASE_URL must be a valid URL"),
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1, "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required"),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  R2_ACCOUNT_ID: z.string().min(1, "R2_ACCOUNT_ID is required"),
-  R2_ACCESS_KEY_ID: z.string().min(1, "R2_ACCESS_KEY_ID is required"),
-  R2_SECRET_ACCESS_KEY: z.string().min(1, "R2_SECRET_ACCESS_KEY is required"),
-  R2_BUCKET_NAME: z.string().min(1, "R2_BUCKET_NAME is required"),
-  R2_PUBLIC_URL: z.string().url("R2_PUBLIC_URL must be a valid URL"),
-});
+const envSchema = z
+  .object({
+    // Either DATABASE_URL on its own, or the discrete DB_* set — checked below,
+    // because zod cannot express "one of these two groups" in the object shape.
+    DATABASE_URL: z.string().optional(),
+    DB_HOST: z.string().optional(),
+    DB_USER: z.string().optional(),
+    DB_PASSWORD: z.string().optional(),
+    DB_NAME: z.string().optional(),
+    // Signs the session cookie. 32 characters is the floor for an HMAC-SHA256
+    // key that is worth having; a short secret is guessable, and a missing one
+    // means nobody can sign in at all.
+    SESSION_SECRET: z
+      .string()
+      .min(32, "SESSION_SECRET must be at least 32 characters (see .env.example for how to generate one)"),
+    R2_ACCOUNT_ID: z.string().min(1, "R2_ACCOUNT_ID is required"),
+    R2_ACCESS_KEY_ID: z.string().min(1, "R2_ACCESS_KEY_ID is required"),
+    R2_SECRET_ACCESS_KEY: z.string().min(1, "R2_SECRET_ACCESS_KEY is required"),
+    R2_BUCKET_NAME: z.string().min(1, "R2_BUCKET_NAME is required"),
+    R2_PUBLIC_URL: z.string().url("R2_PUBLIC_URL must be a valid URL"),
+  })
+  .refine(
+    (env) => !!env.DATABASE_URL || !!(env.DB_HOST && env.DB_USER && env.DB_PASSWORD && env.DB_NAME),
+    {
+      message:
+        "Database is not configured — set DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME, or a single DATABASE_URL",
+      path: ["DB_HOST"],
+    },
+  );
 
 export class EnvironmentValidationTask implements StartupTask {
   name = "Environment Validation";

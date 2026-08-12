@@ -1,27 +1,27 @@
 /**
- * Verify RBAC end-to-end against the REAL Supabase project: for each of the
- * app's 7 roles, create a disposable Supabase Auth user (role set via
- * user_metadata, exactly like scripts/verify-phone-login.ts), confirm the
- * `handle_new_user` DB trigger (supabase/migrations/0001_init.sql) actually
- * persists that role onto `profiles.role`, then feed that REAL, DB-read role
- * through the app's real `hasRole()` (lib/auth.ts) against every role-gate
- * constant used across the app (lib/constants.ts). Deletes every test user
- * whether it passes or fails.
+ * Verify RBAC end-to-end against the REAL database: for each of the app's 7
+ * roles, create a disposable account via createAuthUser (lib/db/auth.ts, the
+ * same function the admin Create User form calls), confirm it actually persists
+ * that role onto `profiles.role`, then feed that REAL, DB-read role through the
+ * app's real `hasRole()` (lib/auth.ts) against every role-gate constant used
+ * across the app (lib/constants.ts). Deletes every test user whether it passes
+ * or fails.
  *
  *   npx tsx --tsconfig scripts/tsconfig.pipeline.json scripts/verify-rbac.ts
  *
- * Scope, stated honestly: this proves the DB trigger -> profiles.role ->
+ * WRITES TO THE CONFIGURED DATABASE: seven clearly-marked test accounts,
+ * removed in a finally block.
+ *
+ * Scope, stated honestly: this proves the createAuthUser -> profiles.role ->
  * hasRole() pipeline is correct for all 7 roles against all 6 role-gate
  * constants — i.e. "does a COMPLAINT_MANAGER account really resolve to a role
- * that COMPLAINT_WRITE_ROLES accepts and RTI_WRITE_ROLES rejects." It does
- * NOT make a live HTTP request through middleware/an API route (that would
- * require replicating @supabase/ssr's cookie chunking format by hand, which
- * is fragile and out of scope) — the "does every route actually call
- * requireRole/hasRole" wiring question is answered separately by the static
- * nav-items.ts / page-guard cross-check, and "does requireRole throw the
- * right error for a disallowed role" is covered by mocked unit tests
- * (__tests__ — mocking getSessionUser is trivial in Vitest; faking a real
- * Next.js cookie session is not).
+ * that COMPLAINT_WRITE_ROLES accepts and RTI_WRITE_ROLES rejects." It does NOT
+ * make a live HTTP request through middleware/an API route — the "does every
+ * route actually call requireRole/hasRole" wiring question is answered
+ * separately by the static nav-items.ts / page-guard cross-check, and "does
+ * requireRole throw the right error for a disallowed role" is covered by mocked
+ * unit tests (__tests__ — mocking getSessionUser is trivial in Vitest; faking a
+ * real Next.js cookie session is not).
  */
 import { loadEnv } from "./db";
 loadEnv();
@@ -29,7 +29,8 @@ loadEnv();
 const TEST_PASSWORD = "VerifyRbac!2026";
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
+  const { createAuthUser, deleteAuthUser } = await import("@/lib/db/auth");
   const { hasRole } = await import("@/lib/auth");
   const {
     USER_ROLES,
@@ -60,24 +61,27 @@ async function main() {
       const email = `verify-rbac-${role.toLowerCase()}-test@example.com`;
       console.log(`\n── ${role} ──`);
 
-      const { data, error } = await admin.auth.admin.createUser({
+      const created = await createAuthUser({
         email,
         password: TEST_PASSWORD,
-        email_confirm: true,
-        user_metadata: { name: `Verify RBAC (${role}, test)`, role },
+        name: `Verify RBAC (${role}, test)`,
+        role,
+        phone: null,
       });
-      if (error || !data.user) {
-        console.error(`  ✗ createUser failed: ${error?.message}`);
+      if (!created.id) {
+        console.error(`  ✗ createAuthUser failed: ${created.error}`);
         failures++;
         continue;
       }
-      createdUserIds.push(data.user.id);
+      const newUserId = created.id;
+      createdUserIds.push(newUserId);
 
-      // Confirm the DB trigger actually persisted this role (not assumed).
+      // Confirm the role was actually persisted (not assumed). createAuthUser
+      // writes the profiles row itself, replacing Supabase's auth.users trigger.
       const { data: profile, error: profileErr } = await admin
         .from("profiles")
         .select("role")
-        .eq("id", data.user.id)
+        .eq("id", newUserId)
         .single();
       if (profileErr || !profile) {
         console.error(`  ✗ could not read back profiles.role: ${profileErr?.message}`);
@@ -86,13 +90,13 @@ async function main() {
       }
       const persistedRole = (profile as { role: string }).role;
       if (persistedRole !== role) {
-        console.error(`  ✗ handle_new_user trigger persisted role="${persistedRole}", expected "${role}"`);
+        console.error(`  ✗ createAuthUser persisted role="${persistedRole}", expected "${role}"`);
         failures++;
         continue;
       }
       console.log(`  ✓ profiles.role persisted correctly as "${persistedRole}"`);
 
-      const sessionUser = { id: data.user.id, email, profile: profile as never, role: persistedRole as never };
+      const sessionUser = { id: newUserId, email, profile: profile as never, role: persistedRole as never };
 
       for (const [gateName, allowedRoles] of Object.entries(ROLE_GATES)) {
         const expected = allowedRoles.includes(role);
@@ -108,8 +112,11 @@ async function main() {
   } finally {
     console.log(`\n── Cleaning up ${createdUserIds.length} disposable test user(s) ──`);
     for (const id of createdUserIds) {
-      const { error } = await admin.auth.admin.deleteUser(id);
-      if (error) console.error(`  ✗ COULD NOT DELETE test user ${id}: ${error.message} — remove it manually.`);
+      try {
+        await deleteAuthUser(id);
+      } catch (e) {
+        console.error(`  ✗ COULD NOT DELETE test user ${id}: ${e} — remove it manually.`);
+      }
     }
     console.log("  ✓ done");
   }

@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { runAdvisorAnalysis, resolveAdvisorLanguage } from "@/lib/ai/advisor/recommendation-engine";
 import type { AdvisorLanguage, RecommendationRow } from "@/lib/ai/advisor/types";
 

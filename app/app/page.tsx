@@ -15,7 +15,7 @@ export const metadata = { title: "Install the Android app" };
  *
  * Deliberately NOT gated on a session: whoever installs this has, by definition,
  * not signed in on that phone yet. Nothing here is sensitive — it is a download
- * link and instructions. `updateSession` (lib/supabase/middleware.ts) only
+ * link and instructions. `updateSession` (lib/db/middleware.ts) only
  * refreshes cookies and gates nothing, so no matcher change was needed.
  *
  * Release metadata is resolved at request time from app/latest.json in R2, which

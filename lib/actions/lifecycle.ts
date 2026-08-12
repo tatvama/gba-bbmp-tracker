@@ -1,8 +1,8 @@
 "use server";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { analyzeReplyGap, type ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 
@@ -20,7 +20,7 @@ export interface ReplyGapResult {
  * Returns replyText: null (not an error) when no reply has been found yet.
  */
 export async function gatherReplyGapInputs(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
   replyTextOverride?: string,
 ): Promise<{ demands: string; replyText: string | null; complaintFound: boolean }> {

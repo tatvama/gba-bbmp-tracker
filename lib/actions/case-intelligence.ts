@@ -1,7 +1,7 @@
 "use server";
 
 import { after } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { buildCaseIntelligence, STALE_BUILD_MS } from "@/lib/intelligence/engine";
 
 /**

@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 
 /**
  * Register / remove this browser's Web Push endpoint.
@@ -47,12 +47,12 @@ export async function subscribeToPush(
   if (!parsed.success) return { ok: false, error: "Invalid push subscription." };
 
   const { endpoint, keys } = parsed.data;
-  const supabase = await createClient();
+  const db = await createClient();
 
   // Upsert on endpoint: re-subscribing the same browser yields the SAME
   // endpoint, so this refreshes the row (including re-homing it if a different
   // user signs in on a shared device) instead of colliding on the unique index.
-  const { error } = await supabase.from("push_subscriptions").upsert(
+  const { error } = await db.from("push_subscriptions").upsert(
     {
       user_id: user.id,
       endpoint,
@@ -77,10 +77,10 @@ export async function unsubscribeFromPush(endpoint: string): Promise<PushActionR
   if (!user) return { ok: false, error: "Not signed in." };
   if (!endpoint) return { ok: false, error: "Missing endpoint." };
 
-  const supabase = await createClient();
+  const db = await createClient();
   // RLS already restricts this to the caller's rows; the explicit user_id match
   // keeps the intent visible at the call site rather than implied by policy.
-  const { error } = await supabase
+  const { error } = await db
     .from("push_subscriptions")
     .delete()
     .eq("endpoint", endpoint)

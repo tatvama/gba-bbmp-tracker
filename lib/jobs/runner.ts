@@ -5,14 +5,14 @@ import "server-only";
  * hand-rolling its own after()+DB-row wiring — this is the "every module
  * reuses the framework" primitive.
  *
- * Deliberately request-free (takes an admin SupabaseClient, never touches
+ * Deliberately request-free (takes an admin DbClient, never touches
  * cookies/next/headers) so sweepBackgroundJobs can run from instrumentation.ts
  * with no HTTP request in flight — same reasoning as
  * lib/complaints/escalation-scheduler.ts and lib/import-queue/worker.ts.
  */
 import { after } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DbClient } from "@/lib/db";
+import { createAdminClient } from "@/lib/db";
 import { notifyUser } from "@/lib/notifications";
 import { publishJobChange } from "./bus";
 import { tryAcquire, release } from "./concurrency";
@@ -51,7 +51,7 @@ const UNIQUE_VIOLATION = "23505";
  * is queued/running fails to insert — that failure is caught here and turned
  * into "reconnect to the existing job" rather than an error.
  */
-export async function startJob(admin: SupabaseClient, opts: StartJobInput): Promise<StartJobResult> {
+export async function startJob(admin: DbClient, opts: StartJobInput): Promise<StartJobResult> {
   const { data: job, error } = await admin
     .from("background_jobs")
     .insert({
@@ -82,7 +82,7 @@ export async function startJob(admin: SupabaseClient, opts: StartJobInput): Prom
   return { ok: true, jobId };
 }
 
-async function findInFlightJob(admin: SupabaseClient, type: JobType, entityType: string | null, entityId: string | null): Promise<string | null> {
+async function findInFlightJob(admin: DbClient, type: JobType, entityType: string | null, entityId: string | null): Promise<string | null> {
   let q = admin.from("background_jobs").select("id").eq("type", type).in("status", ["queued", "running"]);
   q = entityType === null ? q.is("entity_type", null) : q.eq("entity_type", entityType);
   q = entityId === null ? q.is("entity_id", null) : q.eq("entity_id", entityId);
@@ -221,7 +221,7 @@ export async function dispatchJob(jobId: string, meta: JobDispatchMeta): Promise
 }
 
 async function failOrRetry(
-  admin: SupabaseClient,
+  admin: DbClient,
   jobId: string,
   meta: JobDispatchMeta,
   errorMsg: string,
@@ -282,7 +282,7 @@ export interface SweepResult {
  * lib/import-queue/store.ts's requeueOrphanedProcessing and the AI Advisor's
  * stale-lock reclaim, generalized once here instead of reimplemented per type.
  */
-export async function sweepBackgroundJobs(admin: SupabaseClient): Promise<SweepResult> {
+export async function sweepBackgroundJobs(admin: DbClient): Promise<SweepResult> {
   let reclaimed = 0;
   let retried = 0;
 

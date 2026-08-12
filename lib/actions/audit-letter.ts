@@ -9,7 +9,7 @@ import {
   type LetterVariant,
   type SignatoryKey,
 } from "@/lib/constants";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { generateText, isAiConfigured } from "@/lib/ai/provider";
 import { buildRoadWorkLetterPrompt } from "@/lib/ai/road-work-knowledge";
 import { assembleSkeleton, skeletonToPlainText } from "@/lib/letters/letter-skeleton";
@@ -211,8 +211,8 @@ export async function saveAuditIntake(
   } catch (e) {
     return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const db = await createClient();
+  const { data, error } = await db
     .from("audit_intakes")
     .insert({
       output_type: input.outputType,
@@ -254,8 +254,8 @@ export async function linkAuditIntake(
   } catch (e) {
     return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
-  const supabase = await createClient();
-  const { error } = await supabase
+  const db = await createClient();
+  const { error } = await db
     .from("audit_intakes")
     .update({
       entity_type: patch.entityType ?? null,

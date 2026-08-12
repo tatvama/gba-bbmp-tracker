@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "./db";
 
 /**
  * Write an in-app notification (the alerts bell). Best-effort — never throws
@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * be shared by any server module (jobs, forensic import, cron, …).
  */
 export async function notifyUser(
-  admin: SupabaseClient,
+  admin: DbClient,
   userId: string,
   n: { type: string; title: string; body?: string | null; link?: string | null; entityType?: string | null; entityId?: string | null },
 ): Promise<void> {

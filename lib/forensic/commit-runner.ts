@@ -1,7 +1,7 @@
 import "server-only";
 import { createReadStream } from "node:fs";
 import { readFile } from "node:fs/promises";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { scanDivisionVisualDuplicates } from "@/lib/forensic/job-photo-dedupe";
 import { uploadToR2 } from "@/lib/storage/r2-upload";
 import { walkTempDir, deleteTempDir, type TempDirFile } from "@/lib/forensic/zip";
@@ -103,7 +103,7 @@ function baseName(p: string): string {
  * a division yet. Best-effort throughout: anything that doesn't resolve is null.
  */
 export async function resolveOrgIds(
-  admin: SupabaseClient,
+  admin: DbClient,
   dataset: { division?: string | null; sub_division?: string | null } | null | undefined,
   jobCode: string,
 ): Promise<{ division_id: string | null; eng_subdivision_id: string | null; ward_id: string | null }> {
@@ -150,7 +150,7 @@ export async function resolveOrgIds(
  * throws) when no contact is mapped yet.
  */
 async function resolveAssignedEngineer(
-  admin: SupabaseClient,
+  admin: DbClient,
   engSubdivisionId: string | null,
 ): Promise<{ assigned_engineer_id: string | null; responsible_department: string | null }> {
   if (!engSubdivisionId) return { assigned_engineer_id: null, responsible_department: null };
@@ -176,7 +176,7 @@ async function resolveAssignedEngineer(
 }
 
 export async function commitForensicJobs(
-  admin: SupabaseClient,
+  admin: DbClient,
   params: CommitForensicParams,
 ): Promise<CommitForensicResult> {
   const startedAt = Date.now();
@@ -242,7 +242,7 @@ export async function commitForensicJobs(
 
       // 2) Upload files → R2 (bounded concurrency; per-file try/catch so one
       // file's failure never aborts the job or the batch). Dedup is R2-AWARE:
-      // skip only files that already have an R2-backed row; legacy Supabase
+      // skip only files that already have a sentinel-bucket row; older bucket+path
       // rows are re-uploaded and migrated in place.
       const { data: existingDocs } = await admin
         .from("job_documents")

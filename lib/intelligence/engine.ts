@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { ENGINE_VERSION, type CaseIntelligence, type BuildCaseIntelligenceResult } from "./types";
 import { PROMPT_VERSIONS } from "./prompts";
@@ -37,7 +37,7 @@ export const STALE_BUILD_MS = 5 * 60 * 1000;
  * Lokayukta, court petitions) — drafting is just the first caller.
  */
 export async function buildCaseIntelligence(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
   opts?: { force?: boolean },
 ): Promise<BuildCaseIntelligenceResult> {

@@ -16,7 +16,7 @@ import { loadEnv } from "./db";
 loadEnv();
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const { downloadFromR2ByKey } = await import("@/lib/storage/r2-upload");
   const { R2_STORAGE_SENTINEL } = await import("@/lib/constants");
   const admin = createAdminClient();

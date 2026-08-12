@@ -1,6 +1,6 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { downloadBuffer, uploadBuffer } from "@/lib/storage/supabase-upload";
+import { createAdminClient } from "@/lib/db";
+import { downloadBuffer, uploadBuffer } from "@/lib/storage/object-store";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { ocrAnyDocument } from "@/lib/ocr/process-job-document";
 import { fingerprintImage } from "@/lib/ocr/image-fingerprint";

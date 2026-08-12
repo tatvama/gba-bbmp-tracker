@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient, createAdminClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { writeAudit, diffFields } from "@/lib/audit";
 import {
@@ -15,7 +14,7 @@ import { RTI_WRITE_ROLES, RTI_STATUSES, RTI_DOCUMENT_TYPES, STORAGE_BUCKETS } fr
 import { getDeadlineRules } from "@/lib/settings";
 import { computeRtiDeadlines } from "@/lib/rti-deadlines";
 import type { ActionState } from "@/lib/actions/contacts";
-import { uploadBuffer, downloadBuffer, getSignedUrl, removeObject } from "@/lib/storage/supabase-upload";
+import { uploadBuffer, downloadBuffer, getSignedUrl, removeObject } from "@/lib/storage/object-store";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { analyzeRtiAcknowledgement } from "@/lib/ai/rti-acknowledgement-analyzer";
 import { summarizeRtiDocument } from "@/lib/ai/rti-document-summarizer";
@@ -61,7 +60,7 @@ function parseRti(formData: FormData) {
 }
 
 async function rtiToRow(
-  supabase: any,
+  db: any,
   input: Record<string, any>,
   deadlines: { normalDue: string | null; lifeLibertyDue: string | null; firstAppealDue: string | null; secondAppealDue: string | null },
 ) {
@@ -83,7 +82,7 @@ async function rtiToRow(
     gbaSubdivision = input.engSubDivisionId ?? null;
 
     if (gbaDivision) {
-      const { data: d } = await supabase
+      const { data: d } = await db
         .from("divisions")
         .select("id")
         .eq("name", gbaDivision)
@@ -91,7 +90,7 @@ async function rtiToRow(
       divisionId = d?.id ?? null;
     }
     if (gbaSubdivision) {
-      const { data: s } = await supabase
+      const { data: s } = await db
         .from("eng_subdivisions")
         .select("id")
         .eq("name", gbaSubdivision)
@@ -182,22 +181,22 @@ export async function createRti(_prev: ActionState, formData: FormData): Promise
   if (!parsed.success)
     return { error: "Please fix the errors below.", fieldErrors: fieldErrors(parsed.error) };
 
-  const supabase = await createClient();
+  const db = await createClient();
   const deadlines = await deadlinesFor(parsed.data);
   const row = {
-    ...await rtiToRow(supabase, parsed.data, deadlines),
+    ...await rtiToRow(db, parsed.data, deadlines),
     internal_ref: genRef("RTI"),
     created_by: user.id,
     updated_by: user.id,
   };
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("rti_applications")
     .insert(row)
     .select("id")
     .single();
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti",
     entityId: data.id,
     changedBy: user.id,
@@ -222,14 +221,14 @@ export async function updateRti(
   if (!parsed.success)
     return { error: "Please fix the errors below.", fieldErrors: fieldErrors(parsed.error) };
 
-  const supabase = await createClient();
-  const { data: before } = await supabase.from("rti_applications").select("*").eq("id", id).single();
+  const db = await createClient();
+  const { data: before } = await db.from("rti_applications").select("*").eq("id", id).single();
   const deadlines = await deadlinesFor(parsed.data);
-  const row = { ...await rtiToRow(supabase, parsed.data, deadlines), updated_by: user.id };
-  const { error } = await supabase.from("rti_applications").update(row).eq("id", id);
+  const row = { ...await rtiToRow(db, parsed.data, deadlines), updated_by: user.id };
+  const { error } = await db.from("rti_applications").update(row).eq("id", id);
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti",
     entityId: id,
     changedBy: user.id,
@@ -247,10 +246,10 @@ export async function deleteRti(id: string): Promise<ActionState> {
   } catch (e) {
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
-  const supabase = await createClient();
-  const { error } = await supabase.from("rti_applications").delete().eq("id", id);
+  const db = await createClient();
+  const { error } = await db.from("rti_applications").delete().eq("id", id);
   if (error) return { error: error.message };
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti",
     entityId: id,
     changedBy: user.id,
@@ -285,7 +284,7 @@ export async function createFirstAppeal(
     return { error: "Please fix the errors below.", fieldErrors: fieldErrors(parsed.error) };
   const d = parsed.data;
 
-  const supabase = await createClient();
+  const db = await createClient();
   const rules = await getDeadlineRules();
   const faaOrderDue = d.dateFiled
     ? // FAA disposal target from filing date
@@ -312,7 +311,7 @@ export async function createFirstAppeal(
     created_by: user.id,
     updated_by: user.id,
   };
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("rti_first_appeals")
     .insert(row)
     .select("id")
@@ -330,9 +329,9 @@ export async function createFirstAppeal(
     rtiUpdate.second_appeal_due = secondAppealDue;
     rtiUpdate.status = "FAA Order Received";
   }
-  await supabase.from("rti_applications").update(rtiUpdate).eq("id", rtiId);
+  await db.from("rti_applications").update(rtiUpdate).eq("id", rtiId);
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti_first_appeal",
     entityId: data.id,
     changedBy: user.id,
@@ -368,7 +367,7 @@ export async function createSecondAppeal(
     return { error: "Please fix the errors below.", fieldErrors: fieldErrors(parsed.error) };
   const d = parsed.data;
 
-  const supabase = await createClient();
+  const db = await createClient();
   const row = {
     rti_id: rtiId,
     first_appeal_id: d.firstAppealId ?? null,
@@ -388,19 +387,19 @@ export async function createSecondAppeal(
     created_by: user.id,
     updated_by: user.id,
   };
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("rti_second_appeals")
     .insert(row)
     .select("id")
     .single();
   if (error) return { error: error.message };
 
-  await supabase
+  await db
     .from("rti_applications")
     .update({ status: d.filingDate ? "Second Appeal Filed" : "Second Appeal Drafted", updated_by: user.id })
     .eq("id", rtiId);
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti_second_appeal",
     entityId: data.id,
     changedBy: user.id,
@@ -433,10 +432,10 @@ export async function uploadRtiAcknowledgementAction(
     return { error: "Only image files (JPEG, PNG, WebP) and PDF documents are supported" };
   }
 
-  const supabase = await createClient();
+  const db = await createClient();
 
   // Get current user name for history
-  const { data: profile } = await supabase
+  const { data: profile } = await db
     .from("profiles")
     .select("name")
     .eq("id", user.id)
@@ -447,7 +446,7 @@ export async function uploadRtiAcknowledgementAction(
     const startTime = Date.now();
 
     // 1. Read existing record to check if we are replacing/superseding
-    const { data: before } = await supabase
+    const { data: before } = await db
       .from("rti_applications")
       .select("*")
       .eq("id", rtiId)
@@ -479,7 +478,7 @@ export async function uploadRtiAcknowledgementAction(
         timestamp: new Date().toISOString(),
         user: userName,
       });
-      await writeAudit(supabase, {
+      await writeAudit(db, {
         entityType: "rti",
         entityId: rtiId,
         changedBy: user.id,
@@ -491,7 +490,7 @@ export async function uploadRtiAcknowledgementAction(
         timestamp: new Date().toISOString(),
         user: userName,
       });
-      await writeAudit(supabase, {
+      await writeAudit(db, {
         entityType: "rti",
         entityId: rtiId,
         changedBy: user.id,
@@ -513,7 +512,7 @@ export async function uploadRtiAcknowledgementAction(
     });
 
     // Set initial status to Uploaded
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_image_path: storagePath,
@@ -539,7 +538,7 @@ export async function uploadRtiAcknowledgementAction(
       user: "System (Tesseract)",
     });
 
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_status: "OCR Processing",
@@ -589,7 +588,7 @@ export async function uploadRtiAcknowledgementAction(
       user: "System (Tesseract)",
     });
 
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_ocr_text: combinedOcrText,
@@ -607,7 +606,7 @@ export async function uploadRtiAcknowledgementAction(
       user: "System (AI)",
     });
 
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_status: "AI Processing",
@@ -662,7 +661,7 @@ export async function uploadRtiAcknowledgementAction(
       user: "System (AI)",
     });
 
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_status: finalAckStatus,
@@ -683,7 +682,7 @@ export async function uploadRtiAcknowledgementAction(
       .eq("id", rtiId);
 
     // Audit trace for all changes
-    await writeAudit(supabase, {
+    await writeAudit(db, {
       entityType: "rti",
       entityId: rtiId,
       changedBy: user.id,
@@ -700,14 +699,14 @@ export async function uploadRtiAcknowledgementAction(
     console.error("[uploadRtiAcknowledgementAction]", e);
     // Safe fall-back: set status to Verification Failed, but keep uploaded details
     try {
-      const { data: current } = await supabase
+      const { data: current } = await db
         .from("profiles")
         .select("name")
         .eq("id", user.id)
         .single();
       const fallbackUserName = current?.name || user.email || "Unknown User";
 
-      const { data: currentRti } = await supabase
+      const { data: currentRti } = await db
         .from("rti_applications")
         .select("ack_history")
         .eq("id", rtiId)
@@ -718,7 +717,7 @@ export async function uploadRtiAcknowledgementAction(
         timestamp: new Date().toISOString(),
         user: `System (Error: ${e instanceof Error ? e.message : "Pipeline error"})`,
       });
-      await supabase
+      await db
         .from("rti_applications")
         .update({
           ack_status: "Verification Failed",
@@ -743,8 +742,8 @@ export async function runAiVerificationOnlyAction(rtiId: string): Promise<Action
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: profile } = await supabase
+  const db = await createClient();
+  const { data: profile } = await db
     .from("profiles")
     .select("name")
     .eq("id", user.id)
@@ -752,7 +751,7 @@ export async function runAiVerificationOnlyAction(rtiId: string): Promise<Action
   const userName = profile?.name || user.email || "Unknown User";
 
   try {
-    const rti = await supabase
+    const rti = await db
       .from("rti_applications")
       .select("*")
       .eq("id", rtiId)
@@ -773,7 +772,7 @@ export async function runAiVerificationOnlyAction(rtiId: string): Promise<Action
       user: userName,
     });
 
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_status: "AI Processing",
@@ -834,7 +833,7 @@ export async function runAiVerificationOnlyAction(rtiId: string): Promise<Action
     };
 
     // Update DB
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_status: finalAckStatus,
@@ -853,7 +852,7 @@ export async function runAiVerificationOnlyAction(rtiId: string): Promise<Action
       })
       .eq("id", rtiId);
 
-    await writeAudit(supabase, {
+    await writeAudit(db, {
       entityType: "rti",
       entityId: rtiId,
       changedBy: user.id,
@@ -879,8 +878,8 @@ export async function confirmRtiFiledAction(rtiId: string): Promise<ActionState>
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: profile } = await supabase
+  const db = await createClient();
+  const { data: profile } = await db
     .from("profiles")
     .select("name")
     .eq("id", user.id)
@@ -888,7 +887,7 @@ export async function confirmRtiFiledAction(rtiId: string): Promise<ActionState>
   const userName = profile?.name || user.email || "Unknown User";
 
   try {
-    const { data: before } = await supabase
+    const { data: before } = await db
       .from("rti_applications")
       .select("status, date_filed, ack_history")
       .eq("id", rtiId)
@@ -907,7 +906,7 @@ export async function confirmRtiFiledAction(rtiId: string): Promise<ActionState>
     });
 
     // Update status to Filed, update filing date if it was null
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         status: "Filed",
@@ -917,7 +916,7 @@ export async function confirmRtiFiledAction(rtiId: string): Promise<ActionState>
       })
       .eq("id", rtiId);
 
-    await writeAudit(supabase, {
+    await writeAudit(db, {
       entityType: "rti",
       entityId: rtiId,
       changedBy: user.id,
@@ -944,8 +943,8 @@ export async function deleteRtiAcknowledgementAction(rtiId: string): Promise<Act
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: profile } = await supabase
+  const db = await createClient();
+  const { data: profile } = await db
     .from("profiles")
     .select("name")
     .eq("id", user.id)
@@ -953,7 +952,7 @@ export async function deleteRtiAcknowledgementAction(rtiId: string): Promise<Act
   const userName = profile?.name || user.email || "Unknown User";
 
   try {
-    const { data: before } = await supabase
+    const { data: before } = await db
       .from("rti_applications")
       .select("*")
       .eq("id", rtiId)
@@ -990,7 +989,7 @@ export async function deleteRtiAcknowledgementAction(rtiId: string): Promise<Act
     });
 
     // Reset current acknowledgement columns
-    await supabase
+    await db
       .from("rti_applications")
       .update({
         ack_image_path: null,
@@ -1010,7 +1009,7 @@ export async function deleteRtiAcknowledgementAction(rtiId: string): Promise<Act
       })
       .eq("id", rtiId);
 
-    await writeAudit(supabase, {
+    await writeAudit(db, {
       entityType: "rti",
       entityId: rtiId,
       changedBy: user.id,
@@ -1032,16 +1031,16 @@ export async function getSignedUrlAction(path: string): Promise<string | null> {
   } catch {
     return null;
   }
-  // R2 files are stored as full public URLs — return directly, no Supabase lookup.
+  // R2 files are stored as full public URLs — return directly, no signing needed.
   if (isR2Url(path)) return path;
-  // Legacy: Supabase-stored files use a short-lived signed URL.
+  // Bucket+path rows get a short-lived signed URL.
   return getSignedUrl(STORAGE_BUCKETS.rti, path);
 }
 
 // ── RTI documents (capture/scan → merge PDF → OCR → summarise) ────────────────
 //   Flexible, typed document list per RTI (Application, Acknowledgement, Reply,
 //   FAA Order, …). Replaces the single-slot acknowledgement flow. See
-//   supabase/migrations/0015_rti_documents.sql.
+//   db/migrations/0015_rti_documents.sql.
 
 /** Doc types whose upload starts/seeds the statutory reply clock. */
 const CLOCK_DOC_TYPES = new Set(["Application", "Acknowledgement"]);
@@ -1309,8 +1308,8 @@ export async function commitRtiLettersAction(params: {
     return { error: "Nothing to create." };
   }
 
-  const supabase = await createClient();
-  const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+  const db = await createClient();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", user.id).single();
   const userName = profile?.name || user.email || "Unknown User";
 
   const stagingPdf = isR2Url(storagePath)
@@ -1353,12 +1352,12 @@ export async function commitRtiLettersAction(params: {
         rules,
       );
       const row = {
-        ...(await rtiToRow(supabase, input, deadlines)),
+        ...(await rtiToRow(db, input, deadlines)),
         internal_ref: genUniqueRef(),
         created_by: user.id,
         updated_by: user.id,
       };
-      const { data: created, error: cErr } = await supabase
+      const { data: created, error: cErr } = await db
         .from("rti_applications")
         .insert(row)
         .select("id")
@@ -1367,7 +1366,7 @@ export async function commitRtiLettersAction(params: {
       const newId = created.id as string;
       createdIds.push(newId);
 
-      await writeAudit(supabase, {
+      await writeAudit(db, {
         entityType: "rti",
         entityId: newId,
         changedBy: user.id,
@@ -1393,7 +1392,7 @@ export async function commitRtiLettersAction(params: {
       });
 
       // 4. Attach the split as this case's Application document.
-      await supabase.from("rti_documents").insert({
+      await db.from("rti_documents").insert({
         rti_id: newId,
         doc_type: "Application",
         title: null,
@@ -1479,11 +1478,11 @@ export async function uploadRtiDocumentAction(
     parts.push({ buffer: Buffer.from(await f.arrayBuffer()), mimeType: isPdf ? "application/pdf" : f.type });
   }
 
-  const supabase = await createClient();
-  const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+  const db = await createClient();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", user.id).single();
   const userName = profile?.name || user.email || "Unknown User";
 
-  const { data: rti } = await supabase
+  const { data: rti } = await db
     .from("rti_applications")
     .select("id, subject, internal_ref, public_authority, category, date_filed, date_received, reply_date, is_life_liberty, status")
     .eq("id", rtiId)
@@ -1503,7 +1502,7 @@ export async function uploadRtiDocumentAction(
     });
 
     // 3. Create the document row (processing).
-    const { data: inserted, error: insErr } = await supabase
+    const { data: inserted, error: insErr } = await db
       .from("rti_documents")
       .insert({
         rti_id: rtiId,
@@ -1524,7 +1523,7 @@ export async function uploadRtiDocumentAction(
     if (insErr || !inserted) throw new Error(insErr?.message || "Failed to create document record");
     docId = inserted.id;
 
-    await writeAudit(supabase, {
+    await writeAudit(db, {
       entityType: "rti",
       entityId: rtiId,
       changedBy: user.id,
@@ -1533,7 +1532,7 @@ export async function uploadRtiDocumentAction(
 
     // 4. OCR + AI summary.
     const { ocrText, ocrConfidence, summary } = await ocrAndSummarize(pdf, rti);
-    await supabase
+    await db
       .from("rti_documents")
       .update({
         ocr_text: ocrText,
@@ -1624,9 +1623,9 @@ export async function uploadRtiDocumentAction(
 
       if (Object.keys(patch).length > 0) {
         patch.updated_by = user.id;
-        await supabase.from("rti_applications").update(patch).eq("id", rtiId);
+        await db.from("rti_applications").update(patch).eq("id", rtiId);
         if (changes.length > 0) {
-          await writeAudit(supabase, { entityType: "rti", entityId: rtiId, changedBy: user.id, changes });
+          await writeAudit(db, { entityType: "rti", entityId: rtiId, changedBy: user.id, changes });
         }
       }
     }
@@ -1638,7 +1637,7 @@ export async function uploadRtiDocumentAction(
     console.error("[uploadRtiDocumentAction]", e);
     if (docId) {
       try {
-        await supabase
+        await db
           .from("rti_documents")
           .update({ ocr_status: "Failed", ai_status: "Failed" })
           .eq("id", docId);
@@ -1660,22 +1659,22 @@ export async function reprocessRtiDocumentAction(docId: string): Promise<ActionS
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: doc } = await supabase
+  const db = await createClient();
+  const { data: doc } = await db
     .from("rti_documents")
     .select("id, rti_id, pdf_path")
     .eq("id", docId)
     .single();
   if (!doc) return { error: "Document not found" };
 
-  const { data: rti } = await supabase
+  const { data: rti } = await db
     .from("rti_applications")
     .select("subject, internal_ref, public_authority")
     .eq("id", doc.rti_id)
     .single();
 
   try {
-    await supabase
+    await db
       .from("rti_documents")
       .update({ ocr_status: "Processing", ai_status: "Pending" })
       .eq("id", docId);
@@ -1686,7 +1685,7 @@ export async function reprocessRtiDocumentAction(docId: string): Promise<ActionS
     if (!pdf) throw new Error("Stored PDF could not be downloaded");
 
     const { ocrText, ocrConfidence, summary } = await ocrAndSummarize(pdf, rti ?? {});
-    await supabase
+    await db
       .from("rti_documents")
       .update({
         ocr_text: ocrText,
@@ -1703,7 +1702,7 @@ export async function reprocessRtiDocumentAction(docId: string): Promise<ActionS
   } catch (e) {
     console.error("[reprocessRtiDocumentAction]", e);
     try {
-      await supabase
+      await db
         .from("rti_documents")
         .update({ ocr_status: "Failed", ai_status: "Failed" })
         .eq("id", docId);
@@ -1723,8 +1722,8 @@ export async function deleteRtiDocumentAction(docId: string): Promise<ActionStat
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: doc } = await supabase
+  const db = await createClient();
+  const { data: doc } = await db
     .from("rti_documents")
     .select("id, rti_id, pdf_path, doc_type")
     .eq("id", docId)
@@ -1737,7 +1736,7 @@ export async function deleteRtiDocumentAction(docId: string): Promise<ActionStat
   if (isR2Url(doc.pdf_path)) await deleteFromR2(doc.pdf_path);
   else await removeObject(STORAGE_BUCKETS.rti, doc.pdf_path);
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti",
     entityId: doc.rti_id,
     changedBy: user.id,
@@ -1759,8 +1758,8 @@ export async function updateRtiFilingDateAction(
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: rti } = await supabase
+  const db = await createClient();
+  const { data: rti } = await db
     .from("rti_applications")
     .select("date_filed, date_received, reply_date, is_life_liberty, status")
     .eq("id", rtiId)
@@ -1779,7 +1778,7 @@ export async function updateRtiFilingDateAction(
     rules,
   );
 
-  await supabase
+  await db
     .from("rti_applications")
     .update({
       date_filed: filingDate,
@@ -1791,7 +1790,7 @@ export async function updateRtiFilingDateAction(
     })
     .eq("id", rtiId);
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti",
     entityId: rtiId,
     changedBy: user.id,
@@ -1829,15 +1828,15 @@ export async function closeRtiCaseAction(rtiId: string): Promise<ActionState> {
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: rti } = await supabase
+  const db = await createClient();
+  const { data: rti } = await db
     .from("rti_applications")
     .select("status")
     .eq("id", rtiId)
     .single();
   if (!rti) return { error: "RTI application not found" };
 
-  const { data: docs } = await supabase
+  const { data: docs } = await db
     .from("rti_documents")
     .select("doc_type")
     .eq("rti_id", rtiId);
@@ -1846,13 +1845,13 @@ export async function closeRtiCaseAction(rtiId: string): Promise<ActionState> {
     return { error: "Upload a reply or an appeal order before closing this case." };
   }
 
-  const { error } = await supabase
+  const { error } = await db
     .from("rti_applications")
     .update({ status: "Closed", updated_by: user.id })
     .eq("id", rtiId);
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti",
     entityId: rtiId,
     changedBy: user.id,
@@ -1872,27 +1871,27 @@ export async function reopenRtiCaseAction(rtiId: string): Promise<ActionState> {
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
 
-  const supabase = await createClient();
-  const { data: rti } = await supabase
+  const db = await createClient();
+  const { data: rti } = await db
     .from("rti_applications")
     .select("status")
     .eq("id", rtiId)
     .single();
   if (!rti) return { error: "RTI application not found" };
 
-  const { data: docs } = await supabase
+  const { data: docs } = await db
     .from("rti_documents")
     .select("doc_type")
     .eq("rti_id", rtiId);
   const reopened = impliedStatusFromDocTypes(new Set((docs ?? []).map((d) => d.doc_type)));
 
-  const { error } = await supabase
+  const { error } = await db
     .from("rti_applications")
     .update({ status: reopened, updated_by: user.id })
     .eq("id", rtiId);
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "rti",
     entityId: rtiId,
     changedBy: user.id,

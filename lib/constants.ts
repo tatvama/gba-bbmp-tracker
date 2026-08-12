@@ -118,7 +118,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
 
 // BBMP responsible-department taxonomy. A complaint's `type` is the department
 // that owns the issue — the same set the AI classifier picks from during import
-// and the DB CHECK constraint enforces (see supabase/migrations/0039). Keep this
+// and the DB CHECK constraint enforces (see db/migrations/0039). Keep this
 // list, COMPLAINT_TYPE_VALUES (lib/ai/complaint-intake-analyzer.ts), and mig 0039
 // in sync.
 export const COMPLAINT_TYPES = [
@@ -475,7 +475,7 @@ export const ALLOWED_UPLOAD_MIME = [
   "image/jpeg", "image/png", "image/webp", "application/pdf",
 ] as const;
 
-/** Supabase Storage buckets (all private). */
+/** Logical document buckets. Each is an R2 key prefix (lib/storage/object-store.ts). */
 export const STORAGE_BUCKETS = {
   documents: "complaint-documents",
   evidence: "complaint-evidence",
@@ -488,7 +488,7 @@ export const STORAGE_BUCKETS = {
 /**
  * Sentinel written to job_documents/complaint_documents.storage_bucket for R2-
  * backed rows (forensic-ZIP import). ALWAYS this literal string, never null —
- * a real Supabase bucket name is equally truthy, so every existing
+ * a logical bucket name is equally truthy, so every existing
  * `doc.storage_bucket && doc.storage_path` guard elsewhere in the codebase
  * (e.g. lib/actions/job-audit.ts) keeps working unmodified for R2 rows too.
  * storage_path for these rows holds a bare R2 object key, never a full URL.

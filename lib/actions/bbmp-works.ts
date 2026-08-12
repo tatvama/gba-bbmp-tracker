@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { writeAudit, diffFields } from "@/lib/audit";
 import { WRITE_ROLES } from "@/lib/constants";
@@ -63,8 +63,8 @@ export async function updateBbmpWork(
     };
   }
 
-  const supabase = await createClient();
-  const { data: before } = await supabase.from("bbmp_works").select("*").eq("id", id).single();
+  const db = await createClient();
+  const { data: before } = await db.from("bbmp_works").select("*").eq("id", id).single();
   if (!before) return { error: "Work record not found." };
 
   const row = {
@@ -126,10 +126,10 @@ export async function updateBbmpWork(
     remarks: str(obj.remarks),
   };
 
-  const { error } = await supabase.from("bbmp_works").update(row).eq("id", id);
+  const { error } = await db.from("bbmp_works").update(row).eq("id", id);
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "bbmp_work",
     entityId: id,
     changedBy: user.id,

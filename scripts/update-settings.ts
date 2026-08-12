@@ -1,16 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import * as dotenv from "dotenv";
 
-dotenv.config();
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+dotenv.config();
+const db = createDbClient();
 
 async function run() {
   console.log("Fetching current RTI deadline rules...");
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("app_settings")
     .select("value")
     .eq("key", "rti_deadline_rules")
@@ -30,7 +26,7 @@ async function run() {
   };
 
   console.log("Updating secondAppealDays to 15...");
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from("app_settings")
     .update({ value: updatedRules })
     .eq("key", "rti_deadline_rules");

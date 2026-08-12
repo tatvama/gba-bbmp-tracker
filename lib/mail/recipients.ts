@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { resolveOfficerForWard } from "@/lib/contacts/resolve-officer";
 import { officerDisplayName } from "@/lib/contacts/officer-recipient";
 import { isValidEmail, normalizeAddressList } from "./message";
@@ -80,7 +80,7 @@ export function pickEmailableOfficer(
   return null;
 }
 
-async function fetchContacts(admin: SupabaseClient, ids: string[]): Promise<Map<string, ContactLite>> {
+async function fetchContacts(admin: DbClient, ids: string[]): Promise<Map<string, ContactLite>> {
   const map = new Map<string, ContactLite>();
   const wanted = ids.filter(Boolean);
   if (!wanted.length) return map;
@@ -90,7 +90,7 @@ async function fetchContacts(admin: SupabaseClient, ids: string[]): Promise<Map<
 }
 
 export async function resolveComplaintEmailRecipients(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
 ): Promise<EmailRecipients> {
   try {
@@ -102,7 +102,7 @@ export async function resolveComplaintEmailRecipients(
 
     if (!complaint) return EMPTY("Complaint not found.");
 
-    // Through `unknown`: supabase-js's inference types an embedded resource as an
+    // Through `unknown`: the PostgREST client inferred an embedded resource as an
     // array even for a many-to-one FK join, where it is an object at runtime —
     // the same assumption lib/queries.ts makes for this exact `ward:wards!ward_id`
     // embed. Normalized below so either shape works.

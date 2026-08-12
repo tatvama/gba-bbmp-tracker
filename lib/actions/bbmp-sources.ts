@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { WRITE_ROLES } from "@/lib/constants";
 import { startJob } from "@/lib/jobs/runner";

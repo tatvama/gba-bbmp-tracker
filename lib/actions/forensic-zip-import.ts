@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { commitForensicJobs } from "@/lib/forensic/commit-runner";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_WRITE_ROLES } from "@/lib/constants";
 import type { CommitForensicResult, ForensicImportBatch, ForensicJobResult } from "@/lib/forensic/skill-output";

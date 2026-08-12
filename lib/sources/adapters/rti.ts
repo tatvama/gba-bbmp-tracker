@@ -8,15 +8,15 @@ import "server-only";
  * BBMPWorkDetails fields — so this adapter reports no facts, only a
  * citation, which still counts toward the official-source tiering rule.
  */
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { registerSourceAdapter } from "@/lib/sources/registry";
 import type { WorkSourceAdapter, WorkSourceAdapterResult, WorkSourceQuery } from "@/lib/sources/types";
 
 async function search(query: WorkSourceQuery): Promise<WorkSourceAdapterResult> {
   if (!query.jobNumber) return { ok: true, facts: [], citation: null };
-  const supabase = createAdminClient();
+  const db = createAdminClient();
 
-  const { data: rti, error: rtiError } = await supabase
+  const { data: rti, error: rtiError } = await db
     .from("rti_applications")
     .select("id, internal_ref, rti_number")
     .eq("job_number", query.jobNumber)
@@ -26,7 +26,7 @@ async function search(query: WorkSourceQuery): Promise<WorkSourceAdapterResult> 
   if (rtiError) return { ok: false, facts: [], citation: null, error: rtiError.message };
   if (!rti) return { ok: true, facts: [], citation: null };
 
-  const { data: doc } = await supabase
+  const { data: doc } = await db
     .from("rti_documents")
     .select("title, doc_type, page_count, doc_date")
     .eq("rti_id", rti.id)

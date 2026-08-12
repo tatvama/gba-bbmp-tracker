@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { getComplaintSettings } from "@/lib/settings";
 import type {
   ComplaintWithRelations,
@@ -24,7 +24,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
  * one place. Returns null when the complaint doesn't exist (deleted mid-flight).
  */
 export async function buildAdvisorContext(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
 ): Promise<AdvisorContext | null> {
   const [{ data: complaint }, settings] = await Promise.all([

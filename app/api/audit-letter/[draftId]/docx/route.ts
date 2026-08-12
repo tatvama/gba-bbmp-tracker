@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { RTI_WRITE_ROLES, COMPLAINT_WRITE_ROLES, type UserRole } from "@/lib/constants";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { buildLetterDocx } from "@/lib/docx/bill-stop-builder";
 import type { LetterSkeleton } from "@/lib/letters/types";
 
@@ -22,8 +22,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ draftId: s
   }
 
   const { draftId } = await ctx.params;
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const db = await createClient();
+  const { data, error } = await db
     .from("audit_intakes")
     .select("skeleton, job_number")
     .eq("id", draftId)

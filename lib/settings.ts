@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import {
   DEFAULT_DEADLINE_RULES,
   type DeadlineRules,
@@ -33,8 +33,8 @@ export const TVCC_SENDER_KEY = "tvcc_sender";
  */
 export async function getDeadlineRules(): Promise<DeadlineRules> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", DEADLINE_RULES_KEY)
@@ -52,8 +52,8 @@ export async function getDeadlineRules(): Promise<DeadlineRules> {
  */
 export async function getComplaintSettings(): Promise<ComplaintSettings> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", COMPLAINT_SETTINGS_KEY)
@@ -68,8 +68,8 @@ export async function getComplaintSettings(): Promise<ComplaintSettings> {
 /** Read the configurable duplicate-photo detection thresholds, merged over defaults. */
 export async function getPhotoDedupeRules(): Promise<PhotoDedupeRules> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", PHOTO_DEDUPE_RULES_KEY)
@@ -90,8 +90,8 @@ export async function getPhotoDedupeRules(): Promise<PhotoDedupeRules> {
  */
 export async function getLegalNoticeSender(): Promise<LegalNoticeSender> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", LEGAL_NOTICE_SENDER_KEY)
@@ -111,8 +111,8 @@ export async function getLegalNoticeSender(): Promise<LegalNoticeSender> {
  */
 export async function getDeptLetterSender(): Promise<DeptLetterSender> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", DEPT_LETTER_SENDER_KEY)
@@ -132,8 +132,8 @@ export async function getDeptLetterSender(): Promise<DeptLetterSender> {
  */
 export async function getTvccOffices(): Promise<Record<CorporationCode, TvccOffice>> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", TVCC_OFFICES_KEY)
@@ -149,8 +149,8 @@ export async function getTvccOffices(): Promise<Record<CorporationCode, TvccOffi
  *  over the seed default. Pre-fills the "from address" fields in the copy dialog. */
 export async function getTvccSender(): Promise<TvccSender> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", TVCC_SENDER_KEY)
@@ -165,8 +165,8 @@ export async function getTvccSender(): Promise<TvccSender> {
 /** Read forensics thresholds (geofence radius, etc.), merged over defaults. */
 export async function getForensicsRules(): Promise<ForensicsRules> {
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const db = await createClient();
+    const { data } = await db
       .from("app_settings")
       .select("value")
       .eq("key", FORENSICS_RULES_KEY)

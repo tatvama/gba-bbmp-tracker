@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "../db";
 
 /**
  * Plain (non-"use server") background_jobs reads — deliberately NOT in
@@ -39,7 +39,7 @@ const COLS =
 
 /** Active (queued/running/retrying) jobs plus a recent-history window of
  *  terminal ones, for a specific user — the Global Task Center's data. */
-export async function listActiveAndRecentJobs(admin: SupabaseClient, userId: string, recentHours = 24): Promise<JobRow[]> {
+export async function listActiveAndRecentJobs(admin: DbClient, userId: string, recentHours = 24): Promise<JobRow[]> {
   const cutoff = new Date(Date.now() - recentHours * 3_600_000).toISOString();
   const { data } = await admin
     .from("background_jobs")

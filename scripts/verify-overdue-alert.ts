@@ -41,7 +41,7 @@ async function main() {
   // never goes through the request-triggered code path that normally imports
   // it (lib/jobs/handlers/index.ts, pulled in by lib/actions/mail.ts et al.).
   await import("@/lib/jobs/handlers");
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const { sweepOverdueAlerts } = await import("@/lib/complaints/overdue-alert-scheduler");
   const { sweepBackgroundJobs } = await import("@/lib/jobs/runner");
 

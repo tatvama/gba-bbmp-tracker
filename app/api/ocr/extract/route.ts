@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
-import { validateUpload } from "@/lib/storage/supabase-upload";
+import { validateUpload } from "@/lib/storage/object-store";
 import { runOcr } from "@/lib/ocr/ocr-service";
 import { extractWorkOrder } from "@/lib/ai/road-work-extractor";
 import { getComplaintSettings } from "@/lib/settings";

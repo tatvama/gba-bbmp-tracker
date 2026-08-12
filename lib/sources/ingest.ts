@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { recomputeVerification } from "@/lib/bbmp-works/verification";
 import { SOURCE_DISPLAY_NAME } from "./types";
 import type { SourceCitation, SourceFact } from "./types";
@@ -57,12 +57,12 @@ const FIELD_TO_COLUMN: Record<string, string> = {
  *  record one work_sources citation, and recompute verification_status.
  *  Returns the work's id. */
 export async function ingestFacts(
-  supabase: SupabaseClient,
+  db: DbClient,
   params: { jobNumber: string; facts: SourceFact[]; citation: SourceCitation; userId?: string },
 ): Promise<string> {
   const { jobNumber, facts, citation, userId } = params;
 
-  const { data: existing } = await supabase
+  const { data: existing } = await db
     .from("bbmp_works")
     .select("id")
     .eq("job_number", jobNumber)
@@ -81,11 +81,11 @@ export async function ingestFacts(
   if (existing?.id) {
     workId = existing.id;
     if (Object.keys(patch).length) {
-      const { error } = await supabase.from("bbmp_works").update(patch).eq("id", workId);
+      const { error } = await db.from("bbmp_works").update(patch).eq("id", workId);
       if (error) throw new Error(`ingestFacts: update failed — ${error.message}`);
     }
   } else {
-    const { data: inserted, error } = await supabase
+    const { data: inserted, error } = await db
       .from("bbmp_works")
       .insert({ job_number: jobNumber, ...patch, created_by: userId ?? null })
       .select("id")
@@ -94,7 +94,7 @@ export async function ingestFacts(
     workId = inserted.id;
   }
 
-  const { error: sourceError } = await supabase.from("work_sources").insert({
+  const { error: sourceError } = await db.from("work_sources").insert({
     work_id: workId,
     source_id: citation.sourceId,
     source_name: SOURCE_DISPLAY_NAME[citation.sourceId],
@@ -108,6 +108,6 @@ export async function ingestFacts(
   });
   if (sourceError) throw new Error(`ingestFacts: source insert failed — ${sourceError.message}`);
 
-  await recomputeVerification(supabase, workId);
+  await recomputeVerification(db, workId);
   return workId;
 }

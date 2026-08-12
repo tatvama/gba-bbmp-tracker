@@ -13,7 +13,7 @@ import { getDivisionResponsibleOfficers } from "@/lib/dedupe-photos";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { formatDate, orDash } from "@/lib/format";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { triggerCaseIntelligenceRebuild } from "@/lib/actions/case-intelligence";
 import { STALE_BUILD_MS } from "@/lib/intelligence/engine";
 import { AutoRefresh } from "@/components/auto-refresh";

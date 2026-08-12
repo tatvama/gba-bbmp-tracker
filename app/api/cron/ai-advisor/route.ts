@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
 import { runAdvisorAnalysis } from "@/lib/ai/advisor/recommendation-engine";
 

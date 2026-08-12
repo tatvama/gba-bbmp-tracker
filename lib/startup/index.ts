@@ -4,7 +4,7 @@ export { StartupManager } from "./manager";
 export { StartupLogger } from "./logger";
 export type { StartupTask } from "./types";
 export { EnvironmentValidationTask } from "./environment";
-export { SupabaseClientTask, DatabaseConnectivityTask } from "./supabase";
+export { DatabaseConfigurationTask, DatabaseConnectivityTask } from "./database";
 export { DatabaseMigrationTask } from "./migrations";
 export { DatabaseSeedingTask } from "./seed";
 export { StorageInitializationTask } from "./storage";

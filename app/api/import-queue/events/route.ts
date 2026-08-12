@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { listImportSessions } from "@/lib/import-queue/store";
 import { subscribeImportChanges } from "@/lib/import-queue/bus";
 import { kickImportWorker } from "@/lib/import-queue/worker";

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { listAllTaskItems } from "@/lib/jobs/adapters";
 import { subscribeJobChanges } from "@/lib/jobs/bus";
 

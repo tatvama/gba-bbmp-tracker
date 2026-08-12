@@ -2,9 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  SESSION_COOKIE_NAME,
+  sessionCookieOptions,
+  signSessionToken,
+} from "@/lib/session";
+import { verifyCredentials, recordSignIn, findEmailByPhone } from "@/lib/db/auth";
 import { isValidIndianMobile, normalizePhone } from "@/lib/phone";
 
 const credsSchema = z.object({
@@ -44,46 +49,38 @@ export async function signInAction(
       return { error: "Enter a valid email or phone number" };
     }
 
-    // Supabase Auth's own phone identifier needs an SMS provider (e.g.
-    // Twilio) configured project-wide before it'll accept ANY phone sign-in
-    // — even this password-only kind with no OTP involved. Rather than take
-    // on that dependency, a phone number is resolved to its linked email via
-    // profiles (kept in sync by lib/actions/users.ts) and signed in below the
-    // same way an email identifier already is.
-    let admin;
-    try {
-      admin = createAdminClient();
-    } catch {
-      return { error: "Server is misconfigured — contact an admin." };
-    }
+    // A phone number is resolved to its linked email via profiles (kept in sync
+    // by lib/actions/users.ts) and then signed in exactly as an email would be.
+    // This indirection predates the move off Supabase — it existed because
+    // Supabase's own phone identifier required an SMS provider — and is kept
+    // because profiles.phone remains the only place a phone is recorded.
     const e164Phone = `+91${normalizePhone(identifier)}`;
-    const { data: matches } = await admin
-      .from("profiles")
-      .select("email")
-      .eq("phone", e164Phone)
-      .limit(2);
-    // Exactly one match required — 0 means no account uses this phone, 2+
-    // means an admin assigned it to more than one account and the target is
-    // ambiguous. Same generic message either way so a login attempt can't be
-    // used to probe which phone numbers are registered.
-    const match = matches && matches.length === 1 ? matches[0] : undefined;
-    if (!match?.email) {
-      return { error: "Invalid login credentials" };
-    }
-    email = match.email;
+    const resolved = await findEmailByPhone(e164Phone);
+    // Same generic message whether the number is unknown or assigned twice, so
+    // a login attempt cannot be used to probe which numbers are registered.
+    if (!resolved) return { error: "Invalid login credentials" };
+    email = resolved;
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: error.message };
+  const { user, banned } = await verifyCredentials(email, password);
+  if (banned) return { error: "This account is suspended. Contact an admin." };
+  if (!user) return { error: "Invalid login credentials" };
+
+  const cookieStore = await cookies();
+  cookieStore.set(
+    SESSION_COOKIE_NAME,
+    await signSessionToken(user.id),
+    sessionCookieOptions(),
+  );
+  await recordSignIn(user.id);
 
   revalidatePath("/", "layout");
   redirect("/");
 }
 
 export async function signOutAction() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE_NAME, "", { ...sessionCookieOptions(), maxAge: 0 });
   revalidatePath("/", "layout");
   redirect("/login");
 }

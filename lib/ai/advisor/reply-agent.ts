@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { gatherReplyGapInputs } from "@/lib/actions/lifecycle";
 import { analyzeReplyGap, type ReplyGap } from "@/lib/ai/reply-gap-analyzer";
 import type { RecommendationAction } from "./types";
@@ -15,7 +15,7 @@ export interface ReplyEvaluation {
  * + lib/actions/lifecycle.ts's gatherReplyGapInputs) — no new AI logic. Maps the
  * gap result into one of the advisor's recommendation actions.
  */
-export async function evaluateReply(admin: SupabaseClient, complaintId: string): Promise<ReplyEvaluation> {
+export async function evaluateReply(admin: DbClient, complaintId: string): Promise<ReplyEvaluation> {
   const { demands, replyText, complaintFound } = await gatherReplyGapInputs(admin, complaintId);
   if (!complaintFound || !replyText) {
     return { hasReply: false, gap: null, suggestedAction: "none" };

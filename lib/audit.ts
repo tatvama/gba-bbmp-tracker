@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "./db";
 
 export interface FieldChange {
   field: string;
@@ -43,7 +43,7 @@ export type AuditEntityType =
 
 /** Write one audit_logs row per changed field. Called on EVERY tracked mutation. */
 export async function writeAudit(
-  supabase: SupabaseClient,
+  db: DbClient,
   params: {
     entityType: AuditEntityType;
     entityId: string;
@@ -63,6 +63,6 @@ export async function writeAudit(
     new_value: stringify(c.newValue),
     changed_by: params.changedBy,
   }));
-  const { error } = await supabase.from("audit_logs").insert(rows);
+  const { error } = await db.from("audit_logs").insert(rows);
   if (error) console.error("[writeAudit]", error);
 }

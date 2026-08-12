@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -11,11 +11,11 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const db = createDbClient();
 
 async function run() {
   console.log("Clearing import_uploads table...");
-  const { error } = await supabase
+  const { error } = await db
     .from("import_uploads")
     .delete()
     .neq("id", "00000000-0000-0000-0000-000000000000");

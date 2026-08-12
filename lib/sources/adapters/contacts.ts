@@ -6,7 +6,7 @@ import "server-only";
  * fields ("who is responsible for this area"), not financial facts — a
  * contact can vouch for who holds a role, never for what a job cost.
  */
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { registerSourceAdapter } from "@/lib/sources/registry";
 import type { SourceFact, WorkSourceAdapter, WorkSourceAdapterResult, WorkSourceQuery } from "@/lib/sources/types";
 
@@ -20,14 +20,14 @@ const DESIGNATION_TO_FIELD: Record<string, string> = {
 
 async function search(query: WorkSourceQuery): Promise<WorkSourceAdapterResult> {
   if (!query.divisionName && !query.subDivisionName) return { ok: true, facts: [], citation: null };
-  const supabase = createAdminClient();
+  const db = createAdminClient();
 
-  let contactsQuery = supabase
+  let contactsQuery = db
     .from("contacts")
     .select("full_name, designation, phone, email, division:divisions!division_id(name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name)");
 
   if (query.subDivisionName) {
-    const { data: subdiv } = await supabase
+    const { data: subdiv } = await db
       .from("eng_subdivisions")
       .select("id")
       .ilike("name", `%${query.subDivisionName}%`)
@@ -35,7 +35,7 @@ async function search(query: WorkSourceQuery): Promise<WorkSourceAdapterResult> 
       .maybeSingle();
     if (subdiv?.id) contactsQuery = contactsQuery.eq("eng_subdivision_id", subdiv.id);
   } else if (query.divisionName) {
-    const { data: division } = await supabase
+    const { data: division } = await db
       .from("divisions")
       .select("id")
       .ilike("name", `%${query.divisionName}%`)

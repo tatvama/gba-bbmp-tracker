@@ -1,6 +1,6 @@
 import "server-only";
 import { readFile } from "node:fs/promises";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { walkTempDir } from "@/lib/forensic/zip";
 import { groupEntriesByJobCode, classifyRelPath, parseJob, fileExt, type RawEntry } from "@/lib/forensic/parse-skill-output";
 import { extractDocxText } from "@/lib/forensic/docx-text";
@@ -70,7 +70,7 @@ export async function processForensicBatch(
       type JoinRow = { job_number: string; complaint_id: string | null; complaints: { deleted_at: string | null } | { deleted_at: string | null }[] | null };
       for (const r of (data ?? []) as unknown as JoinRow[]) {
         // The complaint_id FK is many-to-one, so `complaints` is a single row
-        // at runtime — but supabase-js types it as an array without generated
+        // at runtime — but the PostgREST client typed it as an array without generated
         // relationship metadata, so accept both shapes.
         const complaint = Array.isArray(r.complaints) ? r.complaints[0] : r.complaints;
         if (r.complaint_id && complaint?.deleted_at) continue;

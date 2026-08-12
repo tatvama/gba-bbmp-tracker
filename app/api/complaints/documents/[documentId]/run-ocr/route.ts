@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { getComplaintSettings } from "@/lib/settings";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 import { startJob } from "@/lib/jobs/runner";

@@ -7,7 +7,7 @@ import { PageLanguageToggle } from "@/components/complaints/page-language-toggle
 import { DetailRow } from "@/components/detail-row";
 import { getComplaint, listComplaintTimeline, listComplaintDocuments } from "@/lib/queries";
 import { formatDate, formatDateTime, orDash } from "@/lib/format";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { translate } from "@/lib/i18n/translate";
 import { translateEnum } from "@/lib/i18n/translate-enum";

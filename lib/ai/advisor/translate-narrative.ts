@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { translateToKannada, translateToEnglish } from "@/lib/ai/translate";
 import type { AdvisorLanguage, NarrativeSnapshot } from "./types";
 
@@ -12,7 +12,7 @@ import type { AdvisorLanguage, NarrativeSnapshot } from "./types";
  * Every translation is cached in translation_cache, so a repeat is free.
  */
 export async function translateNarrative(
-  admin: SupabaseClient,
+  admin: DbClient,
   snap: NarrativeSnapshot,
   target: AdvisorLanguage,
 ): Promise<NarrativeSnapshot> {

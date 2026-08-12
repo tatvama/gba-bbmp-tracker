@@ -9,7 +9,7 @@
  * proof-of-receipt is worse than an unmatched one, so anything below the fuzzy
  * floor returns `none` (no proposal) and the human picks in the review screen.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import type { ComplaintIntakeExtraction } from "@/lib/ai/complaint-intake-analyzer";
 import type { AckMatchResult, MatchCandidate, MatchConfidence } from "@/lib/complaints/ack-reconcile";
 import { extractJobCode } from "@/lib/ifms/downloader";
@@ -185,7 +185,7 @@ export function scoreAckMatch(
  * ordered so a future truncation drops the oldest (least likely relevant)
  * rows first, deterministically, instead of an unspecified subset.
  */
-export async function loadComplaintPool(admin: SupabaseClient, max = 50_000): Promise<PoolComplaint[]> {
+export async function loadComplaintPool(admin: DbClient, max = 50_000): Promise<PoolComplaint[]> {
   // IMPORTANT: every column here must exist on `complaints`. PostgREST fails the
   // WHOLE query if ONE column is unknown — and this function used to also select
   // `reporter_name`, which no migration ever added, so the query errored on every
@@ -219,7 +219,7 @@ export async function loadComplaintPool(admin: SupabaseClient, max = 50_000): Pr
  * ids in the current pool) to keep the query small.
  */
 export async function loadAcknowledgedComplaintIds(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintIds?: string[],
 ): Promise<Set<string>> {
   if (complaintIds && complaintIds.length === 0) return new Set();

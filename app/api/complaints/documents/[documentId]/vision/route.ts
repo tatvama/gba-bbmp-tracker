@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { downloadBuffer } from "@/lib/storage/supabase-upload";
+import { createAdminClient } from "@/lib/db";
+import { downloadBuffer } from "@/lib/storage/object-store";
 import { analyzePhotoVision } from "@/lib/ai/photo-vision";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
 

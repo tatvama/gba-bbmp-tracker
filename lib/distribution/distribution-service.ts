@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { R2_STORAGE_SENTINEL, type CorporationCode } from "@/lib/constants";
 import { corporationAddressedRoleKeys, officeCopyRoleKeys, type RecipientRoleKey } from "@/lib/complaints/recipient-roles";
 import { DOCUMENT_VARIANTS } from "./document-variants";
@@ -23,7 +23,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 const slug = (s: string) => (s || "letter").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export interface DistributionDeps {
-  admin: SupabaseClient;
+  admin: DbClient;
   storage: StoragePort;
   render: VariantRenderer;
   resolve: RecipientResolver;

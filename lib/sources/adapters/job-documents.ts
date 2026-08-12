@@ -8,7 +8,7 @@ import "server-only";
  * manually scanned upload) so the citation's URL honestly reflects where the
  * evidence lives.
  */
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { registerSourceAdapter } from "@/lib/sources/registry";
 import type { SourceId, WorkSourceAdapter, WorkSourceAdapterResult, WorkSourceQuery } from "@/lib/sources/types";
 
@@ -16,9 +16,9 @@ const DOC_TYPES = ["Work order copy", "Estimate copy"];
 
 async function search(query: WorkSourceQuery): Promise<WorkSourceAdapterResult> {
   if (!query.jobNumber) return { ok: true, facts: [], citation: null };
-  const supabase = createAdminClient();
+  const db = createAdminClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("job_documents")
     .select("document_type, original_file_name, source, storage_path")
     .eq("job_number", query.jobNumber)

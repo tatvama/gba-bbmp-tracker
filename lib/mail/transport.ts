@@ -6,7 +6,7 @@ import { resolveMailConfig, canSend, type MailConfig } from "./config";
  * The Gmail SMTP transport (server-only).
  *
  * Credentials come from the environment ONLY — never from app_settings, which is
- * world-readable (`for select using (true)`, supabase/migrations/0003_phase2.sql)
+ * world-readable (`for select using (true)`, db/migrations/0003_phase2.sql)
  * and therefore fetchable by any anonymous visitor holding the public
  * publishable key. Same policy the AI keys follow (.env.example).
  *

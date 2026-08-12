@@ -13,10 +13,10 @@
  * AND a Route Handler, same reason lib/complaints/ack-reconcile.ts is plain.
  */
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { R2_STORAGE_SENTINEL } from "@/lib/constants";
 import { uploadToR2 } from "@/lib/storage/r2-upload";
-import { buildPath } from "@/lib/storage/supabase-upload";
+import { buildPath } from "@/lib/storage/object-store";
 import { analyzeDocumentById } from "@/lib/ocr/process-document";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { startJob } from "@/lib/jobs/runner";
@@ -85,7 +85,7 @@ function exOfficerName(extracted: Record<string, unknown>): string {
  * on failure — callers decide how to handle/report a failed attach.
  */
 export async function attachAcknowledgmentDocument(
-  admin: SupabaseClient,
+  admin: DbClient,
   input: AttachAcknowledgmentInput,
 ): Promise<AttachAcknowledgmentResult> {
   const path = buildPath(input.complaintId, input.fileName, Date.now(), Math.random().toString(36).slice(2, 8));

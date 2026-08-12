@@ -1,7 +1,7 @@
 "use server";
 
 import { requireRole, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
 import { startJob } from "@/lib/jobs/runner";
 // Side-effect import: registers the "vision_scan" job handler.

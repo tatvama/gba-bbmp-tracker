@@ -1,5 +1,5 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { startJob } from "@/lib/jobs/runner";
 // Side-effect import: registers the "email_send" handler. NEVER import this from
 // instrumentation.ts or lib/startup/* — see the bundler note in instrumentation.ts.

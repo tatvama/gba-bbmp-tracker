@@ -1,11 +1,18 @@
 /**
- * Creates (or promotes) an ADMIN user via the Supabase service-role API.
+ * Creates (or promotes) an ADMIN user directly in the application's database.
  *
  *   npm run db:create-admin -- admin@example.com "StrongPass123" "Admin Name"
  *
- * Requires SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL in .env.
+ * Requires the DB_* (or DATABASE_URL) settings in .env. Passwords are hashed by
+ * Postgres via pgcrypto — see lib/db/auth.ts.
  */
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
+import {
+  createAuthUser,
+  updateAuthUserPassword,
+  updateAuthUserRole,
+} from "../lib/db/auth";
+import { getPool } from "../lib/db/pool";
 import { loadEnv } from "./db";
 
 loadEnv();
@@ -19,55 +26,48 @@ async function main() {
     process.exit(1);
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    console.error("✗ NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env");
+  const db = createDbClient();
+
+  const created = await createAuthUser({
+    email,
+    password,
+    name: name ?? "Admin",
+    role: "ADMIN",
+    phone: null,
+  });
+
+  if (created.id) {
+    console.log(`✓ Admin created: ${email}`);
+    await getPool().end();
+    return;
+  }
+
+  // Already present — promote them and reset the password to the one given.
+  const { data: existing } = await db
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (!existing?.id) {
+    console.error("✗ Failed to create user:", created.error);
+    await getPool().end();
     process.exit(1);
   }
 
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  await updateAuthUserPassword(existing.id as string, password);
+  await updateAuthUserRole(existing.id as string, "ADMIN");
+  await db
+    .from("profiles")
+    .update({ email, name })
+    .eq("id", existing.id as string);
 
-  // Try to create; if the user already exists, find + promote them.
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { name, role: "ADMIN" },
-  });
-
-  let userId = data?.user?.id;
-
-  if (error) {
-    if (/already.*registered|exists/i.test(error.message)) {
-      const { data: list } = await admin.auth.admin.listUsers();
-      userId = list.users.find((u) => u.email === email)?.id;
-      if (!userId) {
-        console.error("✗ User exists but could not be located:", error.message);
-        process.exit(1);
-      }
-      await admin.auth.admin.updateUserById(userId, {
-        password,
-        user_metadata: { name, role: "ADMIN" },
-      });
-      console.log("→ Existing user updated.");
-    } else {
-      console.error("✗ Failed to create user:", error.message);
-      process.exit(1);
-    }
-  }
-
-  // Ensure the profile row reflects ADMIN (the trigger sets it on insert, but
-  // updating metadata above does not re-fire it).
-  if (userId) {
-    await admin
-      .from("profiles")
-      .upsert({ id: userId, email, name, role: "ADMIN" }, { onConflict: "id" });
-  }
-
-  console.log(`✓ Admin ready: ${email}`);
+  console.log(`→ Existing user updated and promoted to ADMIN: ${email}`);
+  await getPool().end();
 }
 
-main();
+main().catch(async (e) => {
+  console.error(e);
+  await getPool().end().catch(() => {});
+  process.exit(1);
+});

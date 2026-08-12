@@ -1,6 +1,6 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { downloadBuffer, getSignedUrl } from "@/lib/storage/supabase-upload";
+import { createAdminClient } from "@/lib/db";
+import { downloadBuffer, getSignedUrl } from "@/lib/storage/object-store";
 import { downloadFromR2ByKey, getR2SignedUrl } from "@/lib/storage/r2-upload";
 import { hammingHex } from "@/lib/ocr/image-fingerprint";
 import { DEFAULT_PHOTO_DEDUPE_RULES, R2_STORAGE_SENTINEL } from "@/lib/constants";
@@ -66,7 +66,7 @@ export interface JobPhotoDuplicateCluster {
 }
 
 const FETCH_CAP = 4000;
-const IN_CHUNK = 200; // supabase .in() batch size
+const IN_CHUNK = 200; // db .in() batch size
 const VISUAL_PAIR_BUDGET = 60; // max AI pairwise comparisons per division scan
 const TIME_WINDOW_DAYS = 183; // ±6 months
 const THUMBS_PER_CLUSTER = 8; // signed thumbnails per fingerprint cluster
@@ -170,7 +170,7 @@ function perceptualMatch(a: PhotoRow, b: PhotoRow): "exact" | "perceptual" | nul
   return null;
 }
 
-/** Short-lived signed view URL for a photo row (R2 or Supabase). Never throws. */
+/** Short-lived signed view URL for a photo row. Never throws. */
 async function signPhotoUrl(bucket: string | null, path: string | null): Promise<string | null> {
   if (!path) return null;
   try {
@@ -295,7 +295,7 @@ export interface VisualScanResult {
   error?: string;
 }
 
-/** Download a photo's bytes — R2 by bare key (forensic imports) or Supabase Storage by bucket+path. */
+/** Download a photo bytes — by bare key (forensic imports) or by bucket+path. */
 async function downloadPhoto(row: PhotoRow): Promise<Buffer | null> {
   if (!row.path) return null;
   if (row.bucket === R2_STORAGE_SENTINEL) return downloadFromR2ByKey(row.path);

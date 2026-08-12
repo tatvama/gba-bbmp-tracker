@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "../db";
 import webpush, { WebPushError } from "web-push";
 
 /**
@@ -100,7 +100,7 @@ export function isPushConfigured(): boolean {
 }
 
 async function deliver(
-  admin: SupabaseClient,
+  admin: DbClient,
   rows: SubscriptionRow[],
   payload: PushPayload,
 ): Promise<PushFanoutResult> {
@@ -200,7 +200,7 @@ async function deliver(
  *   push_subscriptions is owner-only, so a cookie client would read zero rows.
  */
 export async function sendPushToAllSubscribers(
-  admin: SupabaseClient,
+  admin: DbClient,
   payload: PushPayload,
 ): Promise<PushFanoutResult> {
   if (!ensureConfigured()) {
@@ -221,7 +221,7 @@ export async function sendPushToAllSubscribers(
 
 /** Every device belonging to one user. */
 export async function sendPushToUser(
-  admin: SupabaseClient,
+  admin: DbClient,
   userId: string,
   payload: PushPayload,
 ): Promise<PushFanoutResult> {

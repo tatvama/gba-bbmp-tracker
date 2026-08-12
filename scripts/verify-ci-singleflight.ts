@@ -11,7 +11,7 @@ import { loadEnv } from "./db";
 loadEnv();
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const { buildCaseIntelligence } = await import("@/lib/intelligence/engine");
   const admin = createAdminClient();
 

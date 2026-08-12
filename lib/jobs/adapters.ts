@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "../db";
 import type { TaskItem, JobStatus, JobType } from "./types";
 import { listActiveAndRecentJobs, type JobRow } from "./queries";
 import { moduleLabelForType, resultLinkForRow, isCancellableType } from "./task-links";
@@ -66,7 +66,7 @@ export function adaptImportUpload(row: ImportUploadRow): TaskItem {
   };
 }
 
-export async function listImportUploadTasks(admin: SupabaseClient, userId: string, recentHours = 24): Promise<TaskItem[]> {
+export async function listImportUploadTasks(admin: DbClient, userId: string, recentHours = 24): Promise<TaskItem[]> {
   const cutoff = new Date(Date.now() - recentHours * 3_600_000).toISOString();
   const { data } = await admin
     .from("import_uploads")
@@ -128,7 +128,7 @@ export function adaptAckBatch(row: AckBatchRow): TaskItem {
   };
 }
 
-export async function listAckBatchTasks(admin: SupabaseClient, userId: string, recentHours = 24): Promise<TaskItem[]> {
+export async function listAckBatchTasks(admin: DbClient, userId: string, recentHours = 24): Promise<TaskItem[]> {
   const cutoff = new Date(Date.now() - recentHours * 3_600_000).toISOString();
   const { data } = await admin
     .from("ack_import_batches")
@@ -142,7 +142,7 @@ export async function listAckBatchTasks(admin: SupabaseClient, userId: string, r
 
 /** Everything the two adapters cover, merged and sorted — called alongside
  *  background_jobs rows to build the Task Center's full list. */
-export async function listAdaptedTasks(admin: SupabaseClient, userId: string, recentHours = 24): Promise<TaskItem[]> {
+export async function listAdaptedTasks(admin: DbClient, userId: string, recentHours = 24): Promise<TaskItem[]> {
   const [imports, acks] = await Promise.all([
     listImportUploadTasks(admin, userId, recentHours),
     listAckBatchTasks(admin, userId, recentHours),
@@ -228,7 +228,7 @@ export interface TaskCenterOptions {
 /** The Global Task Center's single data source: real background_jobs rows
  *  plus the two read-only adapters, all normalized into the same TaskItem
  *  shape, merged and sorted into one list. */
-export async function listAllTaskItems(admin: SupabaseClient, userId: string, opts: TaskCenterOptions = {}): Promise<TaskItem[]> {
+export async function listAllTaskItems(admin: DbClient, userId: string, opts: TaskCenterOptions = {}): Promise<TaskItem[]> {
   const recentHours = opts.recentHours ?? 24;
   const jobRows = await listActiveAndRecentJobs(admin, userId, recentHours);
   const jobs = jobRows.map(adaptBackgroundJob);

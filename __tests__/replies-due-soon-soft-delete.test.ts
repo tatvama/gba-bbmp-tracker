@@ -27,7 +27,7 @@ function makeQueryBuilder(result: { data: unknown[]; error?: unknown }) {
 }
 
 let builder: ReturnType<typeof makeQueryBuilder>;
-vi.mock("@/lib/supabase/server", () => ({
+vi.mock("@/lib/db", () => ({
   createClient: vi.fn(async () => ({ from: (table: string) => (table === "complaints" ? builder : makeQueryBuilder({ data: [] })) })),
 }));
 

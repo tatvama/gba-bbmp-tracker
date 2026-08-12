@@ -1,5 +1,5 @@
 /**
- * Applies every PENDING SQL file in supabase/migrations (in filename order) to
+ * Applies every PENDING SQL file in db/migrations (in filename order) to
  * the Supabase Postgres database identified by DATABASE_URL, tracked in a
  * schema_migrations table (version = filename). Only files not yet recorded
  * there are applied, each in its own transaction. This is the SAME tracked
@@ -27,7 +27,7 @@ loadEnv();
 async function main() {
   const url = requireDatabaseUrl();
   const here = dirname(fileURLToPath(import.meta.url));
-  const migrationsDir = join(here, "..", "supabase", "migrations");
+  const migrationsDir = join(here, "..", "db", "migrations");
 
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith(".sql"))

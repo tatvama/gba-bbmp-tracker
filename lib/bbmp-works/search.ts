@@ -1,6 +1,6 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
+import type { DbClient } from "@/lib/db";
+import { createClient } from "@/lib/db";
 import type { BBMPWorkDetails, WorkSearchRequest, WorkSearchResponse } from "./types";
 import { validateWorkSearchRequest } from "./types";
 import { normalizeJobNumber } from "./normalize";
@@ -16,12 +16,12 @@ const FUZZY_THRESHOLD = 0.3;
 const SUGGESTION_THRESHOLD = 0.15;
 
 async function fuzzyMatch(
-  supabase: SupabaseClient,
+  db: DbClient,
   column: "ward_name" | "work_name" | "contractor_name" | "engineer_name" | "location_description",
   query: string,
   threshold = FUZZY_THRESHOLD,
 ): Promise<BbmpWorkRow[]> {
-  const { data, error } = await supabase.rpc("bbmp_works_fuzzy_search", {
+  const { data, error } = await db.rpc("bbmp_works_fuzzy_search", {
     p_column: column,
     p_query: query,
     p_threshold: threshold,
@@ -31,42 +31,42 @@ async function fuzzyMatch(
   return (data as BbmpWorkRow[]) ?? [];
 }
 
-async function exactOrIlike(supabase: SupabaseClient, build: (q: any) => any): Promise<BbmpWorkRow[]> {
-  const { data, error } = await build(supabase.from("bbmp_works").select("*"));
+async function exactOrIlike(db: DbClient, build: (q: any) => any): Promise<BbmpWorkRow[]> {
+  const { data, error } = await build(db.from("bbmp_works").select("*"));
   logErr("exactOrIlike", error);
   return (data as BbmpWorkRow[]) ?? [];
 }
 
 // ── Priority-ordered search tiers (spec section 3) ──────────────────────────
 
-async function searchByJobNumber(supabase: SupabaseClient, value?: string) {
+async function searchByJobNumber(db: DbClient, value?: string) {
   const v = normalizeJobNumber(value);
   if (!v) return [];
-  return exactOrIlike(supabase, (q) => q.eq("job_number", v).limit(25));
+  return exactOrIlike(db, (q) => q.eq("job_number", v).limit(25));
 }
 
-async function searchByWorkNumber(supabase: SupabaseClient, value?: string) {
+async function searchByWorkNumber(db: DbClient, value?: string) {
   const v = normalizeJobNumber(value);
   if (!v) return [];
-  return exactOrIlike(supabase, (q) => q.eq("work_number", v).limit(25));
+  return exactOrIlike(db, (q) => q.eq("work_number", v).limit(25));
 }
 
-async function searchByTenderNumber(supabase: SupabaseClient, value?: string) {
+async function searchByTenderNumber(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
-  return exactOrIlike(supabase, (q) => q.ilike("tender_number", v).limit(25));
+  return exactOrIlike(db, (q) => q.ilike("tender_number", v).limit(25));
 }
 
-async function searchByWorkOrderNumber(supabase: SupabaseClient, value?: string) {
+async function searchByWorkOrderNumber(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
-  return exactOrIlike(supabase, (q) => q.ilike("work_order_number", v).limit(25));
+  return exactOrIlike(db, (q) => q.ilike("work_order_number", v).limit(25));
 }
 
-async function searchByWardNumber(supabase: SupabaseClient, value?: string) {
+async function searchByWardNumber(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
-  return exactOrIlike(supabase, (q) => q.eq("ward_number", v).limit(25));
+  return exactOrIlike(db, (q) => q.eq("ward_number", v).limit(25));
 }
 
 // Kannada Unicode block. gba_wards.ward_name_kn is the only *_kn column that
@@ -78,8 +78,8 @@ async function searchByWardNumber(supabase: SupabaseClient, value?: string) {
 // against, so this deliberately covers ward names only.
 const KANNADA_RE = /[ಀ-೿]/;
 
-async function resolveKannadaWardName(supabase: SupabaseClient, value: string): Promise<string | null> {
-  const { data, error } = await supabase
+async function resolveKannadaWardName(db: DbClient, value: string): Promise<string | null> {
+  const { data, error } = await db
     .from("gba_wards")
     .select("ward_name_en")
     .ilike("ward_name_kn", `%${value}%`)
@@ -89,38 +89,38 @@ async function resolveKannadaWardName(supabase: SupabaseClient, value: string): 
   return (data as { ward_name_en: string } | null)?.ward_name_en ?? null;
 }
 
-async function searchByWardName(supabase: SupabaseClient, value?: string) {
+async function searchByWardName(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
   if (KANNADA_RE.test(v)) {
-    const resolved = await resolveKannadaWardName(supabase, v);
-    return resolved ? fuzzyMatch(supabase, "ward_name", resolved) : [];
+    const resolved = await resolveKannadaWardName(db, v);
+    return resolved ? fuzzyMatch(db, "ward_name", resolved) : [];
   }
-  return fuzzyMatch(supabase, "ward_name", v);
+  return fuzzyMatch(db, "ward_name", v);
 }
 
 /** Resolve a possibly-legacy division name to its current canonical name via
  *  divisions.old_names (mirrors wards.old_wards), so a work-search division
  *  filter still matches works even when a legacy name was typed. Falls back
  *  to null (caller then searches only the literal typed value). */
-async function resolveDivisionName(supabase: SupabaseClient, division: string): Promise<string | null> {
+async function resolveDivisionName(db: DbClient, division: string): Promise<string | null> {
   const needle = division.trim();
   if (!needle) return null;
-  const { data: byName } = await supabase.from("divisions").select("name").ilike("name", `%${needle}%`).limit(1).maybeSingle();
+  const { data: byName } = await db.from("divisions").select("name").ilike("name", `%${needle}%`).limit(1).maybeSingle();
   if (byName?.name) return byName.name;
-  const { data: all } = await supabase.from("divisions").select("name, old_names");
+  const { data: all } = await db.from("divisions").select("name, old_names");
   const match = (all as { name: string; old_names: string[] }[] | null)?.find((d) =>
     (d.old_names ?? []).some((o) => o.toLowerCase() === needle.toLowerCase()),
   );
   return match?.name ?? null;
 }
 
-async function searchByDivisionSubDivision(supabase: SupabaseClient, division?: string, subDivision?: string) {
+async function searchByDivisionSubDivision(db: DbClient, division?: string, subDivision?: string) {
   const div = division?.trim();
   const sub = subDivision?.trim();
   if (!div && !sub) return [];
-  const resolvedDivision = div ? await resolveDivisionName(supabase, div) : null;
-  return exactOrIlike(supabase, (q) => {
+  const resolvedDivision = div ? await resolveDivisionName(db, div) : null;
+  return exactOrIlike(db, (q) => {
     let query = q;
     if (div) {
       const or =
@@ -134,19 +134,19 @@ async function searchByDivisionSubDivision(supabase: SupabaseClient, division?: 
   });
 }
 
-async function searchByZone(supabase: SupabaseClient, value?: string) {
+async function searchByZone(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
-  return exactOrIlike(supabase, (q) => q.ilike("zone", `%${v}%`).limit(25));
+  return exactOrIlike(db, (q) => q.ilike("zone", `%${v}%`).limit(25));
 }
 
-async function searchByWorkName(supabase: SupabaseClient, value?: string) {
+async function searchByWorkName(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
-  return fuzzyMatch(supabase, "work_name", v);
+  return fuzzyMatch(db, "work_name", v);
 }
 
-async function searchByLocation(supabase: SupabaseClient, location?: string, layoutName?: string, roadName?: string) {
+async function searchByLocation(db: DbClient, location?: string, layoutName?: string, roadName?: string) {
   const loc = location?.trim();
   const layout = layoutName?.trim();
   const road = roadName?.trim();
@@ -157,16 +157,16 @@ async function searchByLocation(supabase: SupabaseClient, location?: string, lay
     `road_name.ilike.%${term}%`,
     `layout_name.ilike.%${term}%`,
   ].join(",");
-  return exactOrIlike(supabase, (q) => q.or(or).limit(25));
+  return exactOrIlike(db, (q) => q.or(or).limit(25));
 }
 
-async function searchByContractorName(supabase: SupabaseClient, value?: string) {
+async function searchByContractorName(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
-  return fuzzyMatch(supabase, "contractor_name", v);
+  return fuzzyMatch(db, "contractor_name", v);
 }
 
-async function searchByEngineerName(supabase: SupabaseClient, value?: string) {
+async function searchByEngineerName(db: DbClient, value?: string) {
   const v = value?.trim();
   if (!v) return [];
   const or = [
@@ -177,13 +177,13 @@ async function searchByEngineerName(supabase: SupabaseClient, value?: string) {
     `superintending_engineer.ilike.%${v}%`,
     `chief_engineer.ilike.%${v}%`,
   ].join(",");
-  return exactOrIlike(supabase, (q) => q.or(or).limit(25));
+  return exactOrIlike(db, (q) => q.or(or).limit(25));
 }
 
-async function attachSources(supabase: SupabaseClient, rows: BbmpWorkRow[]) {
+async function attachSources(db: DbClient, rows: BbmpWorkRow[]) {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const { data, error } = await supabase.from("work_sources").select("*").in("work_id", ids);
+  const { data, error } = await db.from("work_sources").select("*").in("work_id", ids);
   logErr("attachSources", error);
   const byWork = new Map<string, WorkSourceRow[]>();
   for (const s of (data as (WorkSourceRow & { work_id: string })[]) ?? []) {
@@ -196,7 +196,7 @@ async function attachSources(supabase: SupabaseClient, rows: BbmpWorkRow[]) {
 
 /** Loosened fuzzy match against the field the user actually supplied, used
  *  only when the full cascade misses (spec section 8's "not found" branch). */
-async function buildSuggestions(supabase: SupabaseClient, request: WorkSearchRequest): Promise<string[]> {
+async function buildSuggestions(db: DbClient, request: WorkSearchRequest): Promise<string[]> {
   const candidates: Array<{ column: "ward_name" | "work_name" | "contractor_name"; value?: string }> = [
     { column: "ward_name", value: request.wardName },
     { column: "work_name", value: request.workName },
@@ -205,7 +205,7 @@ async function buildSuggestions(supabase: SupabaseClient, request: WorkSearchReq
   for (const { column, value } of candidates) {
     const v = value?.trim();
     if (!v) continue;
-    const rows = await fuzzyMatch(supabase, column, v, SUGGESTION_THRESHOLD);
+    const rows = await fuzzyMatch(db, column, v, SUGGESTION_THRESHOLD);
     const key = column === "ward_name" ? "wardName" : column === "work_name" ? "workName" : "contractorName";
     const names = rows
       .map((r) => (r as unknown as Record<string, unknown>)[column] as string | null)
@@ -236,21 +236,21 @@ export async function searchBBMPWork(request: WorkSearchRequest): Promise<WorkSe
     };
   }
 
-  const supabase = await createClient();
+  const db = await createClient();
 
   const tiers: Array<() => Promise<BbmpWorkRow[]>> = [
-    () => searchByJobNumber(supabase, request.jobNumber),
-    () => searchByWorkNumber(supabase, request.workNumber),
-    () => searchByTenderNumber(supabase, request.tenderNumber),
-    () => searchByWorkOrderNumber(supabase, request.workOrderNumber),
-    () => searchByWardNumber(supabase, request.wardNumber),
-    () => searchByWardName(supabase, request.wardName),
-    () => searchByDivisionSubDivision(supabase, request.division, request.subDivision),
-    () => searchByZone(supabase, request.zone),
-    () => searchByWorkName(supabase, request.workName),
-    () => searchByLocation(supabase, request.location, request.layoutName, request.roadName),
-    () => searchByContractorName(supabase, request.contractorName),
-    () => searchByEngineerName(supabase, request.engineerName),
+    () => searchByJobNumber(db, request.jobNumber),
+    () => searchByWorkNumber(db, request.workNumber),
+    () => searchByTenderNumber(db, request.tenderNumber),
+    () => searchByWorkOrderNumber(db, request.workOrderNumber),
+    () => searchByWardNumber(db, request.wardNumber),
+    () => searchByWardName(db, request.wardName),
+    () => searchByDivisionSubDivision(db, request.division, request.subDivision),
+    () => searchByZone(db, request.zone),
+    () => searchByWorkName(db, request.workName),
+    () => searchByLocation(db, request.location, request.layoutName, request.roadName),
+    () => searchByContractorName(db, request.contractorName),
+    () => searchByEngineerName(db, request.engineerName),
   ];
 
   const user = await getSessionUser();
@@ -259,8 +259,8 @@ export async function searchBBMPWork(request: WorkSearchRequest): Promise<WorkSe
     for (const tier of tiers) {
       const rows = await tier();
       if (rows.length > 0) {
-        const data = await attachSources(supabase, rows);
-        void logSearchHistory(supabase, { userId: user?.id ?? null, queryParams: request as Record<string, unknown>, resultCount: data.length });
+        const data = await attachSources(db, rows);
+        void logSearchHistory(db, { userId: user?.id ?? null, queryParams: request as Record<string, unknown>, resultCount: data.length });
         return { success: true, totalResults: data.length, data, message: `Found ${data.length} result(s).` };
       }
     }
@@ -275,8 +275,8 @@ export async function searchBBMPWork(request: WorkSearchRequest): Promise<WorkSe
     };
   }
 
-  const suggestions = await buildSuggestions(supabase, request);
-  void logSearchHistory(supabase, { userId: user?.id ?? null, queryParams: request as Record<string, unknown>, resultCount: 0 });
+  const suggestions = await buildSuggestions(db, request);
+  void logSearchHistory(db, { userId: user?.id ?? null, queryParams: request as Record<string, unknown>, resultCount: 0 });
   return {
     success: false,
     totalResults: 0,
@@ -290,20 +290,20 @@ export async function searchBBMPWork(request: WorkSearchRequest): Promise<WorkSe
 /** Single-record lookup for permalink pages (app/bbmp-works/[id],
  *  app/bbmp-works/job/[jobNumber]). Returns null if not found. */
 export async function getBBMPWorkById(id: string): Promise<BBMPWorkDetails | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("bbmp_works").select("*").eq("id", id).maybeSingle();
+  const db = await createClient();
+  const { data, error } = await db.from("bbmp_works").select("*").eq("id", id).maybeSingle();
   logErr("getBBMPWorkById", error);
   if (!data) return null;
-  const [details] = await attachSources(supabase, [data as BbmpWorkRow]);
+  const [details] = await attachSources(db, [data as BbmpWorkRow]);
   return details ?? null;
 }
 
 export async function getBBMPWorkByJobNumber(jobNumber: string): Promise<BBMPWorkDetails | null> {
-  const supabase = await createClient();
+  const db = await createClient();
   const normalized = normalizeJobNumber(jobNumber) ?? jobNumber;
-  const { data, error } = await supabase.from("bbmp_works").select("*").eq("job_number", normalized).maybeSingle();
+  const { data, error } = await db.from("bbmp_works").select("*").eq("job_number", normalized).maybeSingle();
   logErr("getBBMPWorkByJobNumber", error);
   if (!data) return null;
-  const [details] = await attachSources(supabase, [data as BbmpWorkRow]);
+  const [details] = await attachSources(db, [data as BbmpWorkRow]);
   return details ?? null;
 }

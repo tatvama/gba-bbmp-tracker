@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { requireRole, getSessionUser, AuthorizationError } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_FIELD_ROLES, COMPLAINT_DRAFT_KINDS, type ComplaintDraftKind } from "@/lib/constants";
 import { startJob, dispatchJob } from "@/lib/jobs/runner";
 import { listAllTaskItems } from "@/lib/jobs/adapters";

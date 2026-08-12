@@ -48,7 +48,7 @@ function makeAdminClient() {
   };
 }
 
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => makeAdminClient()) }));
+vi.mock("@/lib/db", () => ({ createAdminClient: vi.fn(() => makeAdminClient()) }));
 
 describe("deleteAckBatchAction — R2 cleanup failure is logged, not silent", () => {
   beforeEach(() => {

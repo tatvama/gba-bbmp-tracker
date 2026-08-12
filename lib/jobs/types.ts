@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "../db";
 
 /**
  * The enterprise background-job framework's shared types. One physical table
@@ -23,7 +23,7 @@ export type JobType = "ai_draft" | "ocr" | "vision_scan" | "export" | "source_fe
  *  no separate columns, so this stays compatible with how ai_draft already
  *  writes its live status into the same jsonb column. */
 export interface JobHandlerContext<TInput = unknown> {
-  admin: SupabaseClient;
+  admin: DbClient;
   jobId: string;
   /** The user who started (or, for a retry, originally started) the job —
    *  for handlers that need it on their own business-logic writes (e.g.

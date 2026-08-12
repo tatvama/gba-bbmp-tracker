@@ -1,6 +1,6 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DbClient } from "@/lib/db";
+import { createAdminClient } from "@/lib/db";
 import { buildWardIndex, type ComplaintJurisdictionScope } from "@/lib/contacts/filter-hierarchy";
 import { isValidEmail } from "./message";
 import { resolveComplaintEmailRecipients } from "./recipients";
@@ -46,7 +46,7 @@ export interface RecommendedRecipientsResult {
   resolutionReason: string | null;
 }
 
-async function fetchJurisdictionContacts(admin: SupabaseClient): Promise<JurisdictionContactRow[]> {
+async function fetchJurisdictionContacts(admin: DbClient): Promise<JurisdictionContactRow[]> {
   const { data } = await admin.from("contacts").select(JURISDICTION_CONTACT_FIELDS).not("email", "is", null).order("full_name");
   return (data as JurisdictionContactRow[] | null) ?? [];
 }
@@ -59,7 +59,7 @@ async function fetchJurisdictionContacts(admin: SupabaseClient): Promise<Jurisdi
  * already follows.
  */
 export async function listRecommendedRecipients(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
 ): Promise<RecommendedRecipientsResult> {
   try {
@@ -120,7 +120,7 @@ export async function listRecommendedRecipients(
  * (Chief Engineer, Special Commissioner, CM's office, …) have no per-complaint
  * division to scope by. Returns [] gracefully before that import has run.
  */
-export async function listDepartmentRecipients(admin: SupabaseClient): Promise<RecipientOption[]> {
+export async function listDepartmentRecipients(admin: DbClient): Promise<RecipientOption[]> {
   try {
     const { data } = await admin
       .from("contacts")

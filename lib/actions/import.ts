@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { contactImportRowSchema } from "@/lib/validators";
 import { WRITE_ROLES } from "@/lib/constants";
@@ -37,14 +37,14 @@ export async function commitImport(input: ImportInput): Promise<ImportResult> {
     });
   }
 
-  const supabase = await createClient();
+  const db = await createClient();
 
   // Lookups for name → id resolution
   const [corpsRes, divsRes, subsRes, existingRes] = await Promise.all([
-    supabase.from("corporations").select("id,code,name"),
-    supabase.from("divisions").select("id,name"),
-    supabase.from("eng_subdivisions").select("id,name"),
-    supabase.from("contacts").select("id,full_name,phone,whatsapp,email"),
+    db.from("corporations").select("id,code,name"),
+    db.from("divisions").select("id,name"),
+    db.from("eng_subdivisions").select("id,name"),
+    db.from("contacts").select("id,full_name,phone,whatsapp,email"),
   ]);
 
   const corpByName = new Map<string, string>();
@@ -129,13 +129,13 @@ export async function commitImport(input: ImportInput): Promise<ImportResult> {
 
   if (!input.dryRun) {
     if (toInsert.length) {
-      const { error } = await supabase.from("contacts").insert(toInsert);
+      const { error } = await db.from("contacts").insert(toInsert);
       if (error) return { ...result, error: error.message };
     }
     for (const u of toUpdate) {
-      await supabase.from("contacts").update(u.row).eq("id", u.id);
+      await db.from("contacts").update(u.row).eq("id", u.id);
     }
-    await supabase.from("import_logs").insert({
+    await db.from("import_logs").insert({
       file_name: input.fileName,
       total_rows: result.total,
       imported_rows: result.imported,
@@ -146,7 +146,7 @@ export async function commitImport(input: ImportInput): Promise<ImportResult> {
     });
     revalidatePath("/contacts");
   } else {
-    await supabase.from("import_logs").insert({
+    await db.from("import_logs").insert({
       file_name: input.fileName,
       total_rows: result.total,
       imported_rows: result.imported,

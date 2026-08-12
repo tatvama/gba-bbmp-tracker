@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole, getSessionUser, AuthorizationError, type SessionUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getSignedUrl, uploadBuffer, buildPath, validateUpload } from "@/lib/storage/supabase-upload";
+import { createAdminClient } from "@/lib/db";
+import { getSignedUrl, uploadBuffer, buildPath, validateUpload, removeObject } from "@/lib/storage/object-store";
 import { getR2SignedUrl, uploadToR2, deleteFromR2 } from "@/lib/storage/r2-upload";
 import { buildMergedPdf } from "@/lib/pdf/merge";
 import { analyzeDocumentById } from "@/lib/ocr/process-document";
@@ -47,7 +47,7 @@ import { complaintDistributionDeps } from "@/lib/distribution/complaint-deps";
 import type { RecipientRoleKey } from "@/lib/complaints/recipient-roles";
 import { computeStageDeadline } from "@/lib/complaints/escalation-cycle";
 import { buildComplaintDocumentFileName } from "@/lib/complaints/document-naming";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import type { DraftLanguage, LegalTone } from "@/lib/constants";
 
 export interface ActionState {
@@ -73,7 +73,7 @@ function fieldErrors(error: { issues: { path: (string | number)[]; message: stri
  *  the full role matrix (incl. Field Officer / Verifier) works without RLS friction. */
 async function authed(
   roles: UserRole[],
-): Promise<{ user: SessionUser; admin: SupabaseClient } | { error: string }> {
+): Promise<{ user: SessionUser; admin: DbClient } | { error: string }> {
   let user: SessionUser;
   try {
     user = await requireRole(roles);
@@ -83,12 +83,12 @@ async function authed(
   try {
     return { user, admin: createAdminClient() };
   } catch {
-    return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY — required for complaint writes/uploads." };
+    return { error: "The database is not configured on the server — complaint writes/uploads are unavailable." };
   }
 }
 
 async function addTimeline(
-  admin: SupabaseClient,
+  admin: DbClient,
   e: {
     complaintId: string;
     eventType: string;
@@ -113,7 +113,7 @@ async function addTimeline(
 }
 
 async function addReminder(
-  admin: SupabaseClient,
+  admin: DbClient,
   r: { complaintId: string; title: string; dueDate: string; reminderType: string; createdBy: string; priority?: string },
 ) {
   await admin.from("reminders").insert({
@@ -136,7 +136,7 @@ function parse(formData: FormData) {
   return complaintSchema.safeParse(obj);
 }
 
-async function toRow(admin: SupabaseClient, input: Record<string, any>) {
+async function toRow(admin: DbClient, input: Record<string, any>) {
   let divisionId = input.divisionId ?? null;
   let engSubDivisionId = input.engSubDivisionId ?? null;
   let gbaWardId = null;
@@ -820,18 +820,13 @@ export async function deleteComplaintDocument(documentId: string, complaintId: s
         console.warn(`[deleteComplaintDocument] R2 cleanup failed for document ${documentId} (${doc.storage_path})`, e);
       });
     }
-    const supabaseFiles = [doc.processed_storage_path, doc.thumbnail_storage_path].filter((p): p is string => !!p);
-    if (supabaseFiles.length) {
-      await admin
-        .storage.from(STORAGE_BUCKETS.processed).remove(supabaseFiles)
-        .then(({ error: storageErr }) => {
-          if (storageErr) {
-            console.warn(`[deleteComplaintDocument] Supabase Storage cleanup failed for document ${documentId}`, storageErr);
-          }
-        })
-        .catch((e) => {
-          console.warn(`[deleteComplaintDocument] Supabase Storage cleanup threw for document ${documentId}`, e);
-        });
+    // The AI-derived images (OCR render + thumbnail) live under the processed
+    // bucket's key prefix. removeObject is already best-effort and never throws.
+    const derivedFiles = [doc.processed_storage_path, doc.thumbnail_storage_path].filter(
+      (p): p is string => !!p,
+    );
+    for (const path of derivedFiles) {
+      await removeObject(STORAGE_BUCKETS.processed, path);
     }
   } catch (e) {
     console.warn("[deleteComplaintDocument] storage cleanup failed (row already removed)", e);
@@ -1073,7 +1068,7 @@ export async function getDocumentViewUrl(
 ): Promise<{ url?: string; error?: string }> {
   const user = await getSessionUser();
   if (!user) return { error: "Sign in to view documents." };
-  let admin: SupabaseClient;
+  let admin: DbClient;
   try {
     admin = createAdminClient();
   } catch {
@@ -1088,11 +1083,12 @@ export async function getDocumentViewUrl(
   const bucket = which === "processed" ? "complaint-processed-images" : doc.storage_bucket;
   const path = which === "processed" ? doc.processed_storage_path : doc.storage_path;
   if (!path) return { error: "File not available." };
-  // R2-backed rows (forensic-ZIP-imported letters/docs) store a bare object key.
-  // Use a short-lived PRESIGNED URL, not the public URL: it works even when the
-  // bucket has no public access enabled and keeps complaint PII private. The
-  // `processed` path is always a Supabase-backed AI-derived image, never R2, so
-  // it falls through to the unchanged Supabase getSignedUrl call below.
+  // Sentinel-bucket rows (forensic-ZIP-imported letters/docs) store a bare
+  // object key. Use a short-lived PRESIGNED URL, not the public URL: it works
+  // even when the bucket has no public access enabled and keeps complaint PII
+  // private. A `processed` path is an AI-derived image stored under the
+  // processed bucket's key prefix, so it takes the getSignedUrl call below,
+  // which resolves that prefix against R2 (lib/storage/object-store.ts).
   if (which === "original" && bucket === R2_STORAGE_SENTINEL) {
     try {
       return { url: await getR2SignedUrl(path, 3600) };
@@ -1104,11 +1100,11 @@ export async function getDocumentViewUrl(
   return url ? { url } : { error: "Could not create signed URL." };
 }
 
-/** View URL for a job-case evidence document (job_documents), R2 or Supabase. */
+/** View URL for a job-case evidence document (job_documents). */
 export async function getJobDocumentViewUrl(documentId: string): Promise<{ url?: string; error?: string }> {
   const user = await getSessionUser();
   if (!user) return { error: "Sign in to view documents." };
-  let admin: SupabaseClient;
+  let admin: DbClient;
   try {
     admin = createAdminClient();
   } catch {

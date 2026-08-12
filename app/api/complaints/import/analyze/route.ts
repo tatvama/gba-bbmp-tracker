@@ -9,7 +9,7 @@ import { uploadToR2 } from "@/lib/storage/r2-upload";
 import { detectComplaintLetters } from "@/lib/ai/complaint-letter-detector";
 import { generateVision } from "@/lib/ai/provider";
 import { analyzeComplaintIntakeFromImages, COMPLAINT_TYPE_VALUES } from "@/lib/ai/complaint-intake-analyzer";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

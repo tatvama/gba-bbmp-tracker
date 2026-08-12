@@ -5,7 +5,7 @@ import path from "node:path";
 import { mkdir } from "node:fs/promises";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { processForensicBatch } from "@/lib/forensic/import-runner";
 import { MAX_ZIP_BYTES, extractZipToTempDir, deleteTempDir } from "@/lib/forensic/zip";
 

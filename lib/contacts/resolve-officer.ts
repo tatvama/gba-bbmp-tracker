@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import type { Contact, ContactJurisdiction } from "@/lib/types";
 import { buildOfficerRecipient, type OfficerRecipient } from "./officer-recipient";
 
@@ -18,7 +18,7 @@ export interface ResolvedOfficer {
 }
 
 export async function resolveOfficerForWard(
-  admin: SupabaseClient,
+  admin: DbClient,
   opts: { wardNo?: number | null; wardId?: string | null },
 ): Promise<ResolvedOfficer | null> {
   try {

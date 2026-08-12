@@ -19,20 +19,20 @@ describe("Startup System", () => {
   describe("EnvironmentValidationTask", () => {
     it("should fail validation if required env vars are missing", async () => {
       // Clear required variables
-      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-      delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
       delete process.env.DATABASE_URL;
+      delete process.env.DB_HOST;
+      delete process.env.DB_USER;
+      delete process.env.DB_PASSWORD;
+      delete process.env.DB_NAME;
+      delete process.env.SESSION_SECRET;
 
       const task = new EnvironmentValidationTask();
       await expect(task.run()).rejects.toThrow("Environment validation failed");
     });
 
     it("should pass validation when all required env vars are present", async () => {
-      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "anon-key";
-      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
       process.env.DATABASE_URL = "postgresql://localhost:5432/db";
+      process.env.SESSION_SECRET = "a".repeat(32);
       process.env.R2_ACCOUNT_ID = "account-id";
       process.env.R2_ACCESS_KEY_ID = "access-key";
       process.env.R2_SECRET_ACCESS_KEY = "secret-key";
@@ -44,10 +44,8 @@ describe("Startup System", () => {
     });
 
     it("should log warning if optional variables are missing", async () => {
-      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "anon-key";
-      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
       process.env.DATABASE_URL = "postgresql://localhost:5432/db";
+      process.env.SESSION_SECRET = "a".repeat(32);
       process.env.R2_ACCOUNT_ID = "account-id";
       process.env.R2_ACCESS_KEY_ID = "access-key";
       process.env.R2_SECRET_ACCESS_KEY = "secret-key";

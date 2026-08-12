@@ -13,8 +13,8 @@ import "server-only";
  * letter and print-queue-list.tsx already use), advances the stage, and
  * computes the next deadline from escalation_flow_configs.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DbClient } from "@/lib/db";
+import { createAdminClient } from "@/lib/db";
 import { runComplaintDraft } from "@/lib/ai/complaint-draft";
 import { DEFAULT_COMPLAINT_SETTINGS, COMPLAINT_DRAFT_KINDS, type ComplaintSettings, type DraftLanguage } from "@/lib/constants";
 import {
@@ -42,7 +42,7 @@ export interface SweepResult {
   errors: string[];
 }
 
-async function loadComplaintSettings(admin: SupabaseClient): Promise<ComplaintSettings> {
+async function loadComplaintSettings(admin: DbClient): Promise<ComplaintSettings> {
   const { data } = await admin.from("app_settings").select("value").eq("key", COMPLAINT_SETTINGS_KEY).maybeSingle();
   return { ...DEFAULT_COMPLAINT_SETTINGS, ...((data?.value as Partial<ComplaintSettings>) ?? {}) };
 }
@@ -58,7 +58,7 @@ function transitionTitle(nextStage: string): string {
 
 /** Runs one complaint's due stage transition. Returns true if it advanced. */
 async function advanceOneComplaint(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaint: DueComplaint,
   configByStage: Map<string, EscalationFlowConfigRow>,
   settings: ComplaintSettings,

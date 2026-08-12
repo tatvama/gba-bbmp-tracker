@@ -1,10 +1,10 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { DEFAULT_COMPLAINT_SETTINGS, type ComplaintType } from "@/lib/constants";
 import { classifyComplaintType } from "@/lib/ai/classify-complaint-type";
 
 /** app_settings key — same value as lib/settings COMPLAINT_SETTINGS_KEY, inlined
- *  here because lib/settings pulls the cookie-scoped supabase client
+ *  here because lib/settings pulls the cookie-scoped db client
  *  (next/headers), which must stay OUT of this worker/CLI-reachable module. */
 const COMPLAINT_SETTINGS_KEY = "complaint_settings";
 
@@ -27,7 +27,7 @@ export interface ConvertJobCaseResult {
 /** Case-number prefix via the ADMIN client — getComplaintSettings() reads
  *  through the cookie-scoped client and silently falls back to defaults when
  *  there's no request; this stays correct in the background worker. */
-async function caseNumberPrefix(admin: SupabaseClient): Promise<string> {
+async function caseNumberPrefix(admin: DbClient): Promise<string> {
   try {
     const { data } = await admin.from("app_settings").select("value").eq("key", COMPLAINT_SETTINGS_KEY).maybeSingle();
     const value = (data?.value ?? {}) as { caseNumberPrefix?: string };
@@ -38,7 +38,7 @@ async function caseNumberPrefix(admin: SupabaseClient): Promise<string> {
 }
 
 export async function convertJobCaseCore(
-  admin: SupabaseClient,
+  admin: DbClient,
   jobCaseId: string,
   userId: string,
   opts?: { complaintType?: ComplaintType | null },

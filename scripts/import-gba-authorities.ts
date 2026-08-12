@@ -22,7 +22,7 @@ loadEnv();
 const COMMIT = process.argv.includes("--commit");
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const admin = createAdminClient();
 
   console.log(`GBA authorities: ${GBA_AUTHORITIES.length} recipients.`);

@@ -1,5 +1,7 @@
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/session";
+import { findUserWithProfile } from "@/lib/db/auth";
 import type { Profile } from "@/lib/types";
 import type { UserRole } from "@/lib/constants";
 
@@ -16,27 +18,28 @@ export interface SessionUser {
  *
  * Wrapped in React's `cache()` so repeated calls within the same request
  * (e.g. the root layout + a page + several nested components all checking
- * the session) share one `auth.getUser()` + profile round trip instead of
+ * the session) share one token verification + profile round trip instead of
  * repeating it per call. Same inputs (none) -> same output within a request.
  */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const cookieStore = await cookies();
+  const payload = await verifySessionToken(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+  if (!payload) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
+  // The token proves WHO is asking; it deliberately carries no role. Roles are
+  // read from the database on every request so revoking or downgrading someone
+  // takes effect immediately rather than whenever their cookie happens to
+  // expire.
+  const record = await findUserWithProfile(payload.uid);
+  if (!record) return null;
+
+  const profile = (record.profile as Profile | null) ?? null;
 
   return {
-    id: user.id,
-    email: user.email ?? null,
-    profile: (profile as Profile) ?? null,
-    role: (profile as Profile | null)?.role ?? "VIEWER",
+    id: record.id,
+    email: record.email ?? null,
+    profile,
+    role: profile?.role ?? "VIEWER",
   };
 });
 

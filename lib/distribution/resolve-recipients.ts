@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { COMPLAINT_RECIPIENT_ROLES, corporationOfficeName, contactMatchesRole } from "@/lib/complaints/recipient-roles";
 import { matchOfficerByDesignation, type OfficerMatchRow } from "./officer-match";
 import type { RecipientEnrichment } from "./copy-to";
@@ -27,7 +27,7 @@ type ContactRow = {
 };
 
 export async function resolveComplaintRecipients(
-  admin: SupabaseClient,
+  admin: DbClient,
   complaintId: string,
 ): Promise<RecipientEnrichment> {
   const enrich: RecipientEnrichment = {};
@@ -107,12 +107,12 @@ export async function resolveComplaintRecipients(
   return enrich;
 }
 
-async function corporationNameById(admin: SupabaseClient, corporationId: string): Promise<string | null> {
+async function corporationNameById(admin: DbClient, corporationId: string): Promise<string | null> {
   const { data } = await admin.from("corporations").select("name").eq("id", corporationId).maybeSingle();
   return (data?.name as string | undefined) ?? null;
 }
 
-async function contactsFor(admin: SupabaseClient, col: string, val: string | null | undefined): Promise<ContactRow[]> {
+async function contactsFor(admin: DbClient, col: string, val: string | null | undefined): Promise<ContactRow[]> {
   if (!val) return [];
   const { data } = await admin.from("contacts").select(SELECT).eq(col, val).limit(200);
   return (data as ContactRow[] | null) ?? [];

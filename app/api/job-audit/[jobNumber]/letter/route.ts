@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser, hasRole } from "@/lib/auth";
 import { COMPLAINT_VERIFY_ROLES } from "@/lib/constants";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { buildLetterDocx } from "@/lib/docx/bill-stop-builder";
 import { evidenceIndexToCsv } from "@/lib/letters/evidence-index";
 import { buildQuantityTable, buildRiskTable } from "@/lib/letters/tables";

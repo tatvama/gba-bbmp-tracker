@@ -5,7 +5,7 @@
  *
  *   npm run db:seed-sr
  */
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadEnv } from "./db";
@@ -19,7 +19,7 @@ async function main() {
     console.error("\n✗ NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in .env.\n");
     process.exit(1);
   }
-  const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  const admin = createDbClient();
 
   const rows = JSON.parse(readFileSync(join(process.cwd(), "data", "sr_rates_sample.json"), "utf8")) as Record<string, unknown>[];
 

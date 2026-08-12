@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { officerTransferSchema } from "@/lib/validators";
@@ -40,8 +40,8 @@ export async function addOfficerTransfer(
     return { error: "Please fix the errors below.", fieldErrors: fieldErrors(parsed.error) };
   const d = parsed.data;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const db = await createClient();
+  const { data, error } = await db
     .from("officer_transfers")
     .insert({
       officer_id: officerId,
@@ -69,7 +69,7 @@ export async function addOfficerTransfer(
     .filter(Boolean)
     .join(" / ");
   if (posting || d.effectiveDate) {
-    await supabase
+    await db
       .from("contacts")
       .update({
         transfer_status: "Transferred",
@@ -79,7 +79,7 @@ export async function addOfficerTransfer(
       .eq("id", officerId);
   }
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "officer",
     entityId: officerId,
     changedBy: user.id,

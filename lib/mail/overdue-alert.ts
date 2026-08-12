@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { getMailConfig, getMailTransport, fromHeader } from "./transport";
 import { canSend, skipReason } from "./config";
 import { applyRedirect, buildOverdueAlertEmail, type IntendedEnvelope, type OverdueAlertComplaintItem } from "./message";
@@ -93,7 +93,7 @@ interface ComplaintRow {
 }
 
 export async function sendOverdueAlertDigest(
-  admin: SupabaseClient,
+  admin: DbClient,
   input: SendOverdueAlertDigestInput,
 ): Promise<SendOverdueAlertDigestResult> {
   const config = getMailConfig();

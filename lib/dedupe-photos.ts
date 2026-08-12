@@ -1,5 +1,5 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { getPhotoDedupeRules } from "@/lib/settings";
 import { hammingHex, type PhotoFingerprint } from "@/lib/ocr/image-fingerprint";
 import type { PhotoDedupeRules } from "@/lib/constants";

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getNotificationDigest } from "@/lib/queries";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 // Safe import site: this is request-triggered code, never reached from
 // instrumentation.ts's graph. See the import-site rule in lib/push/send.ts.
 import { sendPushToAllSubscribers, isPushConfigured } from "@/lib/push/send";
@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 /**
  * Scheduled notification job. Point any scheduler at this route (Coolify cron,
- * cron-job.org, GitHub Actions, Supabase pg_cron) e.g. every morning:
+ * cron-job.org, GitHub Actions, system cron, pg_cron) e.g. every morning:
  *   curl -H "x-cron-secret: $CRON_SECRET" https://yoursite/api/cron/notifications
  *
  * Auth: requires CRON_SECRET (header `x-cron-secret` or `?secret=`).

@@ -2,7 +2,7 @@
 
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { RTI_WRITE_ROLES, COMPLAINT_WRITE_ROLES, type UserRole } from "@/lib/constants";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { generateText, aiProvider, aiModel } from "@/lib/ai/provider";
 import { stripKannadaDashes } from "@/lib/letters/safe-language";
 import {
@@ -289,8 +289,8 @@ export async function saveAiDraft(input: {
   } catch (e) {
     return { ok: false, error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const db = await createClient();
+  const { data, error } = await db
     .from("ai_drafts")
     .insert({
       entity_type: input.entityType ?? null,

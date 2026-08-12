@@ -15,7 +15,7 @@ const COMPLAINT_ID = process.argv[2] || "d367af4e-d752-413e-b57d-4f4808a3ac6d";
 type Check = { name: string; pass: boolean; detail?: string };
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const { buildCaseIntelligence } = await import("@/lib/intelligence/engine");
   const { runComplaintDraft } = await import("@/lib/ai/complaint-draft");
 

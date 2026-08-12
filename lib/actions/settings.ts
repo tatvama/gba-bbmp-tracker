@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { DEADLINE_RULES_KEY, COMPLAINT_SETTINGS_KEY } from "@/lib/settings";
 import {
@@ -38,8 +38,8 @@ export async function updateDeadlineRules(
     value[k] = Number.isFinite(n) && n > 0 ? Math.round(n) : DEFAULT_DEADLINE_RULES[k];
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("app_settings").upsert(
+  const db = await createClient();
+  const { error } = await db.from("app_settings").upsert(
     {
       key: DEADLINE_RULES_KEY,
       value,
@@ -95,8 +95,8 @@ export async function updateComplaintSettings(
     excludeSaturdaysAsWorkingDay: bool("excludeSaturdaysAsWorkingDay"),
   };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("app_settings").upsert(
+  const db = await createClient();
+  const { error } = await db.from("app_settings").upsert(
     { key: COMPLAINT_SETTINGS_KEY, value, updated_by: user.id, updated_at: new Date().toISOString() },
     { onConflict: "key" },
   );

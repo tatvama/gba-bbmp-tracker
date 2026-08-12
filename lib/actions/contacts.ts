@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { writeAudit, diffFields } from "@/lib/audit";
 import { contactSchema, contactJurisdictionInputSchema, type ContactJurisdictionInput } from "@/lib/validators";
@@ -60,7 +60,7 @@ function toRow(input: Record<string, any>) {
  *  Absent field → leave existing untouched; present (even "[]") → replace-all,
  *  so the form round-trips the full set (getContact seeds the editor on edit). */
 async function syncContactJurisdictions(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  db: Awaited<ReturnType<typeof createClient>>,
   contactId: string,
   raw: FormDataEntryValue | null,
 ): Promise<void> {
@@ -79,9 +79,9 @@ async function syncContactJurisdictions(
     .map((r) => r.data)
     .filter((r) => r.wardNo != null || r.wardId); // must identify a ward
 
-  await supabase.from("contact_jurisdictions").delete().eq("contact_id", contactId);
+  await db.from("contact_jurisdictions").delete().eq("contact_id", contactId);
   if (!rows.length) return;
-  await supabase.from("contact_jurisdictions").insert(
+  await db.from("contact_jurisdictions").insert(
     rows.map((r, i) => ({
       contact_id: contactId,
       ward_id: r.wardId ?? null,
@@ -116,13 +116,13 @@ export async function createContact(
     return { error: "Please fix the errors below.", fieldErrors: zodToFieldErrors(parsed.error) };
   }
 
-  const supabase = await createClient();
+  const db = await createClient();
   const row = { ...toRow(parsed.data), created_by: user.id, updated_by: user.id };
-  const { data, error } = await supabase.from("contacts").insert(row).select("id").single();
+  const { data, error } = await db.from("contacts").insert(row).select("id").single();
   if (error) return { error: error.message };
 
-  await syncContactJurisdictions(supabase, data.id, formData.get("wardJurisdictions"));
-  await writeAudit(supabase, {
+  await syncContactJurisdictions(db, data.id, formData.get("wardJurisdictions"));
+  await writeAudit(db, {
     entityType: "contact",
     entityId: data.id,
     changedBy: user.id,
@@ -148,14 +148,14 @@ export async function updateContact(
     return { error: "Please fix the errors below.", fieldErrors: zodToFieldErrors(parsed.error) };
   }
 
-  const supabase = await createClient();
-  const { data: before } = await supabase.from("contacts").select("*").eq("id", id).single();
+  const db = await createClient();
+  const { data: before } = await db.from("contacts").select("*").eq("id", id).single();
   const row = { ...toRow(parsed.data), updated_by: user.id };
-  const { error } = await supabase.from("contacts").update(row).eq("id", id);
+  const { error } = await db.from("contacts").update(row).eq("id", id);
   if (error) return { error: error.message };
 
-  await syncContactJurisdictions(supabase, id, formData.get("wardJurisdictions"));
-  await writeAudit(supabase, {
+  await syncContactJurisdictions(db, id, formData.get("wardJurisdictions"));
+  await writeAudit(db, {
     entityType: "contact",
     entityId: id,
     changedBy: user.id,
@@ -181,8 +181,8 @@ export async function setContactVerification(
     return { error: "Invalid verification status" };
   }
 
-  const supabase = await createClient();
-  const { data: before } = await supabase
+  const db = await createClient();
+  const { data: before } = await db
     .from("contacts")
     .select("verification_status, internal_notes")
     .eq("id", contactId)
@@ -198,10 +198,10 @@ export async function setContactVerification(
     update.internal_notes = `${prevNotes}\n[${new Date().toISOString().slice(0, 10)}] ${note.trim()}`.trim();
   }
 
-  const { error } = await supabase.from("contacts").update(update).eq("id", contactId);
+  const { error } = await db.from("contacts").update(update).eq("id", contactId);
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "contact",
     entityId: contactId,
     changedBy: user.id,
@@ -220,10 +220,10 @@ export async function deleteContact(id: string): Promise<ActionState> {
   } catch (e) {
     return { error: e instanceof AuthorizationError ? e.message : "Not authorized" };
   }
-  const supabase = await createClient();
-  const { error } = await supabase.from("contacts").delete().eq("id", id);
+  const db = await createClient();
+  const { error } = await db.from("contacts").delete().eq("id", id);
   if (error) return { error: error.message };
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "contact",
     entityId: id,
     changedBy: user.id,

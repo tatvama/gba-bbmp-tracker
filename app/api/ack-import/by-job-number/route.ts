@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSessionUser, hasRole } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/db";
 import { COMPLAINT_FIELD_ROLES } from "@/lib/constants";
-import { validateUpload } from "@/lib/storage/supabase-upload";
+import { validateUpload } from "@/lib/storage/object-store";
 import { getComplaintSettings } from "@/lib/settings";
 import { extractJobCode } from "@/lib/ifms/downloader";
 import { attachAcknowledgmentDocument } from "@/lib/complaints/ack-attach";

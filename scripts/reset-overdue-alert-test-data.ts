@@ -17,7 +17,7 @@ if (!complaintIds.length) {
 }
 
 async function main() {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { createAdminClient } = await import("@/lib/db");
   const admin = createAdminClient();
 
   const { data: rows } = await admin

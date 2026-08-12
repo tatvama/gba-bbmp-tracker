@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/db";
 import { requireRole, AuthorizationError } from "@/lib/auth";
 import { writeAudit, diffFields } from "@/lib/audit";
 import { wardEditSchema } from "@/lib/validators";
@@ -32,8 +32,8 @@ export async function updateWard(
     return { error: "Please fix the errors below.", fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { data: before } = await supabase.from("wards").select("*").eq("new_no", newNo).single();
+  const db = await createClient();
+  const { data: before } = await db.from("wards").select("*").eq("new_no", newNo).single();
   const row = {
     new_name: parsed.data.newName,
     property_count: parsed.data.propertyCount ?? null,
@@ -42,10 +42,10 @@ export async function updateWard(
     verification_status: parsed.data.verificationStatus,
     confidence_score: parsed.data.confidenceScore,
   };
-  const { error } = await supabase.from("wards").update(row).eq("new_no", newNo);
+  const { error } = await db.from("wards").update(row).eq("new_no", newNo);
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "ward",
     entityId: before?.id ?? String(newNo),
     changedBy: user.id,
@@ -68,19 +68,19 @@ export async function setWardVerification(
   }
   if (!VERIFICATION_STATUSES.includes(status as never)) return { error: "Invalid status" };
 
-  const supabase = await createClient();
-  const { data: before } = await supabase
+  const db = await createClient();
+  const { data: before } = await db
     .from("wards")
     .select("id, verification_status")
     .eq("new_no", newNo)
     .single();
-  const { error } = await supabase
+  const { error } = await db
     .from("wards")
     .update({ verification_status: status })
     .eq("new_no", newNo);
   if (error) return { error: error.message };
 
-  await writeAudit(supabase, {
+  await writeAudit(db, {
     entityType: "ward",
     entityId: before?.id ?? String(newNo),
     changedBy: user.id,

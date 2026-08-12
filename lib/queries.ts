@@ -1,7 +1,6 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DbClient } from "@/lib/db";
+import { createClient, createAdminClient } from "@/lib/db";
 import { CORP_NAME, CORPORATION_CODES, COMPLAINT_OPEN_STATUSES } from "@/lib/constants";
 import { getDeadlineRules } from "@/lib/settings";
 import { activeDeadline } from "@/lib/rti-deadlines";
@@ -80,9 +79,9 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const supabase = await sb();
+  const db = await sb();
   const count = async (table: string, mod?: (q: any) => any) => {
-    let q = supabase.from(table).select("*", { count: "exact", head: true });
+    let q = db.from(table).select("*", { count: "exact", head: true });
     if (mod) q = mod(q);
     const { count: c, error } = await q;
     logErr(`count:${table}`, error);
@@ -103,13 +102,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     count("contacts", (q) => q.eq("verification_status", "VERIFIED")),
     count("contacts", (q) => q.eq("verification_status", "PENDING")),
     // GBA wards = sum of corporation ward_count (369)
-    supabase.from("corporations").select("ward_count"),
+    db.from("corporations").select("ward_count"),
     // Old-198 represented = distinct old_wards entries across all wards
-    supabase.from("wards").select("old_wards"),
+    db.from("wards").select("old_wards"),
     count("contacts", (q) => q.or("phone.is.null,email.is.null,office_address.is.null")),
     // wards whose eng sub-division has no contact
-    supabase.from("contacts").select("eng_subdivision_id").not("eng_subdivision_id", "is", null),
-    supabase.from("wards").select("eng_subdivision_id"),
+    db.from("contacts").select("eng_subdivision_id").not("eng_subdivision_id", "is", null),
+    db.from("wards").select("eng_subdivision_id"),
   ]);
 
   const gbaWards = (corps ?? []).reduce(
@@ -145,8 +144,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function getRecentlyUpdated(limit = 8): Promise<Contact[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select("*")
     .order("updated_at", { ascending: false })
@@ -156,8 +155,8 @@ export async function getRecentlyUpdated(limit = 8): Promise<Contact[]> {
 }
 
 export async function getNeedsVerification(limit = 8): Promise<Contact[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select("*")
     .in("verification_status", ["PENDING", "NEEDS_CORRECTION", "UNKNOWN"])
@@ -171,8 +170,8 @@ export async function getNeedsVerification(limit = 8): Promise<Contact[]> {
 // Wards
 // --------------------------------------------------------------------------
 export async function listWards(): Promise<WardWithRelations[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("wards")
     .select(WARD_SELECT)
     .order("new_no", { ascending: true });
@@ -181,8 +180,8 @@ export async function listWards(): Promise<WardWithRelations[]> {
 }
 
 export async function getWard(newNo: number): Promise<WardWithRelations | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("wards")
     .select(WARD_SELECT)
     .eq("new_no", newNo)
@@ -195,15 +194,15 @@ export async function getWard(newNo: number): Promise<WardWithRelations | null> 
 // Corporations / Divisions / Sub-divisions
 // --------------------------------------------------------------------------
 export async function listCorporations(): Promise<Corporation[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase.from("corporations").select("*").order("name");
+  const db = await sb();
+  const { data, error } = await db.from("corporations").select("*").order("name");
   logErr("listCorporations", error);
   return (data as Corporation[]) ?? [];
 }
 
 export async function getCorporation(code: string): Promise<Corporation | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("corporations")
     .select("*")
     .eq("code", code.toUpperCase())
@@ -235,8 +234,8 @@ export interface GbaDivision {
 
 /** GBA per-corporation breakdown (division → sub-division → wards), from public.gba_wards. */
 export async function getGbaStructure(code: string): Promise<GbaDivision[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("gba_wards")
     .select("ward_no, ward_name_en, ward_name_kn, legible, division, subdivision, assembly_constituency")
     .eq("corporation_code", code.toUpperCase())
@@ -294,8 +293,8 @@ export interface GbaTreeCorp {
 }
 
 export async function getGbaTree(): Promise<GbaTreeCorp[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("gba_wards")
     .select(
       "corporation_code, ward_no, ward_name_en, ward_name_kn, legible, division, subdivision, assembly_constituency",
@@ -346,8 +345,8 @@ export async function getGbaTree(): Promise<GbaTreeCorp[]> {
 }
 
 export async function getBbmpTree(): Promise<GbaTreeCorp[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("wards")
     .select(
       "new_no, new_name, old_wards, division:divisions!division_id(name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name), derived_corporation:corporations!derived_corporation_id(code)",
@@ -415,8 +414,8 @@ export async function getBbmpTree(): Promise<GbaTreeCorp[]> {
 export async function listDivisions(): Promise<
   (Division & { corporation?: Pick<Corporation, "code" | "name"> | null })[]
 > {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("divisions")
     .select("*, corporation:corporations!corporation_id(code,name)")
     .order("name");
@@ -425,8 +424,8 @@ export async function listDivisions(): Promise<
 }
 
 export async function getDivision(id: string) {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("divisions")
     .select("*, corporation:corporations!corporation_id(id,code,name)")
     .eq("id", id)
@@ -438,8 +437,8 @@ export async function getDivision(id: string) {
 export async function listSubDivisions(): Promise<
   (EngSubDivision & { division?: Pick<Division, "id" | "name"> | null })[]
 > {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("eng_subdivisions")
     .select("*, division:divisions!division_id(id,name)")
     .order("sl_no", { ascending: true, nullsFirst: false });
@@ -448,8 +447,8 @@ export async function listSubDivisions(): Promise<
 }
 
 export async function getSubDivision(id: string) {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("eng_subdivisions")
     .select("*, division:divisions!division_id(id,name,corporation_id)")
     .eq("id", id)
@@ -459,8 +458,8 @@ export async function getSubDivision(id: string) {
 }
 
 export async function listWardsForSubDivision(subId: string): Promise<Ward[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("wards")
     .select("*")
     .eq("eng_subdivision_id", subId)
@@ -470,8 +469,8 @@ export async function listWardsForSubDivision(subId: string): Promise<Ward[]> {
 }
 
 export async function listWardsForDivision(divisionId: string): Promise<Ward[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("wards")
     .select("*")
     .eq("division_id", divisionId)
@@ -481,8 +480,8 @@ export async function listWardsForDivision(divisionId: string): Promise<Ward[]> 
 }
 
 export async function listSubDivisionsForDivision(divisionId: string): Promise<EngSubDivision[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("eng_subdivisions")
     .select("*")
     .eq("division_id", divisionId)
@@ -495,8 +494,8 @@ export async function listSubDivisionsForDivision(divisionId: string): Promise<E
 // Contacts
 // --------------------------------------------------------------------------
 export async function listContacts(): Promise<ContactWithRelations[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select(CONTACT_SELECT)
     .order("full_name");
@@ -505,8 +504,8 @@ export async function listContacts(): Promise<ContactWithRelations[]> {
 }
 
 export async function getContact(id: string): Promise<ContactWithRelations | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select(CONTACT_SELECT) // includes contact_jurisdictions — seeds the ward editor on edit
     .eq("id", id)
@@ -516,8 +515,8 @@ export async function getContact(id: string): Promise<ContactWithRelations | nul
 }
 
 export async function listContactsForSubDivision(subId: string): Promise<Contact[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select("*")
     .eq("eng_subdivision_id", subId);
@@ -526,8 +525,8 @@ export async function listContactsForSubDivision(subId: string): Promise<Contact
 }
 
 export async function listContactsForCorporation(corpId: string): Promise<Contact[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select("*")
     .eq("corporation_id", corpId)
@@ -570,8 +569,8 @@ function mapGbaComplaint(c: any) {
 }
 
 export async function listComplaints(): Promise<ComplaintWithRelations[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaints")
     .select(COMPLAINT_SELECT)
     .is("deleted_at", null)
@@ -582,8 +581,8 @@ export async function listComplaints(): Promise<ComplaintWithRelations[]> {
 }
 
 export async function listComplaintsForWard(wardId: string): Promise<Complaint[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaints")
     .select("*")
     .eq("ward_id", wardId)
@@ -594,8 +593,8 @@ export async function listComplaintsForWard(wardId: string): Promise<Complaint[]
 }
 
 export async function listSources(): Promise<SourceDocument[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase.from("source_documents").select("*").order("title");
+  const db = await sb();
+  const { data, error } = await db.from("source_documents").select("*").order("title");
   logErr("listSources", error);
   return (data as SourceDocument[]) ?? [];
 }
@@ -604,8 +603,8 @@ export async function listAuditLogs(
   filter?: { entityType?: string; entityId?: string },
   limit = 200,
 ): Promise<AuditLog[]> {
-  const supabase = await sb();
-  let q = supabase.from("audit_logs").select("*").order("changed_at", { ascending: false }).limit(limit);
+  const db = await sb();
+  let q = db.from("audit_logs").select("*").order("changed_at", { ascending: false }).limit(limit);
   if (filter?.entityType) q = q.eq("entity_type", filter.entityType);
   if (filter?.entityId) q = q.eq("entity_id", filter.entityId);
   const { data, error } = await q;
@@ -634,7 +633,7 @@ export interface GbaWardSearchRow {
 }
 
 export async function globalSearch(q: string): Promise<SearchResults> {
-  const supabase = await sb();
+  const db = await sb();
   const term = q.trim();
   if (!term) return { wards: [], contacts: [], divisions: [], subdivisions: [], complaints: [], gbaWards: [] };
   const like = `%${term}%`;
@@ -655,25 +654,25 @@ export async function globalSearch(q: string): Promise<SearchResults> {
   ].join(",");
 
   const [wards, contacts, divisions, subdivisions, complaints, gbaWards] = await Promise.all([
-    supabase.from("wards").select(WARD_SELECT).or(wardOr).order("new_no").limit(25),
-    supabase
+    db.from("wards").select(WARD_SELECT).or(wardOr).order("new_no").limit(25),
+    db
       .from("contacts")
       .select(CONTACT_SELECT)
       .or(`full_name.ilike.${like},designation.ilike.${like},phone.ilike.${like},email.ilike.${like}`)
       .limit(25),
-    supabase.from("divisions").select("*").ilike("name", like).limit(25),
-    supabase
+    db.from("divisions").select("*").ilike("name", like).limit(25),
+    db
       .from("eng_subdivisions")
       .select("*, division:divisions!division_id(id,name)")
       .ilike("name", like)
       .limit(25),
-    supabase
+    db
       .from("complaints")
       .select("*")
       .or(`title.ilike.${like},complaint_number.ilike.${like},internal_case_number.ilike.${like},rti_number.ilike.${like},latest_reply_summary.ilike.${like}`)
       .is("deleted_at", null)
       .limit(25),
-    supabase
+    db
       .from("gba_wards")
       .select("corporation_code, ward_no, ward_name_en, division, subdivision")
       .or(gbaOr)
@@ -693,8 +692,8 @@ export async function globalSearch(q: string): Promise<SearchResults> {
 }
 
 export async function listDivisionsForCorporation(corpId: string): Promise<Division[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("divisions")
     .select("*")
     .eq("corporation_id", corpId)
@@ -704,8 +703,8 @@ export async function listDivisionsForCorporation(corpId: string): Promise<Divis
 }
 
 export async function countDerivedWards(corpId: string): Promise<number> {
-  const supabase = await sb();
-  const { count, error } = await supabase
+  const db = await sb();
+  const { count, error } = await db
     .from("wards")
     .select("*", { count: "exact", head: true })
     .eq("derived_corporation_id", corpId);
@@ -767,8 +766,8 @@ function mapGbaRti(r: any) {
 }
 
 export async function listRtis(): Promise<RtiWithRelations[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_applications")
     .select(RTI_SELECT)
     .order("updated_at", { ascending: false });
@@ -778,8 +777,8 @@ export async function listRtis(): Promise<RtiWithRelations[]> {
 }
 
 export async function getRti(id: string): Promise<RtiWithRelations | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_applications")
     .select(RTI_SELECT)
     .eq("id", id)
@@ -800,8 +799,8 @@ export async function getRtiFormOptions() {
 }
 
 export async function listFirstAppeals(rtiId: string): Promise<RtiFirstAppeal[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_first_appeals")
     .select("*")
     .eq("rti_id", rtiId)
@@ -811,8 +810,8 @@ export async function listFirstAppeals(rtiId: string): Promise<RtiFirstAppeal[]>
 }
 
 export async function listSecondAppeals(rtiId: string): Promise<RtiSecondAppeal[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_second_appeals")
     .select("*")
     .eq("rti_id", rtiId)
@@ -822,8 +821,8 @@ export async function listSecondAppeals(rtiId: string): Promise<RtiSecondAppeal[
 }
 
 export async function listRtiDocuments(rtiId: string): Promise<RtiDocument[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_documents")
     .select("*")
     .eq("rti_id", rtiId)
@@ -833,8 +832,8 @@ export async function listRtiDocuments(rtiId: string): Promise<RtiDocument[]> {
 }
 
 export async function listAllFirstAppeals(): Promise<RtiFirstAppeal[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_first_appeals")
     .select("*")
     .order("created_at", { ascending: false });
@@ -843,8 +842,8 @@ export async function listAllFirstAppeals(): Promise<RtiFirstAppeal[]> {
 }
 
 export async function listAllSecondAppeals(): Promise<RtiSecondAppeal[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_second_appeals")
     .select("*")
     .order("created_at", { ascending: false });
@@ -853,8 +852,8 @@ export async function listAllSecondAppeals(): Promise<RtiSecondAppeal[]> {
 }
 
 export async function getFirstAppeal(id: string): Promise<RtiFirstAppeal | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_first_appeals")
     .select("*")
     .eq("id", id)
@@ -864,8 +863,8 @@ export async function getFirstAppeal(id: string): Promise<RtiFirstAppeal | null>
 }
 
 export async function getSecondAppeal(id: string): Promise<RtiSecondAppeal | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_second_appeals")
     .select("*")
     .eq("id", id)
@@ -879,8 +878,8 @@ export async function listCommunications(
   entityType: string,
   entityId: string,
 ): Promise<CommunicationLog[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("communication_logs")
     .select("*")
     .eq("entity_type", entityType)
@@ -892,8 +891,8 @@ export async function listCommunications(
 
 /** Pending RTI reminders soonest-first (RTI dashboard "urgent follow-ups"). */
 export async function listUpcomingRtiReminders(limit = 8): Promise<Reminder[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("reminders")
     .select("*")
     .eq("entity_type", "rti")
@@ -924,8 +923,8 @@ export interface RtiDashboardStats {
 // ==========================================================================
 
 export async function getComplaint(id: string): Promise<ComplaintWithRelations | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaints")
     .select(COMPLAINT_SELECT)
     .eq("id", id)
@@ -953,8 +952,8 @@ export interface ComplaintLetterDraft {
 }
 
 export async function getComplaintLetterDraft(complaintId: string): Promise<ComplaintLetterDraft | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("letter_drafts")
     .select("id, content, file_name, variant, language, print_status, printed_at, printed_by_profile:profiles!printed_by(name)")
     .eq("complaint_id", complaintId)
@@ -1007,8 +1006,8 @@ export interface PrintQueueLetter {
  * the queue opens the exact stored file.
  */
 export async function listPrintQueueLetters(): Promise<PrintQueueLetter[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("letter_drafts")
     .select(
       "id, complaint_id, job_number, variant, language, file_name, print_status, printed_at, created_at, band, content, printed_by_profile:profiles!printed_by(name), complaint:complaints!complaint_id(id, internal_case_number, title, status, complaint_mode, date_submitted)",
@@ -1023,7 +1022,7 @@ export async function listPrintQueueLetters(): Promise<PrintQueueLetter[]> {
   const complaintIds = [...new Set(rows.map((r) => r.complaint_id).filter(Boolean))] as string[];
   const docsByComplaint = new Map<string, { pdfDocId: string | null; docxDocId: string | null }>();
   if (complaintIds.length) {
-    const { data: docs } = await supabase
+    const { data: docs } = await db
       .from("complaint_documents")
       .select("id, complaint_id, document_type")
       .in("complaint_id", complaintIds)
@@ -1064,8 +1063,8 @@ export async function listPrintQueueLetters(): Promise<PrintQueueLetter[]> {
 /** Count of letters still waiting to print (dashboard banner) — excludes
  *  already-printed letters, even if their complaint hasn't been filed yet. */
 export async function countPrintPendingLetters(): Promise<number> {
-  const supabase = await sb();
-  const { count, error } = await supabase
+  const db = await sb();
+  const { count, error } = await db
     .from("letter_drafts")
     .select("id", { count: "exact", head: true })
     .eq("print_status", "pending");
@@ -1085,10 +1084,10 @@ export interface ReplyDueSoon {
 
 /** The complaints behind that count, soonest deadline first (dashboard list). */
 export async function listRepliesDueSoon(withinDays = 5, limit = 8): Promise<ReplyDueSoon[]> {
-  const supabase = await sb();
+  const db = await sb();
   const now = new Date();
   const until = new Date(now.getTime() + withinDays * 86_400_000);
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("complaints")
     .select("id, internal_case_number, title, escalation_stage, escalation_stage_deadline")
     .is("deleted_at", null)
@@ -1124,8 +1123,8 @@ export interface EscalationFlowConfig {
 /** The escalation ladder's configurable stages — single source of truth for
  *  both the scheduler and the drag-drop process-flow page. */
 export async function listEscalationFlowConfigs(): Promise<EscalationFlowConfig[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("escalation_flow_configs")
     .select("id, stage_key, label, sla_days, sla_unit, on_elapse_draft_kind, on_elapse_next_stage, position_x, position_y, sort_order, is_active")
     .order("sort_order", { ascending: true });
@@ -1148,8 +1147,8 @@ export async function listEscalationFlowConfigs(): Promise<EscalationFlowConfig[
 /** Live count of complaints currently sitting in each escalation_stage value —
  *  drives the per-node badge on the process-flow page. */
 export async function getEscalationStageCounts(): Promise<Record<string, number>> {
-  const supabase = await sb();
-  const { data, error } = await supabase.from("complaints").select("escalation_stage").is("deleted_at", null);
+  const db = await sb();
+  const { data, error } = await db.from("complaints").select("escalation_stage").is("deleted_at", null);
   logErr("getEscalationStageCounts", error);
   const counts: Record<string, number> = {};
   for (const row of (data as { escalation_stage: string }[] | null) ?? []) {
@@ -1178,8 +1177,8 @@ export interface JobEvidenceDoc {
  * surface the full imported evidence set for viewing.
  */
 export async function getJobDocumentsByNumber(jobNumber: string): Promise<JobEvidenceDoc[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("job_documents")
     .select("id, title, original_file_name, document_type, mime_type, storage_bucket, storage_path, file_size, ocr_status")
     .eq("job_number", jobNumber)
@@ -1189,8 +1188,8 @@ export async function getJobDocumentsByNumber(jobNumber: string): Promise<JobEvi
 }
 
 export async function listComplaintDocuments(complaintId: string): Promise<ComplaintDocument[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaint_documents")
     .select("*, uploaded_by_profile:profiles!uploaded_by(name, role)")
     .eq("complaint_id", complaintId)
@@ -1200,8 +1199,8 @@ export async function listComplaintDocuments(complaintId: string): Promise<Compl
 }
 
 export async function listComplaintTimeline(complaintId: string): Promise<ComplaintTimelineEntry[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaint_timeline")
     .select("*, created_by_profile:profiles!created_by(name, role)")
     .eq("complaint_id", complaintId)
@@ -1211,8 +1210,8 @@ export async function listComplaintTimeline(complaintId: string): Promise<Compla
 }
 
 export async function listComplaintReplies(complaintId: string): Promise<ComplaintReply[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaint_replies")
     .select("*")
     .eq("complaint_id", complaintId)
@@ -1222,8 +1221,8 @@ export async function listComplaintReplies(complaintId: string): Promise<Complai
 }
 
 export async function listComplaintActions(complaintId: string): Promise<ComplaintActionTaken[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaint_action_taken")
     .select("*")
     .eq("complaint_id", complaintId)
@@ -1233,8 +1232,8 @@ export async function listComplaintActions(complaintId: string): Promise<Complai
 }
 
 export async function listComplaintCommunications(complaintId: string): Promise<CommunicationLog[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("communication_logs")
     .select("*")
     .eq("entity_type", "complaint")
@@ -1245,8 +1244,8 @@ export async function listComplaintCommunications(complaintId: string): Promise<
 }
 
 export async function listComplaintReminders(complaintId: string): Promise<Reminder[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("reminders")
     .select("*")
     .eq("entity_type", "complaint")
@@ -1257,8 +1256,8 @@ export async function listComplaintReminders(complaintId: string): Promise<Remin
 }
 
 export async function listComplaintEscalations(complaintId: string) {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("escalation_logs")
     .select("*, created_by_profile:profiles!created_by(name, role)")
     .eq("entity_type", "complaint")
@@ -1269,8 +1268,8 @@ export async function listComplaintEscalations(complaintId: string) {
 }
 
 export async function listComplaintAiDrafts(complaintId: string): Promise<AiDraft[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("ai_drafts")
     .select("*, created_by_profile:profiles!created_by(name, role)")
     .eq("entity_type", "complaint")
@@ -1282,8 +1281,8 @@ export async function listComplaintAiDrafts(complaintId: string): Promise<AiDraf
 
 /** OCR jobs joined with their document's title/complaint for the admin queue. */
 export async function listOcrJobs(): Promise<(OcrJob & { document?: { id: string; title: string | null; complaint_id: string; ocr_status: string } | null })[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("ocr_jobs")
     .select("*, document:complaint_documents!document_id(id,title,complaint_id,ocr_status)")
     .order("created_at", { ascending: false })
@@ -1296,8 +1295,8 @@ export async function listOcrJobs(): Promise<(OcrJob & { document?: { id: string
 export async function listComplaintDocsForReports(): Promise<
   (ComplaintDocument & { complaint?: { id: string; title: string; internal_case_number: string | null } | null })[]
 > {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaint_documents")
     .select("*, complaint:complaints!complaint_id(id,title,internal_case_number)")
     .order("uploaded_at", { ascending: false })
@@ -1307,12 +1306,12 @@ export async function listComplaintDocsForReports(): Promise<
 }
 
 export async function rtiDashboardStats(): Promise<RtiDashboardStats> {
-  const supabase = await sb();
+  const db = await sb();
   // getDeadlineRules() is only used later (post-processing rows) -> independent
   // of the rti_applications read, so fetch both in parallel.
   const [rules, { data, error }] = await Promise.all([
     getDeadlineRules(),
-    supabase
+    db
       .from("rti_applications")
       .select(
         "status, priority, is_life_liberty, satisfaction_status, normal_due, life_liberty_due, first_appeal_due, second_appeal_due",
@@ -1394,8 +1393,8 @@ export type OfficerRow = ContactWithRelations & {
 
 /** All officers (contacts), with relations + reporting line, for the hierarchy. */
 export async function listOfficers(): Promise<OfficerRow[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select(OFFICER_SELECT)
     .order("full_name");
@@ -1404,8 +1403,8 @@ export async function listOfficers(): Promise<OfficerRow[]> {
 }
 
 export async function getOfficer(id: string): Promise<OfficerRow | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select(OFFICER_SELECT)
     .eq("id", id)
@@ -1443,8 +1442,8 @@ interface RecipientOfficerRaw {
 
 /** Officers/contacts for the recipient picker — id, posting, contact + jurisdiction. */
 export async function listRecipientOfficers(): Promise<RecipientOfficer[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select(
       "id, full_name, designation, role_level, office_address, phone, email, division:divisions!division_id(name), corporation:corporations!corporation_id(name), eng_subdivision:eng_subdivisions!eng_subdivision_id(name)",
@@ -1468,8 +1467,8 @@ export async function listRecipientOfficers(): Promise<RecipientOfficer[]> {
 
 /** Officers who report to this officer. */
 export async function listDirectReports(officerId: string): Promise<OfficerRow[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("contacts")
     .select(OFFICER_SELECT)
     .eq("reporting_officer_id", officerId)
@@ -1479,8 +1478,8 @@ export async function listDirectReports(officerId: string): Promise<OfficerRow[]
 }
 
 export async function listOfficerTransfers(officerId: string): Promise<OfficerTransfer[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("officer_transfers")
     .select("*")
     .eq("officer_id", officerId)
@@ -1499,7 +1498,7 @@ export interface OfficerScorecard {
 
 /** Accountability counts for one officer (assigned complaints + linked RTIs). */
 export async function getOfficerScorecard(officerId: string): Promise<OfficerScorecard> {
-  const supabase = await sb();
+  const db = await sb();
   const today = new Date().toISOString().slice(0, 10);
   const assignedOr = `assigned_engineer_id.eq.${officerId},assigned_officer_id.eq.${officerId}`;
 
@@ -1511,9 +1510,9 @@ export async function getOfficerScorecard(officerId: string): Promise<OfficerSco
 
   const [complaintsTotal, complaintsOpen, complaintsOverdue, rtisLinked, transfers] =
     await Promise.all([
-      num(supabase.from("complaints").select("*", { count: "exact", head: true }).is("deleted_at", null).or(assignedOr)),
+      num(db.from("complaints").select("*", { count: "exact", head: true }).is("deleted_at", null).or(assignedOr)),
       num(
-        supabase
+        db
           .from("complaints")
           .select("*", { count: "exact", head: true })
           .is("deleted_at", null)
@@ -1521,7 +1520,7 @@ export async function getOfficerScorecard(officerId: string): Promise<OfficerSco
           .in("status", COMPLAINT_OPEN_STATUSES as unknown as string[]),
       ),
       num(
-        supabase
+        db
           .from("complaints")
           .select("*", { count: "exact", head: true })
           .is("deleted_at", null)
@@ -1529,8 +1528,8 @@ export async function getOfficerScorecard(officerId: string): Promise<OfficerSco
           .in("status", COMPLAINT_OPEN_STATUSES as unknown as string[])
           .lt("next_follow_up_date", today),
       ),
-      num(supabase.from("rti_applications").select("*", { count: "exact", head: true }).eq("contact_id", officerId)),
-      num(supabase.from("officer_transfers").select("*", { count: "exact", head: true }).eq("officer_id", officerId)),
+      num(db.from("rti_applications").select("*", { count: "exact", head: true }).eq("contact_id", officerId)),
+      num(db.from("officer_transfers").select("*", { count: "exact", head: true }).eq("officer_id", officerId)),
     ]);
 
   return { complaintsTotal, complaintsOpen, complaintsOverdue, rtisLinked, transfers };
@@ -1565,32 +1564,32 @@ export interface NotificationDigest {
  * client (which bypasses RLS) rather than this being re-derived somewhere else.
  */
 export async function getNotificationDigest(
-  client?: SupabaseClient,
+  client?: DbClient,
 ): Promise<NotificationDigest> {
-  const supabase = client ?? (await sb());
+  const db = client ?? (await sb());
   const rules = await getDeadlineRules();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
 
   const [rtiRes, cmpRes, remRes, auditRes] = await Promise.all([
-    supabase
+    db
       .from("rti_applications")
       .select("id, internal_ref, subject, status, is_life_liberty, normal_due, life_liberty_due, first_appeal_due, second_appeal_due")
       .neq("status", "Closed"),
-    supabase
+    db
       .from("complaints")
       .select("id, internal_case_number, title, next_follow_up_date, status")
       .is("deleted_at", null)
       .in("status", COMPLAINT_OPEN_STATUSES as unknown as string[])
       .lt("next_follow_up_date", today)
       .order("next_follow_up_date"),
-    supabase
+    db
       .from("reminders")
       .select("id, title, due_date, entity_type, entity_id, status")
       .eq("status", "Pending")
       .lte("due_date", today)
       .order("due_date"),
-    supabase
+    db
       .from("job_audits")
       .select("job_number, risk_band, risk_score, total_exposure, created_at")
       .in("risk_band", ["bill_stop", "serious"])
@@ -1670,9 +1669,9 @@ export interface PublicCaseStatus {
 
 /** Sanitised, no-login status of a complaint or RTI by UUID (for share links). */
 export async function getPublicCaseStatus(id: string): Promise<PublicCaseStatus | null> {
-  const supabase = await sb();
+  const db = await sb();
 
-  const { data: c } = await supabase
+  const { data: c } = await db
     .from("complaints")
     .select("internal_case_number, title, status, date_submitted, latest_reply_date, latest_action_taken_date, next_follow_up_date, ward:wards!ward_id(new_no,new_name)")
     .eq("id", id)
@@ -1696,7 +1695,7 @@ export async function getPublicCaseStatus(id: string): Promise<PublicCaseStatus 
     };
   }
 
-  const { data: r } = await supabase
+  const { data: r } = await db
     .from("rti_applications")
     .select("internal_ref, subject, status, date_filed, normal_due, first_appeal_due, ward:wards!ward_id(new_no,new_name)")
     .eq("id", id)
@@ -1734,8 +1733,8 @@ export interface FraudAnalytics {
 
 /** Portfolio-wide statistical fraud signals from the bill_audits table. */
 export async function getFraudAnalytics(): Promise<FraudAnalytics> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("bill_audits")
     .select("grand_total, red_flag_count, created_at, complaint:complaints!complaint_id(contractor, assigned_engineer:contacts!assigned_engineer_id(full_name))")
     .limit(8000);
@@ -1786,8 +1785,8 @@ export interface LocationOverlap {
 
 /** Different works whose reported locations are < `maxMeters` apart (possible double-work / overlap). */
 export async function getLocationOverlaps(maxMeters = 60): Promise<LocationOverlap[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaints")
     .select("id, internal_case_number, job_number, contractor, location, latitude, longitude")
     .not("latitude", "is", null)
@@ -1850,21 +1849,21 @@ export interface RedFlagSummary {
 
 /** Aggregate fraud signals per contractor + a global red-flag summary. */
 export async function getContractorRisk(): Promise<{ summary: RedFlagSummary; contractors: ContractorRisk[] }> {
-  const supabase = await sb();
+  const db = await sb();
   const today = new Date().toISOString().slice(0, 10);
 
   const [compRes, docRes, auditRes] = await Promise.all([
-    supabase
+    db
       .from("complaints")
       .select("id, contractor, job_number, status, next_follow_up_date")
       .is("deleted_at", null)
       .limit(5000),
-    supabase
+    db
       .from("complaint_documents")
       .select("complaint_id, is_duplicate, vision_verdict, geo_flag")
       .or("is_duplicate.eq.true,vision_verdict.not.is.null,geo_flag.eq.far")
       .limit(8000),
-    supabase
+    db
       .from("job_audits")
       .select("job_number, risk_band, total_exposure, red_flag_count, created_at")
       .order("created_at", { ascending: false })
@@ -1968,10 +1967,10 @@ export interface CrossJobPattern {
  * the pure detectRepeatPatterns engine over every persisted job audit.
  */
 export async function getCrossJobPatterns(): Promise<CrossJobPattern[]> {
-  const supabase = await sb();
+  const db = await sb();
   const [auditRes, compRes] = await Promise.all([
-    supabase.from("job_audits").select("job_number, report, created_at").order("created_at", { ascending: false }).limit(2000),
-    supabase.from("complaints").select("job_number, contractor").not("job_number", "is", null).is("deleted_at", null).limit(5000),
+    db.from("job_audits").select("job_number, report, created_at").order("created_at", { ascending: false }).limit(2000),
+    db.from("complaints").select("job_number, contractor").not("job_number", "is", null).is("deleted_at", null).limit(5000),
   ]);
   logErr("patterns:audits", auditRes.error);
   logErr("patterns:complaints", compRes.error);
@@ -2013,15 +2012,15 @@ export async function getCrossJobPatterns(): Promise<CrossJobPattern[]> {
 
 /** Points for the forensic map: complaint reported locations + photo EXIF GPS. */
 export async function getForensicMapPoints(): Promise<MapPoint[]> {
-  const supabase = await sb();
+  const db = await sb();
   const [comps, photos] = await Promise.all([
-    supabase
+    db
       .from("complaints")
       .select("id, internal_case_number, title, latitude, longitude")
       .not("latitude", "is", null)
       .is("deleted_at", null)
       .limit(2000),
-    supabase
+    db
       .from("complaint_documents")
       .select("complaint_id, document_type, exif_gps_lat, exif_gps_lon, geo_flag")
       .not("exif_gps_lat", "is", null)
@@ -2076,8 +2075,8 @@ export interface JobAuditRow {
 
 /** Latest persisted forensic report for a job (no re-run). */
 export async function getJobAudit(jobNumber: string): Promise<JobAuditRow | null> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("job_audits")
     .select("*")
     .eq("job_number", jobNumber)
@@ -2103,8 +2102,8 @@ export async function getJobAudit(jobNumber: string): Promise<JobAuditRow | null
 
 /** Distinct job numbers across complaints, with complaint + document counts. */
 export async function listJobNumbers(): Promise<{ jobNumber: string; complaints: number }[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("complaints")
     .select("job_number")
     .not("job_number", "is", null)
@@ -2121,10 +2120,10 @@ export async function listJobNumbers(): Promise<{ jobNumber: string; complaints:
 
 /** Known job codes (union of job_cases + complaints) — typeahead for linking an RTI. */
 export async function listKnownJobCodes(): Promise<string[]> {
-  const supabase = await sb();
+  const db = await sb();
   const [casesRes, compRes] = await Promise.all([
-    supabase.from("job_cases").select("job_number").limit(5000),
-    supabase.from("complaints").select("job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
+    db.from("job_cases").select("job_number").limit(5000),
+    db.from("complaints").select("job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
   ]);
   logErr("listKnownJobCodes:cases", casesRes.error);
   logErr("listKnownJobCodes:complaints", compRes.error);
@@ -2153,8 +2152,8 @@ export interface JobLinkedRti {
 /** RTI applications linked to a job number (for the unified by-job-code dossier). */
 export async function getJobLinkedRtis(jobNumber: string): Promise<JobLinkedRti[]> {
   if (!jobNumber) return [];
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("rti_applications")
     .select("id, internal_ref, subject, status, date_filed, reply_date, normal_due")
     .eq("job_number", jobNumber)
@@ -2186,13 +2185,13 @@ async function loadJobCasesWithAudit(): Promise<{
   cases: Record<string, unknown>[];
   latestAudit: Map<string, LatestAudit>;
 }> {
-  const supabase = await sb();
+  const db = await sb();
   const [casesRes, auditRes] = await Promise.all([
-    supabase
+    db
       .from("job_cases")
       .select("job_number, contractor, division, net_amount, gross_amount, year, status, complaint_id")
       .limit(5000),
-    supabase
+    db
       .from("job_audits")
       .select("job_number, risk_band, total_exposure, red_flag_count, created_at")
       .order("created_at", { ascending: false })
@@ -2343,8 +2342,8 @@ export interface OversightStats {
 
 /** Platform-wide forensic oversight totals (latest audit per job). */
 export async function getOversightStats(): Promise<OversightStats> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("job_audits")
     .select("job_number, risk_band, total_exposure, red_flag_count, created_at")
     .order("created_at", { ascending: false })
@@ -2368,17 +2367,17 @@ export async function getOversightStats(): Promise<OversightStats> {
 
 /** Open complaints past their follow-up date + RTIs past their normal due date. */
 export async function getOverdueCounts(): Promise<{ complaintsOverdue: number; rtiDue: number }> {
-  const supabase = await sb();
+  const db = await sb();
   const today = new Date().toISOString().slice(0, 10);
   const [compRes, rtiRes] = await Promise.all([
-    supabase
+    db
       .from("complaints")
       .select("id", { count: "exact", head: true })
       .is("deleted_at", null)
       .not("status", "in", '("Resolved","Closed")')
       .not("next_follow_up_date", "is", null)
       .lt("next_follow_up_date", today),
-    supabase
+    db
       .from("rti_applications")
       .select("id", { count: "exact", head: true })
       .not("normal_due", "is", null)
@@ -2406,10 +2405,10 @@ export interface JobNumberWithAudit {
  * Replaces a per-job getJobAudit() loop on the jobs index page.
  */
 export async function listJobNumbersWithAudits(): Promise<JobNumberWithAudit[]> {
-  const supabase = await sb();
+  const db = await sb();
   const [compRes, auditRes] = await Promise.all([
-    supabase.from("complaints").select("id, job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
-    supabase.from("job_audits").select("job_number, risk_band, risk_score, finding_count, red_flag_count, created_at").order("created_at", { ascending: false }).limit(5000),
+    db.from("complaints").select("id, job_number").not("job_number", "is", null).is("deleted_at", null).limit(5000),
+    db.from("job_audits").select("job_number, risk_band, risk_score, finding_count, red_flag_count, created_at").order("created_at", { ascending: false }).limit(5000),
   ]);
   logErr("listJobNumbersWithAudits:complaints", compRes.error);
   logErr("listJobNumbersWithAudits:audits", auditRes.error);
@@ -2448,8 +2447,8 @@ export async function listJobNumbersWithAudits(): Promise<JobNumberWithAudit[]> 
 
 /** Finding codes the verifier has dismissed for a job (false positives). */
 export async function listDismissedFindings(jobNumber: string): Promise<string[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("finding_review")
     .select("finding_code, status")
     .eq("job_number", jobNumber)
@@ -2470,8 +2469,8 @@ export interface JobAuditHistoryRow {
 
 /** Prior audit runs for a job (newest first) — for the run-over-run history/diff. */
 export async function listJobAudits(jobNumber: string): Promise<JobAuditHistoryRow[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("job_audits")
     .select("id, risk_score, risk_band, finding_count, red_flag_count, total_exposure, created_at")
     .eq("job_number", jobNumber)
@@ -2522,8 +2521,8 @@ function toLetterDraftRow(r: Record<string, unknown>): LetterDraftRow {
 
 /** Saved letter drafts for a job (newest first) — so drafts can be reopened. */
 export async function listLetterDrafts(jobNumber: string): Promise<LetterDraftRow[]> {
-  const supabase = await sb();
-  const { data, error } = await supabase
+  const db = await sb();
+  const { data, error } = await db
     .from("letter_drafts")
     .select("id, job_number, variant, language, signatory_key, content, lint_ok, ai_used, file_name, created_at")
     .eq("job_number", jobNumber)
@@ -2545,8 +2544,8 @@ export interface JobDossierComplaint {
 
 /** All complaints + documents under a job number — for the consolidated PIL dossier. */
 export async function getJobDossier(jobNumber: string): Promise<JobDossierComplaint[]> {
-  const supabase = await sb();
-  const { data: comps, error } = await supabase
+  const db = await sb();
+  const { data: comps, error } = await db
     .from("complaints")
     .select("id, internal_case_number, title, location, contractor, division:divisions!division_id(name)")
     .eq("job_number", jobNumber)
@@ -2555,7 +2554,7 @@ export async function getJobDossier(jobNumber: string): Promise<JobDossierCompla
   const ids = (comps ?? []).map((c) => (c as Record<string, unknown>).id as string);
   if (ids.length === 0) return [];
 
-  const { data: docs, error: dErr } = await supabase
+  const { data: docs, error: dErr } = await db
     .from("complaint_documents")
     .select("id, complaint_id, title, document_type, file_sha256, is_duplicate, vision_verdict, geo_flag, uploaded_at")
     .in("complaint_id", ids)

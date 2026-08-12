@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/db";
 import { extractJson, extractorSystem } from "@/lib/ai/json-extract";
 import { isAiConfigured } from "@/lib/ai/provider";
 import { fnv1a64Hex } from "@/lib/intelligence/case-hash";
@@ -106,7 +106,7 @@ async function aiTranslateBatch(dir: Direction, strings: string[]): Promise<Map<
  * Every non-empty input is present in the map (mapping to itself if it needs no
  * translation, is uncached and AI is off/failed).
  */
-async function translateBatch(admin: SupabaseClient, texts: string[], dir: Direction): Promise<Map<string, string>> {
+async function translateBatch(admin: DbClient, texts: string[], dir: Direction): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const unique = [...new Set(texts.map((t) => (t ?? "").trim()).filter(Boolean))];
   if (!unique.length) return out;
@@ -162,17 +162,17 @@ async function translateBatch(admin: SupabaseClient, texts: string[], dir: Direc
 }
 
 /** Kannada (or mixed) → English. Map keys are the trimmed source strings. */
-export function translateToEnglish(admin: SupabaseClient, texts: string[]): Promise<Map<string, string>> {
+export function translateToEnglish(admin: DbClient, texts: string[]): Promise<Map<string, string>> {
   return translateBatch(admin, texts, DIR_EN);
 }
 
 /** English (or mixed) → formal Kannada. Map keys are the trimmed source strings. */
-export function translateToKannada(admin: SupabaseClient, texts: string[]): Promise<Map<string, string>> {
+export function translateToKannada(admin: DbClient, texts: string[]): Promise<Map<string, string>> {
   return translateBatch(admin, texts, DIR_KN);
 }
 
 /** Convenience: translate one string to English (or return it unchanged). */
-export async function translateOne(admin: SupabaseClient, text: string | null | undefined): Promise<string> {
+export async function translateOne(admin: DbClient, text: string | null | undefined): Promise<string> {
   const t = (text ?? "").trim();
   if (!t) return "";
   const map = await translateToEnglish(admin, [t]);

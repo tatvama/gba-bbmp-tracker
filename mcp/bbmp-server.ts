@@ -2,8 +2,8 @@
  * BBMP MCP Server — exposes ward, contact, complaint, and RTI data as Claude tools.
  *
  * Transport: stdio (works with Claude Desktop, Claude Code, any MCP client).
- * Auth: Supabase service-role key (bypasses RLS — trusted server-side process).
- * Write tools use the admin client directly (no user-session needed); created_by = null.
+ * Auth: connects straight to Postgres as the app's trusted role — this is a
+ * server-side process with no end-user session. Write tools set created_by = null.
  *
  * Usage:
  *   npm run mcp:start          # from project root (loads .env automatically)
@@ -11,7 +11,7 @@
  *
  * For Claude Desktop add to ~/AppData/Roaming/Claude/claude_desktop_config.json:
  *   { "mcpServers": { "bbmp": { "command": "npx", "args": ["tsx", "D:/Tatvam/BBMP/mcp/bbmp-server.ts"],
- *     "env": { "NEXT_PUBLIC_SUPABASE_URL": "...", "SUPABASE_SERVICE_ROLE_KEY": "..." } } } }
+ *     "env": { "DB_HOST": "...", "DB_USER": "...", "DB_PASSWORD": "...", "DB_NAME": "..." } } } }
  *
  * IMPORTANT: never use console.log() here — stdout belongs to the MCP wire protocol.
  * Use console.error() for all diagnostics.
@@ -25,7 +25,8 @@ import path from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
+import { uploadBuffer } from "../lib/storage/object-store";
 import { z } from "zod";
 
 // Framework-free lib imports (no "server-only" guard — safe outside Next.js)
@@ -50,24 +51,23 @@ import type { JobAuditReport } from "../lib/forensics/job-audit";
 
 // ── Environment validation ──────────────────────────────────────────────────
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const hasDbConfig =
+  !!process.env.DATABASE_URL ||
+  !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME);
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+if (!hasDbConfig) {
   console.error(
     "[bbmp-mcp] Missing required environment variables.\n" +
-      "  NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.\n" +
+      "  Set DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME, or a single DATABASE_URL.\n" +
       "  When running from the project root, dotenv reads .env automatically.\n" +
       "  For Claude Desktop, pass them in the mcpServers.env config block.",
   );
   process.exit(1);
 }
 
-// ── Supabase admin client (bypasses RLS — service role only) ────────────────
+// ── Database client ─────────────────────────────────────────────────────────
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const db = createDbClient();
 
 // ── Shared SELECT strings (mirrored from lib/queries.ts) ────────────────────
 
@@ -147,7 +147,7 @@ server.registerTool(
       ];
       promises.push(
         (async () => {
-          const { data, error } = await supabase
+          const { data, error } = await db
             .from("wards")
             .select(
               "new_no, new_name, zone, assembly_constituency, verification_status, derived_corporation:corporations!derived_corporation_id(code,name)",
@@ -172,7 +172,7 @@ server.registerTool(
     if (all || types!.includes("contact")) {
       promises.push(
         (async () => {
-          const { data, error } = await supabase
+          const { data, error } = await db
             .from("contacts")
             .select(
               "id, full_name, designation, phone, whatsapp, email, verification_status, eng_subdivision:eng_subdivisions!eng_subdivision_id(name)",
@@ -199,7 +199,7 @@ server.registerTool(
       promises.push(
         (async () => {
           const today = new Date().toISOString().slice(0, 10);
-          const { data, error } = await supabase
+          const { data, error } = await db
             .from("complaints")
             .select(
               "id, internal_case_number, title, status, priority, next_follow_up_date, ward:wards!ward_id(new_no,new_name)",
@@ -229,7 +229,7 @@ server.registerTool(
     if (all || types!.includes("rti")) {
       promises.push(
         (async () => {
-          const { data, error } = await supabase
+          const { data, error } = await db
             .from("rti_applications")
             .select("id, internal_ref, subject, status, priority, normal_due")
             .or(`internal_ref.ilike.${like},subject.ilike.${like},public_authority.ilike.${like}`)
@@ -269,7 +269,7 @@ server.registerTool(
     },
   },
   async ({ ward_number }) => {
-    const { data: ward, error } = await supabase
+    const { data: ward, error } = await db
       .from("wards")
       .select(WARD_SELECT)
       .eq("new_no", ward_number)
@@ -283,7 +283,7 @@ server.registerTool(
     const subId = (ward as Record<string, unknown> & { eng_subdivision?: { id?: string } })
       .eng_subdivision?.id;
     if (subId) {
-      const { data } = await supabase
+      const { data } = await db
         .from("contacts")
         .select("id, full_name, designation, phone, whatsapp, email, verification_status")
         .eq("eng_subdivision_id", subId)
@@ -317,7 +317,7 @@ server.registerTool(
   async ({ zone, corporation_code, limit = 25 }) => {
     let corpId: string | null = null;
     if (corporation_code) {
-      const { data: corp } = await supabase
+      const { data: corp } = await db
         .from("corporations")
         .select("id")
         .eq("code", corporation_code)
@@ -325,7 +325,7 @@ server.registerTool(
       corpId = (corp as { id?: string } | null)?.id ?? null;
     }
 
-    let q = supabase
+    let q = db
       .from("wards")
       .select(
         "new_no, new_name, zone, assembly_constituency, verification_status, derived_corporation:corporations!derived_corporation_id(code,name)",
@@ -371,7 +371,7 @@ server.registerTool(
     },
   },
   async ({ case_id }) => {
-    const q = supabase.from("complaints").select(COMPLAINT_SELECT).is("deleted_at", null);
+    const q = db.from("complaints").select(COMPLAINT_SELECT).is("deleted_at", null);
     const { data, error } = isUuid(case_id)
       ? await q.eq("id", case_id).maybeSingle()
       : await q.eq("internal_case_number", case_id).maybeSingle();
@@ -412,7 +412,7 @@ server.registerTool(
 
     let wardId: string | null = null;
     if (ward_number) {
-      const { data: ward } = await supabase
+      const { data: ward } = await db
         .from("wards")
         .select("id")
         .eq("new_no", ward_number)
@@ -420,7 +420,7 @@ server.registerTool(
       wardId = (ward as { id?: string } | null)?.id ?? null;
     }
 
-    let q = supabase
+    let q = db
       .from("complaints")
       .select(
         "id, internal_case_number, title, status, priority, next_follow_up_date, date_submitted, latest_reply_date, latest_action_taken_date, ward:wards!ward_id(new_no,new_name), assigned_engineer:contacts!assigned_engineer_id(full_name,designation,phone)",
@@ -479,7 +479,7 @@ server.registerTool(
     },
   },
   async ({ ref }) => {
-    const q = supabase.from("rti_applications").select(RTI_SELECT);
+    const q = db.from("rti_applications").select(RTI_SELECT);
     const { data, error } = isUuid(ref)
       ? await q.eq("id", ref).maybeSingle()
       : await q.eq("internal_ref", ref).maybeSingle();
@@ -517,7 +517,7 @@ server.registerTool(
     // If filtering by deadline bucket, fetch more (bucket is computed in-process)
     const fetchLimit = deadline_bucket ? Math.min(limit * 10, 500) : limit;
 
-    let q = supabase
+    let q = db
       .from("rti_applications")
       .select(
         "id, internal_ref, subject, status, priority, is_life_liberty, normal_due, life_liberty_due, first_appeal_due, second_appeal_due, corporation:corporations!corporation_id(name)",
@@ -582,7 +582,7 @@ server.registerTool(
     const today = new Date().toISOString().slice(0, 10);
 
     async function count(table: string, modifier?: (q: any) => any): Promise<number> {
-      let q: any = supabase.from(table).select("*", { count: "exact", head: true });
+      let q: any = db.from(table).select("*", { count: "exact", head: true });
       if (modifier) q = modifier(q);
       const { count: c, error } = await q;
       logErr(`stats:${table}`, error);
@@ -622,7 +622,7 @@ server.registerTool(
     ]);
 
     // RTI overdue: in-process deadline computation
-    const { data: rtiRows } = await supabase
+    const { data: rtiRows } = await db
       .from("rti_applications")
       .select("status, is_life_liberty, normal_due, life_liberty_due, first_appeal_due, second_appeal_due");
     const now = new Date();
@@ -668,7 +668,7 @@ server.registerTool(
   async ({ corporation_code, designation, subdivision_id, limit = 20 }) => {
     let corpId: string | null = null;
     if (corporation_code) {
-      const { data: corp } = await supabase
+      const { data: corp } = await db
         .from("corporations")
         .select("id")
         .eq("code", corporation_code)
@@ -676,7 +676,7 @@ server.registerTool(
       corpId = (corp as { id?: string } | null)?.id ?? null;
     }
 
-    let q = supabase.from("contacts").select(CONTACT_SELECT).order("full_name").limit(limit);
+    let q = db.from("contacts").select(CONTACT_SELECT).order("full_name").limit(limit);
     if (designation) q = q.ilike("designation", `%${designation}%`);
     if (subdivision_id) q = q.eq("eng_subdivision_id", subdivision_id);
     if (corpId) q = q.eq("corporation_id", corpId);
@@ -716,7 +716,7 @@ server.registerTool(
     },
   },
   async ({ id }) => {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("contacts")
       .select(CONTACT_SELECT)
       .eq("id", id)
@@ -730,7 +730,7 @@ server.registerTool(
     const subId = (data as Record<string, unknown> & { eng_subdivision?: { id?: string } })
       .eng_subdivision?.id;
     if (subId) {
-      const { data: wardData } = await supabase
+      const { data: wardData } = await db
         .from("wards")
         .select("new_no, new_name, verification_status")
         .eq("eng_subdivision_id", subId)
@@ -798,7 +798,7 @@ server.registerTool(
     let divisionId: string | null = null;
 
     if (ward_number) {
-      const { data: ward } = await supabase
+      const { data: ward } = await db
         .from("wards")
         .select("id, derived_corporation_id, division_id")
         .eq("new_no", ward_number)
@@ -811,7 +811,7 @@ server.registerTool(
     }
 
     // 2. Complaint settings (case number prefix)
-    const { data: settingsRow } = await supabase
+    const { data: settingsRow } = await db
       .from("app_settings")
       .select("value")
       .eq("key", "complaint_settings")
@@ -821,7 +821,7 @@ server.registerTool(
     const year = new Date().getFullYear();
 
     // 3. Generate atomic case number (RPC param names are p_prefix / p_year)
-    const { data: caseNum, error: rpcErr } = await supabase.rpc(
+    const { data: caseNum, error: rpcErr } = await db.rpc(
       "next_complaint_case_number",
       { p_prefix: prefix, p_year: year },
     );
@@ -829,7 +829,7 @@ server.registerTool(
     if (!caseNum) return err("Failed to generate case number — check DB migration");
 
     // 4. Insert complaint
-    const { data: inserted, error: insertErr } = await supabase
+    const { data: inserted, error: insertErr } = await db
       .from("complaints")
       .insert({
         title,
@@ -852,7 +852,7 @@ server.registerTool(
     if (!inserted) return err("Failed to insert complaint");
 
     // 5. Timeline entry
-    await supabase.from("complaint_timeline").insert({
+    await db.from("complaint_timeline").insert({
       complaint_id: (inserted as Record<string, unknown>).id,
       event_type: "Created",
       description: "Case created via BBMP MCP server",
@@ -921,19 +921,21 @@ server.registerTool(
     // 3. Storage path
     const storagePath = `${complaint_id}/${Date.now()}-${slugPath(fileName)}`;
 
-    // 4. Upload to Supabase Storage
-    const { error: uploadErr } = await supabase.storage
-      .from(bucket)
-      .upload(storagePath, buffer, { contentType: mime, upsert: false });
-    logErr("upload_document:storage", uploadErr);
-    if (uploadErr) return err(`Storage upload failed: ${uploadErr.message}`);
+    // 4. Upload to object storage (R2; `bucket` is a key prefix)
+    try {
+      await uploadBuffer({ bucket, path: storagePath, body: buffer, contentType: mime });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      logErr("upload_document:storage", message);
+      return err(`Storage upload failed: ${message}`);
+    }
 
     // 5. Determine OCR status
     const isPdf = mime === "application/pdf";
     const ocrStatus = run_ocr && !isPdf ? "Queued" : "Not Started";
 
     // 6. Insert document record
-    const { data: doc, error: docErr } = await supabase
+    const { data: doc, error: docErr } = await db
       .from("complaint_documents")
       .insert({
         complaint_id,
@@ -956,7 +958,7 @@ server.registerTool(
     const docId = (doc as Record<string, unknown>).id as string;
 
     // 7. Timeline entry
-    await supabase.from("complaint_timeline").insert({
+    await db.from("complaint_timeline").insert({
       complaint_id,
       event_type: isSitePhoto ? "Photo Evidence" : "Document Uploaded",
       description: `Uploaded: ${title ?? fileName}${document_type ? ` (${document_type})` : ""}`,
@@ -1008,7 +1010,7 @@ server.registerTool(
   },
   async ({ complaint_id, status, notes, next_follow_up_date }) => {
     // 1. Fetch existing to get current status
-    const { data: existing, error: fetchErr } = await supabase
+    const { data: existing, error: fetchErr } = await db
       .from("complaints")
       .select("id, status, title")
       .eq("id", complaint_id)
@@ -1023,7 +1025,7 @@ server.registerTool(
     const updatePayload: Record<string, unknown> = { status, updated_by: null };
     if (next_follow_up_date) updatePayload.next_follow_up_date = next_follow_up_date;
 
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await db
       .from("complaints")
       .update(updatePayload)
       .eq("id", complaint_id);
@@ -1038,7 +1040,7 @@ server.registerTool(
       .filter(Boolean)
       .join(" | ");
 
-    await supabase.from("complaint_timeline").insert({
+    await db.from("complaint_timeline").insert({
       complaint_id,
       event_type: "Status Change",
       description: timelineDesc,
@@ -1096,7 +1098,7 @@ server.registerTool(
     const date = reply_date ?? new Date().toISOString().slice(0, 10);
 
     // 1. Insert reply record
-    const { error: replyErr } = await supabase.from("complaint_replies").insert({
+    const { error: replyErr } = await db.from("complaint_replies").insert({
       complaint_id,
       reply_summary: summary,
       reply_date: date,
@@ -1114,10 +1116,10 @@ server.registerTool(
     };
     if (next_follow_up_date) complaintUpdate.next_follow_up_date = next_follow_up_date;
 
-    await supabase.from("complaints").update(complaintUpdate).eq("id", complaint_id);
+    await db.from("complaints").update(complaintUpdate).eq("id", complaint_id);
 
     // 3. Timeline entry
-    await supabase.from("complaint_timeline").insert({
+    await db.from("complaint_timeline").insert({
       complaint_id,
       event_type: "Reply Received",
       description: `Reply on ${date}: ${summary.slice(0, 120)}${summary.length > 120 ? "…" : ""}`,
@@ -1161,7 +1163,7 @@ server.registerTool(
     }
     let wardName: string | null = null;
     if (ward_number) {
-      const { data: w } = await supabase.from("wards").select("new_no,new_name").eq("new_no", ward_number).maybeSingle();
+      const { data: w } = await db.from("wards").select("new_no,new_name").eq("new_no", ward_number).maybeSingle();
       const wr = w as { new_no?: number; new_name?: string } | null;
       wardName = wr ? `${wr.new_no} — ${wr.new_name}` : `Ward ${ward_number}`;
     }
@@ -1223,7 +1225,7 @@ server.registerTool(
   async ({ subject, info_requested, category, status = "Draft", priority, ward_number, public_authority, pio_name, date_filed }) => {
     let wardId: string | null = null;
     if (ward_number) {
-      const { data: w } = await supabase.from("wards").select("id").eq("new_no", ward_number).maybeSingle();
+      const { data: w } = await db.from("wards").select("id").eq("new_no", ward_number).maybeSingle();
       wardId = (w as { id?: string } | null)?.id ?? null;
     }
 
@@ -1233,7 +1235,7 @@ server.registerTool(
     );
     const internalRef = `RTI-${Date.now().toString(36).slice(-5).toUpperCase()}`;
 
-    const { data: inserted, error: insertErr } = await supabase
+    const { data: inserted, error: insertErr } = await db
       .from("rti_applications")
       .insert({
         internal_ref: internalRef,
@@ -1284,7 +1286,7 @@ server.registerTool(
     },
   },
   async ({ job_number }) => {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("job_audits")
       .select("report, risk_score, risk_band, total_exposure, finding_count, red_flag_count, doc_count, created_at")
       .eq("job_number", job_number)
@@ -1330,7 +1332,7 @@ server.registerTool(
     },
   },
   async ({ job_number, variant, language = "Kannada", signatory = "raghav_gowda", use_ai = true, persist = true }) => {
-    const { data: audit } = await supabase
+    const { data: audit } = await db
       .from("job_audits")
       .select("report, risk_score, risk_band")
       .eq("job_number", job_number)
@@ -1389,7 +1391,7 @@ server.registerTool(
     let draftId: string | null = null;
 
     if (persist) {
-      const { data: ins, error: insErr } = await supabase
+      const { data: ins, error: insErr } = await db
         .from("letter_drafts")
         .insert({
           job_number, variant, language: ctx.language, signatory_key: ctx.signatoryKey,
@@ -1430,7 +1432,7 @@ server.registerResource(
     mimeType: "application/json",
   },
   async () => {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("corporations")
       .select("code, name, name_kn, ward_count, division_count, subdivision_count")
       .order("name");
@@ -1461,7 +1463,7 @@ server.registerResource(
     mimeType: "application/json",
   },
   async () => {
-    const { data } = await supabase
+    const { data } = await db
       .from("app_settings")
       .select("value, updated_at")
       .eq("key", "rti_deadline_rules")

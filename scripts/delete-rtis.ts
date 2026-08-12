@@ -1,16 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+import { createDbClient } from "../lib/db";
 import * as dotenv from "dotenv";
 
-dotenv.config();
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+dotenv.config();
+const db = createDbClient();
 
 async function run() {
   console.log("Deleting all RTI applications...");
-  const { error: errorRtis } = await supabase
+  const { error: errorRtis } = await db
     .from("rti_applications")
     .delete()
     .neq("id", "00000000-0000-0000-0000-000000000000");
@@ -22,7 +18,7 @@ async function run() {
   }
 
   console.log("Deleting all RTI reminders / follow-ups...");
-  const { error: errorReminders } = await supabase
+  const { error: errorReminders } = await db
     .from("reminders")
     .delete()
     .eq("entity_type", "rti");
