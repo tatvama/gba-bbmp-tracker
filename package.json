@@ -28,7 +28,7 @@
     "apk:publish": "tsx --tsconfig scripts/tsconfig.pipeline.json scripts/publish-apk.ts",
     "changelog": "tsx scripts/update-changelog.ts",
     "hooks:install": "tsx scripts/install-hooks.ts",
-    "prepare": "tsx scripts/install-hooks.ts",
+    "prepare": "node -e \"const{existsSync}=require('fs');if(existsSync('scripts/install-hooks.ts'))require('child_process').execSync('tsx scripts/install-hooks.ts',{stdio:'inherit'})\"",
     "db:verify": "tsx --tsconfig scripts/tsconfig.pipeline.json scripts/verify-db-layer.ts",
     "storage:migrate-from-supabase": "tsx --tsconfig scripts/tsconfig.pipeline.json scripts/migrate-supabase-storage-to-r2.ts"
   },

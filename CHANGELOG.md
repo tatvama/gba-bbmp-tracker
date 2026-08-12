@@ -17,6 +17,10 @@ Entries are grouped by date and derived from
 
 - **db:** replace Supabase with our own PostgreSQL server
 
+### Fixes
+
+- **docker:** stop the `prepare` hook from failing `npm ci` in a container build
+
 ### Refactoring
 
 - **db:** one source of truth for the database connection
